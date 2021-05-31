@@ -1,0 +1,11 @@
+requests==2.24.0
+rpmfile==1.0.8
+paramiko==2.7.2
+backports.lzma==0.0.14
+MySQL-python
+ruamel.yaml
+subprocess32==3.5.4
+prettytable==1.0.1
+enum34==1.1.6
+progressbar==2.5
+halo==0.0.30

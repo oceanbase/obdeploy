@@ -1,0 +1,10 @@
+- src_path: ./home/admin/oceanbase/lib/libaio.so
+  target_path: libaio.so
+- src_path: ./home/admin/oceanbase/lib/libaio.so.1
+  target_path: libaio.so.1
+- src_path: ./home/admin/oceanbase/lib/libaio.so.1.0.1
+  target_path: libaio.so.1.0.1
+- src_path: ./home/admin/oceanbase/lib/libmariadb.so
+  target_path: libmariadb.so
+- src_path: ./home/admin/oceanbase/lib/libmariadb.so.3
+  target_path: libmariadb.so.3

@@ -1,0 +1,9 @@
+nohup.out
+*.pyc
+*.pyo
+build
+dist
+.vscode
+.git
+__pycache__
+.idea/workspace.xml

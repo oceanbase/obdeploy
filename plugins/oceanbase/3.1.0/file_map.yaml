@@ -1,0 +1,4 @@
+- src_path: ./home/admin/oceanbase/bin/observer 
+  target_path: bin/observer
+  type: bin
+  mode: 755

@@ -1,0 +1,9 @@
+rpmfile==1.0.8
+paramiko==2.7.2
+requests==2.25.1
+PyMySQL==1.0.2
+ruamel.yaml
+subprocess32==3.5.4
+prettytable==2.1.0
+progressbar==2.5
+halo==0.0.31

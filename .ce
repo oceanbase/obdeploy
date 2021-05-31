@@ -1,0 +1,8 @@
+# remove spec
+rm -f ob-deploy.spec
+
+# push to oceanbase-ce-publish/obdeploy
+rm -rf .git && git init
+git remote add origin git@gitlab.alibaba-inc.com:oceanbase-ce-publish/obdeploy
+git add -f . && git commit -m "init push"
+git push -f origin master

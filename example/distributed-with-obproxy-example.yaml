@@ -1,0 +1,50 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+oceanbase-ce:
+  servers:
+    - name: z1
+      # Please don't use hostname, only IP can be supported
+      ip: 172.19.33.2
+    - name: z2
+      ip: 172.19.33.3
+    - name: z3
+      ip: 172.19.33.4
+  global:
+    # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
+    # if set severs as "127.0.0.1", please set devname as "lo"
+    # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
+    devname: eth0
+    # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
+    memory_limit: 64G
+    datafile_disk_percentage: 20
+    cluster_id: 1
+  # In this example , support multiple ob process in single node, so different process use different ports.
+  # If deploy ob cluster in multiple nodes, the port and path setting can be same. 
+  z1:
+    mysql_port: 2883
+    rpc_port: 2882
+    home_path: /root/observer
+    zone: zone1
+  z2:
+    mysql_port: 2883
+    rpc_port: 2882
+    home_path: /root/observer
+    zone: zone2
+  z3:
+    mysql_port: 2883
+    rpc_port: 2882
+    home_path: /root/observer
+    zone: zone3
+obproxy:
+  servers:
+    - 192.168.1.5
+  global:
+    listen_port: 2883
+    home_path: /root/obproxy
+    # oceanbase root server list
+    # format: ip:mysql_port,ip:mysql_port
+    rs_list: 192.168.1.2:2883;192.168.1.3:2883;192.168.1.4:2883
+    enable_cluster_checkout: false
