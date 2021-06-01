@@ -34,7 +34,7 @@
 
   ```shell
   sudo yum install -y yum-utils
-  sudo yum-config-manager --add-repo http://yum.tbsite.net/mirrors/oceanbase/OceanBase.repo
+  sudo yum-config-manager --add-repo https://mirrors.aliyun.com/oceanbase/OceanBase.repo
   sudo yum install -y ob-deploy
   source /etc/profile.d/obd.sh
   ```
