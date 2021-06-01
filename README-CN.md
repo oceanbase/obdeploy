@@ -44,6 +44,7 @@
   使用源码安装 OBD 之前，请确认您已安装以下依赖：
 
   - gcc
+  - wget
   - python-devel
   - openssl-devel
   - xz-devel
