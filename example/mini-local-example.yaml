@@ -8,11 +8,10 @@ oceanbase-ce:
     # if set severs as "127.0.0.1", please set devname as "lo"
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: lo
-    mysql_port: 2883
+    mysql_port: 2881
     rpc_port: 2882
     zone: zone1
     cluster_id: 1
-    datafile_size: 8G
     # please set memory limit to a suitable value which is matching resource. 
     memory_limit: 8G
     system_memory: 4G
@@ -29,3 +28,6 @@ oceanbase-ce:
     enable_separate_sys_clog: 0
     enable_merge_by_turn: FALSE
     datafile_disk_percentage: 20
+    syslog_level: INFO
+    enable_syslog_recycle: true
+    max_syslog_file_count: 4
