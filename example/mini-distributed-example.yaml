@@ -3,6 +3,8 @@
 #   username: your username
 #   password: your password if need
 #   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
   servers:
     - name: z1
@@ -18,7 +20,6 @@ oceanbase-ce:
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: eth0
     cluster_id: 1
-    datafile_size: 8G
     # please set memory limit to a suitable value which is matching resource. 
     memory_limit: 8G
     system_memory: 4G
@@ -35,18 +36,21 @@ oceanbase-ce:
     enable_separate_sys_clog: 0
     enable_merge_by_turn: FALSE
     datafile_disk_percentage: 20
+    syslog_level: INFO
+    enable_syslog_recycle: true
+    max_syslog_file_count: 4
   z1:
-    mysql_port: 2883
+    mysql_port: 2881
     rpc_port: 2882
     home_path: /root/observer
     zone: zone1
   z2:
-    mysql_port: 2883
+    mysql_port: 2881
     rpc_port: 2882
     home_path: /root/observer
     zone: zone2
   z3:
-    mysql_port: 2883
+    mysql_port: 2881
     rpc_port: 2882
     home_path: /root/observer
     zone: zone3

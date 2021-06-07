@@ -8,10 +8,13 @@ oceanbase-ce:
     # if set severs as "127.0.0.1", please set devname as "lo"
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: lo
-    mysql_port: 2883
+    mysql_port: 2881
     rpc_port: 2882
     zone: zone1
     # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
     memory_limit: 64G
     datafile_disk_percentage: 20
+    syslog_level: INFO
+    enable_syslog_recycle: true
+    max_syslog_file_count: 4
     cluster_id: 1

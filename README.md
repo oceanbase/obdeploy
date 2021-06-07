@@ -71,7 +71,7 @@
 在此之前您需要确认以下信息：
 
 - 当前用户为 root。
-- `2882` 和 `2883` 端口没有被占用。
+- `2881` 和 `2882` 端口没有被占用。
 - 您的机器内存应该不低于 8G。
 - 您的机器 CPU 数目应该不低于 2。
 
@@ -81,7 +81,7 @@
 obd cluster deploy c1 -c ./example/mini-local-example.yaml
 obd cluster start c1
 # 使用 mysql 客户端链接到到 OceanBase 数据库。
-mysql -h127.1 -uroot -P2883
+mysql -h127.1 -uroot -P2881
 ```
 
 ## 使用 OBD 启动 OceanBase 数据库集群
