@@ -152,7 +152,7 @@ obd cluster start lo
 # 参看obd管理的集群列表
 obd cluster list
 # 查看 lo 集群状态
-obd cluster disply lo
+obd cluster display lo
 ```
 
 ### 第 4 步. 修改配置
