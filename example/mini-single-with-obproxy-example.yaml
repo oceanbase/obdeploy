@@ -45,6 +45,7 @@ obproxy:
     - 192.168.1.2
   global:
     listen_port: 2883
+    prometheus_listen_port: 2884
     home_path: /root/obproxy
     # oceanbase root server list
     # format: ip:mysql_port,ip:mysql_port
