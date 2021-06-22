@@ -19,6 +19,7 @@ oceanbase-ce:
     rpc_port: 2882
     zone: zone1
     cluster_id: 1
+    datafile_size: 8G
     # please set memory limit to a suitable value which is matching resource. 
     memory_limit: 8G
     system_memory: 4G
@@ -38,3 +39,4 @@ oceanbase-ce:
     syslog_level: INFO
     enable_syslog_recycle: true
     max_syslog_file_count: 4
+    root_password: # root user password, can be empty

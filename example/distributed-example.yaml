@@ -3,8 +3,6 @@
 #   username: your username
 #   password: your password if need
 #   key_file: your ssh-key file path if need
-#   port: your ssh port, default 22
-#   timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
   servers:
     - name: z1
@@ -26,6 +24,7 @@ oceanbase-ce:
     enable_syslog_recycle: true
     max_syslog_file_count: 4
     cluster_id: 1
+    root_password: # root user password
   # In this example , support multiple ob process in single node, so different process use different ports.
   # If deploy ob cluster in multiple nodes, the port and path setting can be same. 
   z1:

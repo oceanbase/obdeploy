@@ -25,3 +25,4 @@ oceanbase-ce:
     enable_syslog_recycle: true
     max_syslog_file_count: 4
     cluster_id: 1
+    root_password: # root user password, can be empty
