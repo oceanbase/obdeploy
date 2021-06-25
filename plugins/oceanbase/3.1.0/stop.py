@@ -37,7 +37,7 @@ def config_url(ocp_config_server, appname, cid):
 
 def get_port_socket_inode(client, port):
     port = hex(port)[2:].zfill(4).upper()
-    cmd = "cat  /proc/net/{tcp,udp} | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+    cmd = "bash -c 'cat /proc/net/{tcp,udp}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
         return False
@@ -86,16 +86,17 @@ def stop(plugin_context, *args, **kwargs):
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid and client.execute_command('ps uax | egrep " %s " | grep -v grep' % remote_pid):
             stdio.verbose('%s observer[pid:%s] stopping ...' % (server, remote_pid))
-            client.execute_command('kill -9 -%s; rm -f %s' % (remote_pid, remote_pid_path))
+            client.execute_command('kill -9 %s' % (remote_pid))
             servers[server] = {
                 'client': client,
                 'mysql_port': server_config['mysql_port'],
                 'rpc_port': server_config['rpc_port'],
-                'pid': remote_pid
+                'pid': remote_pid,
+                'path': remote_pid_path
             }
         else:
             stdio.verbose('%s observer is not running ...' % server)
-    count = 10
+    count = 30
     check = lambda client, pid, port: confirm_port(client, pid, port) if count < 5 else get_port_socket_inode(client, port)
     time.sleep(1)
     while count and servers:
@@ -109,6 +110,7 @@ def stop(plugin_context, *args, **kwargs):
                     break
                 data[key] = ''
             else:
+                client.execute_command('rm -f %s' % (data['path']))
                 stdio.verbose('%s observer is stopped', server)
         servers = tmp_servers
         count -= 1

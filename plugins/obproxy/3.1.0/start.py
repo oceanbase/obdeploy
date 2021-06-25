@@ -29,7 +29,7 @@ stdio = None
 
 def get_port_socket_inode(client, port):
     port = hex(port)[2:].zfill(4).upper()
-    cmd = "cat  /proc/net/{tcp,udp} | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+    cmd = "bash -c 'cat /proc/net/{tcp,udp}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
         return False
@@ -77,7 +77,7 @@ def is_started(client, remote_bin_path, port, home_path, command):
         return False
     return confirm_home_path(client, pid, home_path) and confirm_command(client, pid, command)
 
-def start(plugin_context, home_path, repository_dir, *args, **kwargs):
+def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     global stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -99,11 +99,14 @@ def start(plugin_context, home_path, repository_dir, *args, **kwargs):
     if error:
         return plugin_context.return_false()
 
+    servers_remote_home_path = {}
     stdio.start_loading('Start obproxy')
     for server in cluster_config.servers:
         client = clients[server]
         remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
-        remote_bin_path[server] = bin_path.replace(home_path, remote_home_path)
+        servers_remote_home_path[server] = remote_home_path
+        remote_bin_path[server] = bin_path.replace(local_home_path, remote_home_path)
+
         server_config = cluster_config.get_server_conf(server)
         pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (server_config['home_path'], server.ip, server_config["listen_port"])
 
@@ -113,10 +116,11 @@ def start(plugin_context, home_path, repository_dir, *args, **kwargs):
             'rs_list',
             'cluster_name'
         ]
+        start_unuse = ['home_path', 'observer_sys_password', 'obproxy_sys_password']
         get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
         opt_str = []
         for key in server_config:
-            if key != 'home_path' and key not in not_opt_str:
+            if key not in start_unuse and key not in not_opt_str:
                 value = get_value(key)
                 opt_str.append('%s=%s' % (key, value))
         cmd = ['-o %s' % ','.join(opt_str)]
@@ -138,14 +142,17 @@ def start(plugin_context, home_path, repository_dir, *args, **kwargs):
         if remote_pid:
             ret = client.execute_command('cat /proc/%s/cmdline' % remote_pid)
             if ret:
-                if ret.stdout.strip() == cmd:
+                if ret.stdout.replace('\0', '') == cmd.strip().replace(' ', ''):
                     continue
                 stdio.stop_loading('fail')
                 stdio.error('%s:%s port is already used' % (server.ip, port))
                 return plugin_context.return_false()
 
         stdio.verbose('starting %s obproxy', server)
+        remote_repository_path = repository_dir.replace(local_home_path, remote_home_path)
+        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % remote_repository_path, True)
         ret = client.execute_command(clusters_cmd[server])
+        client.add_env('LD_LIBRARY_PATH', '', True)
         if not ret:
             stdio.stop_loading('fail')
             stdio.error('failed to start %s obproxy: %s' % (server, ret.stderr))

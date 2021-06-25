@@ -94,6 +94,7 @@ class ClusterConfig(object):
         self.version = version
         self.tag = tag
         self.name = name
+        self.origin_package_hash = package_hash
         self.package_hash = package_hash
         self._temp_conf = {}
         self._default_conf = {}

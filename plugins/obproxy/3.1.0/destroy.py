@@ -28,7 +28,7 @@ def destroy(plugin_context, *args, **kwargs):
         if not ret:
             # pring stderror
             global_ret = False
-            stdio.warn('fail to clean %s:%s', (server, path))
+            stdio.warn('fail to clean %s:%s' % (server, path))
         else:
             stdio.verbose('%s:%s cleaned' % (server, path))
     cluster_config = plugin_context.cluster_config
@@ -38,7 +38,7 @@ def destroy(plugin_context, *args, **kwargs):
     stdio.start_loading('obproxy work dir cleaning')
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
-        stdio.verbose('%s work path cleaning', server)
+        stdio.verbose('%s work path cleaning' % server)
         clean(server, server_config['home_path'])
     if global_ret:
         stdio.stop_loading('succeed')

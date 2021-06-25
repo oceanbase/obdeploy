@@ -28,17 +28,23 @@ else:
     import pymysql as mysql
 
 
-def _connect(ip, port):
+stdio = None
+
+
+def _connect(ip, port, password=''):
+    user = 'root'
+    stdio.verbose('connect %s -P%s -u%s -p%s' % (ip, port, user, password))
     if sys.version_info.major == 2:
-        db = mysql.connect(host=ip, user='root', port=port)
+        db = mysql.connect(host=ip, user=user, port=int(port), passwd=str(password))
         cursor = db.cursor(cursorclass=mysql.cursors.DictCursor)
     else:
-        db = mysql.connect(host=ip, user='root', port=port, cursorclass=mysql.cursors.DictCursor)
+        db = mysql.connect(host=ip, user=user, port=int(port), password=str(password), cursorclass=mysql.cursors.DictCursor)
         cursor = db.cursor()
     return db, cursor
 
 
 def connect(plugin_context, target_server=None, *args, **kwargs):
+    global stdio
     count = 10
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
@@ -54,7 +60,8 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         for server in servers:
             try:
                 server_config = cluster_config.get_server_conf(server)
-                db, cursor = _connect(server.ip, server_config['mysql_port'])
+                password = server_config.get('root_password', '') if count % 2 else ''
+                db, cursor = _connect(server.ip, server_config['mysql_port'], password)
                 stdio.stop_loading('succeed')
                 return plugin_context.return_true(connect=db, cursor=cursor)
             except:

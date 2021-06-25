@@ -26,22 +26,23 @@ from prettytable import PrettyTable
 
 
 def display(plugin_context, cursor, *args, **kwargs):
-    count = 10
     stdio = plugin_context.stdio
     stdio.start_loading('Wait for observer init')
-    while count > 0:
-        try:
-            cursor.execute('select * from oceanbase.__all_server')
-            servers = cursor.fetchall()
-            if servers:
-                stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'], 
-                    lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title='observer')
-                stdio.stop_loading('succeed')
-                return plugin_context.return_true()
-        except Exception as e:
-            if e.args[0] != 1146:
-                raise e
-            count -= 1
-            time.sleep(3)
-    stdio.stop_loading('fail', 'observer need bootstarp')
+    try:
+        while True:
+            try:
+                cursor.execute('select * from oceanbase.__all_server')
+                servers = cursor.fetchall()
+                if servers:
+                    stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'], 
+                        lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title='observer')
+                    stdio.stop_loading('succeed')
+                    return plugin_context.return_true()
+            except Exception as e:
+                if e.args[0] != 1146:
+                    raise e
+                time.sleep(3)
+    except:
+        stdio.stop_loading('fail', 'observer need bootstarp')
+        stdio.exception('')
     plugin_context.return_false()

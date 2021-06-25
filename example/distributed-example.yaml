@@ -3,6 +3,8 @@
 #   username: your username
 #   password: your password if need
 #   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
   servers:
     - name: z1
