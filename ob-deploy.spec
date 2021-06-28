@@ -98,11 +98,11 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
-* Mon jun 28 2021 obd 1.0.1
+* Mon Jun 28 2021 obd 1.0.1
  - support configuration password
  - Multi-level checks before start
  - new features: obd cluster upgrade
  - new features: obd update
  - cancel the timeout limit for waiting for the cluster to initialize
  - new configuration item for store log
- - support SUSE，Ubuntu etc.
+ - support SUSE, Ubuntu etc.
