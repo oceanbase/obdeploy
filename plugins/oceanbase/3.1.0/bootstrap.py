@@ -55,13 +55,19 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
             sql = 'grant select on oceanbase.* to proxyro IDENTIFIED BY "%s"' % value
             stdio.verbose(sql)
             cursor.execute(sql)
+        if global_conf.get('root_password'):
+            sql = 'alter user "root" IDENTIFIED BY "%s"' % global_conf.get('root_password')
+            stdio.verbose('execute sql: %s' % sql)
+            cursor.execute(sql)
         stdio.stop_loading('succeed')
         plugin_context.return_true()
     except:
         stdio.exception('')
         try:
-            cursor.execute('select * from oceanbase.__all_server')
-            servers = cursor.fetchall()
+            cursor.execute('select * from oceanbase.__all_rootservice_event_history where module = "bootstrap" and event = "bootstrap_succeed"')
+            event = cursor.fetchall()
+            if not event:
+                raise Exception('Not found bootstrap_succeed event')
             stdio.stop_loading('succeed')
             plugin_context.return_true()
         except:

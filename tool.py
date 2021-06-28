@@ -27,8 +27,9 @@ import sys
 import stat
 import gzip
 import shutil
+from ssh import LocalClient
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLContextManager, representer
 
 if sys.version_info.major == 2:
     from backports import lzma
@@ -154,14 +155,14 @@ class DirectoryUtil(object):
             elif os.path.isdir(src_name):
                 ret = DirectoryUtil.copy(src_name, dst_name, stdio) and ret
             else:
-                FileUtil.copy(src_name, dst_name)
+                FileUtil.copy(src_name, dst_name, stdio)
         for link_dest, dst_name in links:
-            DirectoryUtil.rm(dst_name, stdio)
-            os.symlink(link_dest, dst_name)
+            FileUtil.symlink(link_dest, dst_name, stdio)
         return ret
 
     @staticmethod
     def mkdir(path, mode=0o755, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('mkdir %s' % path)
         try:
             os.makedirs(path, mode=mode)
             return True
@@ -180,6 +181,7 @@ class DirectoryUtil(object):
 
     @staticmethod
     def rm(path, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('rm %s' % path)
         try:
             if os.path.exists(path):
                 if os.path.islink(path):
@@ -209,6 +211,7 @@ class FileUtil(object):
 
     @staticmethod
     def copy(src, dst, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('copy %s %s' % (src, dst))
         if os.path.exists(src) and os.path.exists(dst) and os.path.samefile(src, dst):
             info = "`%s` and `%s` are the same file" % (src, dst)
             if stdio:
@@ -233,21 +236,39 @@ class FileUtil(object):
         
         try:
             if os.path.islink(src):
-                os.symlink(os.readlink(src), dst)
+                FileUtil.symlink(os.readlink(src), dst)
                 return True
-            with FileUtil.open(src, 'rb') as fsrc:
-                with FileUtil.open(dst, 'wb') as fdst:
+            with FileUtil.open(src, 'rb') as fsrc, FileUtil.open(dst, 'wb') as fdst:
                     FileUtil.copy_fileobj(fsrc, fdst)
+                    os.chmod(dst, os.stat(src).st_mode)
                     return True
         except Exception as e:
-            if stdio:
+            if int(getattr(e, 'errno', -1)) == 26:
+                if LocalClient.execute_command('/usr/bin/cp -f %s %s' % (src, dst), stdio=stdio):
+                    return True
+            elif stdio:
                 getattr(stdio, 'exception', print)('copy error')
             else:
                 raise e
         return False
 
     @staticmethod
+    def symlink(src, dst, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('link %s %s' % (src, dst))
+        try:
+            if DirectoryUtil.rm(dst, stdio):
+                os.symlink(src, dst)
+                return True
+        except Exception as e:
+            if stdio:
+                getattr(stdio, 'exception', print)('link error')
+            else:
+                raise e
+        return False
+
+    @staticmethod
     def open(path, _type='r', stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('open %s for %s' % (path, _type))
         if os.path.exists(path):
             if os.path.isfile(path):
                 return open(path, _type)
@@ -269,6 +290,7 @@ class FileUtil(object):
 
     @staticmethod
     def unzip(source, ztype=None, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('unzip %s' % source)
         if not ztype:
             ztype = source.split('.')[-1]
         try:
@@ -287,6 +309,7 @@ class FileUtil(object):
 
     @staticmethod
     def rm(path, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('rm %s' % path)
         if not os.path.exists(path):
             return True
         try:
@@ -306,6 +329,8 @@ class YamlLoader(YAML):
     def __init__(self, stdio=None, typ=None, pure=False, output=None, plug_ins=None):
         super(YamlLoader, self).__init__(typ=typ, pure=pure, output=output, plug_ins=plug_ins)
         self.stdio = stdio
+        if not self.Representer.yaml_multi_representers and self.Representer.yaml_representers:
+            self.Representer.yaml_multi_representers = self.Representer.yaml_representers
     
     def load(self, stream):
         try:

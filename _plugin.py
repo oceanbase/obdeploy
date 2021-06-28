@@ -27,6 +27,7 @@ from glob import glob
 from copy import deepcopy
 
 from _manager import Manager
+from _rpm import Version
 from tool import ConfigUtil, DynamicLoading, YamlLoader
 
 
@@ -51,10 +52,10 @@ class Plugin(object):
             raise NotImplementedError
         self.component_name = component_name
         self.plugin_path = plugin_path
-        self.version = version.split('.')
+        self.version = Version(version)
 
     def __str__(self):
-        return '%s-%s-%s' % (self.component_name, self.PLUGIN_TYPE.name.lower(), '.'.join(self.version))
+        return '%s-%s-%s' % (self.component_name, self.PLUGIN_TYPE.name.lower(), self.version)
 
     @property
     def mirror_type(self):
@@ -327,12 +328,18 @@ class ParamPlugin(Plugin):
 
 class InstallPlugin(Plugin):
 
+    class FileItemType(Enum):
+
+        FILE = 0
+        DIR = 1
+        BIN = 2
+
     class FileItem(object):
 
         def __init__(self, src_path, target_path, _type):
             self.src_path = src_path
             self.target_path = target_path
-            self.type = _type if _type else 'file'
+            self.type = _type if _type else InstallPlugin.FileItemType.FILE
 
     PLUGIN_TYPE = PluginType.INSTALL
     FILES_MAP_YAML = 'file_map.yaml'
@@ -357,7 +364,7 @@ class InstallPlugin(Plugin):
                         self._file_map[k] = InstallPlugin.FileItem(
                             k,
                             ConfigUtil.get_value_from_dict(data, 'target_path', k),
-                            ConfigUtil.get_value_from_dict(data, 'type', None)
+                            getattr(InstallPlugin.FileItemType, ConfigUtil.get_value_from_dict(data, 'type', 'FILE').upper(), None)
                         )
             except:
                 pass
@@ -366,6 +373,7 @@ class InstallPlugin(Plugin):
     def file_list(self):
         file_map = self.file_map
         return [file_map[k] for k in file_map]
+
 
 
 
@@ -400,7 +408,7 @@ class ComponentPluginLoader(object):
         return plugins
 
     def get_best_plugin(self, version):
-        version = version.split('.')
+        version = Version(version)
         plugins = []
         for plugin in self.get_plugins():
             if plugin.version == version:

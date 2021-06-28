@@ -30,6 +30,7 @@ import string
 import requests
 from glob import glob
 from enum import Enum
+from copy import deepcopy
 from xml.etree import cElementTree
 try:
     from ConfigParser import ConfigParser
@@ -37,7 +38,7 @@ except:
     from configparser import ConfigParser
 
 from _arch import getArchList, getBaseArch
-from _rpm import Package
+from _rpm import Package, PackageInfo
 from tool import ConfigUtil, FileUtil
 from _manager import Manager
 
@@ -45,17 +46,31 @@ from _manager import Manager
 _KEYCRE = re.compile(r"\$(\w+)")
 _ARCH = getArchList()
 _RELEASE = None
-for path in glob('/etc/*-release'):
-    with FileUtil.open(path) as f:
-        info = f.read()
-        m = re.search('VERSION_ID="(\d+)', info)
-        if m:
-            _RELEASE = m.group(1)
-            break
+SUP_MAP = {
+    'ubuntu': (([16], 7), ),
+    'debian': (([9], 7), ),
+    'opensuse-leap': (([15], 7), ),
+    'sles': (([15, 2], 7), ),
+    'fedora': (([33], 7), ),
+}
 _SERVER_VARS = {
     'basearch': getBaseArch(),
-    'releasever': _RELEASE
 }
+with FileUtil.open('/etc/os-release') as f:
+    for line in f.readlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            k, v = line.split('=', 1)
+            _SERVER_VARS[k] = v.strip('"').strip("'")
+        except:
+            pass
+    if 'VERSION_ID' in _SERVER_VARS:
+        m = re.match('\d+', _SERVER_VARS['VERSION_ID'])
+        if m:
+            _RELEASE = m.group(0)
+_SERVER_VARS['releasever'] = _RELEASE
 
 
 
@@ -107,23 +122,24 @@ class MirrorRepository(object):
 
 
 class RemoteMirrorRepository(MirrorRepository):
-    class RemotePackageInfo(object):
+    class RemotePackageInfo(PackageInfo):
 
         def __init__(self, elem):
-            self.name = None
-            self.arch = None
             self.epoch = None
-            self.release = None
-            self.version = None
             self.location = (None, None)
             self.checksum = (None,None) # type,value
             self.openchecksum = (None,None) # type,value
             self.time = (None, None)
+            super(RemoteMirrorRepository.RemotePackageInfo, self).__init__(None, None, None, None, None)
             self._parser(elem)
 
         @property
         def md5(self):
             return self.checksum[1]
+
+        @md5.setter
+        def md5(self, value):
+            self.checksum = (self.checksum[0], value)
 
         def __str__(self):
             url = self.location[1]
@@ -152,13 +168,13 @@ class RemoteMirrorRepository(MirrorRepository):
 
                 elif child_name == 'version':
                     self.epoch = child.attrib.get('epoch')
-                    self.version = child.attrib.get('ver')
-                    self.release = child.attrib.get('rel')
+                    self.set_version(child.attrib.get('ver'))
+                    self.set_release(child.attrib.get('rel'))
 
                 elif child_name == 'time':
                     build = child.attrib.get('build')
                     _file = child.attrib.get('file')
-                    self.location = (_file, build)
+                    self.time = (int(_file), int(build))
                     
                 elif child_name == 'arch':
                     self.arch = child.text
@@ -227,13 +243,13 @@ class RemoteMirrorRepository(MirrorRepository):
         self._db = None
         self._repomds = None
         super(RemoteMirrorRepository, self).__init__(mirror_path, stdio=stdio)
-        self.baseurl = self.var_replace(meta_data['baseurl'], _SERVER_VARS)
+        self.baseurl = meta_data['baseurl']
         self.gpgcheck = ConfigUtil.get_value_from_dict(meta_data, 'gpgcheck', 0, int) > 0
         self.priority = 100 - ConfigUtil.get_value_from_dict(meta_data, 'priority', 99, int)
         if os.path.exists(mirror_path):
             self._load_repo_age()
         repo_age = ConfigUtil.get_value_from_dict(meta_data, 'repo_age', 0, int)
-        if repo_age > self.repo_age:
+        if repo_age > self.repo_age or int(time.time()) - 86400 > self.repo_age:
             self.repo_age = repo_age
             self.update_mirror()
 
@@ -373,7 +389,7 @@ class RemoteMirrorRepository(MirrorRepository):
         file_name = pkg_info.location[1]
         file_path = os.path.join(self.mirror_path, file_name)
         self.stdio and getattr(self.stdio, 'verbose', print)('get RPM package by %s' % pkg_info)
-        if not os.path.exists(file_path) or os.stat(file_path)[8] < self.repo_age:
+        if not os.path.exists(file_path) or os.stat(file_path)[8] < pkg_info.time[1]:
             base_url = pkg_info.location[0] if pkg_info.location[0] else self.baseurl
             url = '%s/%s' % (base_url, pkg_info.location[1])
             if not self.download_file(url, file_path, self.stdio):
@@ -383,7 +399,7 @@ class RemoteMirrorRepository(MirrorRepository):
     def get_pkgs_info(self, **pattern):
         matchs = self.get_pkgs_info_with_score(**pattern)
         if matchs:
-            return [info for info in sorted(matchs, key=lambda x: x[1], reversed=True)]
+            return [info for info in sorted(matchs, key=lambda x: x[1], reverse=True)]
         return matchs
 
     def get_best_pkg_info(self, **pattern):
@@ -393,19 +409,22 @@ class RemoteMirrorRepository(MirrorRepository):
         return None
 
     def get_exact_pkg_info(self, **pattern):
-        self.stdio and getattr(self.stdio, 'verbose', print)('check md5 in pattern or not')
         if 'md5' in pattern and pattern['md5']:
+            self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
             return self.db[pattern['md5']] if pattern['md5'] in self.db else None
-        self.stdio and getattr(self.stdio, 'verbose', print)('check name in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
+            self.stdio and getattr(self.stdio, 'verbose', print)('name is None')
             return None
         name = pattern['name']
-        self.stdio and getattr(self.stdio, 'verbose', print)('check arch in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('name is %s' % name)
         arch = getArchList(pattern['arch']) if 'arch' in pattern and pattern['arch'] else _ARCH
-        self.stdio and getattr(self.stdio, 'verbose', print)('check release in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % arch)
         release = pattern['release'] if 'release' in pattern else None
-        self.stdio and getattr(self.stdio, 'verbose', print)('check version in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('release is %s' % release)
         version = pattern['version'] if 'version' in pattern else None
+        self.stdio and getattr(self.stdio, 'verbose', print)('version is %s' % version)
+        pkgs = []
         for key in self.db:
             info = self.db[key]
             if info.name != name:
@@ -416,25 +435,33 @@ class RemoteMirrorRepository(MirrorRepository):
                 continue
             if version and version != info.version:
                 continue
-            return info
-        return None
+            pkgs.append(info)
+        if pkgs:
+            pkgs.sort()
+            return pkgs[-1]
+        else:
+            return None
 
     def get_pkgs_info_with_score(self, **pattern):
         matchs = []
-        self.stdio and getattr(self.stdio, 'verbose', print)('check md5 in pattern or not')
         if 'md5' in pattern and pattern['md5']:
+            self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
             return [self.db[pattern['md5']], (0xfffffffff, )] if pattern['md5'] in self.db else matchs
-        self.stdio and getattr(self.stdio, 'verbose', print)('check name in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
+            self.stdio and getattr(self.stdio, 'verbose', print)('name is None')
             return matchs
-        self.stdio and getattr(self.stdio, 'verbose', print)('check arch in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('name is %s' % pattern['name'])
         if 'arch' in pattern and pattern['arch']:
             pattern['arch'] = getArchList(pattern['arch'])
         else:
             pattern['arch'] = _ARCH
-        self.stdio and getattr(self.stdio, 'verbose', print)('check version in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % pattern['arch'])
         if 'version' in pattern and pattern['version']:
             pattern['version'] += '.'
+        else:
+            pattern['version'] = None
+        self.stdio and getattr(self.stdio, 'verbose', print)('version is %s' % pattern['version'])
         for key in self.db:
             info = self.db[key]
             if pattern['name'] in info.name:
@@ -448,8 +475,7 @@ class RemoteMirrorRepository(MirrorRepository):
         if version and info_version.find(version) != 0:
             return [0 ,]
             
-        c = info.version.split('.')
-        c.insert(0, len(name) / len(info.name))
+        c = [len(name) / len(info.name), info]
         return c
 
     @staticmethod
@@ -524,6 +550,7 @@ class LocalMirrorRepository(MirrorRepository):
                         continue
                     self.db[key] = data
         except:
+            self.stdio.exception('')
             pass
 
     def _dump_db(self):
@@ -533,6 +560,7 @@ class LocalMirrorRepository(MirrorRepository):
                 pickle.dump(self.db, f)
             return True
         except:
+            self.stdio.exception('')
             pass
         return False
 
@@ -587,7 +615,7 @@ class LocalMirrorRepository(MirrorRepository):
     def get_pkgs_info(self, **pattern):
         matchs = self.get_pkgs_info_with_score(**pattern)
         if matchs:
-            return [info for info in sorted(matchs, key=lambda x: x[1], reversed=True)]
+            return [info for info in sorted(matchs, key=lambda x: x[1], reverse=True)]
         return matchs
 
     def get_best_pkg_info(self, **pattern):
@@ -597,19 +625,22 @@ class LocalMirrorRepository(MirrorRepository):
         return None
 
     def get_exact_pkg_info(self, **pattern):
-        self.stdio and getattr(self.stdio, 'verbose', print)('check md5 in pattern or not')
         if 'md5' in pattern and pattern['md5']:
+            self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
             return self.db[pattern['md5']] if pattern['md5'] in self.db else None
-        self.stdio and getattr(self.stdio, 'verbose', print)('check name in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
+            self.stdio and getattr(self.stdio, 'verbose', print)('name is None')
             return None
         name = pattern['name']
-        self.stdio and getattr(self.stdio, 'verbose', print)('check arch in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('name is %s' % name)
         arch = getArchList(pattern['arch']) if 'arch' in pattern and pattern['arch'] else _ARCH
-        self.stdio and getattr(self.stdio, 'verbose', print)('check release in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % arch)
         release = pattern['release'] if 'release' in pattern else None
-        self.stdio and getattr(self.stdio, 'verbose', print)('check version in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('release is %s' % release)
         version = pattern['version'] if 'version' in pattern else None
+        self.stdio and getattr(self.stdio, 'verbose', print)('version is %s' % version)
+        pkgs = []
         for key in self.db:
             info = self.db[key]
             if info.name != name:
@@ -620,8 +651,12 @@ class LocalMirrorRepository(MirrorRepository):
                 continue
             if version and version != info.version:
                 continue
-            return info
-        return None
+            pkgs.append(info)
+        if pkgs:
+            pkgs.sort()
+            return pkgs[-1]
+        else:
+            return None
 
     def get_best_pkg_info_with_score(self, **pattern):
         matchs = self.get_pkgs_info_with_score(**pattern)
@@ -631,20 +666,23 @@ class LocalMirrorRepository(MirrorRepository):
 
     def get_pkgs_info_with_score(self, **pattern):
         matchs = []
-        self.stdio and getattr(self.stdio, 'verbose', print)('check md5 in pattern or not')
         if 'md5' in pattern and pattern['md5']:
+            self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
             return [self.db[pattern['md5']], (0xfffffffff, )] if pattern['md5'] in self.db else matchs
-        self.stdio and getattr(self.stdio, 'verbose', print)('check name in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
             return matchs
-        self.stdio and getattr(self.stdio, 'verbose', print)('check arch in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('name is %s' % pattern['name'])
         if 'arch' in pattern and pattern['arch']:
             pattern['arch'] = getArchList(pattern['arch'])
         else:
             pattern['arch'] = _ARCH
-        self.stdio and getattr(self.stdio, 'verbose', print)('check version in pattern or not')
+        self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % pattern['arch'])
         if 'version' in pattern and pattern['version']:
             pattern['version'] += '.'
+        else:
+            pattern['version'] = None
+        self.stdio and getattr(self.stdio, 'verbose', print)('version is %s' % pattern['version'])
         for key in self.db:
             info = self.db[key]
             if pattern['name'] in info.name:
@@ -658,8 +696,7 @@ class LocalMirrorRepository(MirrorRepository):
         if version and info_version.find(version) != 0:
             return [0 ,]
             
-        c = info.version.split('.')
-        c.insert(0, len(name) / len(info.name))
+        c = [len(name) / len(info.name), info]
         return c
 
     def get_info_list(self):
@@ -685,6 +722,17 @@ class MirrorRepositoryManager(Manager):
 
     def get_remote_mirrors(self):
         mirrors = []
+        server_vars = deepcopy(_SERVER_VARS)
+        linux_id = server_vars.get('ID')
+        if linux_id in SUP_MAP:
+            version = [int(vnum) for vnum in server_vars.get('VERSION_ID', '').split('.')]
+            for vid, elvid in SUP_MAP[linux_id]:
+                if version < vid:
+                    break
+                server_vars['releasever'] = elvid
+            server_vars['releasever'] = str(elvid)
+            self.stdio and getattr(self.stdio, 'warn', print)('Use centos %s remote mirror repository for %s %s' % (server_vars['releasever'], linux_id, server_vars.get('VERSION_ID')))
+
         for path in glob(os.path.join(self.remote_path, '*.repo')):
             repo_age = os.stat(path)[8]
             with open(path, 'r') as confpp_obj:
@@ -702,11 +750,14 @@ class MirrorRepositoryManager(Manager):
                         meta_data[attr] = value
                     if 'enabled' in meta_data and not meta_data['enabled']:
                         continue
+                    if 'baseurl' not in meta_data:
+                        continue
                     if 'name' not in meta_data:
                         meta_data['name'] = section
                     if 'repo_age' not in meta_data:
                         meta_data['repo_age'] = repo_age
-                    meta_data['name'] = RemoteMirrorRepository.var_replace(meta_data['name'], _SERVER_VARS)
+                    meta_data['name'] = RemoteMirrorRepository.var_replace(meta_data['name'], server_vars)
+                    meta_data['baseurl'] = RemoteMirrorRepository.var_replace(meta_data['baseurl'], server_vars)
                     mirror_path = os.path.join(self.remote_path, meta_data['name'])
                     mirror = RemoteMirrorRepository(mirror_path, meta_data, self.stdio)
                     mirrors.append(mirror)
@@ -720,11 +771,12 @@ class MirrorRepositoryManager(Manager):
     def get_exact_pkg(self, **pattern):
         only_info = 'only_info' in pattern and pattern['only_info']
         mirrors = self.get_mirrors()
+        info = [None, None]
         for mirror in mirrors:
-            info = mirror.get_exact_pkg_info(**pattern)
-            if info:
-                return info if only_info else mirror.get_rpm_pkg_by_info(info)
-        return None
+            new_one = mirror.get_exact_pkg_info(**pattern)
+            if new_one and new_one > info[0]:
+                info = [new_one, mirror]
+        return info[0] if info[0] is None or only_info else info[1].get_rpm_pkg_by_info(info[0])
 
     def get_best_pkg(self, **pattern):
         if 'fuzzy' not in pattern or not pattern['fuzzy']:
@@ -750,7 +802,7 @@ class MirrorRepositoryManager(Manager):
     def add_local_mirror(self, src, force=False):
         self.stdio and getattr(self.stdio, 'verbose', print)('%s is file or not' % src)
         if not os.path.isfile(src):
-            self.stdio and getattr(self.stdio, 'error', print)('%s does not exist or no such file: %s' % src)
+            self.stdio and getattr(self.stdio, 'error', print)('No such file: %s' % (src))
             return None
         try:
             self.stdio and getattr(self.stdio, 'verbose', print)('load %s to Package Object' % src)

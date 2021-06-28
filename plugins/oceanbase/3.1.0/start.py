@@ -92,9 +92,11 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             root_servers[zone] = '%s:%s:%s' % (server.ip, config['rpc_port'], config['mysql_port'])
     rs_list_opt  = '-r \'%s\'' % ';'.join([root_servers[zone] for zone in root_servers])
 
+    servers_remote_home_path = {}
     for server in cluster_config.servers:
         client = clients[server]
         remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+        servers_remote_home_path[server] = remote_home_path
         remote_bin_path = bin_path.replace(local_home_path, remote_home_path)
         server_config = cluster_config.get_server_conf(server)
 
@@ -154,7 +156,10 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     for server in clusters_cmd:
         client = clients[server]
         stdio.verbose('starting %s observer', server)
+        remote_repository_path = repository_dir.replace(local_home_path, remote_home_path)
+        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % remote_repository_path, True)
         ret = client.execute_command(clusters_cmd[server])
+        client.add_env('LD_LIBRARY_PATH', '', True)
         if not ret:
             stdio.stop_loading('fail')
             stdio.error('failed to start %s observer: %s' % (server, ret.stderr))

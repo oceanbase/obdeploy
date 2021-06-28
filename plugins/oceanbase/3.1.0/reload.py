@@ -51,12 +51,13 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
     for key in global_change_conf:
         sql = ''
         try:
-            if key == 'proxyro_password':
+            if key in ['proxyro_password', 'root_password']:
                 if global_change_conf[key] != servers_num:
                     stdio.warn('Invalid: proxyro_password is not a single server configuration item')
                     continue
                 value = change_conf[server][key]
-                sql = 'alter user "proxyro" IDENTIFIED BY "%s"' % value
+                user = key.split('_')[0]
+                sql = 'alter user "%s" IDENTIFIED BY "%s"' % (user, value if value else '')
                 stdio.verbose('execute sql: %s' % sql)
                 cursor.execute(sql)
                 continue

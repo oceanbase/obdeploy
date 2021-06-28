@@ -30,7 +30,7 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
             if key in server_config and server_config[key]:
                 try:
                     sql = 'alter proxyconfig set %s = %%s' % key
-                    value = server_config[key]
+                    value = str(server_config[key])
                     stdio.verbose('execute sql: %s' % (sql % value))
                     cursor[server].execute(sql, [value])
                 except:

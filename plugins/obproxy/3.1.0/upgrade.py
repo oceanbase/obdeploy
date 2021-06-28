@@ -21,27 +21,21 @@
 from __future__ import absolute_import, division, print_function
 
 
-def destroy(plugin_context, *args, **kwargs):
-    def clean(server, path):
-        client = clients[server]
-        ret = client.execute_command('rm -fr %s/* %s/.conf' % (path, path))
-        if not ret:
-            # pring stderror
-            global_ret = False
-            stdio.warn('fail to clean %s:%s' % (server, path))
-        else:
-            stdio.verbose('%s:%s cleaned' % (server, path))
-    cluster_config = plugin_context.cluster_config
+
+
+def upgrade(plugin_context, stop_plugin, start_plugin, connect_plugin, display_plugin, *args, **kwargs):
+    components = plugin_context.components
     clients = plugin_context.clients
+    cluster_config = plugin_context.cluster_config
+    cmd = plugin_context.cmd
+    options = plugin_context.options
     stdio = plugin_context.stdio
-    global_ret = True
-    stdio.start_loading('obproxy work dir cleaning')
-    for server in cluster_config.servers:
-        server_config = cluster_config.get_server_conf(server)
-        stdio.verbose('%s work path cleaning' % server)
-        clean(server, server_config['home_path'])
-    if global_ret:
-        stdio.stop_loading('succeed')
-        plugin_context.return_true()
-    else:
-        stdio.stop_loading('fail')
+
+    if not stop_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
+        return 
+    if not start_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
+        return 
+    
+    ret = connect_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs)
+    if ret and display_plugin(components, clients, cluster_config, cmd, options, stdio, ret.get_return('cursor'), *args, **kwargs):
+        return plugin_context.return_true()

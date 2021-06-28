@@ -35,7 +35,10 @@ from tool import DirectoryUtil, FileUtil
 
 
 ROOT_IO = IO(1)
-VERSION = '1.0.0'
+VERSION = '1.0.1'
+REVISION = '<CID>'
+BUILD_BRANCH = '<B_BRANCH>'
+BUILD_TIME = '<B_TIME>'
 
 
 class BaseCommand(object):
@@ -92,19 +95,17 @@ class ObdCommand(BaseCommand):
         version_fobj = FileUtil.open(version_path, 'a+', stdio=ROOT_IO)
         version_fobj.seek(0)
         version = version_fobj.read()
-        if VERSION.split('.') > version.split('.'):
+        if VERSION != version:
             obd_plugin_path = os.path.join(self.OBD_PATH, 'plugins')
             if DirectoryUtil.mkdir(self.OBD_PATH):
                 root_plugin_path = '/usr/obd/plugins'
                 if os.path.exists(root_plugin_path):
-                    ROOT_IO.verbose('copy %s to %s' % (root_plugin_path, obd_plugin_path))
                     DirectoryUtil.copy(root_plugin_path, obd_plugin_path, ROOT_IO)
             obd_mirror_path = os.path.join(self.OBD_PATH, 'mirror')
             obd_remote_mirror_path = os.path.join(self.OBD_PATH, 'mirror/remote')
             if DirectoryUtil.mkdir(obd_mirror_path):
                 root_remote_mirror = '/usr/obd/mirror/remote'
                 if os.path.exists(root_remote_mirror):
-                    ROOT_IO.verbose('copy %s to %s' % (root_remote_mirror, obd_remote_mirror_path))
                     DirectoryUtil.copy(root_remote_mirror, obd_remote_mirror_path, ROOT_IO)
             version_fobj.seek(0)
             version_fobj.truncate()
@@ -375,10 +376,11 @@ class ClusterRedeployCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterRedeployCommand, self).__init__('redeploy', 'redeploy a cluster had started')
+        self.parser.add_option('-f', '--force-kill', action='store_true', help="force kill when observer is running")
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.redeploy_cluster(self.cmds[0])
+            return obd.redeploy_cluster(self.cmds[0], self.opts)
         else:
             return self._show_help()
 
@@ -419,6 +421,19 @@ class ClusterEditConfigCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class CLusterUpgradeCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(CLusterUpgradeCommand, self).__init__('upgrade', 'upgrade cluster')
+        self.parser.add_option('-f', '--force', action='store_true', help="force upgrade")
+        self.parser.add_option('-c', '--components', type='string', help="the updated component list, use `,` interval")
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.upgrade_cluster(self.cmds[0], self.opts)
+        else:
+            return self._show_help()
+
 class ClusterMajorCommand(MajorCommand):
 
     def __init__(self):
@@ -433,6 +448,7 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(ClusterRedeployCommand())
         self.register_command(ClusterEditConfigCommand())
         self.register_command(ClusterReloadCommand())
+        self.register_command(CLusterUpgradeCommand())
 
 
 class TestMirrorCommand(ObdCommand):
@@ -492,6 +508,21 @@ class BenchMajorCommand(MajorCommand):
         super(BenchMajorCommand, self).__init__('bench', '')
 
 
+class UpdateCommand(ObdCommand):
+
+    def __init__(self):
+        super(UpdateCommand, self).__init__('update', 'update obd')
+
+    def do_command(self):
+        if os.getuid() != 0:
+            ROOT_IO.error('You need to be root to perform this command.')
+            return False
+        return super(UpdateCommand, self).do_command()
+
+    def _do_command(self, obd):
+        return obd.update_obd(VERSION)
+
+
 class MainCommand(MajorCommand):
 
     def __init__(self):
@@ -499,11 +530,15 @@ class MainCommand(MajorCommand):
         self.register_command(MirrorMajorCommand())
         self.register_command(ClusterMajorCommand())
         self.register_command(TestMajorCommand())
+        self.register_command(UpdateCommand())
         self.parser.version = '''OceanBase Deploy: %s
+REVISION: %s
+BUILD_BRANCH: %s
+BUILD_TIME: %s
 Copyright (C) 2021 OceanBase
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
 This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.''' % (VERSION)
+There is NO WARRANTY, to the extent permitted by law.''' % (VERSION, REVISION, BUILD_BRANCH, BUILD_TIME)
         self.parser._add_version_option()
 
 if __name__ == '__main__':

@@ -21,6 +21,27 @@
   need_redeploy: true
   description_en: the directory for the data file
   description_local: 存储sstable等数据的目录
+- name: clog_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the clog file
+  description_local: 存储clog数据的目录
+- name: slog_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the slog file
+  description_local: 存储slog数据的目录
+- name: ilog_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the ilog file
+  description_local: 存储ilog数据的目录 
 - name: devname
   type: STRING
   min_value: NULL
@@ -2129,7 +2150,15 @@
   default: ''
   min_value: NULL
   max_value: NULL
-  section: LOAD_BALANCE
   need_restart: false
   description_en: password of observer proxyro user
   description_local: proxyro用户的密码
+- name: root_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: password of observer root user
+  description_local: sys租户root用户的密码

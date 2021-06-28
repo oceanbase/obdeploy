@@ -10,8 +10,8 @@ function _obd_complete_func
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    obd_cmd="mirror cluster test"
-    cluster_cmd="start deploy redeploy restart reload destroy stop edit-config list display"
+    obd_cmd="mirror cluster test update"
+    cluster_cmd="start deploy redeploy restart reload destroy stop edit-config list display upgrade"
     mirror_cmd="clone create list update"
     test_cmd="mysqltest"
     if [[ ${cur} == * ]] ; then

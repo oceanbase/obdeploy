@@ -38,3 +38,4 @@ oceanbase-ce:
     syslog_level: INFO
     enable_syslog_recycle: true
     max_syslog_file_count: 4
+    root_password: # root user password, can be empty

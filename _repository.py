@@ -22,13 +22,15 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import sys
+import time
 import hashlib
 from glob import glob
 
-from _rpm import Package
+from _rpm import Package, PackageInfo, Version
 from _arch import getBaseArch
 from tool import DirectoryUtil, FileUtil, YamlLoader
 from _manager import Manager
+from _plugin import InstallPlugin
 
 
 class LocalPackage(Package):
@@ -59,14 +61,17 @@ class LocalPackage(Package):
 
     def __init__(self, path, name, version, files, release=None, arch=None):
         self.name = name
-        self.version = version
+        self.set_version(version)
+        self.set_release(release if release else time.strftime("%Y%m%d%H%M%S", time.localtime(time.time())))
         self.md5 = None
-        self.release = release if release else version
         self.arch = arch if arch else getBaseArch()
         self.headers = {}
         self.files = files
         self.path = path
         self.package()
+
+    def __hash__(self):
+        return hash(self.path)
 
     def package(self):
         count = 0
@@ -114,17 +119,19 @@ class LocalPackage(Package):
         return self.RpmObject(self.headers, self.files)
 
 
-class Repository(object):
+class Repository(PackageInfo):
     
     _DATA_FILE = '.data'
 
     def __init__(self, name, repository_dir, stdio=None):
         self.repository_dir = repository_dir
-        self.name = name
-        self.version = None
-        self.hash = None
+        super(Repository, self).__init__(name, None, None, None, None)
         self.stdio = stdio
         self._load()
+    
+    @property
+    def hash(self):
+        return self.md5
 
     def __str__(self):
         return '%s-%s-%s' % (self.name, self.version, self.hash)
@@ -142,16 +149,11 @@ class Repository(object):
         path = os.readlink(self.repository_dir) if os.path.islink(self.repository_dir) else self.repository_dir
         return os.path.join(path, Repository._DATA_FILE)
 
-    # 暂不清楚开源的rpm requirename是否仅有必须的依赖
-    def require_list(self):
-        return []
-
-    # 暂不清楚开源的rpm requirename是否仅有必须的依赖 故先使用 ldd检查bin文件的形式检查依赖
     def bin_list(self, plugin):
         files = []
         if self.version and self.hash:
             for file_item in plugin.file_list():
-                if file_item.type == 'bin':
+                if file_item.type == InstallPlugin.FileItemType.BIN:
                     files.append(os.path.join(self.repository_dir, file_item.target_path))
         return files
 
@@ -173,13 +175,16 @@ class Repository(object):
             return self.version == other.version and self.hash == other.hash
         if isinstance(other, dict):
             return self.version == other['version'] and self.hash == other['hash']
+        return super(Repository, self).__eq__(other)
 
     def _load(self):
         try:
             with open(self.data_file_path, 'r') as f:
                 data = YamlLoader().load(f)
-                self.version = data['version']
-                self.hash = data['hash']
+                self.set_version(data.get('version'))
+                self.set_release(data.get('release'))
+                self.md5 = data.get('hash')
+                self.arch = data.get('arch')
         except:
             pass
 
@@ -192,10 +197,10 @@ class Repository(object):
         path, _hash = os.path.split(path)
         path, version = os.path.split(path)
         if not self.version:
-            self.version = version
+            self.set_version(version)
 
     def _dump(self):
-        data = {'version': self.version, 'hash': self.hash}
+        data = {'version': self.version, 'hash': self.hash, 'release': self.release, 'arch': self.arch}
         try:
             with open(self.data_file_path, 'w') as f:
                 YamlLoader().dump(data, f)
@@ -213,8 +218,18 @@ class Repository(object):
             return True
         self.clear()
         try:
-            file_map = plugin.file_map
             with pkg.open() as rpm:
+                file_map = plugin.file_map
+                need_dirs = {}
+                need_files = {}
+                for src_path in file_map:
+                    file_item = file_map[src_path]
+                    if file_item.type == InstallPlugin.FileItemType.DIR:
+                        if not src_path.endswith('/'):
+                            src_path += '/'
+                        need_dirs[src_path] = file_item.target_path
+                    else:
+                        need_files[src_path] = file_item.target_path
                 files = {}
                 links = {}
                 dirnames = rpm.headers.get("dirnames")
@@ -223,19 +238,29 @@ class Repository(object):
                 filelinktos = rpm.headers.get("filelinktos")
                 filemd5s = rpm.headers.get("filemd5s")
                 filemodes = rpm.headers.get("filemodes")
+                dirs = sorted(need_dirs.keys(), reverse=True)
+                format_str = lambda s: s.decode(errors='replace') if isinstance(s, bytes) else s
                 for i in range(len(basenames)):
-                    path = os.path.join(dirnames[dirindexes[i]], basenames[i])
-                    if isinstance(path, bytes):
-                        path = path.decode()
-                    if not path.startswith('./'):
-                        path = '.%s' % path
+                    if not filemd5s[i] and not filelinktos[i]:
+                        continue
+                    dir_path = format_str(dirnames[dirindexes[i]])
+                    if not dir_path.startswith('./'):
+                        dir_path = '.%s' % dir_path
+                    file_name = format_str(basenames[i])
+                    path = os.path.join(dir_path, file_name)
                     files[path] = i
-                for src_path in file_map:
+                    if path not in need_files:
+                        for n_dir in need_dirs:
+                            if path.startswith(n_dir):
+                                need_files[path] = os.path.join(n_dir, path[len(n_dir):])
+                                break
+                for src_path in need_files:
                     if src_path not in files:
                         raise Exception('%s not found in packge' % src_path)
+                    target_path = os.path.join(self.repository_dir, need_files[src_path])
+                    if os.path.exists(target_path):
+                        return
                     idx = files[src_path]
-                    file_item = file_map[src_path]
-                    target_path = os.path.join(self.repository_dir, file_item.target_path)
                     if filemd5s[idx]:
                         fd = rpm.extractfile(src_path)
                         self.stdio and getattr(self.stdio, 'verbose', print)('extract %s to %s' % (src_path, target_path))
@@ -248,11 +273,17 @@ class Repository(object):
                         links[target_path] = filelinktos[idx]
                     else:
                         raise Exception('%s is directory' % src_path)
+
                 for link in links:
-                    self.stdio and getattr(self.stdio, 'verbose', print)('link %s to %s' % (src_path, target_path))
+                    self.stdio and getattr(self.stdio, 'verbose', print)('link %s to %s' % (links[link], link))
                     os.symlink(links[link], link)
-            self.version = pkg.version
-            self.hash = pkg.md5
+                for n_dir in need_dirs:
+                    if not os.path.isdir(n_dir):
+                        raise Exception('%s: No such dir: %s' % (pkg.path, n_dir))
+            self.set_version(pkg.version)
+            self.set_release(pkg.release)
+            self.md5 = pkg.md5
+            self.arch = pkg.arch
             if self._dump():
                 return True
             else:
@@ -263,7 +294,10 @@ class Repository(object):
         return False
 
     def clear(self):
-        return DirectoryUtil.rm(self.repository_dir, self.stdio) and DirectoryUtil.mkdir(self.repository_dir, stdio=self.stdio)
+        if os.path.exists(self.repository_dir):
+            return DirectoryUtil.rm(self.repository_dir, self.stdio) and DirectoryUtil.mkdir(self.repository_dir, stdio=self.stdio)
+        return True
+
 
 class ComponentRepository(object):
 
@@ -300,12 +334,17 @@ class ComponentRepository(object):
         return repositories
 
     def get_repository_by_version(self, version, tag=None):
+        if tag:
+            return self.get_repository_by_tag(tag, version)
+        repository = self.get_repository_by_tag(self.name, version)
+        if repository:
+            return repository
         path_partten = os.path.join(self.repository_dir, version, tag if tag else '*')
         for path in glob(path_partten):
-            repository = Repository(self.name, path, self.stdio)
-            if repository.hash:
-                return repository
-        return None
+            n_repository = Repository(self.name, path, self.stdio)
+            if n_repository.hash and n_repository > repository:
+                repository = n_repository
+        return repository
 
     def get_repository_by_tag(self, tag, version=None):
         path_partten = os.path.join(self.repository_dir, version if version else '*', tag)
@@ -316,15 +355,17 @@ class ComponentRepository(object):
         return None
 
     def get_repository(self, version=None, tag=None):
+        if tag:
+            return self.get_repository_by_tag(tag, version)
         if version:
             return self.get_repository_by_version(version, tag)
-        version = []
+        version = None
         for rep_version in os.listdir(self.repository_dir):
-            rep_version = rep_version.split('.')
+            rep_version = Version(rep_version)
             if rep_version > version:
                 version = rep_version
         if version:
-            return self.get_repository_by_version('.'.join(version), tag)
+            return self.get_repository_by_version(version, tag)
         return None
 
 
@@ -363,8 +404,6 @@ class RepositoryManager(Manager):
     def get_repository(self, name, version=None, tag=None, instance=True):
         if version:
             return self.get_repository_by_version(name, version, tag)
-        if not tag:
-            tag = name
         if name not in self.component_repositoies:
             path = os.path.join(self.path, name)
             self.component_repositoies[name] = ComponentRepository(name, path, self.stdio)
@@ -388,7 +427,7 @@ class RepositoryManager(Manager):
                 self.repositories[path] = Repository(name, path, self.stdio)
             return self.repositories[path]
         repository =  Repository(name, path, self.stdio)
-        repository.version = version
+        repository.set_version(version)
         return repository
 
     def create_tag_for_repository(self, repository, tag, force=False):

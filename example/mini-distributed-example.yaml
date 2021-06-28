@@ -39,6 +39,7 @@ oceanbase-ce:
     syslog_level: INFO
     enable_syslog_recycle: true
     max_syslog_file_count: 4
+    root_password: # root user password, can be empty
   z1:
     mysql_port: 2881
     rpc_port: 2882

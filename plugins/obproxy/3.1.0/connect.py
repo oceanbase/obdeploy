@@ -28,17 +28,22 @@ else:
     import pymysql as mysql
 
 
-def _connect(ip, port, user):
+stdio = None
+
+
+def _connect(ip, port, user, password=''):
+    stdio.verbose('connect %s -P%s -u%s -p%s' % (ip, port, user, password))
     if sys.version_info.major == 2:
-        db = mysql.connect(host=ip, user=user, port=int(port))
+        db = mysql.connect(host=ip, user=user, port=int(port), passwd=str(password))
         cursor = db.cursor(cursorclass=mysql.cursors.DictCursor)
     else:
-        db = mysql.connect(host=ip, user=user, port=int(port), cursorclass=mysql.cursors.DictCursor)
+        db = mysql.connect(host=ip, user=user, port=int(port), password=str(password), cursorclass=mysql.cursors.DictCursor)
         cursor = db.cursor()
     return db, cursor
 
 
 def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
+    global stdio
     count = 10
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
@@ -61,7 +66,8 @@ def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
         for server in servers:
             try:
                 server_config = cluster_config.get_server_conf(server)
-                db, cursor = _connect(server.ip, server_config['listen_port'], user)
+                pwd_key = 'obproxy_sys_password' if sys_root else 'observer_sys_password'
+                db, cursor = _connect(server.ip, server_config['listen_port'], user, server_config.get(pwd_key, '') if count % 2 else '')
                 dbs[server] = db
                 cursors[server] = cursor
             except:
@@ -70,7 +76,7 @@ def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
         servers = tmp_servers
         servers and time.sleep(3)
     
-    if count and servers:
+    if  servers:
         stdio.stop_loading('fail')
         return plugin_context.return_false()
     else:
