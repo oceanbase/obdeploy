@@ -1,5 +1,5 @@
 Name: ob-deploy
-Version: 1.0.1
+Version: 1.0.2
 Release: 1%{?dist}
 # if you want use the parameter of rpm_create on build time,
 # uncomment below
@@ -106,3 +106,5 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
  - cancel the timeout limit for waiting for the cluster to initialize
  - new configuration item for store log
  - support SUSE, Ubuntu etc.
+* Mon Jun 28 2021 obd 1.0.2
+ - fix memory and disk check bug
