@@ -20,22 +20,12 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 import re
 
 
 stdio = None
 success = True
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'([1-9][0-9]*)([B,K,M,G,T])', size)
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
 
 
 def get_port_socket_inode(client, port):
@@ -54,7 +44,7 @@ def parse_size(size):
         _bytes = int(size)
     else:
         units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'([1-9][0-9]*)([B,K,M,G,T])', size)
+        match = re.match(r'([1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
         _bytes = int(match.group(1)) * units[match.group(2)]
     return _bytes
 
@@ -127,7 +117,7 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
             memory['percentage'] += int(parse_size(server_config['memory_limit_percentage']))
         else:
             memory['percentage'] += 80
-        data_path = server_config['data_dir'] if 'data_dir' in server_config else server_config['home_path']
+        data_path = server_config['data_dir'] if 'data_dir' in server_config else  os.path.join(server_config['home_path'], 'store')
         if not client.execute_command('ls %s/sstable/block_file' % data_path):
             if data_path in disk:
                 critical('Same Path: %s in %s and %s' % (data_path, server, disk[data_path]['server']))
@@ -171,11 +161,15 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
                 alert('(%s) The recommended number of open files is 655350 (Current value: %s)' % (ip, max_of))
 
         # memory
-        ret = client.execute_command("free -b | grep Mem | awk -F' ' '{print $2, $4}'")
+        ret = client.execute_command('cat /proc/meminfo')
         if ret:
-            total_memory, free_memory = ret.stdout.split(' ')
-            total_memory = int(total_memory)
-            free_memory = int(free_memory)
+            total_memory = 0
+            free_memory = 0
+            for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
+                if k == 'MemTotal':
+                    total_memory = parse_size(str(v))
+                elif k == 'MemAvailable':
+                    free_memory = parse_size(str(v))
             total_use = servers_memory[ip]['percentage'] * total_memory / 100 + servers_memory[ip]['num']
             if total_use > free_memory:
                 critical('(%s) not enough memory. (Free: %s, Need: %s)' % (ip, formate_size(free_memory), formate_size(total_use)))
