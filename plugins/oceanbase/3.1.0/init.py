@@ -50,7 +50,7 @@ def init_dir(server, client, key, path, link_path=None):
     ret = client.execute_command('mkdir -p %s' % path)
     if ret:
         if link_path:
-            client.execute_command("if [ '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (path, link_path, path, link_path))
+            client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (path, link_path, path, link_path))
         return True
     else:
         critical('fail to initialize %s %s path: %s permission denied' % (server, key, ret.stderr))
@@ -124,7 +124,7 @@ def init(plugin_context, *args, **kwargs):
             ret = client.execute_command('mkdir -p %s/sstable' % data_path)
             if ret:
                 link_path = '%s/store' % home_path
-                client.execute_command("if [ '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (path, link_path, path, link_path))
+                client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (data_path, link_path, data_path, link_path))
                 for key in ['clog', 'ilog', 'slog']:
                     # init_dir(server, client, key, server_config['%s_dir' % key], os.path.join(data_path, key))
                     log_dir = server_config['%s_dir' % key]
@@ -144,7 +144,7 @@ def init(plugin_context, *args, **kwargs):
                     ret = client.execute_command('mkdir -p %s' % log_dir)
                     if ret:
                         link_path = '%s/%s' % (data_path, key)
-                        client.execute_command("if [ '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (path, link_path, path, link_path))
+                        client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))
                     else:
                         critical('failed to initialize %s %s dir' % (server, key))
             else:
