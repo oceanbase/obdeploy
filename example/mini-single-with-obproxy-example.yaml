@@ -40,8 +40,8 @@ oceanbase-ce:
     max_syslog_file_count: 4
     # observer cluster name, consistent with obproxy's cluster_name
     appname: ob_cluster
-    root_password: # root user password, can be empty
-    proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
+    # root_password: # root user password, can be empty
+    # proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
 obproxy:
   servers:
     - 192.168.1.2
@@ -55,5 +55,5 @@ obproxy:
     enable_cluster_checkout: false
     # observer cluster name, consistent with oceanbase-ce's appname
     cluster_name: ob_cluster
-    obproxy_sys_password: # obproxy sys user password, can be empty
-    observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty
+    # obproxy_sys_password: # obproxy sys user password, can be empty
+    # observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty
