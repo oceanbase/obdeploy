@@ -338,7 +338,7 @@ class ClusterStopCommand(ClusterMirrorCommand):
 class ClusterDestroyCommand(ClusterMirrorCommand):
 
     def __init__(self):
-        super(ClusterDestroyCommand, self).__init__('destroy', 'start a cluster had deployed')
+        super(ClusterDestroyCommand, self).__init__('destroy', 'destroy a cluster had deployed')
         self.parser.add_option('-f', '--force-kill', action='store_true', help="force kill when observer is running")
 
     def _do_command(self, obd):
