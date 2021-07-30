@@ -39,16 +39,16 @@
   source /etc/profile.d/obd.sh
   ```
 
-### 方案2：使用源码安装。
+### 方案2：使用源码安装
 
   使用源码安装 OBD 之前，请确认您已安装以下依赖：
 
-  - gcc
-  - wget
-  - python-devel
-  - openssl-devel
-  - xz-devel
-  - mysql-devel
+- gcc
+- wget
+- python-devel
+- openssl-devel
+- xz-devel
+- mysql-devel
   
   Python2 使用以下命令安装：
 
@@ -72,7 +72,7 @@
 在此之前您需要确认以下信息：
 
 - 当前用户为 root。
-- `2881` 和 `2882` 端口没有被占用。
+- `2882` 和 `2883` 端口没有被占用。
 - 您的机器内存应该不低于 8G。
 - 您的机器 CPU 数目应该不低于 2。
 
@@ -82,7 +82,7 @@
 obd cluster deploy c1 -c ./example/mini-local-example.yaml
 obd cluster start c1
 # 使用 mysql 客户端链接到到 OceanBase 数据库。
-mysql -h127.1 -uroot -P2881
+mysql -h127.1 -uroot -P2883
 ```
 
 ## 使用 OBD 启动 OceanBase 数据库集群
@@ -124,12 +124,14 @@ vi ./example/mini-local-example.yaml
 
 如果您的目标机器（OceanBase 数据库程序运行的机器）不是当前机器，请不要使用 `本地单节点配置样例`，改用其他样例。
 同时您还需要修改配置文件顶部的用户密码信息。
+
 ```yaml
 user:
   username: <您的账号名>
   password: <您的登录密码>
   key_file: <您的私钥路径>
 ```
+
 `username` 为登录到目标机器的用户名，确保您的用户名有 `home_path` 的写权限。`password`和`key_file`都是用于验证改用户的方式，通常情况下只需要填写一个。
 > **注意：** 在配置秘钥路径后，如果您的秘钥不需要口令，请注释或者删掉`password`，以免`password`被视为秘钥口令用于登录，导致校验失败。
 
@@ -195,7 +197,7 @@ obd cluster destroy lo
 
 #### `obd mirror clone`
 
-将本地 RPM 包添加为镜像，之后您可以使用 **OBD 集群** 中相关的命令中启动镜像。
+将一个 RPM 包复制到本地镜像库，之后您可以使用 **OBD 集群** 中相关的命令中启动镜像。
 
 ```shell
 obd mirror clone <path> [-f]
@@ -207,12 +209,13 @@ obd mirror clone <path> [-f]
 
 #### `obd mirror create`
 
-以本地目录为基础创建一个镜像。此命令主要用于使用 OBD 启动自行编译的 OceanBase 开源软件，您可以通过此命令将编译产物加入本地仓库，之后就可以使用 `obd cluster` 相关的命令启动它。
+以本地目录为基础创建一个镜像。此命令主要用于使用 OBD 启动自行编译的 OceanBase 开源软件，您可以通过此命令将编译产物加入本地仓库，之后就可以使用 `obd cluster` 相关的命令启动这个镜像。
 
 ```shell
 obd mirror create -n <component name> -p <your compile dir> -V <component version> [-t <tag>] [-f]
 ```
-例如您根据 [OceanBase 编译指导书](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.0/get-the-oceanbase-database-by-using-source-code)编译成功后，可以使用 `make DESTDIR=./ install && obd mirror create -n oceanbase-ce -V 3.1.0 -p ./usr/local` 将编译产物加入OBD本地仓库。
+
+例如您根据 [OceanBase 数据库编译指导书](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.0/get-the-oceanbase-database-by-using-source-code)编译 OceanBase 数据库。编译成功后，可以使用 `make DESTDIR=./ install && obd mirror create -n oceanbase-ce -V 3.1.0 -p ./usr/local` 命令将编译产物加入 OBD 本地仓库。
 
 选项说明见下表：
 
@@ -220,19 +223,19 @@ obd mirror create -n <component name> -p <your compile dir> -V <component versio
 --- | --- | --- |---
 -n/--name | 是 | string | 组件名。如果您编译的是 OceanBase 数据库，则填写 oceanbase-ce。如果您编译的是 ODP，则填写 obproxy。
 -p/--path | 是 | string | 编译目录。执行编译命令时的目录。OBD 会根据组件自动从该目录下获取所需的文件。
--V/--version | 是 | string | 版本号
+-V/--version | 是 | string | 版本号。
 -t/--tag | 否 | string | 镜像标签。您可以为您的创建的镜像定义多个标签，以英文逗号（,）间隔。
 -f/--force | 否 | bool | 当镜像已存在，或者标签已存在时强制覆盖。默认不开启。
 
 #### `obd mirror list`
 
-显示镜像仓库或镜像列表
+显示镜像仓库或镜像列表。
 
 ```shell
 obd mirror list [mirror repo name]
 ```
 
-参数 `mirror repo name` 为 镜像仓库名。该参数为可选参数。不填时，将显示镜像仓库列表。不为空时，则显示对应仓库的镜像列表。
+参数 `mirror repo name` 为镜像仓库名。该参数为可选参数。不填时，将显示镜像仓库列表。不为空时，则显示对应仓库的镜像列表。
 
 #### `obd mirror update`
 
@@ -248,6 +251,26 @@ OBD 集群命令操作的最小单位为一个部署配置。部署配置是一�
 
 在使用 OBD 启动一个集群之前，您需要先注册这个集群的部署配置到 OBD 中。您可以使用 `obd cluster edit-config` 创建一个空的部署配置，或使用 `obd cluster deploy -c config` 导入一个部署配置。
 
+#### `obd cluster autodeploy`
+
+传入一个简易的配置文件，OBD 会根据目标机器资源自动生成最大规格的完整配置并部署启动集群。
+
+```shell
+obd cluster autodeploy <deploy name> -c <yaml path> [-f] [-U] [-A] [-s]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+选项说明见下表：
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+-c/--config | 是 | string | 无 | 使用指定的 yaml 文件部署，并将部署配置注册到 OBD 中。<br>当`deploy name` 存在时，会判断其状态，如果旧配置尚未部署则覆盖，否则报错。
+-f/--force | 否 | bool | false | 开启时，强制清空工作目录。<br>当组件要求工作目录为空且不使用改选项时，工作目录不为空会返回错误。
+-U/--ulp/ --unuselibrepo | 否 | bool | false | 使用该选项将禁止 OBD 自动处理依赖。不开启的情况下，OBD 将在检查到缺失依赖时搜索相关的 libs 镜像并安装。使用该选项将会在对应的配置文件中添加 **unuse_lib_repository: true**。也可以在配置文件中使用 **unuse_lib_repository: true** 开启。
+-A/--act/--auto-create-tenant | 否 | bool | false | 开启该选项 OBD 将会在bootstrap阶段使用集群全部可用资源创建一个名为`test`的租户。使用该选项将会在对应的配置文件中添加 **auto_create_tenant: true**。也可以在配置文件中使用 **auto_create_tenant: true** 开启。
+-s/--strict-check | 否 | bool | false | 部分组件在启动前会做相关的检查，当检查不通过的时候会报警告，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。
+
 #### `obd cluster edit-config`
 
 修改一个部署配置，当部署配置不存在时创建。
@@ -261,12 +284,12 @@ obd cluster edit-config <deploy name>
 #### `obd cluster deploy`
 
 根据配置部署集群。此命令会根据部署配置文件中组件的信息查找合适的镜像，并安装到本地仓库，此过程称为本地安装。
-在将本地仓库中存在合适版本的组件分发给目标服务器，此过程称为远程安装。
+再将本地仓库中存在合适版本的组件分发给目标服务器，此过程称为远程安装。
 在本地安装和远程安装时都会检查服务器是否存在组件运行所需的依赖。
 此命令可以直接使用 OBD 中已注册的 `deploy name` 部署，也可以通过传入 `yaml` 的配置信息。
 
 ```shell
-obd cluster deploy <deploy name> [-c <yaml path>] [-f] [-U]
+obd cluster deploy <deploy name> [-c <yaml path>] [-f] [-U] [-A]
 ```
 
 参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
@@ -277,7 +300,10 @@ obd cluster deploy <deploy name> [-c <yaml path>] [-f] [-U]
 --- | --- | --- |--- |---
 -c/--config | 否 | string | 无 | 使用指定的 yaml 文件部署，并将部署配置注册到 OBD 中。<br>当`deploy name` 存在时覆盖配置。<br>如果不使用该选项，则会根据 `deploy name` 查找已注册到OBD中的配置信息。
 -f/--force | 否 | bool | false | 开启时，强制清空工作目录。<br>当组件要求工作目录为空且不使用改选项时，工作目录不为空会返回错误。
--U/--ulp/ --unuselibrepo | 否 | bool | false | 使用该选项将禁止 OBD 自动处理依赖。不开启的情况下，OBD 将在检查到缺失依赖时搜索相关的 libs 镜像并安装。使用该选项将会在对应的配置文件中天 **unuse_lib_repository: true**。也可以在配置文件中使用 **unuse_lib_repository: true** 开启。
+-U/--ulp/ --unuselibrepo | 否 | bool | false | 使用该选项将禁止 OBD 自动处理依赖。不开启的情况下，OBD 将在检查到缺失依赖时搜索相关的 libs 镜像并安装。使用该选项将会在对应的配置文件中添加 **unuse_lib_repository: true**。也可以在配置文件中使用 **unuse_lib_repository: true** 开启。
+-A/--act/--auto-create-tenant | 否 | bool | false | 开启该选项 OBD 将会在bootstrap阶段使用集群全部可用资源创建一个名为`test`的租户。使用该选项将会在对应的配置文件中添加 **auto_create_tenant: true**。也可以在配置文件中使用 **auto_create_tenant: true** 开启。
+<!-- --force-delete | 否 | bool | false | 强制删除，删除已注册的集群。
+-s/--strict-check | 否 | bool | false | 当检查失败时抛出错误而不是警告。 -->
 
 #### `obd cluster start`
 
@@ -370,6 +396,53 @@ obd cluster destroy <deploy name> [-f]
 
 选项 `-f` 为 `--force-kill`。检查到工作目录下有运行中的进程时，强制停止。销毁前会做检查是有还有进程在运行中。这些运行中的进程可能是 **start** 失败留下的，也可能是因为配置与其他集群重叠，进程是其他集群的。但无论是哪个原因导致工作目录下有进程未退出，**destroy** 都会直接停止。使用该选项会强制停止这些运行中的进程，强制执行 **destroy**。非必填项。数据类型为 `bool`。默认不开启。
 
+#### `obd cluster tenant create`
+
+创建租户。该命令仅 OceanBase 数据库有效。该命令会自动创建资源单元和资源池，用户不需要手动创建。
+
+```shell
+obd cluster tenant create <deploy name> [-n <tenant name>] [flags]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+选项说明见下表：
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- | ---
+-n/--tenant-name | 否 | string |  test | 租户名。对应的资源单元和资源池根据租户名自动生成，并且避免重名。
+--max-cpu | 否 | float | 0 | 租户可用最大 CPU 数。为 0 时使用集群剩余全部可用 CPU。实际值低于 2 时报错。
+--min-cpu | 否 | float | 0 | 租户可用最小 CPU 数。为 0 时等于 --max-cpu。
+--max-memory | 否 | int | 0 | 租户可用最大内存。为 0 时使用集群剩余全部可用内存。实际值低于 1G 时报错。
+--min-memory | 否 | int | 0 | 租户可用最大内存。为 0 时等于 --max-memory。
+--max-disk-size | 否 | int | 0 | 租户可用最大磁盘空间。为0时使用集群全部可用空间。实际值低于 512M 时报错。
+--max-iops | 否 | int | 128 | 租户 IOPS 最多数量，取值范围为 [128,+∞)。
+--min-iops | 否 | int | 0 | 租户 IOPS 最少数量。值域同 --max-iops 。为 0 时等于 --max-iops 。
+--max-session-num | 否 | int | 64 | 租户 最大 SESSION 数，取值范围为 [64,+∞)。
+--unit-num | 否 | int | 0 | 指定要创建的单个 ZONE 下的单元个数，取值要小于单个 ZONE 中的 OBServer 个数。为 0 自动获取最大值。
+-z/--zone-list | 否 | string | 空 | 指定租户的 ZONE 列表，多个 ZONE 用英文逗号 `,` 间隔。为空时等于集群全部 ZONE。
+--primary-zone | 否 | string | RANDOM | 租户的主 Zone。
+--charset | 否 | string | 空 | 租户的字符集。
+--collate | 否 | string | 空 | 租户校对规则。
+--replica-num | 否 | int | 0 | 租户副本数。为 0 时等于 ZONE 的数目。
+--logonly-replica-num | 否 | string | 0 | 租户日志副本数。为 0 时等于 --replica-num。
+--tablegroup | 否 | string | 空 | 租户默认表组信息
+--locality | 否 | string | 空 | 描述副本在 Zone 间的分布情况，如：F@z1,F@z2,F@z3,R@z4 表示 z1, z2, z3 为全功能副本，z4 为只读副本。
+-s/--variables | 否 | string | on | 设置租户系统变量值。
+
+#### `obd cluster tenant drop`
+
+删除租户。该命令仅OceanBase数据库有效。该命令会自动删除对应的unit和pool。
+
+```shell
+obd cluster tenant drop <deploy name> [-n <tenant name>]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+选项 `-n` 为 `--tenant-name`。要删除的租户名。必填项。
+
+
 ### 测试命令组
 
 #### `obd test mysqltest`
@@ -388,10 +461,10 @@ obd test mysqltest <deploy name> [--test-set <test-set>] [flags]
 --- | --- | --- |--- | ---
 -c/--component | 否 | string | 默认为空 | 待测试的组件名。候选项为 oceanbase-ce 和 obproxy。为空时，按 obproxy、oceanbase-ce 的顺序进行检查。检查到组件存在则不再遍历，使用命中的组件进行后续测试。
 --test-server | 否 | string | 默指定的组件下服务器中的第一个节点。 | 必须是指定的组件下的某个节点名。
---mode | 否 | string | both | 测试模式。候选项为 mysql、both。
+--mode | 否 | string | both | 测试模式。候选项为 mysql、oracle、both。
 --user | 否 | string | root | 执行测试的用户名。
----password | 否 | string | 默认为空 | 执行测试的用户密码。
---mysqltest-bin | 否 | string | mysqltest | 指定的路径不可执行时使用 OBD 自带的 mysqltest。
+--password | 否 | string | 默认为空 | 执行测试的用户密码。
+--mysqltest-bin | 否 | string | mysqltest | mysqltest 二进制文件所在目录。
 --obclient-bin | 否 | string | obclient | OBClient 二进制文件所在目录。
 --test-dir | 否 | string | ./mysql_test/t | mysqltest 所需的 **test-file** 存放的目录。test 文件找不到时会尝试在 OBD 内置中查找。
 --result-dir | 否 | string | ./mysql_test/r | mysqltest 所需的 **result-file** 存放的目录。result 文件找不到时会尝试在 OBD 内置中查找。
@@ -406,6 +479,38 @@ obd test mysqltest <deploy name> [--test-set <test-set>] [flags]
 --init-sql-dir | 否 | string | ../ | init sql 文件所在目录。sql 文件找不到时会尝试在obd内置中查找。
 --init-sql-files | 否 | string | | 需要 init 时执行的 init sql 文件数组。英文逗号（,）间隔。不填时，如果需要 init，OBD 会根据集群配置执行内置的 init。
 --auto-retry | 否 | bool | false | 失败时自动重部署集群进行重试。
+
+#### `obd test sysbench`
+
+对 OcecanBase 数据库或 ODP 组件的指定节点执行 sysbench sysbench 需要 OBClient 和 ob-sysbench，请先安装 OBClient 和 ob-sysbench。
+
+```shell
+obd test sysbench <deploy name> [flags]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- | ---
+-c/--component | 否 | string | 默认为空 | 待测试的组件名。候选项为 oceanbase-ce 和 obproxy。为空时，按 obproxy、oceanbase-ce 的顺序进行检查。检查到组件存在则不再遍历，使用命中的组件进行后续测试。
+--test-server | 否 | string | 默指定的组件下服务器中的第一个节点。 | 必须是指定的组件下的某个节点名。
+--user | 否 | string | root | 执行测试的用户名。
+--password | 否 | string | 默认为空 | 执行测试的用户密码。
+--tenant | 否 | string | test | 执行测试的租户名。
+--database | 否 | string | test | 执行测试的数据库。
+--obclient-bin | 否 | string | obclient | OBClient 二进制文件所在目录。
+--sysbench-bin | 否 | string | sysbench | sysbench 二进制文件所在目录。
+--script-name | 否 | string | oltp_write_only.lua | 要执行的 sysbench 脚本名。
+--sysbench-script-dir | 否 | string | /usr/sysbench/share/sysbench | sysbench 脚本存放目录。
+--tables | 否 | int | 32 | 初始化表的数量。
+--table-size | 否 | int | 100000 | 每张表初始化的数据数量。
+--threads | 否 | int | 150 | 启动的线程数量。
+--time | 否 | int | 60 | 运行时间。设置为 0 时表示不限制时间。
+--interval | 否 | int | 10 | 运行期间日志，单位为秒。
+--events | 否 | int | 0 | 最大请求数量，定义数量后可以不需要 --time 选项。
+--rand-type | 否 | string | 访问数据时使用的随机生成函数。取值可以为 special、uniform、gaussian 或 pareto。 默认值为 special， 早期值为 uniform。
+--skip-trx | 否 | string | 空 | 在只读测试中打开或关闭事务。
+
 
 ## Q&A
 
