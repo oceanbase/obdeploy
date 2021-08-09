@@ -21,7 +21,7 @@
   max_value: 65535
   need_restart: true
   description_en: obproxy prometheus listen port
-  description_local: SQL服务协议端口号
+  description_local: 提供prometheus服务端口号
 - name: appname
   require: false
   type: STRING

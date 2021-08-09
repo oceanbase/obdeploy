@@ -299,6 +299,18 @@ class Repository(PackageInfo):
         return True
 
 
+class RepositoryVO(object):
+
+    def __init__(self, name, version, release, arch, md5, path, tags=[]):
+        self.name = name
+        self.version = version
+        self.release = release
+        self.arch = arch
+        self.md5 = md5
+        self.path = path
+        self.tags = tags
+
+
 class ComponentRepository(object):
 
     def __init__(self, name, repository_dir, stdio=None):
@@ -367,6 +379,15 @@ class ComponentRepository(object):
         if version:
             return self.get_repository_by_version(version, tag)
         return None
+        
+    def get_repositories(self, version=None):
+        if not version:
+            version = '*'
+        repositories = []
+        path_partten = os.path.join(self.repository_dir, version, '*')
+        for path in glob(path_partten):
+            repositories.append(Repository(self.name, path, self.stdio))
+        return repositories
 
 
 class RepositoryManager(Manager):
@@ -379,21 +400,52 @@ class RepositoryManager(Manager):
         self.repositories = {}
         self.component_repositoies = {}
 
-    def get_repositoryies(self, name):
-        repositories = {}
-        path_partten = os.path.join(self.path, name, '*')
-        for path in glob(path_partten):
-            _, version = os.path.split(path)
-            Repository = Repository(name, path, version, self.stdio)
+    def _get_repository_vo(self, repository):
+        return RepositoryVO(
+            repository.name,
+            repository.version,
+            repository.release,
+            repository.arch,
+            repository.md5,
+            repository.repository_dir,
+            []
+        )
+
+    def get_repositories_view(self, name=None):
+        if name:
+            repositories = self.get_component_repositoy(name).get_repositories()
+        else:
+            repositories = []
+            path_partten = os.path.join(self.path, '*')
+            for path in glob(path_partten):
+                _, name = os.path.split(path)
+                repositories += self.get_component_repositoy(name).get_repositories()
+
+        repositories_vo = {}
+        for repository in repositories:
+            if repository.is_shadow_repository():
+                repository_ist = self.get_instance_repository_from_shadow(repository)
+                if repository_ist not in repositories_vo:
+                    repositories_vo[repository_ist] = self._get_repository_vo(repository)
+                _, tag = os.path.split(repository.repository_dir)
+                repositories_vo[repository_ist].tags.append(tag)
+            elif repository not in repositories_vo:
+                repositories_vo[repository] = self._get_repository_vo(repository)
+        return list(repositories_vo.values())
+
+    def get_component_repositoy(self, name):
+        if name not in self.component_repositoies:
+            path = os.path.join(self.path, name)
+            self.component_repositoies[name] = ComponentRepository(name, path, self.stdio)
+        return self.component_repositoies[name]
 
     def get_repository_by_version(self, name, version, tag=None, instance=True):
         if not tag:
             tag = name
         path = os.path.join(self.path, name, version, tag)
         if path not in self.repositories:
-            if name not in self.component_repositoies:
-                self.component_repositoies[name] = ComponentRepository(name, os.path.join(self.path, name), self.stdio)
-            repository = self.component_repositoies[name].get_repository(version, tag)
+            component_repositoy = self.get_component_repositoy(name)
+            repository = component_repositoy.get_repository(version, tag)
             if repository:
                 self.repositories[repository.repository_dir] = repository
                 self.repositories[path] = repository
@@ -404,10 +456,9 @@ class RepositoryManager(Manager):
     def get_repository(self, name, version=None, tag=None, instance=True):
         if version:
             return self.get_repository_by_version(name, version, tag)
-        if name not in self.component_repositoies:
-            path = os.path.join(self.path, name)
-            self.component_repositoies[name] = ComponentRepository(name, path, self.stdio)
-        repository = self.component_repositoies[name].get_repository(version, tag)
+
+        component_repositoy = self.get_component_repositoy(name)
+        repository = component_repositoy.get_repository(version, tag)
         if repository:
             self.repositories[repository.repository_dir] = repository
         return self.get_instance_repository_from_shadow(repository) if repository and instance else repository

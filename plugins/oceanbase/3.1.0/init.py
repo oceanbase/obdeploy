@@ -57,7 +57,7 @@ def init_dir(server, client, key, path, link_path=None):
         return False
 
 
-def init(plugin_context, *args, **kwargs):
+def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     global stdio, force
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -65,6 +65,7 @@ def init(plugin_context, *args, **kwargs):
     servers_dirs = {}
     force = getattr(plugin_context.options, 'force', False)
     stdio.verbose('option `force` is %s' % force)
+    stdio.start_loading('Initializes cluster work home')
     for server in cluster_config.servers:
         ip = server.ip
         if ip not in servers_dirs:
@@ -73,15 +74,24 @@ def init(plugin_context, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
         home_path = server_config['home_path']
-        if 'data_dir' not in server_config:
+        remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+        remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
+
+        if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
-        if 'clog_dir' not in server_config:
-            server_config['clog_dir'] = '%s/clog' % server_config['data_dir']
-        if 'ilog_dir' not in server_config:
-            server_config['ilog_dir'] = '%s/ilog' % server_config['data_dir']
-        if 'slog_dir' not in server_config:
-            server_config['slog_dir'] = '%s/slog' % server_config['data_dir']
-        for key in ['home_path', 'data_dir', 'clog_dir', 'ilog_dir', 'slog_dir']:
+        if not server_config.get('redo_dir'):
+            server_config['redo_dir'] = server_config['data_dir']
+        if not server_config.get('clog_dir'):
+            server_config['clog_dir'] = '%s/clog' % server_config['redo_dir']
+        if not server_config.get('ilog_dir'):
+            server_config['ilog_dir'] = '%s/ilog' % server_config['redo_dir']
+        if not server_config.get('slog_dir'):
+            server_config['slog_dir'] = '%s/slog' % server_config['redo_dir']
+        if server_config['redo_dir'] == server_config['data_dir']:
+            keys = ['home_path', 'data_dir', 'clog_dir', 'ilog_dir', 'slog_dir']
+        else:
+            keys = ['home_path', 'data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir']
+        for key in keys:
             path = server_config[key]
             if path in dirs:
                 critical('Configuration conflict %s: %s is used for %s\'s %s' % (server, path, dirs[path]['server'], dirs[path]['key']))
@@ -91,7 +101,7 @@ def init(plugin_context, *args, **kwargs):
                 'key': key,
             }
             
-        stdio.print('%s initializes cluster work home' % server)
+        stdio.verbose('%s initializes cluster work home' % server)
         if force:
             ret = client.execute_command('rm -fr %s/*' % home_path)
             if not ret:
@@ -105,7 +115,9 @@ def init(plugin_context, *args, **kwargs):
                     continue
             else:
                 critical('fail to init %s home path: create %s failed' % (server, home_path))
-        ret = client.execute_command('bash -c "mkdir -p %s/{etc,admin,.conf,log}"' % home_path)
+        ret = client.execute_command('bash -c "mkdir -p %s/{etc,admin,.conf,log,bin,lib}"' % home_path) \
+         and client.execute_command("if [ -d %s/bin ]; then ln -s %s/bin/* %s/bin; fi" % (remote_repository_dir, remote_repository_dir, home_path)) \
+         and client.execute_command("if [ -d %s/lib ]; then ln -s %s/lib/* %s/lib; fi" % (remote_repository_dir, remote_repository_dir, home_path))
         if ret:
             data_path = server_config['data_dir']
             if force:
@@ -121,7 +133,7 @@ def init(plugin_context, *args, **kwargs):
                         continue
                 else:
                     critical('fail to init %s data path: create %s failed' % (server, data_path))
-            ret = client.execute_command('mkdir -p %s/sstable' % data_path)
+            ret = client.execute_command('bash -c "mkdir -p %s/sstable"' % data_path)
             if ret:
                 link_path = '%s/store' % home_path
                 client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (data_path, link_path, data_path, link_path))
@@ -151,4 +163,9 @@ def init(plugin_context, *args, **kwargs):
                 critical('failed to initialize %s date path' % (server))
         else:
             critical('fail to init %s home path: %s permission denied' % (server, ret.stderr))
-    global_ret and plugin_context.return_true()
+    
+    if global_ret:
+        stdio.stop_loading('succeed')
+        plugin_context.return_true()
+    else:
+        stdio.stop_loading('fail')

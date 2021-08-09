@@ -40,8 +40,9 @@ def destroy(plugin_context, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         stdio.verbose('%s work path cleaning', server)
         clean(server, server_config['home_path'])
-        if 'data_dir' in server_config:
-            clean(server, server_config['data_dir'])
+        for key in ['data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir']:
+            if server_config.get(key):
+                clean(server, server_config[key])
     if global_ret:
         stdio.stop_loading('succeed')
         plugin_context.return_true()

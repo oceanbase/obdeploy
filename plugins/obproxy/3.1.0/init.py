@@ -20,17 +20,27 @@
 from __future__ import absolute_import, division, print_function
 
 
-def init(plugin_context, *args, **kwargs):
+def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     global_ret = True
+    stdio.start_loading('Initializes cluster work home')
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
         home_path = server_config['home_path']
-        stdio.print('%s init cluster work home', server)
-        if not client.execute_command('mkdir -p %s/run' % (home_path)):
+        remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+        remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
+        stdio.verbose('%s init cluster work home', server)
+        if not (client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib}'" % (home_path)) \
+         and client.execute_command("if [ -d %s/bin ]; then ln -s %s/bin/* %s/bin; fi" % (remote_repository_dir, remote_repository_dir, home_path)) \
+         and client.execute_command("if [ -d %s/lib ]; then ln -s %s/lib/* %s/lib; fi" % (remote_repository_dir, remote_repository_dir, home_path))):
             global_ret = False
-            stdio.print('fail to init %s home path', server)
-    global_ret and plugin_context.return_true()
+            stdio.verbose('fail to init %s home path', server)
+            
+    if global_ret:
+        stdio.stop_loading('succeed')
+        plugin_context.return_true()
+    else:
+        stdio.stop_loading('fail')

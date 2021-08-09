@@ -39,32 +39,37 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
         cluster_server[server] = '%s:%s' % (server.ip, config['rpc_port'])
         stdio.verbose('compare configuration of %s' % (server))
         for key in new_config:
-            if key not in config or config[key] != new_config[key]:
-                change_conf[server][key] = new_config[key]
+            n_value = new_config[key]
+            if key not in config or config[key] != n_value:
+                change_conf[server][key] = n_value
                 if key not in global_change_conf:
-                    global_change_conf[key] = 1
-                else:
-                    global_change_conf[key] += 1
+                    global_change_conf[key] = {'value': n_value, 'count': 1}
+                elif n_value == global_change_conf[key]['value']:
+                    global_change_conf[key]['count'] += 1
 
     servers_num = len(servers)
     stdio.verbose('apply new configuration')
     for key in global_change_conf:
-        sql = ''
+        msg = ''
         try:
             if key in ['proxyro_password', 'root_password']:
-                if global_change_conf[key] != servers_num:
+                if global_change_conf[key]['count'] != servers_num:
                     stdio.warn('Invalid: proxyro_password is not a single server configuration item')
                     continue
-                value = change_conf[server][key]
+                value = change_conf[server][key] if change_conf[server].get(key) is not None else ''
                 user = key.split('_')[0]
-                sql = 'alter user "%s" IDENTIFIED BY "%s"' % (user, value if value else '')
+                msg = sql = 'CREATE USER IF NOT EXISTS %s IDENTIFIED BY "%s"' % (user, value)
+                stdio.verbose('execute sql: %s' % sql)
+                cursor.execute(sql)
+                msg = sql = 'alter user "%s" IDENTIFIED BY "%s"' % (user, value)
                 stdio.verbose('execute sql: %s' % sql)
                 cursor.execute(sql)
                 continue
-            if global_change_conf[key] == servers_num:
+            if global_change_conf[key]['count'] == servers_num:
                 sql = 'alter system set %s = %%s' % key
                 value = change_conf[server][key]
-                stdio.verbose('execute sql: %s' % (sql % value))
+                msg = sql % value
+                stdio.verbose('execute sql: %s' % msg)
                 cursor.execute(sql, [value])
                 cluster_config.update_global_conf(key, value, False)
                 continue
@@ -72,13 +77,14 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
                 if key not in change_conf[server]:
                     continue
                 sql = 'alter system set %s = %%s server=%%s' % key
-                value = change_conf[server][key]
-                stdio.verbose('execute sql: %s' % (sql % (value, server)))
-                cursor.execute(sql, [value, server])
+                value = (change_conf[server][key], cluster_server[server])
+                msg = sql % value
+                stdio.verbose('execute sql: %s' % msg)
+                cursor.execute(sql, value)
                 cluster_config.update_server_conf(server,key, value, False)
         except:
             global_ret = False
-            stdio.exception('execute sql exception: %s' % sql)
+            stdio.exception('execute sql exception: %s' % msg)
 
     cursor.execute('alter system reload server')
     cursor.execute('alter system reload zone')

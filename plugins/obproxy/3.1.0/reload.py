@@ -49,6 +49,7 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
     stdio.verbose('apply new configuration')
     success_conf = {}
     sql = ''
+    value = None
     for key in global_change_conf:
         success_conf[key] = []
         for server in servers:
@@ -56,13 +57,13 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
                 continue
             try:
                 sql = 'alter proxyconfig set %s = %%s' % key
-                value = change_conf[server][key]
+                value = change_conf[server][key] if change_conf[server].get(key) is not None else ''
                 stdio.verbose('execute sql: %s' % (sql % value))
                 cursor[server].execute(sql, [value])
                 success_conf[key].append(server)
             except:
                 global_ret = False
-                stdio.exception('execute sql exception: %s' % sql)
+                stdio.exception('execute sql exception: %s' % (sql % value))
     for key in success_conf:
         if global_change_conf[key] == servers_num == len(success_conf):
             cluster_config.update_global_conf(key, value, False)

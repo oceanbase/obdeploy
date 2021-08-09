@@ -20,9 +20,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-import sys
 import time
-from prettytable import PrettyTable
 
 
 def display(plugin_context, cursor, *args, **kwargs):

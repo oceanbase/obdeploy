@@ -72,8 +72,8 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
         stdio.verbose('%s port check' % server)
         for key in ['listen_port', 'prometheus_listen_port']:
             port = int(server_config[key])
+            alert_f = alert if key == 'prometheus_listen_port' else critical
             if port in ports:
-                alert_f = alert if key == 'prometheus_listen_port' else critical
                 alert_f('Configuration conflict %s: %s port is used for %s\'s %s' % (server, port, ports[port]['server'], ports[port]['key']))
                 continue
             ports[port] = {
@@ -81,7 +81,7 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
                 'key': key
             }
             if get_port_socket_inode(client, port):
-                critical('%s:%s port is already used' % (ip, port))
+                alert_f('%s:%s port is already used' % (ip, port))
                 
     if success:
         stdio.stop_loading('succeed')

@@ -142,7 +142,9 @@ class ClusterConfig(object):
     def get_unconfigured_require_item(self, server):
         items = []
         config = self.get_server_conf(server)
-        for key in self._default_conf:
+        for key in self._temp_conf:
+            if not self._temp_conf[key].require:
+                continue
             if key in config:
                 continue
             items.append(key)
@@ -176,7 +178,7 @@ class ClusterConfig(object):
         self._default_conf = {}
         self._temp_conf = temp_conf
         for key in self._temp_conf:
-            if self._temp_conf[key].require:
+            if self._temp_conf[key].require and self._temp_conf[key].default is not None:
                 self._default_conf[key] = self._temp_conf[key].default
         self.set_global_conf(self._global_conf) # 更新全局配置
 
@@ -203,6 +205,9 @@ class ClusterConfig(object):
             conf.update(self._server_conf[server])
             self._cache_server[server] = conf
         return self._cache_server[server]
+
+    def get_original_server_conf(self, server):
+        return self._server_conf.get(server)
 
 
 class DeployStatus(Enum):
@@ -246,6 +251,7 @@ class DeployConfig(object):
     def __init__(self, yaml_path, yaml_loader=yaml):
         self._user = None
         self.unuse_lib_repository = False
+        self.auto_create_tenant = False
         self.components = {}
         self._src_data = None
         self.yaml_path = yaml_path
@@ -260,6 +266,13 @@ class DeployConfig(object):
         if self.unuse_lib_repository != status:
             self.unuse_lib_repository = status
             self._src_data['unuse_lib_repository'] = status
+            return self._dump()
+        return True
+
+    def set_auto_create_tenant(self, status):
+        if self.auto_create_tenant != status:
+            self.auto_create_tenant = status
+            self._src_data['auto_create_tenant'] = status
             return self._dump()
         return True
 
@@ -278,7 +291,9 @@ class DeployConfig(object):
                         ))
                     elif key == 'unuse_lib_repository':
                         self.unuse_lib_repository = self._src_data['unuse_lib_repository']
-                    else:
+                    elif key == 'auto_create_tenant':
+                        self.auto_create_tenant = self._src_data['auto_create_tenant']
+                    elif issubclass(type(self._src_data[key]), dict):
                         self._add_component(key, self._src_data[key])
         except:
             pass
