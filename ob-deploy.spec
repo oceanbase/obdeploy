@@ -116,4 +116,3 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
  - new features: obd update
  - cancel the timeout limit for waiting for the cluster to initialize
  - new configuration item for store log
- - support SUSE, Ubuntu etc.
