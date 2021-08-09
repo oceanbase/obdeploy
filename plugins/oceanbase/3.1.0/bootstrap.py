@@ -37,6 +37,9 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
             floor_servers[zone] = []
             bootstrap.append('REGION "sys_region" ZONE "%s" SERVER "%s:%s"' % (server_config['zone'], server.ip, server_config['rpc_port']))
     try:
+        sql = 'set session ob_query_timeout=1000000000'
+        stdio.verbose('execute sql: %s' % sql)
+        cursor.execute(sql)
         sql = 'alter system bootstrap %s' % (','.join(bootstrap))
         stdio.start_loading('Cluster bootstrap')
         stdio.verbose('execute sql: %s' % sql)
@@ -48,7 +51,7 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
                 cursor.execute(sql)
         global_conf = cluster_config.get_global_conf()
         if 'proxyro_password' in global_conf or 'obproxy' in plugin_context.components:
-            value = global_conf['proxyro_password'] if 'proxyro_password' in global_conf else ''
+            value = global_conf['proxyro_password'] if global_conf.get('proxyro_password') is not None else ''
             sql = 'create user "proxyro" IDENTIFIED BY "%s"' % value
             stdio.verbose(sql)
             cursor.execute(sql)

@@ -445,7 +445,7 @@ class IO(object):
                 self.error(msg)
             else:
                 msg and self.error(msg)
-                self._log(MsgLevel.VERBOSE, '\n'.join(exception_msg))
+                self._log(MsgLevel.ERROR, '\n'.join(exception_msg))
     else:
         def exception(self, msg, *args, **kwargs):
             ei = sys.exc_info()
@@ -462,5 +462,5 @@ class IO(object):
                 self.error(msg)
             else:
                 msg and self.error(msg)
-                self._log(MsgLevel.VERBOSE, ''.join(lines))
+                self._log(MsgLevel.ERROR, ''.join(lines))
 

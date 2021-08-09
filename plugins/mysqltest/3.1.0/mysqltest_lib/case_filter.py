@@ -32,7 +32,6 @@ spm=['spm.spm_expr','spm.spm_with_acs_new_plan_not_ok']
 
 merge_into=['merge_into.merge_insert','merge_into.merge_into_normal', 'merge_into.merge_subquery', 'merge_into.merge_update']
 
-# TODO bin.lb:
 # Temporary failure, remove this after updatable view commit.
 updatable_view = ['view.is_views', 'create_frommysql' ]
 

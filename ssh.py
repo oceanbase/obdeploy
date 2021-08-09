@@ -139,7 +139,10 @@ class SshClient(object):
         return '%s@%s:%d' % (self.config.username, self.config.host, self.config.port)
 
     def _is_local(self):
-        return self.config.host in ['127.0.0.1', 'localhost'] and self.config.username ==  getpass.getuser()
+        return self.is_localhost() and self.config.username ==  getpass.getuser()
+
+    def is_localhost(self, stdio=None):
+        return self.config.host in ['127.0.0.1', 'localhost', '127.1', '127.0.1']
 
     def _login(self, stdio=None):
         if self.is_connected:
