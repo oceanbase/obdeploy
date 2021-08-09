@@ -1,5 +1,5 @@
 Name: ob-deploy
-Version: 1.0.2
+Version: 1.1.0
 Release: 1%{?dist}
 # if you want use the parameter of rpm_create on build time,
 # uncomment below
@@ -108,3 +108,10 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
  - support SUSE, Ubuntu etc.
 * Mon Jun 28 2021 obd 1.0.2
  - fix memory and disk check bug
+* Mon Aug 09 2021 obd 1.1.0
+ - new features: obd cluster autdeploy
+ - new features: obd cluster tenant
+ - new features: obd test sysbench
+ - enhanced startup check
+ - new configuration item for redo log
+ - start / stop the specified server or component
