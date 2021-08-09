@@ -98,6 +98,17 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Mon Aug 09 2021 obd 1.1.0
+ - new features: obd cluster autdeploy
+ - new features: obd cluster tenant
+ - new features: obd test sysbench
+ - enhanced startup check
+ - new configuration item for redo log
+ - start / stop the specified server or component
+ - fix bug: proxyro_password and observer_sys_password can not be None
+ - more help infomation
+* Mon Jun 28 2021 obd 1.0.2
+ - fix memory and disk check bug
 * Mon Jun 28 2021 obd 1.0.1
  - support configuration password
  - Multi-level checks before start
@@ -106,12 +117,3 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
  - cancel the timeout limit for waiting for the cluster to initialize
  - new configuration item for store log
  - support SUSE, Ubuntu etc.
-* Mon Jun 28 2021 obd 1.0.2
- - fix memory and disk check bug
-* Mon Aug 09 2021 obd 1.1.0
- - new features: obd cluster autdeploy
- - new features: obd cluster tenant
- - new features: obd test sysbench
- - enhanced startup check
- - new configuration item for redo log
- - start / stop the specified server or component
