@@ -621,7 +621,7 @@ class SysBenchCommand(TestMirrorCommand):
         self.parser.add_option('--database', type='string', help='Database for a test. [test]', default='test')
         self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
         self.parser.add_option('--sysbench-bin', type='string', help='Sysbench bin path. [sysbench]', default='sysbench')
-        self.parser.add_option('--script-name', type='string', help='Sysbench lua script file name. [point_select]', default='point_select.lua')
+        self.parser.add_option('--script-name', type='string', help='Sysbench lua script file name. [point_select]', default='oltp_point_select.lua')
         self.parser.add_option('--sysbench-script-dir', type='string', help='The directory of the sysbench lua script file. [/usr/sysbench/share/sysbench]', default='/usr/sysbench/share/sysbench')
         self.parser.add_option('--table-size', type='int', help='Number of data initialized per table. [20000]', default=20000)
         self.parser.add_option('--tables', type='int', help='Number of initialization tables. [30]', default=30)
