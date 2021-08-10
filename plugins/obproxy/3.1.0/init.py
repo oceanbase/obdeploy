@@ -25,6 +25,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     global_ret = True
+    force = getattr(plugin_context.options, 'force', False)
     stdio.start_loading('Initializes cluster work home')
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
@@ -33,11 +34,17 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
         remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
         stdio.verbose('%s init cluster work home', server)
+        if force:
+            ret = client.execute_command('rm -fr %s/*' % home_path)
+            if not ret:
+                global_ret = False
+                stdio.error('failed to initialize %s home path: %s' % (server, ret.stderr))
+                continue
         if not (client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib}'" % (home_path)) \
          and client.execute_command("if [ -d %s/bin ]; then ln -s %s/bin/* %s/bin; fi" % (remote_repository_dir, remote_repository_dir, home_path)) \
          and client.execute_command("if [ -d %s/lib ]; then ln -s %s/lib/* %s/lib; fi" % (remote_repository_dir, remote_repository_dir, home_path))):
             global_ret = False
-            stdio.verbose('fail to init %s home path', server)
+            stdio.error('fail to init %s home path', server)
             
     if global_ret:
         stdio.stop_loading('succeed')
