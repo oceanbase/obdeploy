@@ -9,6 +9,7 @@
 - name: cluster_id
   require: true
   type: INT
+  default: 1
   min_value: 1
   max_value: 4294901759
   need_restart: true
@@ -21,13 +22,20 @@
   need_redeploy: true
   description_en: the directory for the data file
   description_local: 存储sstable等数据的目录
+- name: redo_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the redo file
+  description_local: 存储clog, iclog, slog数据的目录
 - name: clog_dir
   type: STRING
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: the directory for the clog file
-  description_local: 存储clog数据的目录
+  description_local: 存储clog数据的目录, clog 应该与 ilog 同盘
 - name: slog_dir
   type: STRING
   min_value: NULL
@@ -52,7 +60,7 @@
 - name: rpc_port
   require: true
   type: INT
-  default: 2500
+  default: 2882
   min_value: 1025
   max_value: 65535
   need_restart: true
@@ -61,7 +69,7 @@
 - name: mysql_port
   require: true
   type: INT
-  default: 2880
+  default: 2881
   min_value: 1025
   max_value: 65535
   need_restart: true
@@ -1641,7 +1649,7 @@
   min_value: 0
   max_value: NULL
   section: OBSERVER
-  need_restart: false
+  need_restart: true
   description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be set according to sysconf; otherwise, this parameter is used.
   description_local: 系统CPU总数，如果设置为0，将自动检测
 - name: auto_delete_expired_backup

@@ -49,14 +49,13 @@ def confirm_port(client, pid, port):
 
 def confirm_command(client, pid, command):
     command = command.replace(' ', '').strip()
-    if client.execute_command('cmd=`cat /proc/%s/cmdline`; if [ "$cmd" != "%s" ]; then exit 1; fi' % (pid, command)):
+    if client.execute_command('bash -c \'cmd=`cat /proc/%s/cmdline`; if [ "$cmd" != "%s" ]; then exot 1; fi\'' % (pid, command)):
         return True
     return False
 
 
 def confirm_home_path(client, pid, home_path):
-    if client.execute_command('path=`ls -l /proc/%s | grep cwd | awk -F\'-> \' \'{print $2}\'`; if [ "$path" != "%s" ]; then exit 1; fi' % 
-        (pid, home_path)):
+    if client.execute_command('path=`ls -l /proc/%s | grep cwd | awk -F\'-> \' \'{print $2}\'`; bash -c \'if [ "$path" != "%s" ]; then exit 1; fi\'' % (pid, home_path)):
         return True
     return False
 
@@ -77,6 +76,7 @@ def is_started(client, remote_bin_path, port, home_path, command):
         return False
     return confirm_home_path(client, pid, home_path) and confirm_command(client, pid, command)
 
+
 def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     global stdio
     cluster_config = plugin_context.cluster_config
@@ -85,9 +85,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     clusters_cmd = {}
     real_cmd = {}
     pid_path = {}
-    remote_bin_path = {}
     need_bootstrap = True
-    bin_path = os.path.join(repository_dir, 'bin/obproxy')
 
     error = False
     for server in cluster_config.servers:
@@ -99,17 +97,20 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     if error:
         return plugin_context.return_false()
 
-    servers_remote_home_path = {}
     stdio.start_loading('Start obproxy')
     for server in cluster_config.servers:
         client = clients[server]
-        remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
-        servers_remote_home_path[server] = remote_home_path
-        remote_bin_path[server] = bin_path.replace(local_home_path, remote_home_path)
-
         server_config = cluster_config.get_server_conf(server)
-        pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (server_config['home_path'], server.ip, server_config["listen_port"])
+        home_path = server_config['home_path']
 
+        if client.execute_command("bash -c 'if [ -f %s/bin/obproxy ]; then exit 1; else exit 0; fi;'" % home_path):
+            remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+            remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
+            client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
+            client.execute_command("ln -s %s/bin/* %s/bin" % (remote_repository_dir, home_path))
+            client.execute_command("ln -s %s/lib/* %s/lib" % (remote_repository_dir, home_path))
+
+        pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (home_path, server.ip, server_config["listen_port"])
         not_opt_str = [
             'listen_port',
             'prometheus_listen_port',
@@ -128,8 +129,8 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             if key in server_config:
                 value = get_value(key)
                 cmd.append('--%s %s' % (key, value))
-        real_cmd[server] = '%s %s' % (remote_bin_path[server], ' '.join(cmd))
-        clusters_cmd[server] = 'cd %s; %s' % (server_config['home_path'], real_cmd[server])
+        real_cmd[server] = '%s/bin/obproxy %s' % (home_path, ' '.join(cmd))
+        clusters_cmd[server] = 'cd %s; %s' % (home_path, real_cmd[server])
 
     for server in clusters_cmd:
         client = clients[server]
@@ -149,8 +150,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 return plugin_context.return_false()
 
         stdio.verbose('starting %s obproxy', server)
-        remote_repository_path = repository_dir.replace(local_home_path, remote_home_path)
-        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % remote_repository_path, True)
+        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % server_config['home_path'], True)
         ret = client.execute_command(clusters_cmd[server])
         client.add_env('LD_LIBRARY_PATH', '', True)
         if not ret:

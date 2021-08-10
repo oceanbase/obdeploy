@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import re
+import time
 
 
 stdio = None
@@ -58,7 +59,17 @@ def formate_size(size):
     return '%.1f%s' % (size, units[idx])
 
 
-def start_check(plugin_context, strict_check=False, *args, **kwargs):
+def time_delta(client):
+    time_st = time.time() * 1000
+    time_srv = int(client.execute_command('date +%s%N').stdout) / 1000000
+    time_ed = time.time() * 1000
+
+    time_it = time_ed - time_st
+    time_srv -= time_it
+    return time_srv - time_st
+
+
+def _start_check(plugin_context, strict_check=False, *args, **kwargs):
     def alert(*arg, **kwargs):
         global success
         if strict_check:
@@ -78,6 +89,8 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
     servers_port = {}
     servers_memory = {}
     servers_disk = {}
+    servers_clog_mount = {}
+    servers_net_inferface = {}
     server_num = len(cluster_config.servers)
     stdio.start_loading('Check before start observer')
     for server in cluster_config.servers:
@@ -95,10 +108,14 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
         if ip not in servers_port:
             servers_disk[ip] = {}
             servers_port[ip] = {}
+            servers_clog_mount[ip] = {}
+            servers_net_inferface[ip] = {}
             servers_memory[ip] = {'num': 0, 'percentage': 0}
         memory = servers_memory[ip]
         ports = servers_port[ip]
         disk = servers_disk[ip]
+        clog_mount = servers_clog_mount[ip]
+        inferfaces = servers_net_inferface[ip]
         stdio.verbose('%s port check' % server)
         for key in ['mysql_port', 'rpc_port']:
             port = int(server_config[key])
@@ -112,24 +129,49 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
             if get_port_socket_inode(client, port):
                 critical('%s:%s port is already used' % (ip, port))
         if 'memory_limit' in server_config:
-            memory['num'] += parse_size(server_config['memory_limit'])
+            try:
+                memory['num'] += parse_size(server_config['memory_limit'])
+            except:
+                critical('memory_limit must be an integer')
+                return
         elif 'memory_limit_percentage' in server_config:
-            memory['percentage'] += int(parse_size(server_config['memory_limit_percentage']))
+            try:
+                memory['percentage'] += int(parse_size(server_config['memory_limit_percentage']))
+            except:
+                critical('memory_limit_percentage must be an integer')
+                return
         else:
             memory['percentage'] += 80
-        data_path = server_config['data_dir'] if 'data_dir' in server_config else  os.path.join(server_config['home_path'], 'store')
+        data_path = server_config['data_dir'] if server_config.get('data_dir') else  os.path.join(server_config['home_path'], 'store')
+        redo_dir = server_config['redo_dir'] if server_config.get('redo_dir') else  data_path
+        clog_dir = server_config['clog_dir'] if server_config.get('clog_dir') else  os.path.join(redo_dir, 'clog')
         if not client.execute_command('ls %s/sstable/block_file' % data_path):
             if data_path in disk:
                 critical('Same Path: %s in %s and %s' % (data_path, server, disk[data_path]['server']))
                 continue
+            if clog_dir in clog_mount:
+                critical('Same Path: %s in %s and %s' % (clog_dir, server, clog_mount[clog_dir]['server']))
+                continue
             disk[data_path] = {
                 'need': 90,
+                'server': server
+            }
+            clog_mount[clog_dir] = {
+                'threshold': server_config.get('clog_disk_utilization_threshold', 80) / 100.0,
                 'server': server
             }
             if 'datafile_size' in server_config and server_config['datafile_size']:
                 disk[data_path]['need'] = server_config['datafile_size']
             elif 'datafile_disk_percentage' in server_config and server_config['datafile_disk_percentage']:
                 disk[data_path]['need'] = int(server_config['datafile_disk_percentage'])
+            
+            devname = server_config.get('devname')
+            if devname:
+                if not client.execute_command("grep -e ' %s:' /proc/net/dev" % devname):
+                    critical('%s No such net interface: %s' % (server, devname))
+            if devname not in inferfaces:
+                inferfaces[devname] = []
+            inferfaces[devname].append(ip)
 
     for ip in servers_clients:
         client = servers_clients[ip]
@@ -179,9 +221,10 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
         if ret:
             for total, avail, path in re.findall('(\d+)\s+(\d+)\s+(.+)', ret.stdout):
                 disk[path] = {
-                    'toatl': int(total) << 10,
+                    'total': int(total) << 10,
                     'avail': int(avail) << 10,
-                    'need': 0
+                    'need': 0,
+                    'threshold': 2
                 }
         for path in servers_disk[ip]:
             kp = '/'
@@ -191,16 +234,77 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
                         kp = p
             need = servers_disk[ip][path]['need']
             if isinstance(need, int):
-                disk[kp]['need'] += disk[kp]['toatl'] * need / 100
+                disk[kp]['need'] += disk[kp]['total'] * need / 100
             else:
-                disk[kp]['need'] += parse_size(need)
+                try:
+                    disk[kp]['need'] += parse_size(need)
+                except:
+                    critical('datafile_size must be an integer')
+                    return
         
+        for path in servers_clog_mount[ip]:
+            kp = '/'
+            for p in disk:
+                if p in path:
+                    if len(p) > len(kp):
+                        kp = p
+            disk[kp]['threshold'] = min(disk[kp]['threshold'], servers_clog_mount[ip][path]['threshold'])
+            
         for p in disk:
+            total = disk[p]['total']
             avail = disk[p]['avail']
             need = disk[p]['need']
+            threshold = disk[p]['threshold']
+            if need > 0 and threshold < 2:
+                alert('(%s) clog and data use the same disk (%s)' % (ip, p))
             if need > avail:
-                critical('(%s) %s not enough disk space. (Avail: %s, Need: %s)' % (ip, kp, formate_size(avail), formate_size(need)))
+                critical('(%s) %s not enough disk space. (Avail: %s, Need: %s)' % (ip, p, formate_size(avail), formate_size(need)))
+            elif 1.0 * (total - avail + need) / total > disk[p]['threshold']:
+                msg = '(%s) %s not enough disk space for clog. Use `redo_dir` to set other disk for clog' % (ip, p)
+                msg += ', or reduce the value of `datafile_size`' if need > 0 else '.'
+                critical(msg)
 
+    if success:
+        for ip in servers_net_inferface:
+            if servers_net_inferface[ip].get(None):
+                devinfo = client.execute_command('cat /proc/net/dev').stdout
+                interfaces = []
+                for interface in re.findall('\n\s+(\w+):', devinfo):
+                    if interface != 'lo':
+                        interfaces.append(interface)
+                if not interfaces:
+                    interfaces = ['lo']
+                if len(interfaces) > 1:
+                    servers = ','.join(str(server) for server in servers_net_inferface[ip][None])
+                    critical('%s has more than one network inferface. Please set `devname` for (%s)' % (ip, servers))
+                else:
+                    servers_net_inferface[ip][interfaces[0]] = servers_net_inferface[ip][None]
+                    del servers_net_inferface[ip][None]
+    if success:
+        for ip in servers_net_inferface:
+            client = servers_clients[ip]
+            for devname in servers_net_inferface[ip]:
+                if client.is_localhost() and devname != 'lo' or (not client.is_localhost() and devname == 'lo'):
+                        critical('%s %s fail to ping %s. Please check configuration `devname`' % (server, devname, ip))
+                        continue
+                for _ip in servers_clients:
+                    if ip == _ip:
+                        continue
+                    if not client.execute_command('ping -W 1 -c 1 -I %s %s' % (devname, _ip)):
+                        critical('%s %s fail to ping %s. Please check configuration `devname`' % (server, devname, _ip))
+                        break
+
+    if success:
+        times = []
+        for ip in servers_disk:
+            client = servers_clients[ip]
+            times.append(time_delta(client))
+        if times and max(times) - min(times) > 200:
+            critical('Cluster NTP is out of sync')
+
+
+def start_check(plugin_context, strict_check=False, *args, **kwargs):
+    _start_check(plugin_context, strict_check)
     if success:
         stdio.stop_loading('succeed')
         plugin_context.return_true()

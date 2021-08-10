@@ -64,7 +64,6 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     stdio = plugin_context.stdio
     clusters_cmd = {}
     need_bootstrap = True
-    bin_path = os.path.join(repository_dir, 'bin/observer')
     root_servers = {}
     global_config = cluster_config.get_global_conf()
     appname = global_config['appname'] if 'appname' in global_config else None
@@ -92,26 +91,22 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             root_servers[zone] = '%s:%s:%s' % (server.ip, config['rpc_port'], config['mysql_port'])
     rs_list_opt  = '-r \'%s\'' % ';'.join([root_servers[zone] for zone in root_servers])
 
-    servers_remote_home_path = {}
     for server in cluster_config.servers:
         client = clients[server]
-        remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
-        servers_remote_home_path[server] = remote_home_path
-        remote_bin_path = bin_path.replace(local_home_path, remote_home_path)
         server_config = cluster_config.get_server_conf(server)
-
-        req_check = ['home_path', 'cluster_id']
-        for key in req_check:
-            if key not in server_config:
-                stdio.stop_loading('fail')
-                stdio.print('%s %s is empty', server, key)
-                return plugin_context.return_false()
-
         home_path = server_config['home_path']
-        if 'data_dir' not in server_config:
+
+        if client.execute_command("bash -c 'if [ -f %s/bin/observer ]; then exit 1; else exit 0; fi;'" % home_path):
+            remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+            remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
+            client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
+            client.execute_command("ln -s %s/bin/* %s/bin" % (remote_repository_dir, home_path))
+            client.execute_command("ln -s %s/lib/* %s/lib" % (remote_repository_dir, home_path))
+
+        if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
 
-        if client.execute_command('ls %s/clog' % server_config['data_dir']).stdout.strip():
+        if client.execute_command('ls %s/ilog/' % server_config['data_dir']).stdout.strip():
             need_bootstrap = False
         
         remote_pid_path = '%s/run/observer.pid' % home_path
@@ -151,13 +146,13 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             if key in server_config:
                 value = get_value(key)
                 cmd.append('%s %s' % (not_opt_str[key], value))
-        clusters_cmd[server] = 'cd %s; %s %s' % (home_path, remote_bin_path, ' '.join(cmd))
+        clusters_cmd[server] = 'cd %s; %s/bin/observer %s' % (home_path, home_path, ' '.join(cmd))
         
     for server in clusters_cmd:
         client = clients[server]
+        server_config = cluster_config.get_server_conf(server)
         stdio.verbose('starting %s observer', server)
-        remote_repository_path = repository_dir.replace(local_home_path, remote_home_path)
-        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % remote_repository_path, True)
+        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % server_config['home_path'], True)
         ret = client.execute_command(clusters_cmd[server])
         client.add_env('LD_LIBRARY_PATH', '', True)
         if not ret:

@@ -1,0 +1,48 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+oceanbase-ce:
+  servers:
+    # Please don't use hostname, only IP can be supported
+    - 192.168.1.3
+  global:
+    # The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
+    home_path: /root/observer
+    # The directory for data storage. The default value is $home_path/store.
+    # data_dir: /data
+    # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
+    # redo_dir: /redo
+    # External port for OceanBase Database. The default value is 2881.
+    # mysql_port: 2881
+    # Internal port for OceanBase Database. The default value is 2882.
+    # rpc_port: 2882
+    # Defines the zone for an observer. The default value is zone1.
+    # zone: zone1
+    # The maximum running memory for an observer. When ignored, autodeploy calculates this value based on the current server available resource.
+    # memory_limit: 58G
+    # The percentage of the maximum available memory to the total memory. This value takes effect only when memory_limit is 0. The default value is 80.
+    # memory_limit_percentage: 80 
+    # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G. Autodeploy calculates this value based on the current server available resource.
+    # system_memory: 22G
+    # The size of a data file. When ignored, autodeploy calculates this value based on the current server available resource.
+    # datafile_size: 200G
+    # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.
+    # datafile_disk_percentage: 90
+    # System log level. The default value is INFO.
+    # syslog_level: INFO
+    # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true. The default value for autodeploy mode is false.
+    # enable_syslog_wf: false
+    # Enable auto system log recycling or not. The default value is false. The default value for autodeploy mode is on.
+    # enable_syslog_recycle: true
+    # The maximum number of reserved log files before enabling auto recycling. When set to 0, no logs are deleted. The default value for autodeploy mode is 4.
+    # max_syslog_file_count: 4
+    # Cluster name for OceanBase Database. The default value is obcluster. When you deploy OceanBase Database and obproxy, this value must be the same as the cluster_name for obproxy.
+    # appname: obcluster
+    # Password for root. The default value is empty.
+    # root_password:
+    # Password for proxyro. proxyro_password must be the same as observer_sys_password. The default value is empty.
+    # proxyro_password:
