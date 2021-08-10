@@ -352,7 +352,7 @@ class ClusterDeployCommand(ClusterMirrorCommand):
         self.parser.add_option('-c', '--config', type='string', help="Path to the configuration yaml file.")
         self.parser.add_option('-f', '--force', action='store_true', help="Force deploy, overwrite the home_path.", default=False)
         self.parser.add_option('-U', '--unuselibrepo', '--ulp', action='store_true', help="Disable OBD from installing the libs mirror automatically.")
-        self.parser.add_option('-A', '--auto-create-tenant', '--act', action='store_false', help="Disable OBD from creating a tenant named `test` by using all the available resource of the cluster.")
+        self.parser.add_option('-A', '--auto-create-tenant', '--act', action='store_true', help="Disable OBD from creating a tenant named `test` by using all the available resource of the cluster.")
         # self.parser.add_option('-F', '--fuzzymatch', action='store_true', help="enable fuzzy match when search package")
 
     def _do_command(self, obd):

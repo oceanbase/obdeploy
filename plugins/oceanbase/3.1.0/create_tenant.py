@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 
 
 import re
+import time
 
 
 def parse_size(size):
@@ -107,6 +108,24 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     unit_num = get_option('unit_num', min_unit_num)
     if unit_num > min_unit_num:
         return error('resource pool unit num is bigger than zone server count')
+    
+    sql = "select count(*) num from oceanbase.__all_server where status = 'active' and start_service_time > 0"
+    try:
+        count = 30
+        while count:
+            stdio.verbose('execute sql: %s' % sql)
+            cursor.execute(sql)
+            num = cursor.fetchone()['num']
+            if num >= unit_num:
+                break
+            count -= 1
+            time.sleep(1)
+        if count == 0:
+            stdio.error('server can not migrate in')
+            return
+    except:
+        exception('execute sql exception: %s' % sql)
+        return
     
     cpu_total = 0
     mem_total = 0
