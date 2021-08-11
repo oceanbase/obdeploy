@@ -8,14 +8,16 @@ oceanbase-ce:
     # if set severs as "127.0.0.1", please set devname as "lo"
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: lo
-    mysql_port: 2881
-    rpc_port: 2882
+    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881.
+    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882.
     zone: zone1
     # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
-    memory_limit: 64G
-    datafile_disk_percentage: 20
-    syslog_level: INFO
-    enable_syslog_recycle: true
-    max_syslog_file_count: 4
-    cluster_id: 1
+    memory_limit: 64G # The maximum running memory for an observer
+    # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
+    # system_memory: 30G
+    datafile_disk_percentage: 20 # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.
+    syslog_level: INFO # System log level. The default value is INFO.
+    enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
+    enable_syslog_recycle: true # Enable auto system log recycling or not. The default value is false.
+    max_syslog_file_count: 4 # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
     # root_password: # root user password, can be empty
