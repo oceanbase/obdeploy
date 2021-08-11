@@ -44,15 +44,30 @@ oceanbase-ce:
   z1:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882.
+    #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
+    # The directory for data storage. The default value is $home_path/store.
+    # data_dir: /data
+    # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
+    # redo_dir: /redo
     zone: zone1
   z2:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882.
+    #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
+    # The directory for data storage. The default value is $home_path/store.
+    # data_dir: /data
+    # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
+    # redo_dir: /redo
     zone: zone2
   z3:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882.
+    #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
+    # The directory for data storage. The default value is $home_path/store.
+    # data_dir: /data
+    # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
+    # redo_dir: /redo
     zone: zone3

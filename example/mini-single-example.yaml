@@ -10,7 +10,12 @@ oceanbase-ce:
     # Please don't use hostname, only IP can be supported
     - 192.168.1.3
   global:
+    #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
+    # The directory for data storage. The default value is $home_path/store.
+    # data_dir: /data
+    # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
+    # redo_dir: /redo
     # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
     # if set severs as "127.0.0.1", please set devname as "lo"
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
