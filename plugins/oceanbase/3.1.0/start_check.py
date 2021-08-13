@@ -167,7 +167,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             
             devname = server_config.get('devname')
             if devname:
-                if not client.execute_command("grep -e ' %s:' /proc/net/dev" % devname):
+                if not client.execute_command("grep -e '^ *%s:' /proc/net/dev" % devname):
                     critical('%s No such net interface: %s' % (server, devname))
             if devname not in inferfaces:
                 inferfaces[devname] = []
