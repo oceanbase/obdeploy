@@ -1,4 +1,4 @@
-# OceanBase Deploy
+# OceanBase Deployer
 
 <!--
 #
@@ -24,13 +24,13 @@
 
 <!-- TODO: some badges here -->
 
-OceanBase Deploy （简称 OBD）是 OceanBase 开源软件的安装部署工具。OBD 同时也是包管理器，可以用来管理 OceanBase 所有的开源软件。本文介绍如何安装 OBD、使用 OBD 和 OBD 的命令。
+OceanBase Deployer (OBD) is an installation and deployment tool for open-source OceanBase software. It is also a package manager for managing all open-source OceanBase software. This topic describes how to install OBD, how to use OBD, and OBD commands.
 
-## 安装 OBD
+## Install OBD
 
-您可以使用以下方式安装 OBD：
+You can install OBD by using these methods:
 
-### 方案1： 使用 RPM 包（Centos 7 及以上）安装
+### Method 1: Install OBD by using RPM packages (only for CentOS 7 or later)
 
 ```shell
 sudo yum install -y yum-utils
@@ -39,9 +39,9 @@ sudo yum install -y ob-deploy
 source /etc/profile.d/obd.sh
 ```
 
-### 方案2：使用源码安装
+### Method 2: Install OBD by using the source code
 
-使用源码安装 OBD 之前，请确认您已安装以下依赖：
+Before you install OBD by using the source code, make sure that you have installed these dependencies:
 
 - gcc
 - wget
@@ -49,8 +49,8 @@ source /etc/profile.d/obd.sh
 - openssl-devel
 - xz-devel
 - mysql-devel
-  
-Python2 使用以下命令安装：
+
+To install OBD on Python2, run these commands:
 
 ```shell
 pip install -r requirements.txt
@@ -58,7 +58,7 @@ sh build.sh
 source /etc/profile.d/obd.sh
 ```
 
-Python3 使用以下命令安装：
+To install OBD on Python3, run these commands:
 
 ```shell
 pip install -r requirements3.txt
@@ -66,260 +66,258 @@ sh build.sh
 source /etc/profile.d/obd.sh
 ```
 
-## 快速启动 OceanBase 数据库
+## Start an OceanBase cluster
 
-安装 OBD 后，您可以使用 root 用户执行这组命令快速启动本地单节点 OceanBase 数据库。
-在此之前您需要确认以下信息：
+After you install OBD, you can run these commands as the root user to start a local single-node OceanBase cluster.
+Before you run the commands, make sure that these conditions are met:
 
-- 当前用户为 root。
-- `2882` 和 `2883` 端口没有被占用。
-- 您的机器内存应该不低于 8G。
-- 您的机器 CPU 数目应该不低于 2。
+- You have logged on as the root user.
+- Ports `2882` and `2883` are available.
+- Your server has at least 8 GB of memory.
+- Your server has at least 2 CPU cores.
 
-> **说明：** 如果以上条件不满足，请参考[使用 OBD 启动 OceanBase 数据库集群](#使用-obd-启动-oceanbase-数据库集群)。
+> **NOTE:** If the preceding conditions are not met, see [Use OBD to start an OceanBase cluster](#Use-OBD-to-start-an-OceanBase-cluster).
 
 ```shell
 obd cluster deploy c1 -c ./example/mini-local-example.yaml
 obd cluster start c1
-# 使用 mysql 客户端链接到到 OceanBase 数据库。
+# Connect to the OceanBase Database by using a MySQL client.
 mysql -h127.1 -uroot -P2883
 ```
 
-## 使用 OBD 启动 OceanBase 数据库集群
+## Use OBD to start an OceanBase cluster
 
-按照以下步骤启动 OceanBase 数据库集群：
+To start an OceanBase cluster, follow these steps:
 
-### 第 1 步. 选择配置文件
+### Step 1: Select a configuration file
 
-根据您的资源条件选择正确的配置文件：
+Select a configuration file based on your resource configurations:
 
-#### 小规格开发模式
+#### Small-scale development mode
 
-适用于个人设备（内存不低于 8G）。
+This development mode applies to personal devices with at least 8 GB of memory.
 
-- [本地单节点配置样例](./example/mini-local-example.yaml)
-- [单节点配置样例](./example/mini-single-example.yaml)
-- [三节点配置样例](./example/mini-distributed-example.yaml)
-- [单节点 + ODP 配置样例](./example/mini-single-with-obproxy-example.yaml)
-- [三节点 + ODP 配置样例](./example/mini-distributed-with-obproxy-example.yaml)
+- [Sample configuration file for local single-node deployment](./example/mini-local-example.yaml)
+- [Sample configuration file for single-node deployment](./example/mini-single-example.yaml)
+- [Sample configuration file for three-node deployment](./example/mini-distributed-example.yaml)
+- [Sample configuration file for single-node deployment with ODP](./example/mini-single-with-obproxy-example.yaml)
+- [Sample configuration file for three-node deployment with ODP](./example/mini-distributed-with-obproxy-example.yaml)
 
-#### 专业开发模式
+#### Professional development mode
 
-适用于高配置 ECS 或物理服务器（不低于 16 核 64G 内存）。  
+This development mode applies to advanced Elastic Compute Service (ECS) instances or physical servers with at least 16 CPU cores and 64 GB of memory.
 
-- [本地单节点配置样例](./example/local-example.yaml)
-- [单节点配置样例](./example/single-example.yaml)
-- [三节点配置样例](./example/distributed-example.yaml)
-- [单节点 + ODP 配置样例](./example/single-with-obproxy-example.yaml)
-- [三节点 + ODP 配置样例](./example/distributed-with-obproxy-example.yaml)
+- [Sample configuration file for local single-node development](./example/local-example.yaml)
+- [Sample configuration file for single-node development](./example/single-example.yaml)
+- [Sample configuration file for three-node development](./example/distributed-example.yaml)
+- [Sample configuration file for single-node development with ODP](./example/single-with-obproxy-example.yaml)
+- [Sample configuration file for three-node development with ODP](./example/distributed-with-obproxy-example.yaml)
 
-本文以 [小规格开发模式-本地单节点](./example/mini-local-example.yaml) 为例，启动一个本地单节点的 OceanBase 数据库。
+This section describes how to start a local single-node OceanBase cluster by using the [sample configuration file for local single-node deployment in the small-scale development mode](./example/mini-local-example.yaml).
 
 ```shell
-# 修改 OceanBase 数据库的工作目录 home_path。
-# 修改 OceanBase 数据库 SQL 服务协议端口号 mysql_port。后续将使用此端口连接数据库。
-# 修改 OceanBase 数据库集群内部通信的端口号 rpc_port。
+# Modify the working directory of the OceanBase cluster: home_path.
+# Modify the SQL service protocol port of the OceanBase cluster: mysql_port. This port will be used to connect to the cluster later.
+# Modify the internal communication port of the OceanBase cluster: rpc_port.
 vi ./example/mini-local-example.yaml
 ```
 
-如果您的目标机器（OceanBase 数据库程序运行的机器）不是当前机器，请不要使用 `本地单节点配置样例`，改用其他样例。
-同时您还需要修改配置文件顶部的用户密码信息。
+If the target server to run the OceanBase cluster is not the logged-in server, do not use the `sample configuration file for local single-node development`. Use another configuration file.
+Do not forget to change the user password at the beginning of the configuration file.
 
 ```yaml
 user:
-  username: <您的账号名>
-  password: <您的登录密码>
-  key_file: <您的私钥路径>
+  username: <Your account name.>
+  password: <Your logon password.>
+  key_file: <The path of your private key.>
 ```
 
-`username` 为登录到目标机器的用户名，确保您的用户名有 `home_path` 的写权限。`password` 和 `key_file` 均用于验证用户，通常情况下只需要填写一个。
-> **注意：** 在配置秘钥路径后，如果您的秘钥不需要口令，请注释或者删除 `password`，以免 `password` 被视为秘钥口令用于登录，导致校验失败。
+`username` specifies the username used to log on to the target server. Make sure that your username has the write permission on the `home_path` directory. `password` and `key_file` are used to authenticate the user. Generally, only one of them is required.
+> **NOTE:** After you specify the path of the key, add an annotation to the `password` field or delete it if your key does not require a password. Otherwise, `password` will be deemed as the password of the key and used for login, leading to a logon verification failure.
 
-### 第 2 步. 部署和启动数据库
+### Step 2: Deploy and start a cluster
 
 ```shell
-# 此命令会检查 home_path 和 data_dir 指向的目录是否为空。
-# 若目录不为空，则报错。此时可以加上 -f 选项，强制清空。
+# The following command checks whether the home_path and data_dir directories are empty.
+# If not, an error is returned. In this case, you can add the -f option to forcibly clear the directories.
 obd cluster deploy lo -c local-example.yaml
 
-# 此命令会检查系统参数 fs.aio-max-nr 是否不小于 1048576。
-# 通常情况下一台机器启动一个节点不需要修改 fs.aio-max-nr。
-# 当一台机器需要启动 4 个及以上的节点时，请务必修改 fs.aio-max-nr。
-obd cluster start lo 
+# The following command checks whether the value of the fs.aio-max-nr parameter is no less than 1048576.
+# Generally, you do not need to modify the fs.aio-max-nr parameter when you start one node on a server.
+# However, you must modify the fs.aio-max-nr parameter when you start four or more nodes on a server.
+obd cluster start lo
 ```
 
-### 第 3 步. 查看集群状态
+### Step 3: View the cluster status
 
 ```shell
-# 参看 OBD 管理的集群列表
+# View clusters managed by OBD.
 obd cluster list
-# 查看 lo 集群状态
+# View the status of the lo cluster.
 obd cluster display lo
 ```
 
-### 第 4 步. 修改配置
+### Step 4: Modify configurations
 
-OceanBase 数据库有数百个配置项，有些配置是耦合的，在您熟悉 OceanBase 数据库之前，不建议您修改示例配件文件中的配置。此处示例用来说明如何修改配置，并使之生效。
+OceanBase Database has hundreds of configuration items and some of them are coupled. We recommend that you do not modify the configurations in the sample configuration file unless you are familiar with OceanBase Database. The following example shows how to modify the configurations and make them take effect.
 
 ```shell
-# 使用 edit-config 命令进入编辑模式，修改集群配置
+# Run the edit-config command to enter the editing mode and modify the cluster configurations.
 obd cluster edit-config lo
-# 修改 sys_bkgd_migration_retry_num 为 5
-# 注意 sys_bkgd_migration_retry_num 值最小为 3
-# 保存并退出后，OBD 会告知您如何使得此次改动生效
-# 此配置项仅需要 reload 即可生效
+# Set the value of sys_bkgd_migration_retry_num to 5.
+# Note that the minimum value of sys_bkgd_migration_retry_num is 3.
+# Save the settings and exit. OBD will tell you how to make the modification take effect.
+# To make the modification take effect, you only need to run the reload command.
 obd cluster reload lo
 ```
 
-### 第 5 步. 停止集群
+### Step 5: Stop the cluster
 
-`stop` 命令用于停止一个运行中的集群。如果 `start` 命令执行失败，但有进程没有退出，请使用 `destroy` 命令。
+You can run the `stop` command to stop a running cluster. If the `start` command fails but some processes are still running, run the `destroy` command to destroy the cluster.
 
 ```shell
 obd cluster stop lo
 ```
 
-### 第 6 步. 销毁集群
+### Step 6: Destroy the cluster
 
-运行以下命令销毁集群：
+To destroy the cluster, run this command:
 
 ```shell
-# 启动集群时失败，可以能会有一些进程停留。
-# 此时可用 -f 选项强制停止并销毁集群
+# When the start command fails, some processes may still be running.
+# In this case, use the -f option to forcibly stop and destroy the cluster.
 obd cluster destroy lo
 ```
 
-## 其他 OBD 命令
+## Other OBD commands
 
-OBD 有多级命令，您可以在每个层级中使用 `-h/--help` 选项查看子命令的帮助信息。
+OBD provides multiple-level commands. You can use the`-h/--help` option to view the help information of sub-commands.
 
-### 镜像和仓库命令组
+### Mirror and repository commands
 
 #### `obd mirror clone`
 
-将一个 RPM 包复制到本地镜像库，之后您可以使用 OBD 集群中相关的命令中启动镜像。
+Copy an RPM package to the local mirror repository. You can run the corresponding OBD cluster command to start the mirror.
 
 ```shell
 obd mirror clone <path> [-f]
 ```
 
-参数 `path` 为 RPM 包的路径。
+`path` specifies the path of the RPM package.
 
-选项 `-f` 为 `--force`。`-f` 为可选选项。默认不开启。开启时，当镜像已经存在时，强制覆盖已有镜像。
+The `-f` option is `--force`. `-f` is optional. This option is disabled by default. If it is enabled and a mirror of the same name exists in the repository, the copied mirror will forcibly overwrite the existing one.
 
 #### `obd mirror create`
 
-以本地目录为基础创建一个镜像。此命令主要用于使用 OBD 启动自行编译的 OceanBase 开源软件，您可以通过此命令将编译产物加入本地仓库，之后就可以使用 `obd cluster` 相关的命令启动这个镜像。
+Creates a mirror based on the local directory. When OBD starts a user-compiled open-source OceanBase software, you can run this command to add the compilation output to the local repository. Then, you can run the corresponding `obd cluster` command to start the mirror.
 
 ```shell
 obd mirror create -n <component name> -p <your compile dir> -V <component version> [-t <tag>] [-f]
 ```
 
-例如，如果您根据 [OceanBase 数据库编译指导书](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.0/get-the-oceanbase-database-by-using-source-code)编译 OceanBase 数据库，在编译成功后，可以使用 `make DESTDIR=./ install && obd mirror create -n oceanbase-ce -V 3.1.0 -p ./usr/local` 命令将编译产物添加至 OBD 本地仓库。
+For example, you can [compile an OceanBase cluster based on the source code](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.0/get-the-oceanbase-database-by-using-source-code). Then, you can run the `make DESTDIR=./ install && obd mirror create -n oceanbase-ce -V 3.1.0 -p ./usr/local` command to add the compilation output to the local repository of OBD.
 
-选项说明见下表：
+This table describes the corresponding options.
 
-选项名 | 是否必选 | 数据类型 | 说明
+| Option | Required | Data type | Description |
 --- | --- | --- |---
--n/--name | 是 | string | 组件名。如果您编译的是 OceanBase 数据库，则填写 oceanbase-ce。如果您编译的是 ODP，则填写 obproxy。
--p/--path | 是 | string | 编译目录。执行编译命令时的目录。OBD 会根据组件自动从该目录下获取所需的文件。
--V/--version | 是 | string | 版本号。
--t/--tag | 否 | string | 镜像标签。您可以为您的创建的镜像定义多个标签，以英文逗号（,）间隔。
--f/--force | 否 | bool | 当镜像已存在，或者标签已存在时强制覆盖。默认不开启。
+| -n/--name | Yes | string | The component name. If you want to compile an OceanBase cluster, set this option to oceanbase-ce. If you want to compile ODP, set this option to obproxy.  |
+| -p/--path | Yes | string | The directory that stores the compilation output. OBD will automatically retrieve files required by the component from this directory.  |
+| -V/--version | Yes | string | The component version.  |
+| -t/--tag | No | string | The mirror tags. You can define one or more tags for the created mirror. Separate multiple tags with commas (,).  |
+| -f/--force | No | bool | Specifies whether to forcibly overwrite an existing mirror or tag. This option is disabled by default.  |
 
 #### `obd mirror list`
 
-显示镜像仓库或镜像列表。
+Shows the mirror repository or mirror list.
 
 ```shell
 obd mirror list [mirror repo name]
 ```
 
-参数 `mirror repo name` 为镜像仓库名。该参数为可选参数。为空时，将显示镜像仓库列表。不为空时，则显示对应仓库的镜像列表。
+`mirror repo name` specifies the mirror repository name. This parameter is optional. When it is not specified, all mirror repositories will be returned. When it is specified, only the specified mirror repository will be returned.
 
 #### `obd mirror update`
 
-同步全部远程镜像仓库的信息。
+Synchronizes the information of all remote mirror repositories.
 
 ```shell
 obd mirror update
 ```
 
-### 集群命令组
+### Cluster commands
 
-OBD 集群命令操作的最小单位为一个部署配置。部署配置是一份 `yaml` 文件，里面包含各个整个部署的全部配置信息，包括服务器登录信息、组件信息、组件配置信息和组件服务器列表等。
+A deployment configuration is the minimum unit for OBD cluster commands. A deployment configuration is a `yaml` file. It contains all configuration information of a deployment, including the server login information, component information, component configuration information, and component server list.
 
-在使用 OBD 启动一个集群之前，您需要先注册这个集群的部署配置到 OBD 中。您可以使用 `obd cluster edit-config` 创建一个空的部署配置，或使用 `obd cluster deploy -c config` 导入一个部署配置。
+To start a cluster by using OBD, you must register the deployment configuration of your cluster to OBD. You can run the `obd cluster edit-config` command to create an empty deployment configuration or run the `obd cluster deploy -c config` command to import a deployment configuration.
 
 #### `obd cluster autodeploy`
 
-传入一个简易的配置文件，OBD 会根据目标机器资源自动生成最大规格的完整配置并部署启动集群。
+When you pass a simple configuration file to OBD, OBD will automatically generate a complete configuration file with the maximum specifications based on the resources of the target server, and then deploy and start a cluster on the target server.
 
 ```shell
 obd cluster autodeploy <deploy name> -c <yaml path> [-f] [-U] [-A] [-s]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项说明见下表：
+The following table describes the corresponding options.
 
-选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+| Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- |---
--c/--config | 是 | string | 无 | 使用指定的 yaml 文件部署，并将部署配置注册到 OBD 中。<br>当`deploy name` 存在时，会判断其状态，如果旧配置尚未部署则覆盖，否则报错。
--f/--force | 否 | bool | false | 开启时，强制清空工作目录。<br>当组件要求工作目录为空且不使用改选项时，工作目录不为空会返回错误。
--U/--ulp/ --unuselibrepo | 否 | bool | false | 使用该选项将禁止 OBD 自动处理依赖。不开启的情况下，OBD 将在检查到缺失依赖时搜索相关的 libs 镜像并安装。使用该选项将会在对应的配置文件中添加 **unuse_lib_repository: true**。也可以在配置文件中使用 **unuse_lib_repository: true** 开启。
--A/--act/--auto-create-tenant | 否 | bool | false | 开启该选项 OBD 将会在 bootstrap 阶段使用集群全部可用资源创建一个名为 `test` 的租户。使用该选项将会在对应的配置文件中添加 **auto_create_tenant: true**。也可以在配置文件中使用 **auto_create_tenant: true** 开启。
--s/--strict-check | 否 | bool | false | 部分组件在启动前会做相关的检查，当检查不通过的时候会报警告，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。
+| -c/--config | Yes | string | None | Specifies the yaml file used for deployment and registers the deployment configuration to OBD. <br>When the `deploy name` already exists, OBD will check the status of the existing deployment configuration. If the existing deployment configuration has not been applied, it will be overwritten. If the existing deployment configuration is in use, an error will be returned.  |
+| -f/--force | No | bool | false | Specifies whether to forcibly clear the working directory. <br>When the component requires an empty working directory but this option is disabled, an error will be returned if the working directory is not empty.  |
+| -U/--ulp/--unuselibrepo | No | bool | false | Specifies whether to prevent OBD from automatically taking actions when dependencies are missing. If this option is disabled and OBD detects that some dependencies are missing, OBD will automatically search for the corresponding libs mirrors and install them. If this option is enabled, the **unuse_lib_repository: true** field will be added to the corresponding configuration file. You can also add the **unuse_lib_repository: true** field to the configuration file to enable this option.  |
+| -A/--act/--auto-create-tenant | No | bool | false | Specifies whether to enable OBD to create the `test` tenant during the bootstrap by using all available resources of the cluster. If this option is enabled, the **auto_create_tenant: true** field will be added to the corresponding configuration file. You can also add the **auto_create_tenant: true** field to the configuration file to enable this option.  |
+| -s/--strict-check | No | bool | false | Specifies whether to return an error and directly exit the process when the component pre-check fails. If this option is disabled, OBD will return an error but not forcibly end the process when pre-check fails. We recommend that you enable this option to avoid startup failures due to insufficient resources.  |
 
 #### `obd cluster edit-config`
 
-修改一个部署配置，当部署配置不存在时创建。
+Modifies a deployment configuration or creates one when the specified deployment configuration does not exist.
 
 ```shell
 obd cluster edit-config <deploy name>
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name for the deployment configuration file.
 
 #### `obd cluster deploy`
 
-根据配置部署集群。此命令会根据部署配置文件中组件的信息查找合适的镜像，并安装到本地仓库，此过程称为本地安装。
-再将本地仓库中存在合适版本的组件分发给目标服务器，此过程称为远程安装。
-在本地安装和远程安装时都会检查服务器是否存在组件运行所需的依赖。
-此命令可以直接使用 OBD 中已注册的 `deploy name` 部署，也可以通过传入 `yaml` 的配置信息。
+Deploys a cluster based on the deployment configuration file. Based on the deployment configuration file, this command finds the matching mirror, then installs the mirror in a local repository. This process is called local installation.
+Then, OBD distributes the components of the required version in the local repository to the target server. This process is called remote installation.
+During both local and remote installation, OBD checks whether the server stores dependencies required for running the components.
+This command allows you to deploy a cluster based on a deployment configuration that has been registered to OBD or by passing a `yaml` file.
 
 ```shell
 obd cluster deploy <deploy name> [-c <yaml path>] [-f] [-U] [-A]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项说明见下表：
+The following table describes the corresponding options.
 
-选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+| Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- |---
--c/--config | 否 | string | 无 | 使用指定的 yaml 文件部署，并将部署配置注册到 OBD 中。<br>当 `deploy name` 存在时覆盖配置。<br>如果不使用该选项，则会根据 `deploy name` 查找已注册到 OBD 中的配置信息。
--f/--force | 否 | bool | false | 开启时，强制清空工作目录。<br>当组件要求工作目录为空且不使用改选项时，工作目录不为空会返回错误。
--U/--ulp/ --unuselibrepo | 否 | bool | false | 使用该选项将禁止 OBD 自动处理依赖。不开启的情况下，OBD 将在检查到缺失依赖时搜索相关的 libs 镜像并安装。使用该选项将会在对应的配置文件中添加 **unuse_lib_repository: true**。也可以在配置文件中使用 **unuse_lib_repository: true** 开启。
--A/--act/--auto-create-tenant | 否 | bool | false | 开启该选项 OBD 将会在 bootstrap 阶段使用集群全部可用资源创建一个名为 `test` 的租户。使用该选项将会在对应的配置文件中添加 **auto_create_tenant: true**。也可以在配置文件中使用 **auto_create_tenant: true** 开启。
-<!-- --force-delete | 否 | bool | false | 强制删除，删除已注册的集群。
--s/--strict-check | 否 | bool | false | 当检查失败时抛出错误而不是警告。 -->
+| -c/--config | No | string | None | Specifies the yaml file used for deployment and registers the deployment configuration to OBD. <br>If this option is enabled and a deployment configuration of the specified `deploy name` already exists, the existing deployment configuration will be overwritten. <br>If this option is not enabled, OBD will search for the registered deployment configuration of the specified `deploy name`.  |
+| -f/--force | No | bool | false | Specifies whether to forcibly clear the working directory. <br>When the component requires an empty working directory but this option is disabled, an error will be returned if the working directory is not empty.  |
+| -U/--ulp/--unuselibrepo | No | bool | false | Specifies whether to prevent OBD from automatically taking actions when dependencies are missing. If this option is disabled and OBD detects that some dependencies are missing, OBD will automatically search for the corresponding libs mirrors and install them. If this option is enabled, the **unuse_lib_repository: true** field will be added to the corresponding configuration file. You can also add the **unuse_lib_repository: true** field to the configuration file to enable this option.  |
+| -A/--act/--auto-create-tenant | No | bool | false | Specifies whether to enable OBD to create the `test` tenant during the bootstrap by using all available resources of the cluster. If this option is enabled, the **auto_create_tenant: true** field will be added to the corresponding configuration file. You can also add the **auto_create_tenant: true** field to the configuration file to enable this option.  |
 
 #### `obd cluster start`
 
-启动已部署的集群，成功时打印集群状态。
+Starts a deployed cluster. If the cluster is started, OBD will return its status.
 
 ```shell
 obd cluster start <deploy name> [-s]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项 `-s` 为 `--strict-check`。部分组件在启动前会做相关的检查，当检查不通过的时候会报警告，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。非必填项。数据类型为 `bool`。默认不开启。
+`-s` is `--strict-check`. `-s` specifies whether to return an error and directly exit the process when the component pre-check fails. If this option is disabled, OBD will return an error but not forcibly end the process when pre-check fails. We recommend that you enable this option to avoid startup failures due to insufficient resources. `-s` is optional. Its data type is `bool`. This option is disabled by default.
 
 #### `obd cluster list`
 
-显示当前 OBD 内注册的全部集群（deploy name）的状态。
+Shows the status of all clusters that have been registered to OBD. The cluster names are specified by the deploy name parameter.
 
 ```shell
 obd cluster list
@@ -327,220 +325,221 @@ obd cluster list
 
 #### `obd cluster display`
 
-展示指定集群的状态。
+Shows the status of the specified cluster.
 
 ```shell
 obd cluster display <deploy name>
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
 #### `obd cluster reload`
 
-重载一个运行中集群。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `reload` 命令应用修改。
-> **注意**：并非全部的配置项都可以通过 `reload` 来应用。有些配置项需要重启集群，甚至是重新部署集群才能生效。
-请根据 edit-config 后返回的信息进行操作。
+Reloads a running cluster. After you modify the configuration information of a running cluster by using the `edit-config` command, you can run the `reload` command to let your modification take effect.
+> **NOTE:** Some configuration items may not take effect after you run the `reload` command. You need to restart or even redeploy the cluster for these configuration items to take effect.
+
+Do operations based on the result returned by the `edit-config` command.
 
 ```shell
 obd cluster reload <deploy name>
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
 #### `obd cluster restart`
 
-重启一个运行中集群。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `restart` 命令应用修改。
+Restarts a running cluster. After you run the edit-config command to modify the configuration information of a running cluster, you can run the `restart` command for the modification to take effect.
 
-> **注意：** 并非所有的配置项都可以通过 `restart` 来应用。有些配置项需要重部署集群才能生效。
+> **NOTE:** Some configuration items may not take effect after you run the `restart` command. You even need to redeploy the cluster for some configuration items to take effect.
 
-请根据 edit-config 后返回的信息进行操作。
+Perform operations based on the result returned by the edit-config command.
 
 ```shell
 obd cluster restart <deploy name>
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
 #### `obd cluster redeploy`
 
-重启一个运行中集群。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `redeploy` 命令应用修改。
+Redeploys a running cluster. After you run the `edit-config` command to modify the configuration information of a running cluster, you can run the `redeploy` command to let your modification take effect.
 
-> **注意：** 该命令会销毁集群，重新部署，您集群中的数据会丢失，请先做好备份。
+> **NOTE:** This command destroys the cluster and redeploys it. Data in the cluster will be lost. Please back up the data before you run this command.
 
 ```shell
 obd cluster redeploy <deploy name>
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
 #### `obd cluster stop`
 
-停止一个运行中的集群。
+Stops a running cluster.
 
 ```shell
 obd cluster stop <deploy name>
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
 #### `obd cluster destroy`
 
-销毁已部署的集群。如果集群处于运行中的状态，该命令会先尝试执行`stop`，成功后再执行`destroy`。
+Destroys a deployed cluster. If the cluster is running, this command stops the cluster before destroying it.
 
 ```shell
 obd cluster destroy <deploy name> [-f]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项 `-f` 为 `--force-kill`。检查到工作目录下有运行中的进程时，强制停止。销毁前会做检查是有还有进程在运行中。这些运行中的进程可能是 **start** 失败留下的，也可能是因为配置与其他集群重叠，进程是其他集群的。但无论是哪个原因导致工作目录下有进程未退出，**destroy** 都会直接停止。使用该选项会强制停止这些运行中的进程，强制执行 **destroy**。非必填项。数据类型为 `bool`。默认不开启。
+`-f` is `--force-kill`. This option specifies whether to forcibly stop running processes in the working directory. Before OBD destroys the cluster, it will check for running processes. These processes may result from the failure of the **start** command. They may also belong to other clusters when configurations of this cluster overlap with those of other clusters. If an ongoing process is found in the working directory, OBD will stop the **destroy** command. However, if this option is enabled, OBD will forcibly stop the ongoing processes and run the **destroy** command. `-f` is optional. Its data type is `bool`. This option is disabled by default.
 
 #### `obd cluster tenant create`
 
-创建租户。该命令仅 OceanBase 数据库有效。该命令会自动创建资源单元和资源池，用户不需要手动创建。
+Creates a tenant. This command applies only to an OceanBase cluster. This command automatically creates resource units and resource pools.
 
 ```shell
 obd cluster tenant create <deploy name> [-n <tenant name>] [flags]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项说明见下表：
+This table describes the corresponding options.
 
-选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+| Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
--n/--tenant-name | 否 | string |  test | 租户名。对应的资源单元和资源池根据租户名自动生成，并且避免重名。
---max-cpu | 否 | float | 0 | 租户可用最大 CPU 数。为 0 时使用集群剩余全部可用 CPU。实际值低于 2 时报错。
---min-cpu | 否 | float | 0 | 租户可用最小 CPU 数。为 0 时等于 --max-cpu。
---max-memory | 否 | int | 0 | 租户可用最大内存。为 0 时使用集群剩余全部可用内存。实际值低于 1G 时报错。
---min-memory | 否 | int | 0 | 租户可用最大内存。为 0 时等于 --max-memory。
---max-disk-size | 否 | int | 0 | 租户可用最大磁盘空间。为0时使用集群全部可用空间。实际值低于 512M 时报错。
---max-iops | 否 | int | 128 | 租户 IOPS 最多数量，取值范围为 [128,+∞)。
---min-iops | 否 | int | 0 | 租户 IOPS 最少数量。值域同 --max-iops 。为 0 时等于 --max-iops 。
---max-session-num | 否 | int | 64 | 租户 最大 SESSION 数，取值范围为 [64,+∞)。
---unit-num | 否 | int | 0 | 指定要创建的单个 ZONE 下的单元个数，取值要小于单个 ZONE 中的 OBServer 个数。为 0 自动获取最大值。
--z/--zone-list | 否 | string | 空 | 指定租户的 ZONE 列表，多个 ZONE 用英文逗号（,）间隔。为空时等于集群全部 ZONE。
---primary-zone | 否 | string | RANDOM | 租户的主 Zone。
---charset | 否 | string | 空 | 租户的字符集。
---collate | 否 | string | 空 | 租户校对规则。
---replica-num | 否 | int | 0 | 租户副本数。为 0 时等于 ZONE 的数目。
---logonly-replica-num | 否 | string | 0 | 租户日志副本数。为 0 时等于 --replica-num。
---tablegroup | 否 | string | 空 | 租户默认表组信息
---locality | 否 | string | 空 | 描述副本在 Zone 间的分布情况，如：F@z1,F@z2,F@z3,R@z4 表示 z1, z2, z3 为全功能副本，z4 为只读副本。
--s/--variables | 否 | string | ob_tcp_invited_nodes='%' | 设置租户系统变量值。
+| -n/--tenant-name | No | string | test | The tenant name. OBD will automatically generate resource units and resource pools with unique names based on the tenant name.  |
+| --max-cpu | No | float | 0 | The maximum number of CPU cores available for the tenant. When this option is set to 0, all available CPU cores of the cluster can be used by the tenant. When the value is less than two, an error is returned.  |
+| --min-cpu | No | float | 0 | The minimum number of CPU cores available for the tenant. When this option is set to 0, the minimum number of CPU cores is the same as the maximum number of CPU cores.  |
+| --max-memory | No | int | 0 | The maximum memory capacity available for the tenant. When this option is set to 0, all available memory capacity of the cluster can be used by the tenant. When the actual value is less than 1 GB, an error is returned.  |
+| --min-memory | No | int | 0 | The minimum memory capacity available for the tenant. When this option is set to 0, the minimum memory capacity is the same as the maximum memory capacity.  |
+| --max-disk-size | No | int | 0 | The maximum disk space available for the tenant. When this option is set to 0, all available disk space of the cluster can be used by the tenant. If the actual value is less than 512 MB, an error is returned.  |
+| --max-iops | No | int | 128 | The maximum IOPS for the tenant. Value range: [128, +∞).  |
+| --min-iops | No | int | 0 | The minimum IOPS for the tenant. Value range: [128, +∞). When this option is set to 0, the minimum IOPS is the same as the maximum IOPS.  |
+| --max-session-num | No | int | 64 | The maximum number of sessions allowed for the tenant. Value range: [64, +∞).  |
+| --unit-num | No | int | 0 | The number of units to be created in a zone. It must be less than the number of OBServers in the zone. When this option is set to 0, the maximum value is used.  |
+| -z/--zone-list | No | string |   | Specifies the list of zones of the tenant. Separate multiple zones with commas (,). If this option is not specified, all zones of the cluster are included.  |
+| --primary-zone | No | string | RANDOM | The primary zone of the tenant.  |
+| --charset | No | string |   | The character set of the tenant.  |
+| --collate | No | string |   | The collation of the tenant.  |
+| --replica-num | No | int | 0 | The number of replicas of the tenant. When this option is set to 0, the number of replicas is the same as that of zones.  |
+| --logonly-replica-num | No | string | 0 | The number of log replicas of the tenant. When this option is set to 0, the number of log replicas is the same as that of replicas.  |
+| --tablegroup | No | string |   | The default table group of the tenant. |
+| --locality | No | string |   | The distribution status of replicas across zones. For example, F@z1,F@z2,F@z3,R@z4 means that z1, z2, and z3 are full-featured replicas and z4 is a read-only replica.  |
+| -s/--variables | No | string | ob_tcp_invited_nodes='%' | The system variables of the tenant.  |
 
 #### `obd cluster tenant drop`
 
-删除租户。该命令仅 OceanBase 数据库有效。该命令会自动删除对应的资源单元和资源池。
+Deletes a tenant. This command applies only to an OceanBase cluster. This command automatically deletes the corresponding resource units and resource pools.
 
 ```shell
 obd cluster tenant drop <deploy name> [-n <tenant name>]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项 `-n` 为 `--tenant-name`。要删除的租户名。必填项。
+`-n` is `--tenant-name`. This option specifies the name of the tenant to be deleted. This option is required.
 
-### 测试命令组
+### Testing commands
 
 #### `obd test mysqltest`
 
-对 OcecanBase 数据库或 ODP 组件的指定节点执行 mysqltest。mysqltest 需要 OBClient，请先安装 OBClient。
+Runs the mysqltest on the specified node of an OcecanBase cluster or ODP. To run the mysqltest, you must install OBClient.
 
 ```shell
 obd test mysqltest <deploy name> [--test-set <test-set>] [flags]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项说明见下表：
+This table describes the corresponding options.
 
-选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+| Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
--c/--component | 否 | string | 默认为空 | 待测试的组件名。候选项为 oceanbase-ce 和 obproxy。为空时，按 obproxy、oceanbase-ce 的顺序进行检查。检查到组件存在则不再遍历，使用命中的组件进行后续测试。
---test-server | 否 | string | 默指定的组件下服务器中的第一个节点。 | 必须是指定的组件下的某个节点名。
---mode | 否 | string | both | 测试模式。候选项为 mysql、both。
---user | 否 | string | root | 执行测试的用户名。
---password | 否 | string | 默认为空 | 执行测试的用户密码。
---mysqltest-bin | 否 | string | mysqltest | mysqltest 二进制文件路径。
---obclient-bin | 否 | string | obclient | OBClient 二进制文件路径。
---test-dir | 否 | string | ./mysql_test/t | mysqltest 所需的 **test-file** 存放的目录。test 文件找不到时会尝试在 OBD 内置中查找。
---result-dir | 否 | string | ./mysql_test/r | mysqltest 所需的 **result-file** 存放的目录。result 文件找不到时会尝试在 OBD 内置中查找。
---tmp-dir | 否 | string | ./tmp | 为 mysqltest tmpdir 选项。
---var-dir | 否 | string | ./var | 将在该目录下创建 log 目录并作为 logdir 选项传入 mysqltest。
---test-set | 否 | string | 无 | test case 数组。多个数组使用英文逗号（,）间隔。
---test-pattern | 否 | string | 无| test 文件名匹配的正则表达式。所有匹配表达式的case将覆盖test-set选项。
---suite | 否 | string | 无 | suite 数组。一个 suite 下包含多个 test。可以使用英文逗号（,）间隔。使用该选项后 --test-pattern 和 --test-set 都将失效。
---suite-dir | 否 | string | ./mysql_test/test_suite | 存放 suite 目录的目录。suite 目录找不到时会尝试在 OBD 内置中查找。
---all | 否 | bool | false | 执行 --suite-dir 下全部的 case。存放 suite 目录的目录。
---need-init | 否 | bool |  false | 执行init sql 文件。一个新的集群要执行 mysqltest 前可能需要执行一些初始化文件，比如创建 case 所需要的账号和租户等。存放 suite 目录的目录。默认不开启。
---init-sql-dir | 否 | string | ../ | init sql 文件所在目录。sql 文件找不到时会尝试在obd内置中查找。
---init-sql-files | 否 | string | | 需要 init 时执行的 init sql 文件数组。英文逗号（,）间隔。不填时，如果需要 init，OBD 会根据集群配置执行内置的 init。
---auto-retry | 否 | bool | false | 失败时自动重部署集群进行重试。
+| -c/--component | No | string |   | The name of the component to be tested. Valid values: oceanbase-ce and obproxy. If this option is not specified, OBD will search for obproxy and oceanbase-ce in sequence. If obproxy is found, OBD will stop the search and use obproxy for the subsequent tests. If obproxy is not found, OBD will continue to search for oceanbase-ce.  |
+| --test-server | No | string | The first node of the specified component.  | It must be the name of a node of the specified component.  |
+| --mode | No | string | both | The test mode. Valid values: mysql and both.  |
+| --user | No | string | root | The username for running the test.  |
+| --password | No | string |   | The password for running the test.  |
+| --mysqltest-bin | No | string | mysqltest | The path of the mysqltest binary file.  |
+| --obclient-bin | No | string | obclient | The path of the OBClient binary file.  |
+| --test-dir | No | string | ./mysql_test/t | The directory that stores the test file required for the mysqltest. If no test file is found in the directory, OBD will search for a built-in test file.  |
+| --result-dir | No | string | ./mysql_test/r | The directory that stores the result file required for the mysqltest. If no result file is found in the directory, OBD will search for a built-in result file.  |
+| --tmp-dir | No | string | ./tmp | The mysqltest tmpdir option.  |
+| --var-dir | No | string | ./var | The directory to create the log directory. The log directory will be added to the mysqltest command as the logdir option.  |
+| --test-set | No | string | None | The test case array. Separate multiple test cases with commas (,).  |
+| --test-pattern | No | string | None | The regular expression for matching test file names. Test cases matching the regular expression will overwrite the values of the test-set option.  |
+| --suite | No | string | None | The suite array. A suite contains multiple tests. Separate multiple tests with commas (,). If this option is enabled, the --test-pattern and --test-set options will become invalid.  |
+| --suite-dir | No | string | ./mysql_test/test_suite | The directory that stores the suite directory. If no suite directory is found in the directory, OBD will search for a built-in suite directory.  |
+| --all | No | bool | false | Specifies whether to run all test cases in the directory specified for the --suite-dir option. The --suite-dir option specifies the directory that stores the suite directory.  |
+| --need-init | No | bool | false | Specifies whether to run the init sql files. Before OBD runs the mysqltest on a new cluster, it may run some initialization files. For example, it may create some accounts or tenants required for running the test cases. The --suite-dir option specifies the directory that stores the suite directory. This option is disabled by default.  |
+| --init-sql-dir | No | string | ../ | The directory that stores the init sql files. If no init sql file is found in the directory, OBD will search for built-in init sql files.  |
+| --init-sql-files | No | string | | The init sql files to be run when initialization is required. Separate multiple init sql files with commas (,). If this option is not specified but initialization is required, OBD will run the built-in init files based on the cluster configurations.  |
+| --auto-retry | No | bool | false | Specifies whether to automatically redeploy the cluster for a retry after a test fails.  |
 
 #### `obd test sysbench`
 
-对 OcecanBase 数据库或 ODP 组件的指定节点执行 Sysbench。 Sysbench 需要 OBClient 和 ob-sysbench，请先安装 OBClient 和 ob-sysbench。
+Runs the Sysbench test on the specified node of an OcecanBase cluster or ODP.  To run the Sysbench test, you must install OBClient and ob-sysbench.
 
 ```shell
 obd test sysbench <deploy name> [flags]
 ```
 
-参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+`deploy name` specifies the name of the deployment configuration file.
 
-选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+| Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
--c/--component | 否 | string | 默认为空 | 待测试的组件名。候选项为 oceanbase-ce 和 obproxy。为空时，按 obproxy、oceanbase-ce 的顺序进行检查。检查到组件存在则不再遍历，使用命中的组件进行后续测试。
---test-server | 否 | string | 默指定的组件下服务器中的第一个节点。 | 必须是指定的组件下的某个节点名。
---user | 否 | string | root | 执行测试的用户名。
---password | 否 | string | 默认为空 | 执行测试的用户密码。
---tenant | 否 | string | test | 执行测试的租户名。
---database | 否 | string | test | 执行测试的数据库。
---obclient-bin | 否 | string | obclient | OBClient 二进制文件路径。
---sysbench-bin | 否 | string | sysbench | sysbench 二进制文件路径。
---script-name | 否 | string | point_select.lua | 要执行的 sysbench 脚本名。
---sysbench-script-dir | 否 | string | /usr/sysbench/share/sysbench | sysbench 脚本存放目录。
---tables | 否 | int | 30 | 初始化表的数量。
---table-size | 否 | int | 20000 | 每张表初始化的数据数量。
---threads | 否 | int | 16 | 启动的线程数量。
---time | 否 | int | 60 | 运行时间。设置为 0 时表示不限制时间。
---interval | 否 | int | 10 | 运行期间日志，单位为秒。
---events | 否 | int | 0 | 最大请求数量，定义数量后可以不需要 --time 选项。
---rand-type | 否 | string | 访问数据时使用的随机生成函数。取值可以为 special、uniform、gaussian 或 pareto。 默认值为 special， 早期值为 uniform。
----skip-trx | 否 | string | 空 | 在只读测试中打开或关闭事务。
+| -c/--component | No | string |   | The name of the component to be tested. Valid values: oceanbase-ce and obproxy. If this option is not specified, OBD will search for obproxy and oceanbase-ce in sequence. If obproxy is found, OBD will stop the search and use obproxy for subsequent tests. If obproxy is not found, OBD will continue to search for oceanbase-ce.  |
+| --test-server | No | string | The first node of the specified component.  | It must be the name of a node of the specified component.  |
+| --user | No | string | root | The username for running the test.  |
+| --password | No | string |   | The password for running the test.  |
+| --tenant | No | string | test | The tenant name for running the test.  |
+| --database | No | string | test | The cluster for performing the test.  |
+| --obclient-bin | No | string | obclient | The path of the OBClient binary file.  |
+| --sysbench-bin | No | string | sysbench | The path of the Sysbench binary file.  |
+| --script-name | No | string | point_select.lua | The name of the Sysbench script to be run.  |
+| --sysbench-script-dir | No | string | /usr/sysbench/share/sysbench | The directory that stores the Sysbench script.  |
+| --tables | No | int | 30 | The number of tables to be initialized.  |
+| --table-size | No | int | 20000 | The data size of each table to be initialized.  |
+| --threads | No | int | 16 | The number of threads to be started.  |
+| --time | No | int | 60 | The running duration. When this option is set to 0, the running duration is not limited.  |
+| --interval | No | int | 10 | The logging interval, in seconds.  |
+| --events | No | int | 0 | The maximum number of requests. If this option is specified, the --time option is not needed.  |
+| --rand-type | No | string | The random number generation function used for data access. Valid values: special, uniform, gaussian, and pareto.  Default value: special.  |
+| ---skip-trx | No | string |   | Specifies whether to enable or disable a transaction in a read-only test.  |
 
 ## Q&A
 
-### Q: 如何指定使用组件的版本？
+### Q: How can I specify the version of a component?
 
-A: 在部署配置文件中使用版本声明。例如，如果您使用的是 OceanBase-CE 3.1.0 版本，可以指定以下配置：
+A: You can add the version declaration to the deployment configuration file. For example, you can specify the version of OceanBase-CE V3.1.0 in the deployment configuration file in the following format:
 
 ```yaml
 oceanbase-ce:
   version: 3.1.0
 ```
 
-### Q: 如何指定使用特定版本的组件？
+### Q: How can I use a component of a specific version?
 
-A: 在部署配置文件中使用 package_hash 或 tag 声明。
-如果您给自己编译的 OceanBase-CE 设置了t ag，您可以使用 tag 来指定。如：
+A: You can add the package_hash or tag declaration to the deployment configuration file.
+For example, if you have tagged your compiled OceanBase-CE, you can specify it by tag. For example:
 
 ```yaml
 oceanbase-ce:
   tag: my-oceanbase
 ```
 
-您也可以通过 package_hash 来指定特定的版本。当您使用 `obd mirror` 相关命令时会打印出组件的 md5 值，这个值即为 package_hash。
+You can also use package_hash to specify a specific version. When you run an `obd mirror` command, OBD will return an MD5 value of the component. The MD5 value is the value of package_hash.
 
 ```yaml
 oceanbase-ce:
   package_hash: 929df53459404d9b0c1f945e7e23ea4b89972069
 ```
 
-### Q：我修改了 OceanBase-CE 了代码，需要修改启动流程怎么办？
+### Q: How can I modify the startup process after I modify the code of OceanBase-CE?
 
-A：您可以修改 `~/.obd/plugins/oceanbase-ce/` 下的启动相关插件。比如您为 3.1.0 版本的 OceanBase-CE 添加了一个新的启动配置，可以修改 ``~/.obd/plugins/oceanbase-ce/3.1.0/start.py``。
+A: You can modify the startup plug-ins in the `~/.obd/plugins/oceanbase-ce/` directory. For example, after you add a new startup configuration item for OceanBase-CE V3.1.0, you can modify the `start.py` file in the `~/.obd/plugins/oceanbase-ce/3.1.0` directory.
 
-## 协议
+## Protocol
 
-OBD 采用 [GPL-3.0](./LICENSE) 协议。
+OBD complies with [GPL-3.0](/LICENSE).

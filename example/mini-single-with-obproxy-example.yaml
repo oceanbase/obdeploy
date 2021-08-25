@@ -56,7 +56,7 @@ obproxy:
     prometheus_listen_port: 2884 # The Prometheus port. The default value is 2884.
     home_path: /root/obproxy
     # oceanbase root server list
-    # format: ip:mysql_port,ip:mysql_port
+    # format: ip:mysql_port;ip:mysql_port
     rs_list: 192.168.1.3:2881
     enable_cluster_checkout: false
     # observer cluster name, consistent with oceanbase-ce's appname
