@@ -1,4 +1,4 @@
-# OceanBase Deploy
+# OceanBase Deployer
 
 <!--
 #
@@ -24,7 +24,7 @@
 
 <!-- TODO: some badges here -->
 
-OceanBase Deploy （简称 OBD）是 OceanBase 开源软件的安装部署工具。OBD 同时也是包管理器，可以用来管理 OceanBase 所有的开源软件。本文介绍如何安装 OBD、使用 OBD 和 OBD 的命令。
+OceanBase Deployer（简称 OBD）是 OceanBase 开源软件的安装部署工具。OBD 同时也是包管理器，可以用来管理 OceanBase 所有的开源软件。本文介绍如何安装 OBD、使用 OBD 和 OBD 的命令。
 
 ## 安装 OBD
 
@@ -73,7 +73,7 @@ source /etc/profile.d/obd.sh
 
 - 当前用户为 root。
 - `2882` 和 `2883` 端口没有被占用。
-- 您的机器内存应该不低于 8G。
+- 您的机器内存应该不低于 8 G。
 - 您的机器 CPU 数目应该不低于 2。
 
 > **说明：** 如果以上条件不满足，请参考[使用 OBD 启动 OceanBase 数据库集群](#使用-obd-启动-oceanbase-数据库集群)。
@@ -197,7 +197,7 @@ OBD 有多级命令，您可以在每个层级中使用 `-h/--help` 选项查看
 
 #### `obd mirror clone`
 
-将一个 RPM 包复制到本地镜像库，之后您可以使用 OBD 集群中相关的命令中启动镜像。
+将一个 RPM 包复制到本地镜像库，之后您可以使用 OBD 集群中相关的命令启动镜像。
 
 ```shell
 obd mirror clone <path> [-f]
@@ -266,7 +266,7 @@ obd cluster autodeploy <deploy name> -c <yaml path> [-f] [-U] [-A] [-s]
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
 -c/--config | 是 | string | 无 | 使用指定的 yaml 文件部署，并将部署配置注册到 OBD 中。<br>当`deploy name` 存在时，会判断其状态，如果旧配置尚未部署则覆盖，否则报错。
--f/--force | 否 | bool | false | 开启时，强制清空工作目录。<br>当组件要求工作目录为空且不使用改选项时，工作目录不为空会返回错误。
+-f/--force | 否 | bool | false | 开启时，强制清空工作目录。<br>当组件要求工作目录为空且不使用该选项时，工作目录不为空会返回错误。
 -U/--ulp/ --unuselibrepo | 否 | bool | false | 使用该选项将禁止 OBD 自动处理依赖。不开启的情况下，OBD 将在检查到缺失依赖时搜索相关的 libs 镜像并安装。使用该选项将会在对应的配置文件中添加 **unuse_lib_repository: true**。也可以在配置文件中使用 **unuse_lib_repository: true** 开启。
 -A/--act/--auto-create-tenant | 否 | bool | false | 开启该选项 OBD 将会在 bootstrap 阶段使用集群全部可用资源创建一个名为 `test` 的租户。使用该选项将会在对应的配置文件中添加 **auto_create_tenant: true**。也可以在配置文件中使用 **auto_create_tenant: true** 开启。
 -s/--strict-check | 否 | bool | false | 部分组件在启动前会做相关的检查，当检查不通过的时候会报警告，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。
@@ -337,7 +337,7 @@ obd cluster display <deploy name>
 
 #### `obd cluster reload`
 
-重载一个运行中集群。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `reload` 命令应用修改。
+重载一个运行中集群。当您使用 `edit-config` 修改一个运行的集群的配置信息后，可以通过 `reload` 命令应用修改。
 > **注意**：并非全部的配置项都可以通过 `reload` 来应用。有些配置项需要重启集群，甚至是重新部署集群才能生效。
 请根据 edit-config 后返回的信息进行操作。
 
@@ -363,7 +363,7 @@ obd cluster restart <deploy name>
 
 #### `obd cluster redeploy`
 
-重启一个运行中集群。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `redeploy` 命令应用修改。
+重启一个运行中集群。当您使用 `edit-config` 修改一个运行的集群的配置信息后，可以通过 `redeploy` 命令应用修改。
 
 > **注意：** 该命令会销毁集群，重新部署，您集群中的数据会丢失，请先做好备份。
 
@@ -397,7 +397,7 @@ obd cluster destroy <deploy name> [-f]
 
 #### `obd cluster tenant create`
 
-创建租户。该命令仅 OceanBase 数据库有效。该命令会自动创建资源单元和资源池，用户不需要手动创建。
+创建租户。该命令仅对 OceanBase 数据库有效。该命令会自动创建资源单元和资源池，用户不需要手动创建。
 
 ```shell
 obd cluster tenant create <deploy name> [-n <tenant name>] [flags]
@@ -416,7 +416,7 @@ obd cluster tenant create <deploy name> [-n <tenant name>] [flags]
 --min-memory | 否 | int | 0 | 租户可用最大内存。为 0 时等于 --max-memory。
 --max-disk-size | 否 | int | 0 | 租户可用最大磁盘空间。为0时使用集群全部可用空间。实际值低于 512M 时报错。
 --max-iops | 否 | int | 128 | 租户 IOPS 最多数量，取值范围为 [128,+∞)。
---min-iops | 否 | int | 0 | 租户 IOPS 最少数量。值域同 --max-iops 。为 0 时等于 --max-iops 。
+--min-iops | 否 | int | 0 | 租户 IOPS 最少数量。取值范围为 [128,+∞)。为 0 时等于 --max-iops 。
 --max-session-num | 否 | int | 64 | 租户 最大 SESSION 数，取值范围为 [64,+∞)。
 --unit-num | 否 | int | 0 | 指定要创建的单个 ZONE 下的单元个数，取值要小于单个 ZONE 中的 OBServer 个数。为 0 自动获取最大值。
 -z/--zone-list | 否 | string | 空 | 指定租户的 ZONE 列表，多个 ZONE 用英文逗号（,）间隔。为空时等于集群全部 ZONE。
@@ -522,7 +522,7 @@ oceanbase-ce:
 ### Q: 如何指定使用特定版本的组件？
 
 A: 在部署配置文件中使用 package_hash 或 tag 声明。
-如果您给自己编译的 OceanBase-CE 设置了t ag，您可以使用 tag 来指定。如：
+如果您给自己编译的 OceanBase-CE 设置了 tag，您可以使用 tag 来指定。如：
 
 ```yaml
 oceanbase-ce:
@@ -538,7 +538,7 @@ oceanbase-ce:
 
 ### Q：我修改了 OceanBase-CE 了代码，需要修改启动流程怎么办？
 
-A：您可以修改 `~/.obd/plugins/oceanbase-ce/` 下的启动相关插件。比如您为 3.1.0 版本的 OceanBase-CE 添加了一个新的启动配置，可以修改 ``~/.obd/plugins/oceanbase-ce/3.1.0/start.py``。
+A：您可以修改 `~/.obd/plugins/oceanbase-ce/` 下的启动相关插件。比如您为 3.1.0 版本的 OceanBase-CE 添加了一个新的启动配置，可以修改 `~/.obd/plugins/oceanbase-ce/3.1.0/start.py`。
 
 ## 协议
 
