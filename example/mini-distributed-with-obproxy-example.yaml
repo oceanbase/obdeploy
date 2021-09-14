@@ -45,8 +45,8 @@ oceanbase-ce:
     # root_password: # root user password, can be empty
     # proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
   z1:
-    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881.
-    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882.
+    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is stared.
+    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is stared.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
     # The directory for data storage. The default value is $home_path/store.
@@ -55,8 +55,8 @@ oceanbase-ce:
     # redo_dir: /redo
     zone: zone1
   z2:
-    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881.
-    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882.
+    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is stared.
+    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is stared.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
     # The directory for data storage. The default value is $home_path/store.
@@ -65,8 +65,8 @@ oceanbase-ce:
     # redo_dir: /redo
     zone: zone2
   z3:
-    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881.
-    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882.
+    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is stared.
+    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is stared.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
     # The directory for data storage. The default value is $home_path/store.

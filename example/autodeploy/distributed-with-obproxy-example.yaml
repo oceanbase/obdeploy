@@ -23,8 +23,9 @@ oceanbase-ce:
     # redo_dir: /redo
     # External port for OceanBase Database. The default value is 2881.
     # mysql_port: 2881
-    # Internal port for OceanBase Database. The default value is 2882.
+    # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is stared.
     # rpc_port: 2882
+    #  DO NOT change this value after the cluster is stared.
     # Defines the zone for an observer. The default value is zone1.
     # zone: zone1
     # The maximum running memory for an observer. When ignored, autodeploy calculates this value based on the current server available resource.
