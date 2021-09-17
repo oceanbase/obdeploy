@@ -21,11 +21,7 @@ oceanbase-ce:
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: eth0
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
-
-
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
-
-
     zone: zone1
     cluster_id: 1
     # please set memory limit to a suitable value which is matching resource. 
