@@ -93,9 +93,9 @@ To start an OceanBase cluster, follow these steps:
 
 Select a configuration file based on your resource configurations:
 
-#### Small-scale development mode
+#### Small-scale deployment mode
 
-This development mode applies to personal devices with at least 8 GB of memory.
+This deployment mode applies to personal devices with at least 8 GB of memory.
 
 - [Sample configuration file for local single-node deployment](./example/mini-local-example.yaml)
 - [Sample configuration file for single-node deployment](./example/mini-single-example.yaml)
@@ -103,17 +103,18 @@ This development mode applies to personal devices with at least 8 GB of memory.
 - [Sample configuration file for single-node deployment with ODP](./example/mini-single-with-obproxy-example.yaml)
 - [Sample configuration file for three-node deployment with ODP](./example/mini-distributed-with-obproxy-example.yaml)
 
-#### Professional development mode
+#### Professional deployment mode
 
-This development mode applies to advanced Elastic Compute Service (ECS) instances or physical servers with at least 16 CPU cores and 64 GB of memory.
+This deployment mode applies to advanced Elastic Compute Service (ECS) instances or physical servers with at least 16 CPU cores and 64 GB of memory.
 
-- [Sample configuration file for local single-node development](./example/local-example.yaml)
-- [Sample configuration file for single-node development](./example/single-example.yaml)
-- [Sample configuration file for three-node development](./example/distributed-example.yaml)
-- [Sample configuration file for single-node development with ODP](./example/single-with-obproxy-example.yaml)
-- [Sample configuration file for three-node development with ODP](./example/distributed-with-obproxy-example.yaml)
+- [Sample configuration file for local single-node deployment](./example/local-example.yaml)
+- [Sample configuration file for single-node deployment](./example/single-example.yaml)
+- [Sample configuration file for three-node deployment](./example/distributed-example.yaml)
+- [Sample configuration file for single-node deployment with ODP](./example/single-with-obproxy-example.yaml)
+- [Sample configuration file for three-node deployment with ODP](./example/distributed-with-obproxy-example.yaml)
+- [Sample configuration file for three-node deployment with ODP and obagent](./example/obagent/distributed-with-obproxy-and-obagent-example.yaml)
 
-This section describes how to start a local single-node OceanBase cluster by using the [sample configuration file for local single-node deployment in the small-scale development mode](./example/mini-local-example.yaml).
+This section describes how to start a local single-node OceanBase cluster by using the [sample configuration file for local single-node deployment in the small-scale deployment mode](./example/mini-local-example.yaml).
 
 ```shell
 # Modify the working directory of the OceanBase cluster: home_path.
@@ -122,7 +123,7 @@ This section describes how to start a local single-node OceanBase cluster by usi
 vi ./example/mini-local-example.yaml
 ```
 
-If the target server to run the OceanBase cluster is not the logged-in server, do not use the `sample configuration file for local single-node development`. Use another configuration file.
+If the target server to run the OceanBase cluster is not the logged-in server, do not use the `sample configuration file for local single-node deployment`. Use another configuration file.
 Do not forget to change the user password at the beginning of the configuration file.
 
 ```yaml
@@ -409,7 +410,7 @@ This table describes the corresponding options.
 | Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
 | -n/--tenant-name | No | string | test | The tenant name. OBD will automatically generate resource units and resource pools with unique names based on the tenant name.  |
-| --max-cpu | No | float | 0 | The maximum number of CPU cores available for the tenant. When this option is set to 0, all available CPU cores of the cluster can be used by the tenant. When the value is less than two, an error is returned.  |
+| --max-cpu | No | float | 0 | The maximum number of CPU cores available for the tenant. When this option is set to 0, all available CPU cores of the cluster can be used by the tenant.  |
 | --min-cpu | No | float | 0 | The minimum number of CPU cores available for the tenant. When this option is set to 0, the minimum number of CPU cores is the same as the maximum number of CPU cores.  |
 | --max-memory | No | int | 0 | The maximum memory capacity available for the tenant. When this option is set to 0, all available memory capacity of the cluster can be used by the tenant. When the actual value is less than 1 GB, an error is returned.  |
 | --min-memory | No | int | 0 | The minimum memory capacity available for the tenant. When this option is set to 0, the minimum memory capacity is the same as the maximum memory capacity.  |

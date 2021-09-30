@@ -417,10 +417,10 @@ class ComponentPluginLoader(object):
                 plugins.append(plugin)
         if plugins:
             plugin = max(plugins, key=lambda x: x.version)
-            self.stdio and getattr(self.stdio, 'warn', print)(
-                '%s %s plugin version %s not found, use the best suitable version %s\n. Use `obd update` to update local plugin repository' % 
-                (self.component_name, self.PLUGIN_TYPE.name.lower(), '.'.join(version), '.'.join(plugin.version))
-                )
+            # self.stdio and getattr(self.stdio, 'warn', print)(
+            #     '%s %s plugin version %s not found, use the best suitable version %s.\n Use `obd update` to update local plugin repository' % 
+            #     (self.component_name, self.PLUGIN_TYPE.name.lower(), version, plugin.version)
+            #     )
             return plugin
         return None
 

@@ -45,12 +45,19 @@ class Version(str):
     def __cmp_value__(self):
         return [(int(_i), _s) for _i, _s in re.findall('(\d+)([^\.]*)', self.__str__())]
 
+    def __eq__(self, value):
+        if value is None:
+            return False
+        return self.__cmp_value__ == self.__class__(value).__cmp_value__
+
     def __gt__(self, value):
         if value is None:
             return True
         return self.__cmp_value__ > self.__class__(value).__cmp_value__
 
     def __ge__(self, value):
+        if value is None:
+            return True
         return self.__eq__(value) or self.__gt__(value)
 
     def __lt__(self, value):
@@ -59,6 +66,8 @@ class Version(str):
         return self.__cmp_value__ < self.__class__(value).__cmp_value__
 
     def __le__(self, value):
+        if value is None:
+            return False
         return self.__eq__(value) or self.__lt__(value)
 
 class Release(Version):

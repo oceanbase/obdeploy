@@ -130,6 +130,17 @@ class ConfigUtil(object):
 class DirectoryUtil(object):
 
     @staticmethod
+    def list_dir(path, stdio=None):
+        files = []
+        for fn in os.listdir(path):
+            fp = os.path.join(path, fn)
+            if os.path.isdir(fp):
+                files += DirectoryUtil.list_dir(fp)
+            else:
+                files.append(fp)
+        return files
+
+    @staticmethod
     def copy(src, dst, stdio=None):
         if not os.path.isdir(src):
             stdio and getattr(stdio, 'error', print)("cannot copy tree '%s': not a directory" % src)

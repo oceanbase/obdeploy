@@ -103,6 +103,7 @@ def stop(plugin_context, *args, **kwargs):
         tmp_servers = {}
         for server in servers:
             data = servers[server]
+            client = clients[server]
             stdio.verbose('%s check whether the port is released' % server)
             for key in ['rpc_port', 'mysql_port']:
                 if data[key] and check(data['client'], data['pid'], data[key]):

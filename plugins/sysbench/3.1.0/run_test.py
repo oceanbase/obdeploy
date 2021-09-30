@@ -77,7 +77,7 @@ def exec_cmd(cmd):
 def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
-        if not value:
+        if value is None:
             value = default
         return value
     def execute(cursor, query, args=None):
@@ -97,7 +97,7 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
     stdio = plugin_context.stdio
     options = plugin_context.options
 
-    optimization = get_option('optimization', 1) > 0
+    optimization = get_option('optimization') > 0
 
     host = get_option('host', '127.0.0.1')
     port = get_option('port', 2881)
@@ -118,6 +118,10 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
     obclient_bin = get_option('obclient_bin', 'obclient')
     sysbench_bin = get_option('sysbench_bin', 'sysbench')
     sysbench_script_dir = get_option('sysbench_script_dir', '/usr/sysbench/share/sysbench')
+
+    if tenant_name == 'sys':
+        stdio.error('DO NOT use sys tenant for testing.')
+        return 
 
     ret = LocalClient.execute_command('%s --help' % obclient_bin, stdio=stdio)
     if not ret:
@@ -152,23 +156,24 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
     except:
         return
 
-    sql = "select * from oceanbase.__all_user where user_name = %s"
-    try:
-        stdio.verbose('execute sql: %s' % (sql % user))
-        cursor.execute(sql, [user])
-        if not cursor.fetchone():
-            stdio.error('User %s not exists.' % user)
-            return
-    except:
+    sql = "select * from oceanbase.__all_user where user_name = '%s'" % user
+    sys_pwd = cluster_config.get_global_conf().get('root_password', '')
+    exec_sql_cmd = "%s -h%s -P%s -uroot@%s %s -A -e" % (obclient_bin, host, port, tenant_name, ("-p'%s'" % sys_pwd) if sys_pwd else '')
+    ret = LocalClient.execute_command('%s "%s"' % (exec_sql_cmd, sql), stdio=stdio)
+    if not ret or not ret.stdout:
+        stdio.error('User %s not exists.' % user)
         return
 
-    exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A -e" % (obclient_bin, host, port, user, tenant_name, "-p'%s'" if password else '')
+    exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A -e" % (obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
     ret = LocalClient.execute_command('%s "%s"' % (exec_sql_cmd, 'select version();'), stdio=stdio)
     if not ret:
         stdio.error(ret.stderr)
         return
 
     sql = ''
+    odp_configs_done = []
+    system_configs_done = []
+    tenant_variables_done = []
     odp_configs = [
         # [配置名, 新值, 旧值, 替换条件: lambda n, o: n != o]
         ['enable_compression_protocol', False, False, lambda n, o: n != o],
@@ -202,8 +207,8 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
         ['_flush_clog_aggregation_buffer_timeout', '1ms', '1ms', lambda n, o: n != o, False],
     ]
 
-    if odp_cursor and optimization:
-        try:
+    try:
+        if odp_cursor and optimization:
             for config in odp_configs:
                 sql = 'show proxyconfig like "%s"' % config[0]
                 ret = execute(odp_cursor, sql)
@@ -211,14 +216,12 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
                     config[2] = ret['value']
                     if config[3](config[1], config[2]):
                         sql = 'alter proxyconfig set %s=%%s' % config[0]
+                        odp_configs_done.append(config)
                         execute(odp_cursor, sql, [config[1]])
-        except:
-            return
 
-    tenant_q = ' tenant="%s"' % tenant_name
-    server_num = len(cluster_config.servers)
-    if optimization:
-        try:
+        tenant_q = ' tenant="%s"' % tenant_name
+        server_num = len(cluster_config.servers)
+        if optimization:
             for config in system_configs:
                 if config[0] == 'sleep':
                     sleep(config[1])
@@ -233,69 +236,65 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
                         sql = 'alter system set %s=%%s' % config[0]
                         if config[4]:
                             sql += tenant_q
+                        system_configs_done.append(config)
                         execute(cursor, sql, [config[1]])
 
             sql = "select count(1) server_num from oceanbase.__all_server where status = 'active'"
             ret = execute(cursor, sql)
             if ret:
                 server_num = ret.get("server_num", server_num)
-        except:
-            return
 
-        parallel_max_servers = max_cpu * 10
-        parallel_servers_target = int(parallel_max_servers * server_num * 0.8)
+            parallel_max_servers = int(max_cpu * 10)
+            parallel_servers_target = int(max_cpu * server_num * 8)
 
-        tenant_variables = [
-            # [变量名, 新值, 旧值, 替换条件: lambda n, o: n != o]
-            ['ob_timestamp_service', 1, 1, lambda n, o: n != o],
-            ['autocommit', 1, 1, lambda n, o: n != o],
-            ['ob_query_timeout', 36000000000, 36000000000, lambda n, o: n != o],
-            ['ob_trx_timeout', 36000000000, 36000000000, lambda n, o: n != o],
-            ['max_allowed_packet', 67108864, 67108864, lambda n, o: n != o],
-            ['ob_sql_work_area_percentage', 100, 100, lambda n, o: n != o],
-            ['parallel_max_servers', parallel_max_servers, parallel_max_servers, lambda n, o: n != o],
-            ['parallel_servers_target', parallel_servers_target, parallel_servers_target, lambda n, o: n != o]
-        ]
-        select_sql_t = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = '%%s'" % tenant_meta['tenant_id']
-        update_sql_t = "ALTER TENANT %s SET VARIABLES %%s = %%%%s" % tenant_name
+            tenant_variables = [
+                # [变量名, 新值, 旧值, 替换条件: lambda n, o: n != o]
+                ['ob_timestamp_service', 1, 1, lambda n, o: n != o],
+                ['autocommit', 1, 1, lambda n, o: n != o],
+                ['ob_query_timeout', 36000000000, 36000000000, lambda n, o: n != o],
+                ['ob_trx_timeout', 36000000000, 36000000000, lambda n, o: n != o],
+                ['max_allowed_packet', 67108864, 67108864, lambda n, o: n != o],
+                ['ob_sql_work_area_percentage', 100, 100, lambda n, o: n != o],
+                ['parallel_max_servers', parallel_max_servers, parallel_max_servers, lambda n, o: n != o],
+                ['parallel_servers_target', parallel_servers_target, parallel_servers_target, lambda n, o: n != o]
+            ]
+            select_sql_t = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = '%%s'" % tenant_meta['tenant_id']
+            update_sql_t = "ALTER TENANT %s SET VARIABLES %%s = %%%%s" % tenant_name
 
-        try:
             for config in tenant_variables:
                 sql = select_sql_t % config[0]
                 ret = execute(cursor, sql)
                 if ret:
                     value = ret['value']
-                    config[2] = int(value) if isinstance(value, str) or value.isdigit() else value
+                    config[2] = int(value) if isinstance(value, str) and value.isdigit() else value
                     if config[3](config[1], config[2]):
                         sql = update_sql_t % config[0]
+                        tenant_variables_done.append(config)
                         execute(cursor, sql, [config[1]])
-        except:
-            return
 
-    sysbench_cmd = "cd %s; %s %s --mysql-host=%s --mysql-port=%s --mysql-user=%s@%s --mysql-db=%s" % (sysbench_script_dir, sysbench_bin, script_name, host, port, user, tenant_name, mysql_db)
+        sysbench_cmd = "cd %s; %s %s --mysql-host=%s --mysql-port=%s --mysql-user=%s@%s --mysql-db=%s" % (sysbench_script_dir, sysbench_bin, script_name, host, port, user, tenant_name, mysql_db)
 
-    if password:
-        sysbench_cmd += ' --mysql-password=%s' % password
-    if table_size:
-        sysbench_cmd += ' --table_size=%s' % table_size
-    if tables:
-        sysbench_cmd += ' --tables=%s' % tables
-    if threads:
-        sysbench_cmd += ' --threads=%s' % threads
-    if time:
-        sysbench_cmd += ' --time=%s' % time
-    if interval:
-        sysbench_cmd += ' --report-interval=%s' % interval
-    if events:
-        sysbench_cmd += ' --events=%s' % events
-    if rand_type:
-        sysbench_cmd += ' --rand-type=%s' % rand_type
-    if skip_trx in ['on', 'off']:
-        sysbench_cmd += ' --skip_trx=%s' % skip_trx
-    if percentile:
-        sysbench_cmd += ' --percentile=%s' % percentile
+        if password:
+            sysbench_cmd += ' --mysql-password=%s' % password
+        if table_size:
+            sysbench_cmd += ' --table_size=%s' % table_size
+        if tables:
+            sysbench_cmd += ' --tables=%s' % tables
+        if threads:
+            sysbench_cmd += ' --threads=%s' % threads
+        if time:
+            sysbench_cmd += ' --time=%s' % time
+        if interval:
+            sysbench_cmd += ' --report-interval=%s' % interval
+        if events:
+            sysbench_cmd += ' --events=%s' % events
+        if rand_type:
+            sysbench_cmd += ' --rand-type=%s' % rand_type
+        if skip_trx in ['on', 'off']:
+            sysbench_cmd += ' --skip_trx=%s' % skip_trx
+        if percentile:
+            sysbench_cmd += ' --percentile=%s' % percentile
 
-    try:
         if exec_cmd('%s cleanup' % sysbench_cmd) and exec_cmd('%s prepare' % sysbench_cmd) and exec_cmd('%s --db-ps-mode=disable run' % sysbench_cmd):
             return plugin_context.return_true()
     except KeyboardInterrupt:
@@ -305,12 +304,12 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
     finally:
         try:
             if optimization:
-                for config in tenant_variables[::-1]:
+                for config in tenant_variables_done[::-1]:
                     if config[3](config[1], config[2]):
                         sql = update_sql_t % config[0]
                         execute(cursor, sql, [config[2]])
 
-                for config in system_configs[::-1]:
+                for config in system_configs_done[::-1]:
                     if config[0] == 'sleep':
                         sleep(config[1])
                         continue
@@ -321,7 +320,7 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
                         execute(cursor, sql, [config[2]])
 
                 if odp_cursor:
-                    for config in odp_configs[::-1]:
+                    for config in odp_configs_done[::-1]:
                         if config[3](config[1], config[2]):
                             sql = 'alter proxyconfig set %s=%%s' % config[0]
                             execute(odp_cursor, sql, [config[2]])

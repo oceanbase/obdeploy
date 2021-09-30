@@ -26,7 +26,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     stdio = plugin_context.stdio
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
-    stdio.start_loading('Initializes cluster work home')
+    stdio.start_loading('Initializes obproxy work home')
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]

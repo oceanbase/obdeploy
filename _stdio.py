@@ -209,6 +209,7 @@ class IO(object):
     VERBOSE_LEVEL = 0
     WARNING_PREV = FormtatText.warning('[WARN]')
     ERROR_PREV = FormtatText.error('[ERROR]')
+    IS_TTY = sys.stdin.isatty()
     
     def __init__(self, level, msg_lv=MsgLevel.DEBUG, trace_logger=None, track_limit=0, root_io=None, stream=sys.stdout):
         self.level = level
@@ -363,15 +364,19 @@ class IO(object):
         self.print(table)
 
     def confirm(self, msg):
-        while True:
-            try:
-                ans = raw_input('%s [y/n]: ' % msg)
-                if ans == 'y':
-                    return True
-                if ans == 'n':
-                    return False
-            except:
-                pass
+        if self.IS_TTY:
+            while True:
+                try:
+                    ans = raw_input('%s [y/n]: ' % msg)
+                    if ans == 'y':
+                        return True
+                    if ans == 'n':
+                        return False
+                except Exception as e:
+                    if not e:
+                        return False
+        else:
+            return False
 
     def _format(self, msg, *args):
         if args:
@@ -441,11 +446,11 @@ class IO(object):
             if lines:
                 exception_msg.append(''.join(lines))
             if self.level <= self.VERBOSE_LEVEL:
-                msg = '%s\n%s' % (msg, '\n'.join(exception_msg))
-                self.error(msg)
+                print_stack = lambda m: self._print(MsgLevel.ERROR, m)
             else:
-                msg and self.error(msg)
-                self._log(MsgLevel.ERROR, '\n'.join(exception_msg))
+                print_stack = lambda m: self._log(MsgLevel.ERROR, m)
+            msg and self.error(msg)
+            print_stack('\n'.join(exception_msg))
     else:
         def exception(self, msg, *args, **kwargs):
             ei = sys.exc_info()
@@ -458,9 +463,9 @@ class IO(object):
             for line in traceback_e.format(chain=True):
                 lines.append(line)
             if self.level <= self.VERBOSE_LEVEL:
-                msg = '%s\n%s' % (msg, ''.join(lines))
-                self.error(msg)
+                print_stack = lambda m: self._print(MsgLevel.ERROR, m)
             else:
-                msg and self.error(msg)
-                self._log(MsgLevel.ERROR, ''.join(lines))
+                print_stack = lambda m: self._log(MsgLevel.ERROR, m)
+            msg and self.error(msg)
+            print_stack(''.join(lines))
 

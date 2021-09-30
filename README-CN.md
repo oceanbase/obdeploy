@@ -112,6 +112,7 @@ mysql -h127.1 -uroot -P2883
 - [三节点配置样例](./example/distributed-example.yaml)
 - [单节点 + ODP 配置样例](./example/single-with-obproxy-example.yaml)
 - [三节点 + ODP 配置样例](./example/distributed-with-obproxy-example.yaml)
+- [三节点 + ODP + obagent 配置样例](./example/obagent/distributed-with-obproxy-and-obagent-example.yaml)
 
 本文以 [小规格开发模式-本地单节点](./example/mini-local-example.yaml) 为例，启动一个本地单节点的 OceanBase 数据库。
 
@@ -310,12 +311,19 @@ obd cluster deploy <deploy name> [-c <yaml path>] [-f] [-U] [-A]
 启动已部署的集群，成功时打印集群状态。
 
 ```shell
-obd cluster start <deploy name> [-s]
+obd cluster start <deploy name> [flags]
 ```
 
 参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
 
-选项 `-s` 为 `--strict-check`。部分组件在启动前会做相关的检查，当检查不通过的时候会报警告，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。非必填项。数据类型为 `bool`。默认不开启。
+选项说明见下表：
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+-s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。用于指定启动的机器。如果组件下的机器没有全部启动，则 start 不会执行 bootstrap。
+-c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定启动的组件。如果配置下的组件没有全部启动，该配置不会进入 running 状态。
+--wop/--without-parameter | 否 | bool | false | 无参启动。启动的时候不带参数。节点第一次的启动时，不响应此选项。
+-S/--strict-check | 否 | bool | false | 部分组件在启动前会做相关的检查。检查不通过时，OBD 将发出告警，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。
 
 #### `obd cluster list`
 
@@ -361,6 +369,14 @@ obd cluster restart <deploy name>
 
 参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
 
+选项说明见下表：
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+-s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。
+-c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定启动的组件。如果配置下的组件没有全部启动，该配置不会进入 running 状态。
+--wop/--without-parameter | 否 | bool | false | 无参启动。启动的时候不带参数。节点第一次的启动时，不响应此选项。
+
 #### `obd cluster redeploy`
 
 重启一个运行中集群。当您使用 `edit-config` 修改一个运行的集群的配置信息后，可以通过 `redeploy` 命令应用修改。
@@ -383,9 +399,16 @@ obd cluster stop <deploy name>
 
 参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
 
+选项说明见下表：
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+-s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。用于指定停止的机器。
+-c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定停止的组件。如果配置下的组件没有全部停止，该配置不会进入 stopped 状态。
+
 #### `obd cluster destroy`
 
-销毁已部署的集群。如果集群处于运行中的状态，该命令会先尝试执行`stop`，成功后再执行`destroy`。
+销毁已部署的集群。如果集群处于运行中的状态，该命令会先尝试执行 `stop`，成功后再执行 `destroy`。
 
 ```shell
 obd cluster destroy <deploy name> [-f]
@@ -410,7 +433,7 @@ obd cluster tenant create <deploy name> [-n <tenant name>] [flags]
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- | ---
 -n/--tenant-name | 否 | string |  test | 租户名。对应的资源单元和资源池根据租户名自动生成，并且避免重名。
---max-cpu | 否 | float | 0 | 租户可用最大 CPU 数。为 0 时使用集群剩余全部可用 CPU。实际值低于 2 时报错。
+--max-cpu | 否 | float | 0 | 租户可用最大 CPU 数。为 0 时使用集群剩余全部可用 CPU。
 --min-cpu | 否 | float | 0 | 租户可用最小 CPU 数。为 0 时等于 --max-cpu。
 --max-memory | 否 | int | 0 | 租户可用最大内存。为 0 时使用集群剩余全部可用内存。实际值低于 1G 时报错。
 --min-memory | 否 | int | 0 | 租户可用最大内存。为 0 时等于 --max-memory。
@@ -507,6 +530,40 @@ obd test sysbench <deploy name> [flags]
 --events | 否 | int | 0 | 最大请求数量，定义数量后可以不需要 --time 选项。
 --rand-type | 否 | string | 访问数据时使用的随机生成函数。取值可以为 special、uniform、gaussian 或 pareto。 默认值为 special， 早期值为 uniform。
 ---skip-trx | 否 | string | 空 | 在只读测试中打开或关闭事务。
+-O/--optimization | 否 | int | 1 | 自动调优等级。为 0 时关闭。
+
+
+#### `obd test tpch`
+
+对 OcecanBase 数据库或 ODP 组件的指定节点执行 TPC-H。 TPC-H 需要 OBClient 和 obtpch，请先安装 OBClient 和 obtpch。
+TPC-H 需要指定一台OceanBase目标服务器作为执行对象。在执行TPC-H测试前，OBD会将测试需要的数据文件传输到指定机器的指定目录下，这些文件可能会比较大，请确保机器上足够的磁盘空间。
+当然你也可以提前在目标机器上准备好数据文件，再通过`--dt/--disable-transfer`选项关闭传输。
+
+```shell
+obd test tpch <deploy name> [flags]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- | ---
+--test-server | 否 | string | 默指定的组件下服务器中的第一个节点。 | 必须是指定的组件下的某个节点名。
+--user | 否 | string | root | 执行测试的用户名。
+--password | 否 | string | 默认为空 | 执行测试的用户密码。
+--tenant | 否 | string | test | 执行测试的租户名。
+--database | 否 | string | test | 执行测试的数据库。
+--obclient-bin | 否 | string | obclient | OBClient 二进制文件路径。
+--dbgen-bin | 否 | string | /usr/local/tpc-h-tools/bin/dbgen | dbgen 二进制文件路径。
+--dss-config | 否 | string | /usr/local/tpc-h-tools/ | dists.dss所在目录。
+-s/--scale-factor | 否 | int | 1 | 自动生成测试数据的规模，单位为G。
+-tmp-dir | 否 | string | ./tmp | 执行tpch时的临时目录。自动生成的测试数据，自动调优的sql文件，执行测试sql的日志文件等都会存在这里。
+--ddl-path | 否 | string | 默认为空 | ddl 文件路径或目录。为空时，OBD会使用自带的ddl文件。
+--tbl-path | 否 | string | 默认为空 | tbl 文件路径或目录。为空时，使用dbgen生成测试数据。
+--sql-path | 否 | string | 默认为空 | sql 文件路径或目录。为空时，OBD会使用自带的sql文件。
+--remote-tbl-dir | 否 | string | 默认为空 | 目标observer上存放tbl的目录，绝对路径，请保证observer的启动用户对该目录有读写权限。在不开启`--test-only`的情况下该选项为必填项
+--test-only | 否 | bool | false | 不执行初始化，仅执行测试sql。
+--dt/--disable-transfer | 否 | bool | false | 禁用传输。开启后将不会把本地tbl传输到远程remote-tbl-dir下，而是直接使用目标机器remote-tbl-dir下的tbl文件。
+-O/--optimization | 否 | int | 1 | 自动调优等级。为 0 时关闭。
 
 ## Q&A
 

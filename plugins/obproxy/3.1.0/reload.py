@@ -29,6 +29,22 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
     change_conf = {}
     global_change_conf = {}
     global_ret = True
+
+    config_map = {
+        'observer_sys_password': 'proxyro_password',
+        'cluster_name': 'appname'
+    }
+    for comp in ['oceanbase', 'oceanbase-ce']:
+        if comp in cluster_config.depends:
+            root_servers = {}
+            ob_config = cluster_config.get_depled_config(comp)
+            new_ob_config = new_cluster_config.get_depled_config(comp)
+            ob_config = {} if ob_config is None else ob_config
+            new_ob_config = {} if new_ob_config is None else new_ob_config
+            for key in config_map:
+                if ob_config.get(key) != new_ob_config.get(key):
+                    global_change_conf[config_map[key]] = new_ob_config.get(key)
+
     for server in servers:
         change_conf[server] = {}
         stdio.verbose('get %s old configuration' % (server))
@@ -45,6 +61,7 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
                     global_change_conf[key] = 1
                 else:
                     global_change_conf[key] += 1
+                    
     servers_num = len(servers)
     stdio.verbose('apply new configuration')
     success_conf = {}

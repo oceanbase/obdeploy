@@ -15,7 +15,7 @@ function _obd_complete_func
     tenant_cmd="create drop"
     mirror_cmd="clone create list update"
     repo_cmd="list"
-    test_cmd="mysqltest sysbench"
+    test_cmd="mysqltest sysbench tpch"
     if [[ ${cur} == * ]] ; then
         case "${prev}" in
             obd);&

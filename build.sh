@@ -28,7 +28,7 @@ rm -fr /usr/bin/obd
 CID=`git log |head -n1 | awk -F' ' '{print $2}'`
 BRANCH=`git branch | grep -e "^\*" | awk -F' ' '{print $2}'`
 DATE=`date '+%b %d %Y %H:%M:%S'`
-cat /usr/obd/_cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" > /usr/obd/obd.py
+cat /usr/obd/_cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" > /usr/obd/obd.py
 echo -e "#!/bin/bash\n$python_bin /usr/obd/obd.py \$*" > /usr/bin/obd
 chmod +x /usr/bin/obd
 echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d/obd.sh to enable it'
