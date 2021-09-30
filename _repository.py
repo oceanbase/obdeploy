@@ -161,7 +161,11 @@ class Repository(PackageInfo):
         files = []
         if self.version and self.hash:
             for file_item in plugin.file_list():
-                files.append(os.path.join(self.repository_dir, file_item.target_path))
+                path = os.path.join(self.repository_dir, file_item.target_path)
+                if file_item.type == InstallPlugin.FileItemType.DIR:
+                    files += DirectoryUtil.list_dir(path)
+                else:
+                    files.append(path)
         return files
 
     def file_check(self, plugin):
@@ -252,7 +256,7 @@ class Repository(PackageInfo):
                     if path not in need_files:
                         for n_dir in need_dirs:
                             if path.startswith(n_dir):
-                                need_files[path] = os.path.join(n_dir, path[len(n_dir):])
+                                need_files[path] = os.path.join(need_dirs[n_dir], path[len(n_dir):])
                                 break
                 for src_path in need_files:
                     if src_path not in files:
@@ -278,7 +282,8 @@ class Repository(PackageInfo):
                     self.stdio and getattr(self.stdio, 'verbose', print)('link %s to %s' % (links[link], link))
                     os.symlink(links[link], link)
                 for n_dir in need_dirs:
-                    if not os.path.isdir(n_dir):
+                    path = os.path.join(self.repository_dir, need_dirs[n_dir])
+                    if not os.path.isdir(path):
                         raise Exception('%s: No such dir: %s' % (pkg.path, n_dir))
             self.set_version(pkg.version)
             self.set_release(pkg.release)

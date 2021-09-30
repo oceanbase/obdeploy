@@ -34,6 +34,9 @@ from paramiko.client import SSHClient, AutoAddPolicy
 from paramiko.ssh_exception import NoValidConnectionsError
 
 
+__all__ = ("SshClient", "SshConfig", "LocalClient")
+
+
 class SshConfig(object):
 
 
@@ -89,13 +92,13 @@ class LocalClient(object):
 
     @staticmethod
     def put_file(local_path, remote_path, stdio=None):
-        if LocalClient.execute_command('cp -f %s %s' % (local_path, remote_path), stdio=stdio):
+        if LocalClient.execute_command('mkdir -p %s && cp -f %s %s' % (os.path.dirname(remote_path), local_path, remote_path), stdio=stdio):
             return True
         return False
 
     @staticmethod
-    def put_dir(self, local_dir, remote_dir, stdio=None):
-        if LocalClient.execute_command('cp -fr %s %s' % (local_dir, remote_dir), stdio=stdio):
+    def put_dir(local_dir, remote_dir, stdio=None):
+        if LocalClient.execute_command('mkdir -p && cp -fr %s %s' % (os.path.dirname(remote_dir), local_dir, remote_dir), stdio=stdio):
             return True
         return False
 
@@ -232,9 +235,13 @@ class SshClient(object):
             return False
         if not self._open_sftp(stdio):
             return False
-        
-        if self.execute_command('mkdir -p %s' % os.path.split(remote_path)[0], stdio):
-            return self.sftp.put(local_path, remote_path)
+        return self._put_file(local_path, remote_path, stdio)
+
+    def _put_file(self, local_path, remote_path, stdio=None):
+        if self.execute_command('mkdir -p %s && rm -fr %s' % (os.path.dirname(remote_path), remote_path), stdio):
+            stdio and getattr(stdio, 'verbose', print)('send %s to %s' % (local_path, remote_path))
+            if self.sftp.put(local_path, remote_path):
+                return self.execute_command('chmod %s %s' % (oct(os.stat(local_path).st_mode)[-3: ], remote_path))
         return False
 
     def put_dir(self, local_dir, remote_dir, stdio=None):
@@ -259,7 +266,7 @@ class SshClient(object):
                 for name in files:
                     local_path = os.path.join(root, name)
                     remote_path = os.path.join(remote_dir, root[local_dir_path_len:].lstrip('/'), name)
-                    if not self.sftp.put(local_path, remote_path):
+                    if not self._put_file(local_path, remote_path, stdio):
                         failed.append(remote_path)
                 for name in dirs:
                     local_path = os.path.join(root, name)

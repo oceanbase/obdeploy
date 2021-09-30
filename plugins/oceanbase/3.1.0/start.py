@@ -84,7 +84,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             return
 
     stdio.start_loading('Start observer')
-    for server in cluster_config.servers:
+    for server in cluster_config.original_servers:
         config = cluster_config.get_server_conf(server)
         zone = config['zone']
         if zone not in root_servers:
@@ -116,36 +116,44 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 continue
 
         stdio.verbose('%s start command construction' % server)
-        not_opt_str = {
-            'zone': '-z',
-            'mysql_port': '-p',
-            'rpc_port': '-P',
-            'nodaemon': '-N',
-            'appname': '-n',
-            'cluster_id': '-c',
-            'data_dir': '-d',
-            'devname': '-i',
-            'syslog_level': '-l',
-            'ipv6': '-6',
-            'mode': '-m',
-            'scn': '-f'
-        }
-        get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
-        opt_str = []
-        for key in server_config:
-            if key not in ['home_path', 'obconfig_url', 'proxyro_password'] and key not in not_opt_str:
-                value = get_value(key)
-                opt_str.append('%s=%s' % (key, value))
-        cmd = []
-        if cfg_url:
-            opt_str.append('obconfig_url=\'%s\'' % cfg_url)
+        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s/etc/observer.config.bin' % home_path):
+            use_parameter = False
         else:
-            cmd.append(rs_list_opt)
-        cmd.append('-o %s' % ','.join(opt_str))
-        for key in not_opt_str:
-            if key in server_config:
-                value = get_value(key)
-                cmd.append('%s %s' % (not_opt_str[key], value))
+            use_parameter = True
+
+        cmd = []
+        if use_parameter:
+            not_opt_str = {
+                'zone': '-z',
+                'mysql_port': '-p',
+                'rpc_port': '-P',
+                'nodaemon': '-N',
+                'appname': '-n',
+                'cluster_id': '-c',
+                'data_dir': '-d',
+                'devname': '-i',
+                'syslog_level': '-l',
+                'ipv6': '-6',
+                'mode': '-m',
+                'scn': '-f'
+            }
+            not_cmd_opt = ['home_path', 'obconfig_url', 'proxyro_password', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir']
+            get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
+            opt_str = []
+            for key in server_config:
+                if key not in not_cmd_opt and key not in not_opt_str:
+                    value = get_value(key)
+                    opt_str.append('%s=%s' % (key, value))
+            if cfg_url:
+                opt_str.append('obconfig_url=\'%s\'' % cfg_url)
+            else:
+                cmd.append(rs_list_opt)
+            cmd.append('-o %s' % ','.join(opt_str))
+            for key in not_opt_str:
+                if key in server_config:
+                    value = get_value(key)
+                    cmd.append('%s %s' % (not_opt_str[key], value))
+
         clusters_cmd[server] = 'cd %s; %s/bin/observer %s' % (home_path, home_path, ' '.join(cmd))
         
     for server in clusters_cmd:

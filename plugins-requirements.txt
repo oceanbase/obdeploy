@@ -1,1 +1,2 @@
 MySQL-python==1.2.5
+pycryptodome==3.10.1

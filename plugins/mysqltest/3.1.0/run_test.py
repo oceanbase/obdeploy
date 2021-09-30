@@ -148,6 +148,7 @@ def run_test(plugin_context, test, env, *args, **kwargs):
     opt['connector'] = 'ob'
     opt['mysql_mode'] = True
     mysqltest_bin = opt['mysqltest_bin'] if 'mysqltest_bin' in opt and opt['mysqltest_bin'] else 'mysqltest'
+    obclient_bin = opt['obclient_bin'] if 'obclient_bin' in opt and opt['obclient_bin'] else 'obclient'
     
     soft = 3600
     buffer = 0
@@ -224,8 +225,15 @@ def run_test(plugin_context, test, env, *args, **kwargs):
 
     opt['result_file'] = os.path.join(opt['result_dir'], test + suffix + '.result')
 
-    server_engine_cmd = '''obclient -h%s -P%s -uroot -Doceanbase -e "select value from __all_virtual_sys_parameter_stat where name like '_enable_static_typing_engine';"''' % (opt['host'], opt['port'])
-    result = LocalClient.execute_command(server_engine_cmd, env={}, timeout=3600, stdio=stdio)
+    if 'my_host' in opt or 'oracle_host' in opt:
+        # compare mode
+        pass
+
+    
+    sys_pwd = cluster_config.get_global_conf().get('root_password', '')
+    exec_sql_cmd = "%s -h%s -P%s -uroot %s -A -Doceanbase -e" % (obclient_bin, opt['host'], opt['port'], ("-p'%s'" % sys_pwd) if sys_pwd else '')
+    server_engine_cmd = '''%s "select value from __all_virtual_sys_parameter_stat where name like '_enable_static_typing_engine';"''' % exec_sql_cmd
+    result = LocalClient.execute_command(server_engine_cmd, timeout=3600, stdio=stdio)
     if not result:
         stdio.error('engine failed, exit code %s. error msg: %s' % (result.code, result.stderr))
 
@@ -245,7 +253,7 @@ def run_test(plugin_context, test, env, *args, **kwargs):
     if 'java' in opt:
         opt['connector'] = 'ob'
 
-    LocalClient.execute_command('obclient -h %s -P %s -uroot -Doceanbase -e "alter system set _enable_static_typing_engine = True;select sleep(2);"' % (opt['host'], opt['port']), stdio=stdio)
+    LocalClient.execute_command('%s "alter system set _enable_static_typing_engine = True;select sleep(2);"' % (exec_sql_cmd), stdio=stdio)
 
     start_time = time.time()
     cmd = 'timeout %s %s %s' % (case_timeout, mysqltest_bin, str(Arguments(opt)))
@@ -272,7 +280,7 @@ def run_test(plugin_context, test, env, *args, **kwargs):
     stdio.verbose(verbose_msg)
     cost = time.time() - start_time
 
-    LocalClient.execute_command('obclient -h %s -P %s -uroot -Doceanbase -e "alter system set _enable_static_typing_engine = False;select sleep(2);"' % (opt['host'], opt['port']), stdio=stdio)
+    LocalClient.execute_command('%s "alter system set _enable_static_typing_engine = False;select sleep(2);"' % (exec_sql_cmd), stdio=stdio)
     result = {"name" : test_ori, "ret" : retcode, "output" : output, "cmd" : cmd, "errput" : errput, 'cost': cost}
     stdio.stop_loading('fail' if retcode else 'succeed')
     return plugin_context.return_true(result=result)

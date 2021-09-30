@@ -280,6 +280,7 @@ def getCanonArch(skipRpmPlatform = 0):
         return getCanonSPARCArch(arch)
     if arch == "x86_64":
         return getCanonX86_64Arch(arch)
+    return arch
 
 canonArch = getCanonArch()
 

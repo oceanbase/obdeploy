@@ -167,9 +167,9 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             cluster_config.update_server_conf(server, 'system_memory', get_system_memory(memory_limit), False)
             
         # cpu
-        if not user_server_config.get('cpu_count'):
+        if not server_config.get('cpu_count'):
             ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
-            if ret and ret.stdout.isdigit():
+            if ret and ret.stdout.strip().isdigit():
                 cpu_num = int(ret.stdout)
                 server_config['cpu_count'] = max(16, int(cpu_num * 0.8))
             else:
@@ -178,11 +178,11 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
         cluster_config.update_server_conf(server, 'cpu_count', max(16, server_config['cpu_count']), False)
             
         # disk
-        if not user_server_config.get('datafile_size') or not user_server_config.get('datafile_disk_percentage'):
+        if not server_config.get('datafile_size') and not user_server_config.get('datafile_disk_percentage'):
             disk = {'/': 0}
-            ret = client.execute_command('df --output=size,avail,target')
+            ret = client.execute_command('df --block-size=1024')
             if ret:
-                for total, avail, path in re.findall('(\d+)\s+(\d+)\s+(.+)', ret.stdout):
+                for total, used, avail, puse, path in re.findall('(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
                     disk[path] = {
                         'total': int(total) << 10,
                         'avail': int(avail) << 10,

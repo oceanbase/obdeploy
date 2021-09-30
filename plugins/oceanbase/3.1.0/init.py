@@ -65,7 +65,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     servers_dirs = {}
     force = getattr(plugin_context.options, 'force', False)
     stdio.verbose('option `force` is %s' % force)
-    stdio.start_loading('Initializes cluster work home')
+    stdio.start_loading('Initializes observer work home')
     for server in cluster_config.servers:
         ip = server.ip
         if ip not in servers_dirs:
@@ -101,7 +101,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 'key': key,
             }
             
-        stdio.verbose('%s initializes cluster work home' % server)
+        stdio.verbose('%s initializes observer work home' % server)
         if force:
             ret = client.execute_command('rm -fr %s/*' % home_path)
             if not ret:

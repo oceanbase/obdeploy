@@ -92,7 +92,9 @@ class ClusterConfig(object):
 
     def __init__(self, servers, name, version, tag, package_hash):
         self.version = version
+        self.origin_version = version
         self.tag = tag
+        self.origin_tag = tag
         self.name = name
         self.origin_package_hash = package_hash
         self.package_hash = package_hash
@@ -101,11 +103,14 @@ class ClusterConfig(object):
         self._global_conf = {}
         self._server_conf = {}
         self._cache_server = {}
+        self._original_global_conf = {}
         self.servers = servers
+        self._original_servers = servers # 保证顺序
         for server in servers:
             self._server_conf[server] = {}
             self._cache_server[server] = None
         self._deploy_config = None
+        self._depends = {}
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -117,9 +122,39 @@ class ClusterConfig(object):
             self._deploy_config = _deploy_config
             return True
         return False
+
+    @property
+    def original_servers(self):
+        return self._original_servers
+
+    @property
+    def depends(self):
+        return self._depends.keys()
+
+    def add_depend(self, name, cluster_conf):
+        self._depends[name] = cluster_conf
+
+    def del_depend(self, name, component_name):
+        if component_name in self._depends:
+            del self._depends[component_name]
+
+    def get_depled_servers(self, name):
+        if name not in self._depends:
+            return None
+        cluster_config = self._depends[name]
+        return deepcopy(cluster_config.original_servers)
+        
+    def get_depled_config(self, name, server=None):
+        if name not in self._depends:
+            return None
+        cluster_config = self._depends[name]
+        config = cluster_config.get_server_conf_with_default(server) if server else cluster_config.get_global_conf()
+        return deepcopy(config)
         
     def update_server_conf(self, server, key, value, save=True):
         if self._deploy_config is None:
+            return False
+        if server not in self._server_conf:
             return False
         if not self._deploy_config.update_component_server_conf(self.name, server, key, value, save):
             return False
@@ -133,24 +168,31 @@ class ClusterConfig(object):
             return False
         if not self._deploy_config.update_component_global_conf(self.name, key, value, save):
             return False
-        self._global_conf[key] = value
+        self._update_global_conf(key, value)
         for server in self._cache_server:
             if self._cache_server[server] is not None:
                 self._cache_server[server][key] = value
         return True
 
+    def _update_global_conf(self, key, value):
+        self._original_global_conf[key] = value
+        self._global_conf[key] = value
+
     def get_unconfigured_require_item(self, server):
         items = []
         config = self.get_server_conf(server)
-        for key in self._temp_conf:
-            if not self._temp_conf[key].require:
-                continue
-            if key in config:
-                continue
-            items.append(key)
+        if config is not None:
+            for key in self._temp_conf:
+                if not self._temp_conf[key].require:
+                    continue
+                if key in config:
+                    continue
+                items.append(key)
         return items
 
     def get_server_conf_with_default(self, server):
+        if server not in self._server_conf:
+            return None
         config = {}
         for key in self._temp_conf:
             if self._temp_conf[key].default is not None:
@@ -159,6 +201,8 @@ class ClusterConfig(object):
         return config
 
     def get_need_redeploy_items(self, server):
+        if server not in self._server_conf:
+            return None
         items = {}
         config = self.get_server_conf(server)
         for key in config:
@@ -167,6 +211,8 @@ class ClusterConfig(object):
         return items
 
     def get_need_restart_items(self, server):
+        if server not in self._server_conf:
+            return None
         items = {}
         config = self.get_server_conf(server)
         for key in config:
@@ -183,14 +229,17 @@ class ClusterConfig(object):
         self.set_global_conf(self._global_conf) # 更新全局配置
 
     def set_global_conf(self, conf):
+        self._original_global_conf = deepcopy(conf)
         self._global_conf = deepcopy(self._default_conf)
-        self._global_conf.update(conf)
+        self._global_conf.update(self._original_global_conf)
         for server in self._cache_server:
             self._cache_server[server] = None
 
     def add_server_conf(self, server, conf):
         if server not in self.servers:
             self.servers.append(server)
+        if server not in self._original_servers:
+            self._original_servers.append(server)
         self._server_conf[server] = conf
         self._cache_server[server] = None
 
@@ -279,6 +328,7 @@ class DeployConfig(object):
     def _load(self):
         try:
             with open(self.yaml_path, 'rb') as f:
+                depends = {}
                 self._src_data = self.yaml_loader.load(f)
                 for key in self._src_data:
                     if key == 'user':
@@ -295,6 +345,14 @@ class DeployConfig(object):
                         self.auto_create_tenant = self._src_data['auto_create_tenant']
                     elif issubclass(type(self._src_data[key]), dict):
                         self._add_component(key, self._src_data[key])
+                        depends[key] = self._src_data[key].get('depends', [])
+                for comp in depends:
+                    conf = self.components[comp]
+                    for name in depends[comp]:
+                        if name == comp:
+                            continue
+                        if name in self.components:
+                            conf.add_depend(name, self.components[name])
         except:
             pass
         if not self.user:
@@ -314,6 +372,34 @@ class DeployConfig(object):
 
     def set_user_conf(self, conf):
         self._user = conf
+
+    def add_depend_for_component(self, component_name, depend_component_name, save=True):
+        if component_name not in self.components:
+            return False
+        if depend_component_name not in self.components:
+            return False
+        cluster_config = self.components[component_name]
+        if depend_component_name in cluster_config.depends:
+            return True
+        cluster_config.add_depend(depend_component_name, self.components[depend_component_name])
+        component_config = self._src_data[component_name]
+        if 'depends' not in component_config:
+            component_config['depends'] = []
+        component_config['depends'].append(depend_component_name)
+        return self.dump() if save else True
+
+    def del_depend_for_component(self, component_name, depend_component_name, save=True):
+        if component_name not in self.components:
+            return False
+        if depend_component_name not in self.components:
+            return False
+        cluster_config = self.components[component_name]
+        if depend_component_name not in cluster_config.depends:
+            return True
+        cluster_config.del_depend(depend_component_name, depend_component_name)
+        component_config = self._src_data[component_name]
+        component_config['depends'] = cluster_config.depends
+        return self.dump() if save else True
 
     def update_component_server_conf(self, component_name, server, key, value, save=True):
         if component_name not in self.components:

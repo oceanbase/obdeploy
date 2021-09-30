@@ -1,0 +1,7 @@
+- src_path: ./home/admin/obagent/bin/monagent
+  target_path: bin/monagent
+  type: bin
+  mode: 755
+- src_path: ./home/admin/obagent/conf
+  target_path: conf
+  type: dir

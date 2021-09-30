@@ -30,6 +30,18 @@ def upgrade(plugin_context, stop_plugin, start_plugin, connect_plugin, display_p
     cmd = plugin_context.cmd
     options = plugin_context.options
     stdio = plugin_context.stdio
+    local_home_path = kwargs.get('local_home_path')
+    repository_dir = kwargs.get('repository_dir')
+
+    for server in cluster_config.servers:
+        client = clients[server]
+        server_config = cluster_config.get_server_conf(server)
+        home_path = server_config['home_path']
+        remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+        remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
+        client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
+        client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
+        client.execute_command("ln -fs %s/lib/* %s/lib" % (remote_repository_dir, home_path))
 
     if not stop_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
         return 

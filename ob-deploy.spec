@@ -1,5 +1,5 @@
 Name: ob-deploy
-Version: 1.1.0
+Version: 1.1.1
 Release: 1%{?dist}
 # if you want use the parameter of rpm_create on build time,
 # uncomment below
@@ -44,7 +44,7 @@ rm -rf $BUILD_DIR build.log ${RPM_BUILD_ROOT} build dist obd.spec
 CID=`git log |head -n1 | awk -F' ' '{print $2}'`
 BRANCH=`git branch | grep -e "^\*" | awk -F' ' '{print $2}'`
 DATE=`date '+%b %d %Y %H:%M:%S'`
-cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" > obd.py
+cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" > obd.py
 mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
 mkdir -p $BUILD_DIR/SOURCES/{site-packages}
 mkdir -p ${RPM_BUILD_ROOT}/usr/bin
@@ -98,6 +98,13 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Thu Sep 30 2021 obd 1.1.1
+ - new features: obd test tych
+ - new features: new keyword "depends" for configuration file
+ - new features: new option "--wop/--without-parameter" for start/restart
+ - new features: a daemon will be started when obproxy is started
+ - new features: support obagent
+ - fix bug: fail to get devname when devname length more than 5
 * Mon Aug 09 2021 obd 1.1.0
  - new features: obd cluster autdeploy
  - new features: obd cluster tenant

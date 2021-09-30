@@ -96,6 +96,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
     for server in cluster_config.servers:
         ip = server.ip
         client = clients[server]
+        servers_clients[ip] = client
         server_config = cluster_config.get_server_conf_with_default(server)
         home_path = server_config['home_path']
         remote_pid_path = '%s/run/observer.pid' % home_path
@@ -104,7 +105,6 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             if client.execute_command('ls /proc/%s' % remote_pid):
                 continue
 
-        servers_clients[ip] = client
         if ip not in servers_port:
             servers_disk[ip] = {}
             servers_port[ip] = {}
@@ -173,7 +173,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
                 inferfaces[devname] = []
             inferfaces[devname].append(ip)
 
-    for ip in servers_clients:
+    for ip in servers_disk:
         client = servers_clients[ip]
         ret = client.execute_command('cat /proc/sys/fs/aio-max-nr /proc/sys/fs/aio-nr')
         if not ret:
@@ -217,9 +217,9 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
                 critical('(%s) not enough memory. (Free: %s, Need: %s)' % (ip, formate_size(free_memory), formate_size(total_use)))
         # disk
         disk = {'/': 0}
-        ret = client.execute_command('df --output=size,avail,target')
+        ret = client.execute_command('df --block-size=1024')
         if ret:
-            for total, avail, path in re.findall('(\d+)\s+(\d+)\s+(.+)', ret.stdout):
+            for total, used, avail, puse, path in re.findall('(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
                 disk[path] = {
                     'total': int(total) << 10,
                     'avail': int(avail) << 10,
@@ -296,9 +296,11 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
 
     if success:
         times = []
-        for ip in servers_disk:
+        for ip in servers_clients:
             client = servers_clients[ip]
-            times.append(time_delta(client))
+            delta = time_delta(client)
+            stdio.verbose('%s time delta %s' % (ip, delta))
+            times.append(delta)
         if times and max(times) - min(times) > 200:
             critical('Cluster NTP is out of sync')
 

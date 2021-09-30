@@ -1,3 +1,4 @@
+
 # coding: utf-8
 # OceanBase Deploy.
 # Copyright (C) 2021 OceanBase
@@ -35,10 +36,11 @@ from tool import DirectoryUtil, FileUtil
 
 
 ROOT_IO = IO(1)
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 REVISION = '<CID>'
 BUILD_BRANCH = '<B_BRANCH>'
 BUILD_TIME = '<B_TIME>'
+DEBUG = True if '<DEBUG>' else False
 
 
 class BaseCommand(object):
@@ -129,17 +131,19 @@ class ObdCommand(BaseCommand):
             ROOT_IO.trace_logger = logger
             obd = ObdHome(self.OBD_PATH, ROOT_IO)
             ROOT_IO.track_limit += 1
+            ROOT_IO.verbose('cmd: %s' % self.cmds)
+            ROOT_IO.verbose('opts: %s' % self.opts)
             ret = self._do_command(obd)
         except NotImplementedError:
             ROOT_IO.exception('command \'%s\' is not implemented' % self.prev_cmd)
         except IOError:
-            ROOT_IO.exception('OBD is running')
+            ROOT_IO.exception('OBD is running.')
         except SystemExit:
             pass
         except:
             ROOT_IO.exception('Running Error.')
-        # if not ret:
-        #     ROOT_IO.print('Trace ID: %s' % trace_id)
+        if DEBUG:
+            ROOT_IO.print('Trace ID: %s' % trace_id)
         return ret
 
     def _do_command(self, obd):
@@ -186,7 +190,7 @@ class MajorCommand(BaseCommand):
 class MirrorCloneCommand(ObdCommand):
 
     def __init__(self):
-        super(MirrorCloneCommand, self).__init__('clone', 'Clone a RPM package to the local mirror repository.')
+        super(MirrorCloneCommand, self).__init__('clone', 'Clone an RPM package to the local mirror repository.')
         self.parser.add_option('-f', '--force', action='store_true', help="Force clone, overwrite the mirror.")
 
     def init(self, cmd, args):
@@ -370,6 +374,7 @@ class ClusterStartCommand(ClusterMirrorCommand):
         self.parser.add_option('-c', '--components', type='string', help="List the started components. Multiple components are separated with commas.")
         self.parser.add_option('-f', '--force-delete', action='store_true', help="Force delete, delete the registered cluster.")
         self.parser.add_option('-S', '--strict-check', action='store_true', help="Throw errors instead of warnings when check fails.")
+        self.parser.add_option('--without-parameter', '--wop', action='store_true', help='Start without parameters.')
 
     def _do_command(self, obd):
         if self.cmds:
@@ -423,6 +428,7 @@ class ClusterRestartCommand(ClusterMirrorCommand):
         super(ClusterRestartCommand, self).__init__('restart', 'Restart a started cluster.')
         self.parser.add_option('-s', '--servers', type='string', help="List the started servers. Multiple servers are separated with commas.")
         self.parser.add_option('-c', '--components', type='string', help="List the started components. Multiple components are separated with commas.")
+        self.parser.add_option('--without-parameter', '--wop', action='store_true', help='Start without parameters.')
 
     def _do_command(self, obd):
         if self.cmds:
@@ -471,7 +477,7 @@ class ClusterListCommand(ClusterMirrorCommand):
 class ClusterEditConfigCommand(ClusterMirrorCommand):
 
     def __init__(self):
-        super(ClusterEditConfigCommand, self).__init__('edit-config', 'Edit a deploy configuration file.')
+        super(ClusterEditConfigCommand, self).__init__('edit-config', 'Edit the configuration file for a specific deployment.')
 
     def _do_command(self, obd):
         if self.cmds:
@@ -498,25 +504,25 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterTenantCreateCommand, self).__init__('create', 'Create a tenant.')
-        self.parser.add_option('-n', '--tenant-name', type='string', help="The tenant name.")
-        self.parser.add_option('--max-cpu', type='float', help="Unit max CPU number.")
-        self.parser.add_option('--min-cpu', type='float', help="Unit min CPU number.")
-        self.parser.add_option('--max-memory', type='int', help="Unit max memory size.")
-        self.parser.add_option('--min-memory', type='int', help="Unit min memory size.")
-        self.parser.add_option('--max-disk-size', type='int', help="Unit max disk size.")
-        self.parser.add_option('--max-iops', type='int', help="Unit max iops number. [128]", default=128)
-        self.parser.add_option('--min-iops', type='int', help="Unit min iops number.")
-        self.parser.add_option('--max-session-num', type='int', help="Unit max session number. [64]", default=64)
+        self.parser.add_option('-n', '--tenant-name', type='string', help="The tenant name. The default tenant name is [test].", default='test')
+        self.parser.add_option('--max-cpu', type='float', help="Max CPU unit number.")
+        self.parser.add_option('--min-cpu', type='float', help="Mind CPU unit number.")
+        self.parser.add_option('--max-memory', type='int', help="Max memory unit size.")
+        self.parser.add_option('--min-memory', type='int', help="Min memory unit size.")
+        self.parser.add_option('--max-disk-size', type='int', help="Max disk unit size.")
+        self.parser.add_option('--max-iops', type='int', help="Max IOPS unit number. [128].", default=128)
+        self.parser.add_option('--min-iops', type='int', help="Min IOPS unit number.")
+        self.parser.add_option('--max-session-num', type='int', help="Max session unit number. [64].", default=64)
         self.parser.add_option('--unit-num', type='int', help="Pool unit number.")
         self.parser.add_option('-z', '--zone-list', type='string', help="Tenant zone list.")
         self.parser.add_option('--charset', type='string', help="Tenant charset.")
         self.parser.add_option('--collate', type='string', help="Tenant COLLATE.")
-        self.parser.add_option('--replica-num', type='int', help="tenant replica num")
+        self.parser.add_option('--replica-num', type='int', help="Tenant replica number.")
         self.parser.add_option('--logonly-replica-num', type='int', help="Tenant logonly replica number.")
         self.parser.add_option('--tablegroup', type='string', help="Tenant tablegroup.")
-        self.parser.add_option('--primary-zone', type='string', help="Tenant primary zone. [RANDOM]", default='RANDOM')
+        self.parser.add_option('--primary-zone', type='string', help="Tenant primary zone. [RANDOM].", default='RANDOM')
         self.parser.add_option('--locality', type='string', help="Tenant locality.")
-        self.parser.add_option('-s', '--variables', type='string', help="Set the variables for the system tenant. [ob_tcp_invited_nodes='%']", default="ob_tcp_invited_nodes='%'")
+        self.parser.add_option('-s', '--variables', type='string', help="Set the variables for the system tenant. [ob_tcp_invited_nodes='%'].", default="ob_tcp_invited_nodes='%'")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -576,8 +582,8 @@ class TestMirrorCommand(ObdCommand):
 class MySQLTestCommand(TestMirrorCommand):
 
     def __init__(self):
-        super(MySQLTestCommand, self).__init__('mysqltest', 'Run mysqltest for a deployment.')
-        self.parser.add_option('--component', type='string', help='The component for mysqltest.')
+        super(MySQLTestCommand, self).__init__('mysqltest', 'Run a mysqltest for a deployment.')
+        self.parser.add_option('--component', type='string', help='Components for mysqltest.')
         self.parser.add_option('--test-server', type='string', help='The server for mysqltest. By default, the first root server in the component is the mysqltest server.')
         self.parser.add_option('--user', type='string', help='Username for a test. [admin]', default='admin')
         self.parser.add_option('--password', type='string', help='Password for a test. [admin]', default='admin')
@@ -592,11 +598,11 @@ class MySQLTestCommand(TestMirrorCommand):
         self.parser.add_option('--var-dir', type='string', help='Var directory to use when run mysqltest. [./var]', default='./var')
         self.parser.add_option('--test-set', type='string', help='test list, use `,` interval')
         self.parser.add_option('--test-pattern', type='string', help='Pattern for test file.')
-        self.parser.add_option('--suite', type='string', help='Suite list.Multiple suites are separated with commas.')
+        self.parser.add_option('--suite', type='string', help='Suite list. Multiple suites are separated with commas.')
         self.parser.add_option('--suite-dir', type='string', help='Suite case directory. [./mysql_test/test_suite]', default='./mysql_test/test_suite')
         self.parser.add_option('--init-sql-dir', type='string', help='Initiate sql directory. [../]', default='../')
         self.parser.add_option('--init-sql-files', type='string', help='Initiate sql file list.Multiple files are separated with commas.')
-        self.parser.add_option('--need-init', action='store_true', help='Execute init sql file.', default=False)
+        self.parser.add_option('--need-init', action='store_true', help='Execute the init SQL file.', default=False)
         self.parser.add_option('--auto-retry', action='store_true', help='Auto retry when fails.', default=False)
         self.parser.add_option('--all', action='store_true', help='Run all suite-dir cases.', default=False)
         self.parser.add_option('--psmall', action='store_true', help='Run psmall cases.', default=False)
@@ -613,8 +619,8 @@ class SysBenchCommand(TestMirrorCommand):
 
     def __init__(self):
         super(SysBenchCommand, self).__init__('sysbench', 'Run sysbench for a deployment.')
-        self.parser.add_option('--component', type='string', help='The component for mysqltest.')
-        self.parser.add_option('--test-server', type='string', help='The server for mysqltest. By default, the first root server in the component is the mysqltest server.')
+        self.parser.add_option('--component', type='string', help='Components for test.')
+        self.parser.add_option('--test-server', type='string', help='The server for test. By default, the first root server in the component is the test server.')
         self.parser.add_option('--user', type='string', help='Username for a test. [root]', default='root')
         self.parser.add_option('--password', type='string', help='Password for a test.')
         self.parser.add_option('--tenant', type='string', help='Tenant for a test. [test]', default='test')
@@ -632,7 +638,7 @@ class SysBenchCommand(TestMirrorCommand):
         self.parser.add_option('--rand-type', type='string', help='Random numbers distribution {uniform,gaussian,special,pareto}.')
         self.parser.add_option('--percentile', type='int', help='Percentile to calculate in latency statistics. Available values are 1-100. 0 means to disable percentile calculations.')
         self.parser.add_option('--skip-trx', dest='{on/off}', type='string', help='Open or close a transaction in a read-only test. ')
-        self.parser.add_option('-O', '--optimization', dest='{0/1}', type='int', help='optimization', default=1)
+        self.parser.add_option('-O', '--optimization', type='int', help='optimization level {0/1}', default=1)
 
     def _do_command(self, obd):
         if self.cmds:
@@ -641,12 +647,43 @@ class SysBenchCommand(TestMirrorCommand):
             return self._show_help()
 
 
+class TPCHCommand(TestMirrorCommand):
+
+    def __init__(self):
+        super(TPCHCommand, self).__init__('tpch', 'Run a TPC-H test for a deployment.')
+        self.parser.add_option('--component', type='string', help='Components for a test.')
+        self.parser.add_option('--test-server', type='string', help='The server for a test. By default, the first root server in the component is the test server.')
+        self.parser.add_option('--user', type='string', help='Username for a test. [root]', default='root')
+        self.parser.add_option('--password', type='string', help='Password for a test.')
+        self.parser.add_option('--tenant', type='string', help='Tenant for a test. [test]', default='test')
+        self.parser.add_option('--database', type='string', help='Database for a test. [test]', default='test')
+        self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
+        self.parser.add_option('--dbgen-bin', type='string', help='dbgen bin path. [/usr/local/tpc-h-tools/bin/dbgen]', default='/usr/local/tpc-h-tools/bin/dbgen')
+        self.parser.add_option('-s', '--scale-factor', type='int', help='Set Scale Factor (SF) to <n>. [1] ', default=1)
+        self.parser.add_option('--tmp-dir', type='string', help='The temporary directory for executing TPC-H. [./tmp]', default='./tmp')
+        self.parser.add_option('--ddl-path', type='string', help='Directory for DDL files.')
+        self.parser.add_option('--tbl-path', type='string', help='Directory for tbl files.')
+        self.parser.add_option('--sql-path', type='string', help='Directory for SQL files.')
+        self.parser.add_option('--remote-tbl-dir', type='string', help='Directory for the tbl on target observers. Make sure that you have read and write access to the directory when you start observer.')
+        self.parser.add_option('--disable-transfer', '--dt', action='store_true', help='Disable the transfer. When enabled, OBD will use the tbl files under remote-tbl-dir instead of transferring local tbl files to remote remote-tbl-dir.')
+        self.parser.add_option('--dss-config', type='string', help='Directory for dists.dss. [/usr/local/tpc-h-tools]', default='/usr/local/tpc-h-tools/')
+        self.parser.add_option('-O', '--optimization', type='int', help='Optimization level {0/1}. [1]', default=1)
+        self.parser.add_option('--test-only', action='store_true', help='Only testing SQLs are executed. No initialization is executed.')
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.tpch(self.cmds[0], self.opts)
+        else:
+            return self._show_help()
+
+
 class TestMajorCommand(MajorCommand):
 
     def __init__(self):
-        super(TestMajorCommand, self).__init__('test', 'Run test for a running deploy deployment.')
+        super(TestMajorCommand, self).__init__('test', 'Run test for a running deployment.')
         self.register_command(MySQLTestCommand())
         self.register_command(SysBenchCommand())
+        self.register_command(TPCHCommand())
 
 
 class BenchMajorCommand(MajorCommand):

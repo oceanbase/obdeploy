@@ -62,11 +62,12 @@ def stop(plugin_context, *args, **kwargs):
             stdio.verbose('%s home_path is empty', server)
             continue
         remote_pid_path = '%s/run/obproxy-%s-%s.pid' % (server_config["home_path"], server.ip, server_config["listen_port"])
+        obproxyd_pid_path = '%s/run/obproxyd-%s-%s.pid' % (server_config["home_path"], server.ip, server_config["listen_port"])
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid:
             if client.execute_command('ls /proc/%s' % remote_pid):
                 stdio.verbose('%s obproxy[pid:%s] stopping ...' % (server, remote_pid))
-                client.execute_command('kill -9 -%s' % remote_pid)
+                client.execute_command('cat %s | xargs kill -9; kill -9 -%s' % (obproxyd_pid_path, remote_pid))
                 servers[server] = {
                     'client': client,
                     'listen_port': server_config['listen_port'],
@@ -84,6 +85,7 @@ def stop(plugin_context, *args, **kwargs):
         tmp_servers = {}
         for server in servers:
             data = servers[server]
+            client = clients[server]
             stdio.verbose('%s check whether the port is released' % server)
             for key in ['prometheus_listen_port', 'listen_port']:
                 if data[key] and check(data['client'], data['pid'], data[key]):

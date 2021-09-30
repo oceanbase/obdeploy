@@ -52,6 +52,7 @@ SUP_MAP = {
     'opensuse-leap': (([15], 7), ),
     'sles': (([15, 2], 7), ),
     'fedora': (([33], 7), ),
+    'uos': (([20], 8), ),
 }
 _SERVER_VARS = {
     'basearch': getBaseArch(),
@@ -88,6 +89,10 @@ class MirrorRepository(object):
         self.stdio = stdio
         self.mirror_path = mirror_path
         self.name = os.path.split(mirror_path)[1]
+        self._str = '%s mirror %s' % (self.mirror_type, self.name)
+
+    def __str__(self):
+        return self._str
 
     @property
     def mirror_type(self):
@@ -774,6 +779,7 @@ class MirrorRepositoryManager(Manager):
         info = [None, None]
         for mirror in mirrors:
             new_one = mirror.get_exact_pkg_info(**pattern)
+            self.stdio.verbose('%s found pkg: %s' % (mirror, new_one))
             if new_one and new_one > info[0]:
                 info = [new_one, mirror]
         return info[0] if info[0] is None or only_info else info[1].get_rpm_pkg_by_info(info[0])
@@ -787,6 +793,7 @@ class MirrorRepositoryManager(Manager):
         source_mirror = None
         for mirror in mirrors:
             t_best = mirror.get_best_pkg_info_with_score(**pattern)
+            self.stdio.verbose('%s found pkg: %s' % (mirror, t_best))
             if best is None:
                 best = t_best
                 source_mirror = mirror
