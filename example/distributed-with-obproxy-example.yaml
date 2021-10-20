@@ -65,6 +65,10 @@ oceanbase-ce:
     # redo_dir: /redo
     zone: zone3
 obproxy:
+  # Set dependent components for the component.
+  # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
+  depends:
+    - oceanbase-ce
   servers:
     - 192.168.1.5
   global:
@@ -73,10 +77,10 @@ obproxy:
     home_path: /root/obproxy
     # oceanbase root server list
     # format: ip:mysql_port;ip:mysql_port. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
-    rs_list: 192.168.1.2:2881;192.168.1.3:2881;192.168.1.4:2881
+    # rs_list: 192.168.1.2:2881;192.168.1.3:2881;192.168.1.4:2881
     enable_cluster_checkout: false
     # observer cluster name, consistent with oceanbase-ce's appname. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
-    cluster_name: obcluster
+    # cluster_name: obcluster
     skip_proxy_sys_private_check: true
     # obproxy_sys_password: # obproxy sys user password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
