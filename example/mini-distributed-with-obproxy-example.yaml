@@ -7,12 +7,12 @@
 #   timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
   servers:
-    - name: z1
+    - name: server1
       # Please don't use hostname, only IP can be supported
       ip: 192.168.1.2
-    - name: z2
+    - name: server2
       ip: 192.168.1.3
-    - name: z3
+    - name: server3
       ip: 192.168.1.4
   global:
     # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
@@ -44,7 +44,7 @@ oceanbase-ce:
     appname: obcluster
     # root_password: # root user password, can be empty
     # proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
-  z1:
+  server1:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
@@ -54,7 +54,7 @@ oceanbase-ce:
     # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
     # redo_dir: /redo
     zone: zone1
-  z2:
+  server2:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
@@ -64,7 +64,7 @@ oceanbase-ce:
     # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
     # redo_dir: /redo
     zone: zone2
-  z3:
+  server3:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
@@ -87,5 +87,6 @@ obproxy:
     enable_cluster_checkout: false
     # observer cluster name, consistent with oceanbase-ce's appname. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     cluster_name: obcluster
+    skip_proxy_sys_private_check: true
     # obproxy_sys_password: # obproxy sys user password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.

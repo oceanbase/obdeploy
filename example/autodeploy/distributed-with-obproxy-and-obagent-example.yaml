@@ -7,12 +7,12 @@
 #   timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
   servers:
-    - name: z1
+    - name: server1
       # Please don't use hostname, only IP can be supported
       ip: 172.19.33.2
-    - name: z2
+    - name: server2
       ip: 172.19.33.3
-    - name: z3
+    - name: server3
       ip: 172.19.33.4
   global:
     # The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
@@ -51,11 +51,11 @@ oceanbase-ce:
     # root_password:
     # Password for proxyro. proxyro_password must be the same as observer_sys_password. The default value is empty.
     # proxyro_password:
-  z1:
+  server1:
     zone: zone1
-  z2:
+  server2:
     zone: zone2
-  z3:
+  server3:
     zone: zone3
 obproxy:
   servers:
@@ -80,12 +80,12 @@ obproxy:
 obagent:
   # The list of servers to be monitored. This list is consistent with the servers in oceanbase-ce. 
   servers:
-    - name: z1
+    - name: server1
       # Please don't use hostname, only IP is supported.
       ip: 172.19.33.2
-    - name: z2
+    - name: server2
       ip: 172.19.33.3
-    - name: z3
+    - name: server3
       ip: 172.19.33.4
   # Set dependent components for the component.
   # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
@@ -94,6 +94,7 @@ obagent:
   global:
     # The working directory for obagent. obagent is started under this directory. This is a required field.
     home_path: /root/observer
+    skip_proxy_sys_private_check: true
     # The port that pulls and manages the metrics. The default port number is 8088.
     # server_port: 8088
     # Debug port for pprof. The default port number is 8089.
