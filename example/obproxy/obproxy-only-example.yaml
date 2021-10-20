@@ -18,5 +18,6 @@ obproxy:
     enable_cluster_checkout: false
     # observer cluster name, consistent with oceanbase-ce's appname. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     cluster_name: obcluster
+    skip_proxy_sys_private_check: true
     # obproxy_sys_password: # obproxy sys user password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
