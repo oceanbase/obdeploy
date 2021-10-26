@@ -77,7 +77,7 @@ Before you run the commands, make sure that these conditions are met:
 - Your server has at least 2 CPU cores.
 
 > **NOTE:** If the preceding conditions are not met, see [Use OBD to start an OceanBase cluster](#Use-OBD-to-start-an-OceanBase-cluster).
-
+> **NOTE:** For the convenience of using root here, OBD and OceanBase database do not have any restrictions on running users. We do not recommend that you use root in production.
 ```shell
 obd cluster deploy c1 -c ./example/mini-local-example.yaml
 obd cluster start c1
