@@ -78,6 +78,7 @@ source /etc/profile.d/obd.sh
 
 > **说明：** 如果以上条件不满足，请参考[使用 OBD 启动 OceanBase 数据库集群](#使用-obd-启动-oceanbase-数据库集群)。
 
+> **注意：** 此处为了方便使用root，OBD和OceanBase数据库没有对运行用户做出任何限制，我们不建议生产中直接使用root。
 ```shell
 obd cluster deploy c1 -c ./example/mini-local-example.yaml
 obd cluster start c1
