@@ -26,7 +26,7 @@ oceanbase-ce:
     # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
     memory_limit: 64G # The maximum running memory for an observer
     # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
-    # system_memory: 30G
+    system_memory: 30G
     datafile_disk_percentage: 20 # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.
     syslog_level: INFO # System log level. The default value is INFO.
     enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
