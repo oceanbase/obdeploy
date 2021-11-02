@@ -529,7 +529,7 @@ obd test sysbench <deploy name> [flags]
 --time | 否 | int | 60 | 运行时间。设置为 0 时表示不限制时间。
 --interval | 否 | int | 10 | 运行期间日志，单位为秒。
 --events | 否 | int | 0 | 最大请求数量，定义数量后可以不需要 --time 选项。
---rand-type | 否 | string |   | 访问数据时使用的随机生成函数。取值可以为 special、uniform、gaussian 或 pareto。 默认值为 special， 早期值为 uniform。
+--rand-type | 否 | string | 空 | 访问数据时使用的随机生成函数。取值可以为 special、uniform、gaussian 或 pareto。 默认值为 special， 早期值为 uniform。
 ---skip-trx | 否 | string | 空 | 在只读测试中打开或关闭事务。
 -O/--optimization | 否 | int | 1 | 自动调优等级。为 0 时关闭。
 
