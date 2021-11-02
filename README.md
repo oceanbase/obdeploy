@@ -50,7 +50,7 @@ Before you install OBD by using the source code, make sure that you have install
 - xz-devel
 - mysql-devel
 
-To install OBD on Python2, run these commands:
+To install OBD on Python2.7, run these commands:
 
 ```shell
 pip install -r requirements.txt
@@ -58,7 +58,7 @@ sh build.sh
 source /etc/profile.d/obd.sh
 ```
 
-To install OBD on Python3, run these commands:
+To install OBD on Python3.8, run these commands:
 
 ```shell
 pip install -r requirements3.txt
@@ -271,7 +271,7 @@ The following table describes the corresponding options.
 | -f/--force | No | bool | false | Specifies whether to forcibly clear the working directory. <br>When the component requires an empty working directory but this option is disabled, an error will be returned if the working directory is not empty.  |
 | -U/--ulp/--unuselibrepo | No | bool | false | Specifies whether to prevent OBD from automatically taking actions when dependencies are missing. If this option is disabled and OBD detects that some dependencies are missing, OBD will automatically search for the corresponding libs mirrors and install them. If this option is enabled, the **unuse_lib_repository: true** field will be added to the corresponding configuration file. You can also add the **unuse_lib_repository: true** field to the configuration file to enable this option.  |
 | -A/--act/--auto-create-tenant | No | bool | false | Specifies whether to enable OBD to create the `test` tenant during the bootstrap by using all available resources of the cluster. If this option is enabled, the **auto_create_tenant: true** field will be added to the corresponding configuration file. You can also add the **auto_create_tenant: true** field to the configuration file to enable this option.  |
-| -s/--strict-check | No | bool | false | Specifies whether to return an error and directly exit the process when the component pre-check fails. If this option is disabled, OBD will return an error but not forcibly end the process when pre-check fails. We recommend that you enable this option to avoid startup failures due to insufficient resources.  |
+| -s/--strict-check | No | bool | false | Some components will do relevant checks before starting. It will issue an alarm when the check fails, but it will not force the process to stop. Using this option can return an error and directly exit the process when the component pre-check fails.  We recommend that you enable this option to avoid startup failures due to insufficient resources.  |
 
 #### `obd cluster edit-config`
 
@@ -310,12 +310,19 @@ The following table describes the corresponding options.
 Starts a deployed cluster. If the cluster is started, OBD will return its status.
 
 ```shell
-obd cluster start <deploy name> [-s]
+obd cluster start <deploy name> [flags]
 ```
 
 `deploy name` specifies the name of the deployment configuration file.
 
-`-s` is `--strict-check`. `-s` specifies whether to return an error and directly exit the process when the component pre-check fails. If this option is disabled, OBD will return an error but not forcibly end the process when pre-check fails. We recommend that you enable this option to avoid startup failures due to insufficient resources. `-s` is optional. Its data type is `bool`. This option is disabled by default.
+This table describes the corresponding options.
+
+| Option | Required | Data type | Default value | Description |
+--- | --- | --- |--- | ---
+| -s/--servers | No | string |   | A list of machines, separated by `,`. Be used for specifying the start-up machines. If not all machines under the component start, the start will not execute bootstrap.  |
+| -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If not all components under the configuration start, this configuration will not enter the running state.  |
+| --wop/--without-parameter | No | bool | false | Start without parameters. It is without parameters when starting. The node does not respond to this option when it is starting for the first time.  |
+| -S/--strict-check | No | bool | false | Some components will do relevant checks before starting. OBD will issue an alarm when the check fails, but OBD will not force the process to stop. Using this option can return an error and directly exit the process when the component pre-check fails.  We recommend that you enable this option to avoid startup failures due to insufficient resources.  |
 
 #### `obd cluster list`
 
@@ -362,6 +369,14 @@ obd cluster restart <deploy name>
 
 `deploy name` specifies the name of the deployment configuration file.
 
+This table describes the corresponding options.
+
+| Option | Required | Data type | Default value | Description |
+--- | --- | --- |--- | ---
+| -s/--servers | No | string |   | A list of machines, separated by `,`.  |
+| -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If not all components under the configuration start, this configuration will not enter the running state.  |
+| --wop/--without-parameter | No | bool | false | Start without parameters. It is without parameters when starting. The node does not respond to this option when it is starting for the first time.  |
+
 #### `obd cluster redeploy`
 
 Redeploys a running cluster. After you run the `edit-config` command to modify the configuration information of a running cluster, you can run the `redeploy` command to let your modification take effect.
@@ -384,9 +399,16 @@ obd cluster stop <deploy name>
 
 `deploy name` specifies the name of the deployment configuration file.
 
+This table describes the corresponding options.
+
+| Option | Required | Data type | Default value | Description |
+--- | --- | --- |--- | ---
+| -s/--servers | No | string |   | A list of machines, separated by `,`. Be used for specifying the start-up machines.  |
+| -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If not all components under the configuration start, this configuration will not enter the stopped state.  |
+
 #### `obd cluster destroy`
 
-Destroys a deployed cluster. If the cluster is running, this command stops the cluster before destroying it.
+Destroys a deployed cluster. If the cluster is running state, this command will first try to execute `stop` and then `destroy` after success.
 
 ```shell
 obd cluster destroy <deploy name> [-f]
@@ -460,7 +482,6 @@ This table describes the corresponding options.
 --- | --- | --- |--- | ---
 | -c/--component | No | string |   | The name of the component to be tested. Valid values: oceanbase-ce and obproxy. If this option is not specified, OBD will search for obproxy and oceanbase-ce in sequence. If obproxy is found, OBD will stop the search and use obproxy for the subsequent tests. If obproxy is not found, OBD will continue to search for oceanbase-ce.  |
 | --test-server | No | string | The first node of the specified component.  | It must be the name of a node of the specified component.  |
-| --mode | No | string | both | The test mode. Valid values: mysql and both.  |
 | --user | No | string | root | The username for running the test.  |
 | --password | No | string |   | The password for running the test.  |
 | --mysqltest-bin | No | string | mysqltest | The path of the mysqltest binary file.  |
@@ -496,7 +517,7 @@ obd test sysbench <deploy name> [flags]
 | --user | No | string | root | The username for running the test.  |
 | --password | No | string |   | The password for running the test.  |
 | --tenant | No | string | test | The tenant name for running the test.  |
-| --database | No | string | test | The cluster for performing the test.  |
+| --database | No | string | test | The database for performing the test.  |
 | --obclient-bin | No | string | obclient | The path of the OBClient binary file.  |
 | --sysbench-bin | No | string | sysbench | The path of the Sysbench binary file.  |
 | --script-name | No | string | point_select.lua | The name of the Sysbench script to be run.  |
@@ -507,8 +528,42 @@ obd test sysbench <deploy name> [flags]
 | --time | No | int | 60 | The running duration. When this option is set to 0, the running duration is not limited.  |
 | --interval | No | int | 10 | The logging interval, in seconds.  |
 | --events | No | int | 0 | The maximum number of requests. If this option is specified, the --time option is not needed.  |
-| --rand-type | No | string | The random number generation function used for data access. Valid values: special, uniform, gaussian, and pareto.  Default value: special.  |
+| --rand-type | No | string |   | The random number generation function used for data access. Valid values: special, uniform, gaussian, and pareto.  Default value: special, early value: uniform.  |
 | ---skip-trx | No | string |   | Specifies whether to enable or disable a transaction in a read-only test.  |
+| -O/--optimization | No | int | 1 | Auto tuning level. Off when 0.  |
+
+#### `obd test tpch`
+
+Runs the TPC-H test on the specified node of an OcecanBase cluster or ODP.  To run the TPC-H test, you must install OBClient and obtpch.
+TPC-H needs to specify an OceanBase target server as the execution target. Before executing the TPC-H test, OBD will transfer the data files required for the test to the specified directory of the specified machine. Please ensure there is enough disk space on this machine because these files may be relatively large.
+Of course, you can prepare the data files on the target machine in advance and then turn off the transfer by the `-dt/--disable-transfer` option.
+
+```shell
+obd test tpch <deploy name> [flags]
+```
+
+`deploy name` specifies the name of the deployment configuration file.
+
+| Option | Required | Data type | Default value | Description |
+--- | --- | --- |--- | ---
+| --test-server | No | string | The first node of the specified component.  | It must be the name of a node of the specified component.  |
+| --user | No | string | root | The username for running the test.  |
+| --password | No | string |   | The password for running the test.  |
+| --tenant | No | string | test | The tenant name for running the test.  |
+| --database | No | string | test | The database for performing the test.  |
+| --obclient-bin | No | string | obclient | The path of the OBClient binary file.  |
+| --dbgen-bin | No | string | /usr/local/tpc-h-tools/bin/dbgen | The path of the dbgen binary file.  |
+| --dss-config | No | string | /usr/local/tpc-h-tools/ | The directory that stores the dists.dss files.  |
+| -s/--scale-factor | No | int | 1 | Automatically generate the scale of test data, in G.  |
+| -tmp-dir | No | string | ./tmp | Temporary directory when executing tpch. Automatically generated test data, auto-tuned sql files, log files for executing test sql, and so on will all be stored here.  |
+| --ddl-path | No | string |   | The path or directory of the ddl file. If it is empty, OBD will use the ddl file that comes with it.  |
+| --tbl-path | No | string |   | The path or directory of the tbl file. If it is empty, use dbgen to generate test data.  |
+| --sql-path | No | string |   | The path or directory of the sql file. If it is empty, OBD will use the sql file that comes with it.  |
+| --remote-tbl-dir | No | string |   | The directory where the tbl is stored on the target observer, it is the absolute path. Please make sure that the user who starts the observer has read and write permissions to this directory. This option is required when  `--test-only` is not enabled.  |
+| --test-only | No | bool | false | Do not perform the initialization, only executing the test SQL.  |
+| --dt/--disable-transfer | No | bool | false | Disable transfer. When you enable it will not transfer the local tbl to the remote remote-tbl-dir, and it will directly use the tbl file under the target machine remote-tbl-dir.  |
+| -O/--optimization | No | int | 1 | Auto tuning level. Off when 0.  |
+
 
 ## Q&A
 
