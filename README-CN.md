@@ -601,4 +601,3 @@ A：您可以修改 `~/.obd/plugins/oceanbase-ce/` 下的启动相关插件。�
 ## 协议
 
 OBD 采用 [GPL-3.0](./LICENSE) 协议。
-
