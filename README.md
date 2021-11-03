@@ -319,10 +319,10 @@ This table describes the corresponding options.
 
 | Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
-| -s/--servers | No | string |   | A list of machines, separated by `,`. Be used for specifying the start-up machines. If not all machines under the component start, the start will not execute bootstrap.  |
-| -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If not all components under the configuration start, this configuration will not enter the running state.  |
-| --wop/--without-parameter | No | bool | false | Start without parameters. It is without parameters when starting. The node does not respond to this option when it is starting for the first time.  |
-| -S/--strict-check | No | bool | false | Some components will do relevant checks before starting. OBD will issue an alarm when the check fails, but OBD will not force the process to stop. Using this option can return an error and directly exit the process when the component pre-check fails.  We recommend that you enable this option to avoid startup failures due to insufficient resources.  |
+| -s/--servers | No | string |   | A list of machines, separated by `,`. Be used for specifying the start-up machines. If this option is disabled, all machines under the component will start without executing bootstrap.  |
+| -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If this option is disabled, all machines under the component will start without entering the running state.  |
+| --wop/--without-parameter | No | bool | false | Start without parameters. The node does not respond to this option when this node is starting for the first time.  |
+| -S/--strict-check | No | bool | false | Some components will do relevant checks before starting. OBD will throw an error when the check fails, but OBD will not force the process to stop. Using this option can return an error and directly exit the process when the component pre-check fails.  We recommend that you enable this option to avoid startup failures due to insufficient resources.  |
 
 #### `obd cluster list`
 
@@ -374,7 +374,7 @@ This table describes the corresponding options.
 | Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
 | -s/--servers | No | string |   | A list of machines, separated by `,`.  |
-| -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If not all components under the configuration start, this configuration will not enter the running state.  |
+| -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If this option is disabled, all machines under the component will start without entering the running state.  |
 | --wop/--without-parameter | No | bool | false | Start without parameters. It is without parameters when starting. The node does not respond to this option when it is starting for the first time.  |
 
 #### `obd cluster redeploy`
@@ -534,9 +534,9 @@ obd test sysbench <deploy name> [flags]
 
 #### `obd test tpch`
 
-Runs the TPC-H test on the specified node of an OcecanBase cluster or ODP.  To run the TPC-H test, you must install OBClient and obtpch.
-TPC-H needs to specify an OceanBase target server as the execution target. Before executing the TPC-H test, OBD will transfer the data files required for the test to the specified directory of the specified machine. Please ensure there is enough disk space on this machine because these files may be relatively large.
-Of course, you can prepare the data files on the target machine in advance and then turn off the transfer by the `-dt/--disable-transfer` option.
+This section describes how to run the TPC-H test on the specified node of an OcecanBase cluster or ODP. To run the TPC-H test, you must install OBClient and obtpch.
+TPC-H needs to specify an OceanBase target server as the execution target. Before executing the TPC-H test, OBD will transfer the data files required for the test to the specified directory of the specified machine. Please make sure that you have enough disk space on this machine because these files may be relatively large.
+Of course, you can prepare the data files on the target machine in advance and then turn off the transfer by using the `-dt/--disable-transfer` option.
 
 ```shell
 obd test tpch <deploy name> [flags]
@@ -554,14 +554,14 @@ obd test tpch <deploy name> [flags]
 | --obclient-bin | No | string | obclient | The path of the OBClient binary file.  |
 | --dbgen-bin | No | string | /usr/local/tpc-h-tools/bin/dbgen | The path of the dbgen binary file.  |
 | --dss-config | No | string | /usr/local/tpc-h-tools/ | The directory that stores the dists.dss files.  |
-| -s/--scale-factor | No | int | 1 | Automatically generate the scale of test data, in G.  |
-| -tmp-dir | No | string | ./tmp | Temporary directory when executing tpch. Automatically generated test data, auto-tuned sql files, log files for executing test sql, and so on will all be stored here.  |
+| -s/--scale-factor | No | int | 1 | Automatically generate the scale of test data, the data is measured in Gigabytes.  |
+| -tmp-dir | No | string | ./tmp | Temporary directory when executing tpch. When enabled, this option will automatically generate test data, auto-tuned SQL files, log files for executing test SQL, and so on.  |
 | --ddl-path | No | string |   | The path or directory of the ddl file. If it is empty, OBD will use the ddl file that comes with it.  |
 | --tbl-path | No | string |   | The path or directory of the tbl file. If it is empty, use dbgen to generate test data.  |
 | --sql-path | No | string |   | The path or directory of the sql file. If it is empty, OBD will use the sql file that comes with it.  |
-| --remote-tbl-dir | No | string |   | The directory where the tbl is stored on the target observer, it is the absolute path. Please make sure that the user who starts the observer has read and write permissions to this directory. This option is required when  `--test-only` is not enabled.  |
-| --test-only | No | bool | false | Do not perform the initialization, only executing the test SQL.  |
-| --dt/--disable-transfer | No | bool | false | Disable transfer. When you enable it will not transfer the local tbl to the remote remote-tbl-dir, and it will directly use the tbl file under the target machine remote-tbl-dir.  |
+| --remote-tbl-dir | No | string |   | The directory where the tbl is stored on the target observer, it is the absolute path. Please make sure that you have the read and write permissions to this directory when you start the server. This option is required when  `--test-only` is not enabled.  |
+| --test-only | No | bool | false | When you enable this option, initialization will not be done, only the test SQL is exectued.  |
+| --dt/--disable-transfer | No | bool | false | Disable transfer. When you enable this option, OBD will not transfer the local tbl to the remote remote-tbl-dir, and OBD will directly use the tbl file under the target machine remote-tbl-dir.  |
 | -O/--optimization | No | int | 1 | Auto tuning level. Off when 0.  |
 
 
