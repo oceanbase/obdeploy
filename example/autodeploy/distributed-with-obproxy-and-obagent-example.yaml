@@ -58,6 +58,8 @@ oceanbase-ce:
   server3:
     zone: zone3
 obproxy:
+  depends:
+    - oceanbase-ce
   servers:
     - 192.168.1.5
   global:
@@ -78,6 +80,8 @@ obproxy:
     # Password for proxyro. proxyro_password must be the same with proxyro_password. The default value is empty.
     # observer_sys_password:
 obagent:
+  depends:
+    - oceanbase-ce
   # The list of servers to be monitored. This list is consistent with the servers in oceanbase-ce. 
   servers:
     - name: server1
