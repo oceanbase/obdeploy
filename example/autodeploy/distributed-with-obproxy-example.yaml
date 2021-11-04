@@ -58,6 +58,8 @@ oceanbase-ce:
   server3:
     zone: zone3
 obproxy:
+  depends:
+    - oceanbase-ce
   servers:
     - 192.168.1.5
   global:
