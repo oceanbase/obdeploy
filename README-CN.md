@@ -50,7 +50,7 @@ source /etc/profile.d/obd.sh
 - xz-devel
 - mysql-devel
   
-Python2 使用以下命令安装：
+Python2.7 使用以下命令安装：
 
 ```shell
 pip install -r requirements.txt
@@ -58,7 +58,7 @@ sh build.sh
 source /etc/profile.d/obd.sh
 ```
 
-Python3 使用以下命令安装：
+Python3.8 使用以下命令安装：
 
 ```shell
 pip install -r requirements3.txt
@@ -78,7 +78,8 @@ source /etc/profile.d/obd.sh
 
 > **说明：** 如果以上条件不满足，请参考[使用 OBD 启动 OceanBase 数据库集群](#使用-obd-启动-oceanbase-数据库集群)。
 
-> **注意：** 此处为了方便使用root，OBD和OceanBase数据库没有对运行用户做出任何限制，我们不建议生产中直接使用root。
+> **注意：** 此处为了方便使用 root，OBD 和 OceanBase 数据库没有对运行用户做出任何限制，我们不建议生产中直接使用 root。
+
 ```shell
 obd cluster deploy c1 -c ./example/mini-local-example.yaml
 obd cluster start c1
@@ -437,7 +438,7 @@ obd cluster tenant create <deploy name> [-n <tenant name>] [flags]
 --max-cpu | 否 | float | 0 | 租户可用最大 CPU 数。为 0 时使用集群剩余全部可用 CPU。
 --min-cpu | 否 | float | 0 | 租户可用最小 CPU 数。为 0 时等于 --max-cpu。
 --max-memory | 否 | int | 0 | 租户可用最大内存。为 0 时使用集群剩余全部可用内存。实际值低于 1G 时报错。
---min-memory | 否 | int | 0 | 租户可用最大内存。为 0 时等于 --max-memory。
+--min-memory | 否 | int | 0 | 租户可用最小内存。为 0 时等于 --max-memory。
 --max-disk-size | 否 | int | 0 | 租户可用最大磁盘空间。为0时使用集群全部可用空间。实际值低于 512M 时报错。
 --max-iops | 否 | int | 128 | 租户 IOPS 最多数量，取值范围为 [128,+∞)。
 --min-iops | 否 | int | 0 | 租户 IOPS 最少数量。取值范围为 [128,+∞)。为 0 时等于 --max-iops 。
@@ -529,7 +530,7 @@ obd test sysbench <deploy name> [flags]
 --time | 否 | int | 60 | 运行时间。设置为 0 时表示不限制时间。
 --interval | 否 | int | 10 | 运行期间日志，单位为秒。
 --events | 否 | int | 0 | 最大请求数量，定义数量后可以不需要 --time 选项。
---rand-type | 否 | string | 访问数据时使用的随机生成函数。取值可以为 special、uniform、gaussian 或 pareto。 默认值为 special， 早期值为 uniform。
+--rand-type | 否 | string | 空 | 访问数据时使用的随机生成函数。取值可以为 special、uniform、gaussian 或 pareto。 默认值为 special， 早期值为 uniform。
 ---skip-trx | 否 | string | 空 | 在只读测试中打开或关闭事务。
 -O/--optimization | 否 | int | 1 | 自动调优等级。为 0 时关闭。
 
