@@ -599,6 +599,10 @@ oceanbase-ce:
 
 A：您可以修改 `~/.obd/plugins/oceanbase-ce/` 下的启动相关插件。比如您为 3.1.0 版本的 OceanBase-CE 添加了一个新的启动配置，可以修改 `~/.obd/plugins/oceanbase-ce/3.1.0/start.py`。
 
+### Q：如何升级 OBD？
+
+A：您可以使用 `obd update` 命令升级 OBD。当您升级完成后可以使用命令 `obd --version` 查看版本，确认是否升级成功。
+
 ## 协议
 
 OBD 采用 [GPL-3.0](./LICENSE) 协议。
