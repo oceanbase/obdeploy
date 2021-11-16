@@ -599,7 +599,7 @@ A: You can modify the startup plug-ins in the `~/.obd/plugins/oceanbase-ce/` dir
 
 ### Q：How to update OBD?
 
-A：To update ODB, use the `obd update` command. When you are done with the update, use `obd --version` to confirm you version.
+A：You can use the `obd update` command to update OBD. When you are done with the update, use the `obd --version` command to confirm the version of OBD.
 
 ## Protocol
 
