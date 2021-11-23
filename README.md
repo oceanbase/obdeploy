@@ -597,6 +597,10 @@ oceanbase-ce:
 
 A: You can modify the startup plug-ins in the `~/.obd/plugins/oceanbase-ce/` directory. For example, after you add a new startup configuration item for OceanBase-CE V3.1.0, you can modify the `start.py` file in the `~/.obd/plugins/oceanbase-ce/3.1.0` directory.
 
+### Q：How to update OBD?
+
+A：You can use the `obd update` command to update OBD. When you are done with the update, use the `obd --version` command to confirm the version of OBD.
+
 ## Protocol
 
 OBD complies with [GPL-3.0](/LICENSE).
