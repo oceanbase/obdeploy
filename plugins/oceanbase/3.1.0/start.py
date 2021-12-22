@@ -137,7 +137,10 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 'mode': '-m',
                 'scn': '-f'
             }
-            not_cmd_opt = ['home_path', 'obconfig_url', 'proxyro_password', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir']
+            not_cmd_opt = [
+                'home_path', 'obconfig_url', 'root_password', 'proxyro_password', 
+                'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir'
+            ]
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
             opt_str = []
             for key in server_config:
