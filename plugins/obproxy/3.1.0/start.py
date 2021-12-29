@@ -95,7 +95,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     clusters_cmd = {}
     real_cmd = {}
     pid_path = {}
-    need_bootstrap = True
+    need_bootstrap = False
 
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
@@ -118,7 +118,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             }
             for key in config_map:
                 ob_key = config_map[key]
-                if not odp_config.get(key) and ob_config.get(ob_key):
+                if key not in odp_config and ob_key in ob_config:
                     cluster_config.update_global_conf(key, ob_config.get(ob_key), save=False)
             break
 
@@ -133,6 +133,15 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         return plugin_context.return_false()
 
     stdio.start_loading('Start obproxy')
+
+    for server in cluster_config.servers:
+        client = clients[server]
+        server_config = cluster_config.get_server_conf(server)
+        home_path = server_config['home_path']
+        if not client.execute_command('ls %s/etc/obproxy_config.bin' % home_path):
+            need_bootstrap = True
+            break
+
     for server in cluster_config.servers:
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
@@ -147,7 +156,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
 
         pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (home_path, server.ip, server_config["listen_port"])
 
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s/etc/obproxy_config.bin' % home_path):
+        if getattr(options, 'without_parameter', False) and need_bootstrap is False:
             use_parameter = False
         else:
             use_parameter = True
@@ -159,9 +168,9 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 'rs_list',
                 'cluster_name'
             ]
-            start_unuse = ['home_path', 'observer_sys_password', 'obproxy_sys_password']
+            start_unuse = ['home_path', 'observer_sys_password', 'obproxy_sys_password', 'observer_root_password']
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
-            opt_str = []
+            opt_str = ["obproxy_sys_password=e3fd448c516073714189b57233c9cf428ccb1bed"]
             for key in server_config:
                 if key not in start_unuse and key not in not_opt_str:
                     value = get_value(key)
@@ -186,9 +195,9 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         remote_pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
         cmd = real_cmd[server].replace('\'', '')
         if remote_pid:
-            ret = client.execute_command('cat /proc/%s/cmdline' % remote_pid)
+            ret = client.execute_command('ls /proc/%s/' % remote_pid)
             if ret:
-                if ret.stdout.replace('\0', '') == cmd.strip().replace(' ', ''):
+                if confirm_port(client, remote_pid, port):
                     continue
                 stdio.stop_loading('fail')
                 stdio.error('%s:%s port is already used' % (server.ip, port))
@@ -206,28 +215,35 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     stdio.stop_loading('succeed')
         
     stdio.start_loading('obproxy program health check')
-    time.sleep(3)
     failed = []
-    fail_time = 0
-    for server in cluster_config.servers:
-        server_config = cluster_config.get_server_conf(server)
-        client = clients[server]
-        stdio.verbose('%s program health check' % server)
-        remote_pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
-        if remote_pid:
-            for pid in remote_pid.split('\n'):
-                confirm = confirm_port(client, pid, int(server_config["listen_port"]))
-                if confirm:
-                    stdio.verbose('%s obproxy[pid: %s] started', server, pid)
-                    client.execute_command('echo %s > %s' % (pid, pid_path[server]))
-                    obproxyd(server_config["home_path"], client, server.ip, server_config["listen_port"])
-                    break
-                else:
-                    fail_time += 1
-            if fail_time == len(remote_pid.split('\n')):
+    servers = cluster_config.servers
+    count = 4
+    while servers and count:
+        count -= 1
+        tmp_servers = []
+        for server in servers:
+            server_config = cluster_config.get_server_conf(server)
+            client = clients[server]
+            stdio.verbose('%s program health check' % server)
+            remote_pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
+            if remote_pid:          
+                for pid in remote_pid.split('\n'):
+                    confirm = confirm_port(client, pid, int(server_config["listen_port"]))
+                    if confirm:
+                        stdio.verbose('%s obproxy[pid: %s] started', server, pid)
+                        client.execute_command('echo %s > %s' % (pid, pid_path[server]))
+                        obproxyd(server_config["home_path"], client, server.ip, server_config["listen_port"])
+                        break
+                    stdio.verbose('failed to start %s obproxy, remaining retries: %d' % (server, count))
+                    if count:
+                        tmp_servers.append(server)
+                    else:
+                        failed.append('failed to start %s obproxy' % server)
+            else:
                 failed.append('failed to start %s obproxy' % server)
-        else:
-            failed.append('failed to start %s obproxy' % server)
+        servers = tmp_servers
+        if servers and count:
+            time.sleep(1)
     if failed:
         stdio.stop_loading('fail')
         for msg in failed:
@@ -235,4 +251,4 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         plugin_context.return_false()
     else:
         stdio.stop_loading('succeed')
-        plugin_context.return_true(need_bootstrap=True)
+        plugin_context.return_true(need_bootstrap=need_bootstrap)

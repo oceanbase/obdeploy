@@ -61,11 +61,11 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
             try:
                 server_config = cluster_config.get_server_conf(server)
                 password = server_config.get('root_password', '') if count % 2 else ''
-                db, cursor = _connect(server.ip, server_config['mysql_port'], password)
+                db, cursor = _connect(server.ip, server_config['mysql_port'], password if password is not None else '')
                 stdio.stop_loading('succeed')
-                return plugin_context.return_true(connect=db, cursor=cursor)
+                return plugin_context.return_true(connect=db, cursor=cursor, server=server)
             except:
-                pass
+                stdio.exception('')
         time.sleep(3)
     
     stdio.stop_loading('fail')

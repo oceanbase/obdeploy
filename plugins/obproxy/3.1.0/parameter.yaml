@@ -242,6 +242,13 @@
   max_value: true
   need_restart: false
   description_en: if client connections reach throttle, true is that new connection will be accepted, and eliminate lru client connection, false is that new connection will disconnect, and err packet will be returned
+- name: max_connections
+  type: INT
+  default: 60000
+  min_value: 0
+  max_value: 65535
+  need_restart: false
+  description_en: max fd proxy could use
 - name: client_max_connections
   type: INT
   default: 8192
@@ -439,3 +446,10 @@
   min_value: ''
   need_restart: false
   description_en: password of observer proxyro user
+- name: observer_root_password
+  type: STRING
+  default: ''
+  max_value: ''
+  min_value: ''
+  need_restart: false
+  description_en: password of observer root user

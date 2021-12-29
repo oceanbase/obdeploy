@@ -226,6 +226,23 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
                     'need': 0,
                     'threshold': 2
                 }
+        all_path = set(list(servers_disk[ip].keys()) + list(servers_clog_mount[ip].keys()))
+        for include_dir in all_path:
+            while include_dir not in disk:
+                ret = client.execute_command('df --block-size=1024 %s' % include_dir)
+                if ret:
+                    for total, used, avail, puse, path in re.findall('(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)',
+                                                                     ret.stdout):
+                        disk[path] = {
+                            'total': int(total) << 10,
+                            'avail': int(avail) << 10,
+                            'need': 0,
+                            'threshold': 2
+                        }
+                    break
+                else:
+                    include_dir = os.path.dirname(include_dir)
+        stdio.verbose('disk: {}'.format(disk))
         for path in servers_disk[ip]:
             kp = '/'
             for p in disk:

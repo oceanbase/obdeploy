@@ -153,6 +153,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         "cluster_name": "appname",
         "cluster_id": "cluster_id",
         "zone_name": "zone",
+        "ob_install_path": "home_path"
     }
 
     stdio.start_loading('Start obproxy')

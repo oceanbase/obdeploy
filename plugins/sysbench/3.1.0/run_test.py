@@ -98,6 +98,7 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
     options = plugin_context.options
 
     optimization = get_option('optimization') > 0
+    ob_optimization = get_option('ob_optimization')
 
     host = get_option('host', '127.0.0.1')
     port = get_option('port', 2881)
@@ -114,7 +115,7 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
     rand_type = get_option('rand_type', None)
     skip_trx = get_option('skip_trx', '').lower()
     percentile = get_option('percentile', None)
-    script_name = get_option('script_name', 'point_select.lua')
+    script_name = get_option('script_name', 'oltp_point_select.lua')
     obclient_bin = get_option('obclient_bin', 'obclient')
     sysbench_bin = get_option('sysbench_bin', 'sysbench')
     sysbench_script_dir = get_option('sysbench_script_dir', '/usr/sysbench/share/sysbench')
@@ -154,18 +155,11 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
         sql = "select * from oceanbase.__all_unit_config where unit_config_id = %d" % pool['unit_config_id']
         max_cpu = execute(cursor, sql)['max_cpu']
     except:
-        return
-
-    sql = "select * from oceanbase.__all_user where user_name = '%s'" % user
-    sys_pwd = cluster_config.get_global_conf().get('root_password', '')
-    exec_sql_cmd = "%s -h%s -P%s -uroot@%s %s -A -e" % (obclient_bin, host, port, tenant_name, ("-p'%s'" % sys_pwd) if sys_pwd else '')
-    ret = LocalClient.execute_command('%s "%s"' % (exec_sql_cmd, sql), stdio=stdio)
-    if not ret or not ret.stdout:
-        stdio.error('User %s not exists.' % user)
+        stdio.exception('')
         return
 
     exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A -e" % (obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
-    ret = LocalClient.execute_command('%s "%s"' % (exec_sql_cmd, 'select version();'), stdio=stdio)
+    ret = LocalClient.execute_command('%s "%s"' % (exec_sql_cmd, 'create database if not exists %s;' % mysql_db), stdio=stdio)
     if not ret:
         stdio.error(ret.stderr)
         return
@@ -221,7 +215,7 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
 
         tenant_q = ' tenant="%s"' % tenant_name
         server_num = len(cluster_config.servers)
-        if optimization:
+        if optimization and ob_optimization:
             for config in system_configs:
                 if config[0] == 'sleep':
                     sleep(config[1])

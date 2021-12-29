@@ -62,7 +62,7 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
         remote_pid_path = "%s/run/obproxy-%s-%s.pid" % (server_config['home_path'], server.ip, server_config["listen_port"])
         remote_pid = client.execute_command("cat %s" % remote_pid_path).stdout.strip()
         if remote_pid:
-            if client.execute_command('ls /proc/%s' % remote_pid):
+            if client.execute_command('ls /proc/%s/fd' % remote_pid):
                 continue
         
         if ip not in servers_port:

@@ -143,7 +143,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                             free_memory = parse_size(str(v))
                     memory_limit = free_memory
                     if memory_limit < MIN_MEMORY:
-                        stdio.errorn('(%s) not enough memory. (Free: %s, Need: %s)' % (ip, format_size(free_memory), format_size(MIN_MEMORY)))
+                        stdio.error('(%s) not enough memory. (Free: %s, Need: %s)' % (ip, format_size(free_memory), format_size(MIN_MEMORY)))
                         success = False
                         continue
                     memory_limit = max(MIN_MEMORY, memory_limit * 0.9)
@@ -188,7 +188,19 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                         'avail': int(avail) << 10,
                         'need': 0,
                     }
-                
+            for include_dir in dirs.values():
+                while include_dir not in disk:
+                    ret = client.execute_command('df --block-size=1024 %s' % include_dir)
+                    if ret:
+                        for total, used, avail, puse, path in re.findall('(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
+                            disk[path] = {
+                                'total': int(total) << 10,
+                                'avail': int(avail) << 10,
+                                'need': 0,
+                            }
+                        break
+                    else:
+                        include_dir = os.path.dirname(include_dir)
             mounts = {}
             for key in dirs:
                 path = dirs[key]

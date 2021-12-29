@@ -143,14 +143,6 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
         stdio.error('fail to get tenant info')
         return
 
-    sql = "select * from oceanbase.__all_user where user_name = '%s'" % user
-    sys_pwd = cluster_config.get_global_conf().get('root_password', '')
-    exec_sql_cmd = "%s -h%s -P%s -uroot@%s %s -A -e" % (obclient_bin, host, port, tenant_name, ("-p'%s'" % sys_pwd) if sys_pwd else '')
-    ret = LocalClient.execute_command('%s "%s"' % (exec_sql_cmd, sql), stdio=stdio)
-    if not ret or not ret.stdout:
-        stdio.error('User %s not exists.' % user)
-        return
-
     if not_test_only:
         sql_cmd_prefix = '%s -h%s -P%s -u%s@%s %s -A' % (obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
         ret = local_execute_command('%s -e "%s"' % (sql_cmd_prefix, 'create database if not exists %s' % mysql_db))
@@ -160,6 +152,12 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
             return
     else:
         sql_cmd_prefix = '%s -h%s -P%s -u%s@%s %s -D %s -A' % (obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '', mysql_db)
+
+    ret = LocalClient.execute_command('%s -e "%s"' % (sql_cmd_prefix, 'select version();'), stdio=stdio)
+    if not ret:
+        stdio.error(ret.stderr)
+        return
+
 
     for server in cluster_config.servers:
         client = clients[server]

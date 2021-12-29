@@ -20,6 +20,8 @@
 
 from __future__ import absolute_import, division, print_function
 
+global_ret = True
+
 
 def destroy(plugin_context, *args, **kwargs):
     def clean(server, path):
@@ -27,6 +29,7 @@ def destroy(plugin_context, *args, **kwargs):
         ret = client.execute_command('rm -fr %s/* %s/.conf' % (path, path))
         if not ret:
             # pring stderror
+            global global_ret
             global_ret = False
             stdio.warn('fail to clean %s:%s' % (server, path))
         else:
@@ -34,7 +37,6 @@ def destroy(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-    global_ret = True
     stdio.start_loading('obproxy work dir cleaning')
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)

@@ -27,6 +27,7 @@ import sys
 import time
 import pickle
 import string
+import fcntl
 import requests
 from glob import glob
 from enum import Enum
@@ -89,6 +90,7 @@ class MirrorRepository(object):
         self.stdio = stdio
         self.mirror_path = mirror_path
         self.name = os.path.split(mirror_path)[1]
+        self.section_name = self.name
         self._str = '%s mirror %s' % (self.mirror_type, self.name)
 
     def __str__(self):
@@ -126,66 +128,67 @@ class MirrorRepository(object):
         return []
 
 
+class RemotePackageInfo(PackageInfo):
+
+    def __init__(self, elem):
+        self.epoch = None
+        self.location = (None, None)
+        self.checksum = (None,None) # type,value
+        self.openchecksum = (None,None) # type,value
+        self.time = (None, None)
+        super(RemotePackageInfo, self).__init__(None, None, None, None, None)
+        self._parser(elem)
+
+    @property
+    def md5(self):
+        return self.checksum[1]
+
+    @md5.setter
+    def md5(self, value):
+        self.checksum = (self.checksum[0], value)
+
+    def __str__(self):
+        url = self.location[1]
+        if self.location[0]:
+            url = self.location[0] + url
+        return url
+
+    def _parser(self, elem):
+        tags = self.__dict__.keys()
+        for child in elem:
+            child_name = RemoteMirrorRepository.ns_cleanup(child.tag)
+            if child_name == 'location':
+                relative = child.attrib.get('href')
+                base = child.attrib.get('base')
+                self.location = (base, relative)
+
+            elif child_name == 'checksum':
+                csum_value = child.text
+                csum_type = child.attrib.get('type')
+                self.checksum = (csum_type,csum_value)
+
+            elif child_name == 'open-checksum':
+                csum_value = child.text
+                csum_type = child.attrib.get('type')
+                self.openchecksum = (csum_type, csum_value)
+
+            elif child_name == 'version':
+                self.epoch = child.attrib.get('epoch')
+                self.set_version(child.attrib.get('ver'))
+                self.set_release(child.attrib.get('rel'))
+
+            elif child_name == 'time':
+                build = child.attrib.get('build')
+                _file = child.attrib.get('file')
+                self.time = (int(_file), int(build))
+
+            elif child_name == 'arch':
+                self.arch = child.text
+            elif child_name == 'name':
+                self.name = child.text
+
+
 class RemoteMirrorRepository(MirrorRepository):
-    class RemotePackageInfo(PackageInfo):
-
-        def __init__(self, elem):
-            self.epoch = None
-            self.location = (None, None)
-            self.checksum = (None,None) # type,value
-            self.openchecksum = (None,None) # type,value
-            self.time = (None, None)
-            super(RemoteMirrorRepository.RemotePackageInfo, self).__init__(None, None, None, None, None)
-            self._parser(elem)
-
-        @property
-        def md5(self):
-            return self.checksum[1]
-
-        @md5.setter
-        def md5(self, value):
-            self.checksum = (self.checksum[0], value)
-
-        def __str__(self):
-            url = self.location[1]
-            if self.location[0]:
-                url = self.location[0] + url
-            return url
-
-        def _parser(self, elem):
-            tags = self.__dict__.keys()
-            for child in elem:
-                child_name = RemoteMirrorRepository.ns_cleanup(child.tag)
-                if child_name == 'location':
-                    relative = child.attrib.get('href')
-                    base = child.attrib.get('base')
-                    self.location = (base, relative)
-                    
-                elif child_name == 'checksum':
-                    csum_value = child.text
-                    csum_type = child.attrib.get('type')
-                    self.checksum = (csum_type,csum_value)
-
-                elif child_name == 'open-checksum':
-                    csum_value = child.text
-                    csum_type = child.attrib.get('type')
-                    self.openchecksum = (csum_type, csum_value)
-
-                elif child_name == 'version':
-                    self.epoch = child.attrib.get('epoch')
-                    self.set_version(child.attrib.get('ver'))
-                    self.set_release(child.attrib.get('rel'))
-
-                elif child_name == 'time':
-                    build = child.attrib.get('build')
-                    _file = child.attrib.get('file')
-                    self.time = (int(_file), int(build))
-                    
-                elif child_name == 'arch':
-                    self.arch = child.text
-                elif child_name == 'name':
-                    self.name = child.text
-
     class RepoData(object):
 
         def __init__(self, elem):
@@ -228,7 +231,7 @@ class RemoteMirrorRepository(MirrorRepository):
                 elif child_name == 'open-size':
                     self.opensize = child.text
                 elif child_name == 'delta':
-                    delta = RepoData(child)
+                    delta = RemoteMirrorRepository.RepoData(child)
                     delta.type = self.type
                     self.deltas.append(delta)
 
@@ -237,6 +240,7 @@ class RemoteMirrorRepository(MirrorRepository):
     REPOMD_FILE = 'repomd.xml'
     OTHER_DB_FILE = 'other_db.xml'
     REPO_AGE_FILE = '.rege_age'
+    DB_CACHE_FILE = '.db'
     PRIMARY_REPOMD_TYPE = 'primary'
 
     def __init__(self, mirror_path, meta_data, stdio=None):
@@ -248,15 +252,18 @@ class RemoteMirrorRepository(MirrorRepository):
         self._db = None
         self._repomds = None
         super(RemoteMirrorRepository, self).__init__(mirror_path, stdio=stdio)
+        self.section_name = meta_data['section_name']
         self.baseurl = meta_data['baseurl']
+        self.enabled = meta_data['enabled'] == '1'
         self.gpgcheck = ConfigUtil.get_value_from_dict(meta_data, 'gpgcheck', 0, int) > 0
         self.priority = 100 - ConfigUtil.get_value_from_dict(meta_data, 'priority', 99, int)
         if os.path.exists(mirror_path):
             self._load_repo_age()
-        repo_age = ConfigUtil.get_value_from_dict(meta_data, 'repo_age', 0, int)
-        if repo_age > self.repo_age or int(time.time()) - 86400 > self.repo_age:
-            self.repo_age = repo_age
-            self.update_mirror()
+        if self.enabled:
+            repo_age = ConfigUtil.get_value_from_dict(meta_data, 'repo_age', 0, int)
+            if repo_age > self.repo_age or int(time.time()) - 86400 > self.repo_age:
+                self.repo_age = repo_age
+                self.update_mirror()
 
     @property
     def db(self):
@@ -268,17 +275,44 @@ class RemoteMirrorRepository(MirrorRepository):
         file_path = self._get_repomd_data_file(primary_repomd)
         if not file_path:
             return []
-        fp = FileUtil.unzip(file_path)
-        if not fp:
-            return []
-        self._db = {}
-        parser = cElementTree.iterparse(fp)
-        for event, elem in parser:
-            if RemoteMirrorRepository.ns_cleanup(elem.tag) == 'package' and elem.attrib.get('type') == 'rpm':
-                info = RemoteMirrorRepository.RemotePackageInfo(elem)
-                # self._db.append(info)
-                self._db[info.md5] = info
+        self._load_db_cache(file_path)
+        if self._db is None:
+            fp = FileUtil.unzip(file_path, stdio=self.stdio)
+            if not fp:
+                return []
+            self._db = {}
+            parser = cElementTree.iterparse(fp)
+            for event, elem in parser:
+                if RemoteMirrorRepository.ns_cleanup(elem.tag) == 'package' and elem.attrib.get('type') == 'rpm':
+                    info = RemotePackageInfo(elem)
+                    self._db[info.md5] = info
+            self._dump_db_cache()
         return self._db
+
+    def _load_db_cache(self, path):
+        try:
+            db_cacahe_path = self.get_db_cache_file(self.mirror_path)
+            repomd_time = os.stat(path)[8]
+            cache_time = os.stat(db_cacahe_path)[8]
+            if cache_time > repomd_time:
+                self.stdio and getattr(self.stdio, 'verbose', print)('load %s' % db_cacahe_path)
+                with open(db_cacahe_path, 'rb') as f:
+                    self._db = pickle.load(f)
+        except:
+            pass
+
+    def _dump_db_cache(self):
+        if self._db:
+            try:
+                db_cacahe_path = self.get_db_cache_file(self.mirror_path)
+                self.stdio and getattr(self.stdio, 'verbose', print)('dump %s' % db_cacahe_path)
+                with open(db_cacahe_path, 'wb') as f:
+                    pickle.dump(self._db, f)
+                return True
+            except:
+                self.stdio.exception('')
+                pass
+            return False
 
     @staticmethod
     def ns_cleanup(qn):
@@ -297,6 +331,10 @@ class RemoteMirrorRepository(MirrorRepository):
         return os.path.join(mirror_path, RemoteMirrorRepository.OTHER_DB_FILE)
 
     @staticmethod
+    def get_db_cache_file(mirror_path):
+        return os.path.join(mirror_path, RemoteMirrorRepository.DB_CACHE_FILE)
+
+    @staticmethod
     def var_replace(string, var):
         if not var:
             return string
@@ -312,9 +350,9 @@ class RemoteMirrorRepository(MirrorRepository):
             replacement = var.get(varname, m.group())
 
             start, end = m.span()
-            done.append(string[:start])    
-            done.append(replacement)   
-            string = string[end:]            
+            done.append(string[:start])
+            done.append(str(replacement))
+            string = string[end:]
 
         return ''.join(done)
         
@@ -390,6 +428,16 @@ class RemoteMirrorRepository(MirrorRepository):
     def get_all_pkg_info(self):
         return [self.db[key] for key in self.db]
 
+    def get_rpm_info_by_md5(self, md5):
+        if md5 in self.db:
+            return self.db[md5]
+        for key in self.db:
+            info = self.db[key]
+            if info.md5 == md5:
+                self.stdio and getattr(self.stdio, 'verbose', print)('%s translate info %s' % (md5, info.md5))
+                return info
+        return None
+
     def get_rpm_pkg_by_info(self, pkg_info):
         file_name = pkg_info.location[1]
         file_path = os.path.join(self.mirror_path, file_name)
@@ -404,7 +452,7 @@ class RemoteMirrorRepository(MirrorRepository):
     def get_pkgs_info(self, **pattern):
         matchs = self.get_pkgs_info_with_score(**pattern)
         if matchs:
-            return [info for info in sorted(matchs, key=lambda x: x[1], reverse=True)]
+            return [info[0] for info in sorted(matchs, key=lambda x: x[1], reverse=True)]
         return matchs
 
     def get_best_pkg_info(self, **pattern):
@@ -416,7 +464,7 @@ class RemoteMirrorRepository(MirrorRepository):
     def get_exact_pkg_info(self, **pattern):
         if 'md5' in pattern and pattern['md5']:
             self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
-            return self.db[pattern['md5']] if pattern['md5'] in self.db else None
+            return self.get_rpm_info_by_md5(pattern['md5'])
         self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
             self.stdio and getattr(self.stdio, 'verbose', print)('name is None')
@@ -462,6 +510,8 @@ class RemoteMirrorRepository(MirrorRepository):
         else:
             pattern['arch'] = _ARCH
         self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % pattern['arch'])
+        release = pattern['release'] if 'release' in pattern else None
+        self.stdio and getattr(self.stdio, 'verbose', print)('release is %s' % release)
         if 'version' in pattern and pattern['version']:
             pattern['version'] += '.'
         else:
@@ -470,14 +520,19 @@ class RemoteMirrorRepository(MirrorRepository):
         for key in self.db:
             info = self.db[key]
             if pattern['name'] in info.name:
-                matchs.append([info, self.match_score(info, **pattern)])
+                score = self.match_score(info, **pattern)
+                if score[0]:
+                    matchs.append([info, score])
         return matchs
 
-    def match_score(self, info, name, arch, version=None):
+    def match_score(self, info, name, arch, version=None, release=None):
         if info.arch not in arch:
             return [0, ]
         info_version = '%s.' % info.version
         if version and info_version.find(version) != 0:
+            return [0 ,]
+        if release and info.release != release:
+            raise Exception ('break')
             return [0 ,]
             
         c = [len(name) / len(info.name), info]
@@ -516,7 +571,7 @@ class RemoteMirrorRepository(MirrorRepository):
                     stdio.start_progressbar('Download %s (%.2f %s)' % (fine_name, num, unit), file_size)
                 chunk_size = 512
                 file_done = 0
-                with FileUtil.open(save_path, "wb", stdio) as fw:
+                with FileUtil.open(save_path, "wb", stdio=stdio) as fw:
                     for chunk in fget.iter_content(chunk_size):
                         fw.write(chunk)
                         file_done = file_done + chunk_size
@@ -538,6 +593,7 @@ class LocalMirrorRepository(MirrorRepository):
         super(LocalMirrorRepository, self).__init__(mirror_path, stdio=stdio)
         self.db = {}
         self.db_path = os.path.join(mirror_path, self._DB_FILE)
+        self.enabled = '-'
         self._load_db()
 
     @property
@@ -546,14 +602,15 @@ class LocalMirrorRepository(MirrorRepository):
 
     def _load_db(self):
         try:
-            with open(self.db_path, 'rb') as f:
-                db = pickle.load(f)
-                for key in db:
-                    data = db[key]
-                    path = getattr(data, 'path', False)
-                    if not path or not os.path.exists(path):
-                        continue
-                    self.db[key] = data
+            if os.path.isfile(self.db_path):
+                with open(self.db_path, 'rb') as f:
+                    db = pickle.load(f)
+                    for key in db:
+                        data = db[key]
+                        path = getattr(data, 'path', False)
+                        if not path or not os.path.exists(path):
+                            continue
+                        self.db[key] = data
         except:
             self.stdio.exception('')
             pass
@@ -620,7 +677,7 @@ class LocalMirrorRepository(MirrorRepository):
     def get_pkgs_info(self, **pattern):
         matchs = self.get_pkgs_info_with_score(**pattern)
         if matchs:
-            return [info for info in sorted(matchs, key=lambda x: x[1], reverse=True)]
+            return [info[0] for info in sorted(matchs, key=lambda x: x[1], reverse=True)]
         return matchs
 
     def get_best_pkg_info(self, **pattern):
@@ -683,6 +740,8 @@ class LocalMirrorRepository(MirrorRepository):
         else:
             pattern['arch'] = _ARCH
         self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % pattern['arch'])
+        release = pattern['release'] if 'release' in pattern else None
+        self.stdio and getattr(self.stdio, 'verbose', print)('release is %s' % release)
         if 'version' in pattern and pattern['version']:
             pattern['version'] += '.'
         else:
@@ -691,14 +750,18 @@ class LocalMirrorRepository(MirrorRepository):
         for key in self.db:
             info = self.db[key]
             if pattern['name'] in info.name:
-                matchs.append([info, self.match_score(info, **pattern)])
+                score = self.match_score(info, **pattern)
+                if score[0]:
+                    matchs.append([info, score])
         return matchs
 
-    def match_score(self, info, name, arch, version=None):
+    def match_score(self, info, name, arch, version=None, release=None):
         if info.arch not in arch:
             return [0, ]
         info_version = '%s.' % info.version
         if version and info_version.find(version) != 0:
+            return [0 ,]
+        if release and info.release != release:
             return [0 ,]
             
         c = [len(name) / len(info.name), info]
@@ -708,24 +771,146 @@ class LocalMirrorRepository(MirrorRepository):
         return [self.db[key] for key in self.db]
 
 
+class MirrorRepositoryConfig(object):
+
+    def __init__(self, path, parser, repo_age):
+        self.path = path
+        self.parser = parser
+        self.repo_age = repo_age
+        self.sections = {}
+
+    def add_section(self, section):
+        self.sections[section.section_name] = section
+
+    def __eq__(self, o):
+        return self.repo_age == o.repo_age
+
+    def __le__(self, o):
+        return self.repo_age < o.repo_age
+
+    def __gt__(self, o):
+        return self.repo_age > o.repo_age
+
+
+class MirrorRepositorySection(object):
+
+    def __init__(self, section_name, meta_data, remote_path):
+        self.section_name = section_name
+        self.meta_data = meta_data
+        self.remote_path = remote_path
+
+    def get_mirror(self, server_vars, stdio=None):
+        meta_data = self.meta_data
+        meta_data['name'] = RemoteMirrorRepository.var_replace(meta_data['name'], server_vars)
+        meta_data['baseurl'] = RemoteMirrorRepository.var_replace(meta_data['baseurl'], server_vars)
+        mirror_path = os.path.join(self.remote_path, meta_data['name'])
+        mirror = RemoteMirrorRepository(mirror_path, meta_data, stdio)
+        return mirror
+
+    @property
+    def is_enabled(self):
+        return self.meta_data.get('enabled', '1') == '1'
+
+
 class MirrorRepositoryManager(Manager):
 
     RELATIVE_PATH = 'mirror'
 
-    def __init__(self, home_path, stdio=None):
+    def __init__(self, home_path, lock_manager=None, stdio=None):
         super(MirrorRepositoryManager, self).__init__(home_path, stdio=stdio)
         self.remote_path = os.path.join(self.path, 'remote') # rpm remote mirror cache
         self.local_path = os.path.join(self.path, 'local')
         self.is_init = self.is_init and self._mkdir(self.remote_path) and self._mkdir(self.local_path)
         self._local_mirror = None
+        self.lock_manager = lock_manager
+        self._cache_path_repo_config = {}
+        self._cache_section_repo_config = {}
+
+    def _lock(self, read_only=False):
+        if self.lock_manager:
+            if read_only:
+                return self.lock_manager.mirror_and_repo_sh_lock()
+            else:
+                return self.lock_manager.mirror_and_repo_ex_lock()
+        return True
 
     @property
     def local_mirror(self):
+        self._lock()
         if self._local_mirror is None:
             self._local_mirror = LocalMirrorRepository(self.local_path, self.stdio)
         return self._local_mirror
 
-    def get_remote_mirrors(self):
+    def _get_repo_config(self, path):
+        self.stdio and getattr(self.stdio, 'verbose', print)('load repo config: %s' % path)
+        repo_conf = self._cache_path_repo_config.get(path)
+        repo_age = os.stat(path)[8]
+        if not repo_conf or repo_age != repo_conf.repo_age:
+            with FileUtil.open(path, 'r', stdio=self.stdio) as confpp_obj:
+                parser = ConfigParser()
+                parser.readfp(confpp_obj)
+                repo_conf = MirrorRepositoryConfig(path, parser, repo_age)
+                self._cache_path_repo_config[path] = repo_conf
+        return self._cache_path_repo_config[path]
+
+    def _get_repo_config_by_section(self, section_name):
+        return self._cache_section_repo_config.get(section_name)
+
+    def _remove_cache(self, section_name):
+        repo_conf = self._cache_section_repo_config[section_name]
+        del self._cache_path_repo_config[repo_conf.path]
+        del self._cache_section_repo_config[section_name]
+
+    def _scan_repo_configs(self):
+        cached_sections = list(self._cache_section_repo_config.keys())
+        for path in glob(os.path.join(self.remote_path, '*.repo')):
+            repo_conf = self._get_repo_config(path)
+            for section in repo_conf.parser.sections():
+                if section in ['main', 'installed']:
+                    continue
+                if section in ['local', 'remote']:
+                    self.stdio and getattr(self.stdio, 'warn', print)('%s is system keyword.' % section)
+                    continue
+                bad = RemoteMirrorRepository.validate_repoid(section)
+                if bad:
+                    continue
+                meta_data = {'section_name': section}
+                for attr in repo_conf.parser.options(section):
+                    value = repo_conf.parser.get(section, attr)
+                    meta_data[attr] = value
+                if 'enabled' not in meta_data:
+                    meta_data['enabled'] = '1'
+                if 'baseurl' not in meta_data:
+                    continue
+                if 'name' not in meta_data:
+                    meta_data['name'] = section
+                if 'repo_age' not in meta_data:
+                    meta_data['repo_age'] = repo_conf.repo_age
+                mirror_section = MirrorRepositorySection(section, meta_data, self.remote_path)
+                repo_conf.add_section(mirror_section)
+                self._cache_section_repo_config[section] = repo_conf
+                if section in cached_sections:
+                    cached_sections.remove(section)
+        if cached_sections:
+            for miss_section in cached_sections:
+                self._remove_cache(miss_section)
+
+    def _get_sections(self):
+        self._scan_repo_configs()
+        sections = {}
+        for repo_conf in sorted(self._cache_path_repo_config.values()):
+            sections.update(repo_conf.sections)
+        return sections.values()
+
+    def _get_section(self, section_name):
+        self._scan_repo_configs()
+        repo_conf = self._get_repo_config_by_section(section_name)
+        if not repo_conf:
+            return None
+        return repo_conf.sections.get(section_name)
+
+    def get_remote_mirrors(self, is_enabled=True):
+        self._lock()
         mirrors = []
         server_vars = deepcopy(_SERVER_VARS)
         linux_id = server_vars.get('ID')
@@ -736,40 +921,17 @@ class MirrorRepositoryManager(Manager):
                     break
                 server_vars['releasever'] = elvid
             server_vars['releasever'] = str(elvid)
-            self.stdio and getattr(self.stdio, 'warn', print)('Use centos %s remote mirror repository for %s %s' % (server_vars['releasever'], linux_id, server_vars.get('VERSION_ID')))
-
-        for path in glob(os.path.join(self.remote_path, '*.repo')):
-            repo_age = os.stat(path)[8]
-            with open(path, 'r') as confpp_obj:
-                parser = ConfigParser()
-                parser.readfp(confpp_obj)
-                for section in parser.sections():
-                    if section in ['main', 'installed']:
-                        continue
-                    bad = RemoteMirrorRepository.validate_repoid(section)
-                    if bad:
-                        continue
-                    meta_data = {}
-                    for attr in parser.options(section):
-                        value = parser.get(section, attr)
-                        meta_data[attr] = value
-                    if 'enabled' in meta_data and not meta_data['enabled']:
-                        continue
-                    if 'baseurl' not in meta_data:
-                        continue
-                    if 'name' not in meta_data:
-                        meta_data['name'] = section
-                    if 'repo_age' not in meta_data:
-                        meta_data['repo_age'] = repo_age
-                    meta_data['name'] = RemoteMirrorRepository.var_replace(meta_data['name'], server_vars)
-                    meta_data['baseurl'] = RemoteMirrorRepository.var_replace(meta_data['baseurl'], server_vars)
-                    mirror_path = os.path.join(self.remote_path, meta_data['name'])
-                    mirror = RemoteMirrorRepository(mirror_path, meta_data, self.stdio)
-                    mirrors.append(mirror)
+            self.stdio and getattr(self.stdio, 'warn', print)('Use centos %s remote mirror repository for %s %s' % (
+            server_vars['releasever'], linux_id, server_vars.get('VERSION_ID')))
+        for mirror_section in self._get_sections():
+            if is_enabled is not None and is_enabled != mirror_section.is_enabled:
+                continue
+            mirrors.append(mirror_section.get_mirror(server_vars, self.stdio))
         return mirrors
 
-    def get_mirrors(self):
-        mirros = self.get_remote_mirrors()
+    def get_mirrors(self, is_enabled=True):
+        self._lock()
+        mirros = self.get_remote_mirrors(is_enabled=is_enabled)
         mirros.append(self.local_mirror)
         return mirros
 
@@ -803,10 +965,21 @@ class MirrorRepositoryManager(Manager):
         if best:
             return best[0] if only_info else source_mirror.get_rpm_pkg_by_info(best[0])
 
+    def get_pkgs_info(self, name, **pattern):
+        pkgs = set()
+        mirrors = self.get_mirrors()
+        for mirror in mirrors:
+            for pkg in mirror.get_pkgs_info(name=name, **pattern):
+                if pkg.name != name:
+                    break
+                pkgs.add(pkg)
+        return pkgs
+
     def add_remote_mirror(self, src):
         pass
 
     def add_local_mirror(self, src, force=False):
+        self._lock()
         self.stdio and getattr(self.stdio, 'verbose', print)('%s is file or not' % src)
         if not os.path.isfile(src):
             self.stdio and getattr(self.stdio, 'error', print)('No such file: %s' % (src))
@@ -828,3 +1001,52 @@ class MirrorRepositoryManager(Manager):
                 return None
         self.stdio and getattr(self.stdio, 'print', print)('%s' % pkg)
         return self.local_mirror.add_pkg(pkg)
+
+    def set_remote_mirror_enabled(self, section_name, enabled=True):
+        self._lock()
+        op = 'Enable' if enabled else 'Disable'
+        enabled_str = '1' if enabled else '0'
+        self.stdio and getattr(self.stdio, 'start_loading')('%s %s' % (op, section_name))
+        if section_name == 'local':
+            self.stdio and getattr(self.stdio, 'error', print)('%s is local mirror repository.' % (section_name))
+            return
+        if section_name == 'remote':
+            self._scan_repo_configs()
+            for repo_config in self._cache_path_repo_config.values():
+                for section_name in repo_config.sections.keys():
+                    repo_config.parser.set(section_name, 'enabled', enabled_str)
+                with FileUtil.open(repo_config.path, 'w', stdio=self.stdio) as confpp_obj:
+                    fcntl.flock(confpp_obj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    repo_config.parser.write(confpp_obj)
+                repo_age = os.stat(repo_config.path)[8]
+                repo_config.repo_age = repo_age
+                for mirror_section in repo_config.sections.values():
+                    mirror_section.meta_data['enabled'] = enabled_str
+                    mirror_section.meta_data['repo_age'] = repo_age
+            self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
+        else:
+            mirror_section = self._get_section(section_name)
+            if not mirror_section:
+                self.stdio and getattr(self.stdio, 'error', print)('%s not found.' % (section_name))
+                self.stdio and getattr(self.stdio, 'stop_loading')('fail')
+                return
+            if mirror_section.is_enabled == enabled:
+                self.stdio and getattr(self.stdio, 'print', print)('%s is already %sd' % (section_name, op))
+                self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
+                return
+            repo_config = self._get_repo_config_by_section(section_name)
+            if not repo_config:
+                self.stdio and getattr(self.stdio, 'error', print)('%s not found.' % (section_name))
+                self.stdio and getattr(self.stdio, 'stop_loading')('fail')
+                return
+
+            repo_config.parser.set(section_name, 'enabled', enabled_str)
+            with FileUtil.open(repo_config.path, 'w', stdio=self.stdio) as confpp_obj:
+                fcntl.flock(confpp_obj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                repo_config.parser.write(confpp_obj)
+
+            repo_age = os.stat(repo_config.path)[8]
+            repo_config.repo_age = repo_age
+            mirror_section.meta_data['enabled'] = enabled_str
+            mirror_section.meta_data['repo_age'] = repo_age
+            self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
