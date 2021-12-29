@@ -51,3 +51,23 @@ Synchronizes the information of all remote mirror repositories.
 ```shell
 obd mirror update
 ```
+
+## `obd mirror disable`
+
+Disable remote mirror repositories. To disable all the remote mirror repositories, run the `obd mirror disable remote` command.
+
+```shell
+obd mirror disable <mirror_repo_name>
+```
+
+Parameter `mirror repo name` specifies the mirror repository name. When you specify `remote`, all the remote mirror repositories are disabled.
+
+## `obd mirror enable`
+
+Enable remote mirror repositories.
+
+```shell
+obd mirror enable <mirror repo name>
+```
+
+Parameter `mirror repo name` specifies the mirror repository name. When you specify `remote`, all the remote mirror repositories are enabled.

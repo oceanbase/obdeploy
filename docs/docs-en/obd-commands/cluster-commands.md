@@ -109,7 +109,7 @@ obd cluster reload <deploy name>
 
 ## `obd cluster restart`
 
-Restarts a running cluster. After you run the edit-config command to modify the configuration information of a running cluster, you can run the `restart` command for the modification to take effect.
+Restarts a running cluster. By default, OBD restarts without any parameters. After you run the edit-config command to modify the configuration information of a running cluster, you can run the `restart` command for the modification to take effect.
 
 > **NOTE:** Some configuration items may not take effect after you run the `restart` command. You even need to redeploy the cluster for some configuration items to take effect. Perform operations based on the result returned by the edit-config command.
 
@@ -125,7 +125,7 @@ This table describes the corresponding options.
 --- | --- | --- |--- | ---
 | -s/--servers | No | string |   | A list of machines, separated by `,`.  |
 | -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If this option is disabled, all machines under the component will start without entering the running state.  |
-| --wop/--without-parameter | No | bool | false | Start without parameters. It is without parameters when starting. The node does not respond to this option when it is starting for the first time.  |
+| --wp/--with-parameter | No | bool | false | Restarts OBD with parameters. This option makes the parameters valid when you restart OBD.   |
 
 ## `obd cluster redeploy`
 
@@ -167,6 +167,25 @@ obd cluster destroy <deploy name> [-f]
 `deploy name` specifies the name of the deployment configuration file.
 
 `-f` is `--force-kill`. This option specifies whether to forcibly stop running processes in the working directory. Before OBD destroys the cluster, it will check for running processes. These processes may result from the failure of the **start** command. They may also belong to other clusters when configurations of this cluster overlap with those of other clusters. If an ongoing process is found in the working directory, OBD will stop the **destroy** command. However, if this option is enabled, OBD will forcibly stop the ongoing processes and run the **destroy** command. `-f` is optional. Its data type is `bool`. This option is disabled by default.
+
+## `obd cluster upgrade`
+
+Update a running component.
+
+```shell
+obd cluster upgrade <deploy_name> -c <component_name> -V <version> [tags]
+```
+
+`deploy name` specifies the name of the deployment configuration file.
+
+| Option | Required | Data type | Default value | Description |
+--- | --- | --- |--- |---
+-c/--component | Yes | string | empty | The component name you want to upgrade.
+-V/--version | Yes | string | The target upgrade version number.
+--skip-check | No | bool | false | Skip check.
+--usable | No | string | empty | The hash list for the mirrors that you use during upgrade. Separated with `,`.
+--disable | No | string | empty | The hash list for the mirrors that you disable during upgrade. Separated with `,`.
+-e/--executer-path | No | string | /usr/obd/lib/executer | The executer path for the upgrade script.
 
 ## `obd cluster tenant create`
 

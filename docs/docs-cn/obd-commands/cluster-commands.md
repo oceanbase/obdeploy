@@ -111,7 +111,7 @@ obd cluster reload <deploy name>
 
 ## `obd cluster restart`
 
-重启一个运行中集群。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `restart` 命令应用修改。
+重启一个运行中集群。重启默认是无参数重启。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `restart` 命令应用修改。
 
 > **注意：** 并非所有的配置项都可以通过 `restart` 来应用。有些配置项需要重部署集群才能生效。请根据 `edit-config` 后返回的信息进行操作。
 
@@ -127,7 +127,7 @@ obd cluster restart <deploy name>
 --- | --- | --- |--- |---
 -s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。
 -c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定启动的组件。如果配置下的组件没有全部启动，该配置不会进入 running 状态。
---wop/--without-parameter | 否 | bool | false | 无参启动。启动的时候不带参数。节点第一次的启动时，不响应此选项。
+--wp/--with-parameter | 否 | bool | false | 使用参数重启 OBD。用于在重启时使配置项生效。
 
 ## `obd cluster redeploy`
 
@@ -169,6 +169,25 @@ obd cluster destroy <deploy name> [-f]
 参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
 
 选项 `-f` 为 `--force-kill`。检查到工作目录下有运行中的进程时，强制停止。销毁前会做检查是有还有进程在运行中。这些运行中的进程可能是 **start** 失败留下的，也可能是因为配置与其他集群重叠，进程是其他集群的。但无论是哪个原因导致工作目录下有进程未退出，**destroy** 都会直接停止。使用该选项会强制停止这些运行中的进程，强制执行 **destroy**。非必填项。数据类型为 `bool`。默认不开启。
+
+## `obd cluster upgrade`
+
+升级一个已经启动的组件。
+
+```shell
+obd cluster upgrade <deploy_name> -c <component_name> -V <version> [tags]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+-c/--component | 是 | string | 空 | 要升级的组件名。
+-V/--version | 是 | string | 目标版本号。
+--skip-check | 否 | bool | false | 跳过可以跳过的检查。
+--usable | 否 | string | 空 | 升级中使用到的镜像hash列表，用 `,` 间隔。
+--disable | 否 | string | 空 | 升级中禁用到的镜像hash列表，用 `,` 间隔。
+-e/--executer-path | 否 | string | /usr/obd/lib/executer | 升级脚本使用的解释器所在路径。
 
 ## `obd cluster tenant create`
 
