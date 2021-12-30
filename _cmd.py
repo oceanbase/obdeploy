@@ -520,9 +520,9 @@ class CLusterUpgradeCommand(ClusterMirrorCommand):
         self.parser.add_option('-f', '--force', action='store_true', help="Force upgrade.")
         self.parser.add_option('-c', '--component', type='string', help="Component name to upgrade.")
         self.parser.add_option('-V', '--version', type='string', help="Target version.")
-        self.parser.add_option('--skip-check', action='store_true', help="Skip file check if can be skip.")
-        self.parser.add_option('--usable', type='string', help="优先选择镜像hash列表，以，间隔。", default='')
-        self.parser.add_option('--disable', type='string', help="禁用镜像hash列表，以，间隔。", default='')
+        self.parser.add_option('--skip-check', action='store_true', help="Skip all the possible checks.")
+        self.parser.add_option('--usable', type='string', help="Hash list for priority mirrors, separated with `,`.", default='')
+        self.parser.add_option('--disable', type='string', help="Hash list for disabled mirrors, separated with `,`.", default='')
         self.parser.add_option('-e', '--executer-path', type='string', help="Executer path.", default=os.path.join(ObdCommand.OBD_INSTALL_PRE, 'usr/obd/lib/executer'))
 
     def _do_command(self, obd):
