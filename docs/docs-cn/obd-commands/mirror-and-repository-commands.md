@@ -51,3 +51,23 @@ obd mirror list [mirror repo name]
 ```shell
 obd mirror update
 ```
+
+## `obd mirror disable`
+
+禁用远程镜像仓库。如果需要禁用所有远程镜像仓库，执行 `obd mirror disable remote` 命令。
+
+```shell
+obd mirror disable <mirror_repo_name>
+```
+
+参数 `mirror repo name` 为镜像仓库名。如果指定 `remote`，则会禁用所有远程镜像仓库。
+
+## `obd mirror enable`
+
+启用远程镜像仓库。
+
+```shell
+obd mirror enable <mirror repo name>
+```
+
+参数 `mirror repo name` 为镜像仓库名。如果指定 `remote`，则会启用所有远程镜像仓库。

@@ -1,29 +1,5 @@
 # OceanBase Deployer
 
-<!--
-#
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
-#
-# This file is part of OceanBase Deploy.
-#
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
-#
--->
-
-<!-- TODO: some badges here -->
-
 OceanBase Deployer (OBD) is an installation and deployment tool for open-source OceanBase software. It is also a package manager for managing all open-source OceanBase software. This topic describes how to install OBD, how to use OBD, and OBD commands.
 
 ## Install OBD
@@ -53,16 +29,20 @@ Before you install OBD by using the source code, make sure that you have install
 To install OBD on Python2.7, run these commands:
 
 ```shell
-pip install -r requirements.txt
-sh build.sh
+sh rpm/build.sh build
 source /etc/profile.d/obd.sh
 ```
 
-To install OBD on Python3.8, run these commands:
+To install OBD on Python3.8, run these commands on Python2.7 first:
 
 ```shell
-pip install -r requirements3.txt
-sh build.sh
+sh rpm/build.sh executer
+```
+
+Then run these commands on Python3.8:
+
+```shell
+sh rpm/build.sh build_obd
 source /etc/profile.d/obd.sh
 ```
 
