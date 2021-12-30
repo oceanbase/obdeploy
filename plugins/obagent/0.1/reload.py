@@ -60,8 +60,10 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
         with open(path) as f:
             data = yaml.load(f)['configs']
             for config in data:
-                key = list(config['value'].keys())[0]
-                config_kv[key] = config['key']
+                key = config.get('value')
+                if key and isinstance(key, dict):
+                    key = list(key.keys())[0]
+                    config_kv[key] = key
 
     global_ret = True
     for server in servers:
