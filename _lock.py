@@ -95,18 +95,26 @@ class MixLock(object):
             raise e
             
     def _lock_escalation(self, try_times):
+        stdio = self.stdio
         while try_times:
             try:
+                if try_times % 1000:
+                    self.stdio = None
+                else:
+                    self.stdio = stdio
                 try_times -= 1
                 self._ex_lock()
                 break
             except KeyboardInterrupt:
+                self.stdio = stdio
                 raise IOError('fail to get lock')
             except Exception as e:
                 if try_times:
                     time.sleep(LockManager.TRY_INTERVAL)
                 else:
+                    self.stdio = stdio
                     raise e
+        self.stdio = stdio
 
     def _sh_unlock(self):
         if self._sh_cnt == 0:
@@ -135,7 +143,7 @@ class MixLock(object):
         return self.locked is False
 
     def _unlock(self):
-        if self.lock_obj:
+        if self._lock_obj:
             FileUtil.unlock(self._lock_obj, stdio=self.stdio)
             self._lock_obj.close()
             self._lock_obj = None
