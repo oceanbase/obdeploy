@@ -1,0 +1,267 @@
+- name: home_path
+  require: true
+  type: STRING
+  need_restart: true
+  description_en: working directory for obagent
+  description_local: Obagent工作目录
+- name: server_port
+  require: true
+  type: INT
+  default: 8088
+  min_value: 1025
+  max_value: 65535
+  need_restart: true
+  description_en: port number for pulling metrics and management
+  description_local: 提供拉取 metrics 和管理的端口
+- name: pprof_port
+  require: true
+  type: INT
+  default: 8089
+  min_value: 1025
+  max_value: 65535
+  need_restart: true
+  description_en: port number for pprof
+  description_local: pprof 调试端口
+- name: log_level
+  require: true
+  type: STRING
+  default: INFO
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: log level
+  description_local: 日志等级
+- name: log_path
+  require: true
+  type: STRING
+  default: log/monagent.log
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: log path
+  description_local: 日志路径
+- name: crypto_method
+  require: true
+  type: STRING
+  default: plain
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: crypto method {aes/plain}
+  description_local: 加密方式，仅支持 aes 和 plain
+- name: crypto_path
+  require: true
+  type: STRING
+  default: conf/.config_secret.key
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: file path for crypto key 
+  description_local: 秘钥存放路径
+- name: log_size
+  require: true
+  type: INT
+  default: 30
+  min_value: 1
+  max_value: 256
+  need_restart: true
+  description_en: size for a log file, measured in megabytes
+  description_local: 单个日志文件大小，单位为 M
+- name: log_expire_day
+  require: true
+  type: INT
+  default: 7
+  min_value: 1
+  max_value: 30
+  need_restart: true
+  description_en: log file expiration time, measured in days
+  description_local: 日志保留天数
+- name: log_file_count
+  require: true
+  type: INT
+  default: 10
+  min_value: 1
+  max_value: NULL
+  need_restart: true
+  description_en: the maximum number for log files. The default value is 10.
+  description_local: 最大保留日志数
+- name: log_use_localtime
+  require: true
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: whether to use local time for log files
+  description_local: 日志文件是否使用本地时间
+- name: log_compress
+  require: true
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: whether to enable log compression
+  description_local: 是否开启日志压缩
+- name: http_basic_auth_user
+  require: true
+  type: STRING
+  default: admin
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: username for HTTP authentication
+  description_local: HTTP 服务认证用户名
+- name: http_basic_auth_password
+  require: false
+  type: STRING
+  default: root
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: password for HTTP authentication
+  description_local: HTTP 服务认证密码
+- name: pprof_basic_auth_user
+  require: true
+  type: STRING
+  default: admin
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: username for debug service
+  description_local: debug 接口认证用户名
+- name: pprof_basic_auth_password
+  require: false
+  type: STRING
+  default: root
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: password for debug service
+  description_local: debug 接口认证密码
+- name: monitor_user
+  require: true
+  type: STRING
+  default: root
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: monitor username for OceanBase Database. The user must have read access to OceanBase Database as a system tenant.
+  description_local: OceanBase 数据库监控数据采集用户名, 需要该用户具有sys租户下 oceanbase 库的读权限
+- name: monitor_password
+  require: false
+  type: STRING
+  default: NULL
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: monitor password for OceanBase Database
+  description_local: OceanBase 数据库监控数据采集用户密码
+- name: sql_port
+  require: false
+  type: INT
+  default: 2881
+  min_value: 1025
+  max_value: 65535
+  need_restart: false
+  description_en: SQL port for observer
+  description_local: observer的 SQL 端口
+- name: rpc_port
+  require: false
+  type: INT
+  default: 2882
+  min_value: 1025
+  max_value: 65535
+  need_restart: false
+  description_en: the RPC port for observer
+  description_local: observer 的 RPC 端口
+- name: cluster_name
+  require: false
+  type: STRING
+  default: obcluster
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: cluster name for OceanBase Database
+  description_local: OceanBase Database 集群名
+- name: cluster_id
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: 4294901759
+  need_restart: false
+  description_en: cluster ID for OceanBase Database
+  description_local: OceanBase 集群 ID
+- name: zone_name
+  require: false
+  type: STRING
+  default: zone1
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: zone name for your observer
+  description_local: observer 所在的 zone 名字
+- name: ob_monitor_status
+  require: true
+  type: STRING
+  default: active
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: monitor status for OceanBase Database. Active is to enable. Inactive is to disable.
+  description_local: OceanBase 监控指标采集状态，active 表示开启，inactive 表示关闭
+- name: host_monitor_status
+  require: true
+  type: STRING
+  default: active
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: monitor status for your host. Active is to enable. Inactive is to disable.
+  description_local: 主机监控指标采集状态， active 表示开启， inactive 表示关闭
+- name: disable_http_basic_auth
+  require: true
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: whether to disable the basic authentication for HTTP service. True is to disable. False is to enable.
+  description_local: 是否禁用 HTTP 服务的basic auth 认证，true 表示禁用，false 表示不禁用
+- name: disable_pprof_basic_auth
+  require: true
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: whether to disable the basic authentication for the debug interface. True is to disable. False is to enable. 
+  description_local: 是否禁用 debug 接口的basic auth 认证，true 表示禁用，false 表示不禁用
+- name: ob_log_monitor_status
+  require: true
+  type: STRING
+  default: inactive
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: status for OceanBase Database log alarm. Active is to enable. Inactive is to disable.
+  description_local: OceanBase 日志报警状态，active 表示开启，inactive 表示关闭
+- name: alertmanager_address
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: Alertmanager address, needed when log alarm is enabled
+  description_local: Alertmanager 地址, 当日志报警开启时需要
+- name: ob_install_path
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: Working directory for OceanBase Database, needed when log alarm is enabled.
+  description_local: OceanBase 安装路径, 当日志报警开启时需要

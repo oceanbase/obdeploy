@@ -98,7 +98,7 @@ class LocalClient(object):
 
     @staticmethod
     def put_dir(local_dir, remote_dir, stdio=None):
-        if LocalClient.execute_command('mkdir -p && cp -fr %s %s' % (os.path.dirname(remote_dir), local_dir, remote_dir), stdio=stdio):
+        if LocalClient.execute_command('mkdir -p %s && cp -fr %s %s' % (remote_dir, os.path.join(local_dir, '*'), remote_dir), stdio=stdio):
             return True
         return False
 
@@ -161,20 +161,17 @@ class SshClient(object):
                 key_filename=self.config.key_filename, 
                 timeout=self.config.timeout
             )
+            self.is_connected = True
         except AuthenticationException:
             stdio and getattr(stdio, 'exception', print)('')
             stdio and getattr(stdio, 'critical', print)('%s@%s username or password error' % (self.config.username, self.config.host))
-            return False
         except NoValidConnectionsError:
             stdio and getattr(stdio, 'exception', print)('')
             stdio and getattr(stdio, 'critical', print)('%s@%s connect failed: time out' % (self.config.username, self.config.host))
-            return False
         except Exception as e:
             stdio and getattr(stdio, 'exception', print)('')
             stdio and getattr(stdio, 'critical', print)('%s@%s connect failed: %s' % (self.config.username, self.config.host, e))
-            return False
-        self.is_connected = True
-        return True
+        return self.is_connected
 
     def _open_sftp(self, stdio=None):
         if self.sftp:
@@ -218,13 +215,17 @@ class SshClient(object):
         stdin, stdout, stderr = self.ssh_client.exec_command(command)
         output = stdout.read().decode(errors='replace')
         error = stderr.read().decode(errors='replace')
-        idx = output.rindex('\n')
-        code = int(output[idx:])
-        verbose_msg = 'exited code %s' % code
+        if output:
+            idx = output.rindex('\n')
+            code = int(output[idx:])
+            stdout = output[:idx]
+            verbose_msg = 'exited code %s' % code
+        else:
+            code, stdout = 1, ''
         if code:
             verbose_msg += ', error output:\n%s' % error
         stdio and getattr(stdio, 'verbose', print)(verbose_msg)
-        return SshReturn(code, output[:idx], error)
+        return SshReturn(code, stdout, error)
  
     def put_file(self, local_path, remote_path, stdio=None):
         stdio = stdio if stdio else self.stdio

@@ -21,6 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import re
 import sys
 from enum import Enum
 from glob import glob
@@ -262,15 +263,232 @@ class PyScriptPlugin(ScriptPlugin):
 
 class ParamPlugin(Plugin):
 
+    class ConfigItemType(object):
+
+        TYPE_STR = None
+
+        def __init__(self, s):
+            try:
+                self._origin = s
+                self._value = 0
+                self._format()
+            except:
+                raise Exception("'%s' is not %s" % (self._origin, self._type_str))
+
+        @property
+        def _type_str(self):
+            if self.TYPE_STR is None:
+                self.TYPE_STR = str(self.__class__.__name__).split('.')[-1]
+            return self.TYPE_STR
+
+        def _format(self):
+            raise NotImplementedError
+
+        def __str__(self):
+            return str(self._origin)
+
+        def __hash__(self):
+            return self._origin.__hash__()
+
+        @property
+        def __cmp_value__(self):
+            return self._value
+
+        def __eq__(self, value):
+            if value is None:
+                return False
+            return self.__cmp_value__ == value.__cmp_value__
+
+        def __gt__(self, value):
+            if value is None:
+                return True
+            return self.__cmp_value__ > value.__cmp_value__
+
+        def __ge__(self, value):
+            if value is None:
+                return True
+            return self.__eq__(value) or self.__gt__(value)
+
+        def __lt__(self, value):
+            if value is None:
+                return False
+            return self.__cmp_value__ < value.__cmp_value__
+
+        def __le__(self, value):
+            if value is None:
+                return False
+            return self.__eq__(value) or self.__lt__(value)
+
+
+    class Moment(ConfigItemType):
+
+        def _format(self):
+            if self._origin:
+                if self._origin.upper() == 'DISABLE':
+                    self._value = 0
+                else:
+                    r = re.match('^(\d{1,2}):(\d{1,2})$', self._origin)
+                    h, m = r.groups()
+                    h, m = int(h), int(m)
+                    if 0 <= h <= 23 and 0 <= m <= 60:
+                        self._value = h * 60 + m
+                    else:
+                        raise Exception('Invalid Value')
+            else:
+                self._value = 0
+        
+    class Time(ConfigItemType):
+
+        UNITS = {
+            'ns': 0.000000001,
+            'us': 0.000001,
+            'ms': 0.001,
+            's': 1,
+            'm': 60,
+            'h': 3600,
+            'd': 86400
+        }
+
+        def _format(self):
+            if self._origin:
+                self._origin = str(self._origin).strip()
+                if self._origin.isdigit():
+                    n = self._origin
+                    unit = self.UNITS['s']
+                else:
+                    r = re.match('^(\d+)(\w+)$', self._origin.lower())
+                    n, u = r.groups()
+                unit = self.UNITS.get(u.lower())
+                if unit:
+                    self._value = int(n) * unit
+                else:
+                    raise Exception('Invalid Value')
+            else:
+                self._value = 0
+
+    class Capacity(ConfigItemType):
+        
+        UNITS = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40, 'P': 1 << 50}
+
+        def _format(self):
+            if self._origin:
+                self._origin = str(self._origin).strip()
+                if self._origin.isdigit():
+                    n = self._origin
+                    unit = self.UNITS['M']
+                else:
+                    r = re.match('^(\d+)(\w)B?$', self._origin.upper())
+                    n, u = r.groups()
+                unit = self.UNITS.get(u.upper())
+                if unit:
+                    self._value = int(n) * unit
+                else:
+                    raise Exception('Invalid Value')
+            else:
+                self._value = 0
+
+    class StringList(ConfigItemType):
+
+        def _format(self):
+            if self._origin:
+                self._origin = str(self._origin).strip()
+                self._value = self._origin.split(';')
+            else:
+                self._value = []
+
+    class Double(ConfigItemType):
+
+        def _format(self):
+            self._value = float(self._origin) if self._origin else 0
+
+    class Boolean(ConfigItemType):
+
+        def _format(self):
+            if isinstance(self._origin, bool):
+                self._value = self._origin
+            else:
+                _origin = str(self._origin).lower()
+                if _origin.isdigit() or _origin in ['true', 'false']:
+                    self._value = bool(self._origin)
+                else:
+                    raise Exception('%s is not Boolean')
+
+    class Integer(ConfigItemType):
+
+        def _format(self):
+            if self._origin is None:
+                self._value = 0
+                self._origin = 0
+            else:
+                _origin = str(self._origin)
+                if _origin.isdigit():
+                    self._value = int(_origin)
+                else:
+                    raise Exception('%s is not Integer')
+
+    class String(ConfigItemType):
+
+        def _format(self):
+            self._value = str(self._origin) if self._origin else ''
+
     class ConfigItem(object):
 
-        def __init__(self, name, default=None, require=False, need_restart=False, need_redeploy=False):
+        def __init__(
+            self,
+            name,
+            param_type=str, 
+            default=None, 
+            min_value=None, 
+            max_value=None, 
+            require=False, 
+            need_restart=False, 
+            need_redeploy=False,
+            modify_limit=None
+        ):
             self.name = name
             self.default = default
             self.require = require
             self.need_restart = need_restart
             self.need_redeploy = need_redeploy
+            self._param_type = param_type
+            self.min_value = param_type(min_value) if min_value is not None else None
+            self.max_value = param_type(max_value) if max_value is not None else None
+            self.modify_limit = getattr(self, ('_%s_limit' % modify_limit).lower(), self._none_limit)
+            self.had_modify_limit = self.modify_limit != self._none_limit
 
+        def param_type(self, value):
+            try:
+                return self._param_type(value)
+            except Exception as e:
+                raise Exception('%s: %s' % (self.name, e))
+
+        def check_value(self, value):
+            if not isinstance(value, self._param_type):
+                value = self.param_type(value)
+            if self.min_value is not None and value < self.min_value:
+                raise Exception('%s less then %s' % (self.name, self.min_value))
+            if self.max_value is not None and value > self.max_value:
+                raise Exception('%s more then %s' % (self.name, self.max_value))
+            return True
+
+        def _modify_limit(self, old_value, new_value):
+            if old_value == new_value:
+                return True
+            raise Exception('DO NOT modify %s after startup' % self.name)
+    
+        def _increase_limit(self, old_value, new_value):
+            if self.param_type(new_value) > self.param_type(old_value):
+                raise Exception('DO NOT increase %s after startup' % self.name)
+            return True
+        
+        def _decrease_limit(self, old_value, new_value):
+            if self.param_type(new_value) < self.param_type(old_value):
+                raise Exception('DO NOT decrease %s after startup' % self.name)
+            return True
+
+        def _none_limit(self, old_value, new_value):
+            return True
+        
     PLUGIN_TYPE = PluginType.PARAM
     DEF_PARAM_YAML = 'parameter.yaml'
     FLAG_FILE = DEF_PARAM_YAML
@@ -279,51 +497,92 @@ class ParamPlugin(Plugin):
         super(ParamPlugin, self).__init__(component_name, plugin_path, version)
         self.def_param_yaml_path = os.path.join(self.plugin_path, self.DEF_PARAM_YAML)
         self._src_data = None
+        self._need_redploy_items = None
+        self._had_modify_limit_items = None
+        self._need_restart_items = None
+        self._params_default = None
 
     @property
     def params(self):
         if self._src_data is None:
             try:
+                TYPES = {
+                    'DOUBLE': ParamPlugin.Double,
+                    'BOOL': ParamPlugin.Boolean,
+                    'INT': ParamPlugin.Integer,
+                    'STRING': ParamPlugin.String,
+                    'MOMENT': ParamPlugin.Moment,
+                    'TIME': ParamPlugin.Time,
+                    'CAPACITY': ParamPlugin.Capacity,
+                    'STRING_LIST': ParamPlugin.StringList
+                }
                 self._src_data = {}
                 with open(self.def_param_yaml_path, 'rb') as f:
                     configs = yaml.load(f)
                     for conf in configs:
+                        param_type = ConfigUtil.get_value_from_dict(conf, 'type', 'STRING').upper()
+                        if param_type in TYPES:
+                            param_type = TYPES[param_type]
+                        else:
+                            param_type = ParamPlugin.String
+
                         self._src_data[conf['name']] = ParamPlugin.ConfigItem(
-                            conf['name'], 
-                            ConfigUtil.get_value_from_dict(conf, 'default', None),
-                            ConfigUtil.get_value_from_dict(conf, 'require', False),
-                            ConfigUtil.get_value_from_dict(conf, 'need_restart', False),
-                            ConfigUtil.get_value_from_dict(conf, 'need_redeploy', False),
+                            name=conf['name'],
+                            param_type=param_type,
+                            default=ConfigUtil.get_value_from_dict(conf, 'default', None),
+                            min_value=ConfigUtil.get_value_from_dict(conf, 'min_value', None),
+                            max_value=ConfigUtil.get_value_from_dict(conf, 'max_value', None),
+                            modify_limit=ConfigUtil.get_value_from_dict(conf, 'modify_limit', None),
+                            require=ConfigUtil.get_value_from_dict(conf, 'require', False),
+                            need_restart=ConfigUtil.get_value_from_dict(conf, 'need_restart', False),
+                            need_redeploy=ConfigUtil.get_value_from_dict(conf, 'need_redeploy', False)
                         )
             except:
                 pass
         return self._src_data
 
-    def get_need_redeploy_items(self):
-        items = []
-        params = self.params
-        for name in params:
-            conf = params[name]
-            if conf.need_redeploy:
-                items.append(name)
-        return items
+    @property
+    def redploy_params(self):
+        if self._need_redploy_items is None:
+            self._need_redploy_items = []
+            params = self.params
+            for name in params:
+                conf = params[name]
+                if conf.need_redeploy:
+                    self._need_redploy_items.append(conf)
+        return self._need_redploy_items
 
-    def get_need_restart_items(self):
-        items = []
-        params = self.params
-        for name in params:
-            conf = params[name]
-            if conf.need_restart:
-                items.append(name)
-        return items
+    @property
+    def modify_limit_params(self):
+        if self._had_modify_limit_items is None:
+            self._had_modify_limit_items = []
+            params = self.params
+            for name in params:
+                conf = params[name]
+                if conf.had_modify_limit:
+                    self._had_modify_limit_items.append(conf)
+        return self._had_modify_limit_items
 
-    def get_params_default(self):
-        temp = {}
-        params = self.params
-        for name in params:
-            conf = params[name]
-            temp[conf.name] = conf.default
-        return temp
+    @property
+    def restart_params(self):
+        if self._need_restart_items is None:
+            self._need_restart_items = []
+            params = self.params
+            for name in params:
+                conf = params[name]
+                if conf.need_restart:
+                    self._need_restart_items.append(conf)
+        return self._need_restart_items
+
+    @property
+    def params_default(self):
+        if self._params_default is None:
+            self._params_default = {}
+            params = self.params
+            for name in params:
+                conf = params[name]
+                temp[conf.name] = conf.default
+        return self._params_default
 
 
 class InstallPlugin(Plugin):
@@ -344,34 +603,65 @@ class InstallPlugin(Plugin):
     PLUGIN_TYPE = PluginType.INSTALL
     FILES_MAP_YAML = 'file_map.yaml'
     FLAG_FILE = FILES_MAP_YAML
+    _KEYCRE = re.compile(r"\$(\w+)")
 
     def __init__(self, component_name, plugin_path, version):
         super(InstallPlugin, self).__init__(component_name, plugin_path, version)
         self.file_map_path = os.path.join(self.plugin_path, self.FILES_MAP_YAML)
-        self._file_map = None
+        self._file_map = {}
 
-    @property
-    def file_map(self):
-        if self._file_map is None:
+    @classmethod
+    def var_replace(cls, string, var):
+        if not var:
+            return string
+        done = []                      
+
+        while string:
+            m = cls._KEYCRE.search(string)
+            if not m:
+                done.append(string)
+                break
+
+            varname = m.group(1).lower()
+            replacement = var.get(varname, m.group())
+
+            start, end = m.span()
+            done.append(string[:start])
+            done.append(str(replacement))
+            string = string[end:]
+
+        return ''.join(done)
+
+    def file_map(self, package_info):
+        var = {
+            'name': package_info.name,
+            'version': package_info.version,
+            'release': package_info.release,
+            'arch': package_info.arch,
+            'md5': package_info.md5,
+        }
+        key = str(var)
+        if not self._file_map.get(key):
             try:
-                self._file_map = {}
+                file_map = {}
                 with open(self.file_map_path, 'rb') as f:
-                    file_map = yaml.load(f)
-                    for data in file_map:
+                    for data in yaml.load(f):
                         k = data['src_path']
                         if k[0] != '.':
                             k = '.%s' % os.path.join('/', k)
-                        self._file_map[k] = InstallPlugin.FileItem(
+                        k = self.var_replace(k, var)
+                        file_map[k] = InstallPlugin.FileItem(
                             k,
                             ConfigUtil.get_value_from_dict(data, 'target_path', k),
                             getattr(InstallPlugin.FileItemType, ConfigUtil.get_value_from_dict(data, 'type', 'FILE').upper(), None)
                         )
+                self._file_map[key] = file_map
             except:
                 pass
-        return self._file_map
+        return self._file_map[key]
 
-    def file_list(self):
-        file_map = self.file_map
+    def file_list(self, package_info):
+        file_map = self.file_map(package_info)
         return [file_map[k] for k in file_map]
 
 

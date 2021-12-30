@@ -22,9 +22,11 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import re
+import pickle
 import getpass
 from copy import deepcopy
 from enum import Enum
+from collections import OrderedDict
 
 from tool import ConfigUtil, FileUtil, YamlLoader
 from _manager import Manager
@@ -228,6 +230,25 @@ class ClusterConfig(object):
                 self._default_conf[key] = self._temp_conf[key].default
         self.set_global_conf(self._global_conf) # 更新全局配置
 
+    def check_param(self):
+        error = []
+        if self._temp_conf:
+            error += self._check_param(self._global_conf)
+            for server in self._server_conf:
+                error += self._check_param(self._server_conf[server])
+        return not error, set(error)
+
+    def _check_param(self, config):
+        error = []
+        for key in config:
+            item = self._temp_conf.get(key)
+            if item:
+                try:
+                    item.check_value(config[key])
+                except Exception as e:
+                    error.append(str(e))
+        return error
+
     def set_global_conf(self, conf):
         self._original_global_conf = deepcopy(conf)
         self._global_conf = deepcopy(self._default_conf)
@@ -270,6 +291,7 @@ class DeployStatus(Enum):
     STATUS_STOPPED = 'stopped'
     STATUS_DESTROYING = 'destroying'
     STATUS_DESTROYED = 'destroyed'
+    STATUS_UPRADEING = 'upgrading'
 
 
 class DeployConfigStatus(Enum):
@@ -282,7 +304,7 @@ class DeployConfigStatus(Enum):
 
 class DeployInfo(object):
 
-    def __init__(self, name, status, components={}, config_status=DeployConfigStatus.UNCHNAGE):
+    def __init__(self, name, status, components=OrderedDict(), config_status=DeployConfigStatus.UNCHNAGE):
         self.status = status
         self.name = name
         self.components = components
@@ -301,7 +323,7 @@ class DeployConfig(object):
         self._user = None
         self.unuse_lib_repository = False
         self.auto_create_tenant = False
-        self.components = {}
+        self.components = OrderedDict()
         self._src_data = None
         self.yaml_path = yaml_path
         self.yaml_loader = yaml_loader
@@ -324,6 +346,29 @@ class DeployConfig(object):
             self._src_data['auto_create_tenant'] = status
             return self._dump()
         return True
+
+    def update_component_package_hash(self, component, package_hash, version=None):
+        if component not in self.components:
+            return False
+        ori_data = self._src_data[component]
+        src_data = deepcopy(ori_data)
+        src_data['package_hash'] = package_hash
+        if version:
+            src_data['version'] = version
+        elif 'version' in src_data:
+            del src_data['version']
+        if 'tag' in src_data:
+            del src_data['tag']
+        
+        self._src_data[component] = src_data
+        if self._dump():
+            cluster_config = self.components[component]
+            cluster_config.package_hash = src_data.get('package_hash')
+            cluster_config.version = src_data.get('version')
+            cluster_config.tag = None
+            return True
+        self._src_data[component] = ori_data
+        return False
 
     def _load(self):
         try:
@@ -461,6 +506,7 @@ class Deploy(object):
 
     DEPLOY_STATUS_FILE = '.data'
     DEPLOY_YAML_NAME = 'config.yaml'
+    UPRADE_META_NAME = '.upgrade'
 
     def __init__(self, config_dir, stdio=None):
         self.config_dir = config_dir
@@ -468,6 +514,7 @@ class Deploy(object):
         self._info = None
         self._config = None
         self.stdio = stdio
+        self._uprade_meta = None
 
     def use_model(self, name, repository, dump=True):
         self.deploy_info.components[name] = {
@@ -485,6 +532,10 @@ class Deploy(object):
         return os.path.join(path, Deploy.DEPLOY_YAML_NAME)
 
     @staticmethod
+    def get_upgrade_meta_path(path):
+        return os.path.join(path, Deploy.UPRADE_META_NAME)
+
+    @staticmethod
     def get_temp_deploy_yaml_path(path):
         return os.path.join(path, 'tmp_%s' % Deploy.DEPLOY_YAML_NAME)
 
@@ -498,7 +549,7 @@ class Deploy(object):
                     self._info = DeployInfo(
                         data['name'],
                         getattr(DeployStatus, data['status'], DeployStatus.STATUS_CONFIGURED),
-                        ConfigUtil.get_value_from_dict(data, 'components', {}),
+                        ConfigUtil.get_value_from_dict(data, 'components', OrderedDict()),
                         getattr(DeployConfigStatus, ConfigUtil.get_value_from_dict(data, 'config_status', '_'), DeployConfigStatus.UNCHNAGE),
                     )
             except:
@@ -524,6 +575,26 @@ class Deploy(object):
             except:
                 pass
         return self._config
+
+    def _get_uprade_meta(self):
+        if self._uprade_meta is None and self.deploy_info.status == DeployStatus.STATUS_UPRADEING:
+            try:
+                path = self.get_upgrade_meta_path(self.config_dir)
+                with open(path) as f:
+                    self._uprade_meta = yaml.load(f)
+            except:
+                self.stdio and getattr(self.stdio, 'exception', print)('fail to load uprade meta data')
+        return self._uprade_meta
+
+    @property
+    def upgrade_ctx(self):
+        uprade_meta = self._get_uprade_meta()
+        return uprade_meta.get('uprade_ctx') if uprade_meta else None
+
+    @property
+    def upgrading_component(self):
+        uprade_meta = self._get_uprade_meta()
+        return uprade_meta.get('component') if uprade_meta else None
 
     def apply_temp_deploy_config(self):
         src_yaml_path = self.get_temp_deploy_yaml_path(self.config_dir)
@@ -554,18 +625,85 @@ class Deploy(object):
             self.stdio and getattr(self.stdio, 'exception', print)('dump deploy info to %s failed' % path)
         return False
 
+    def _update_deploy_status(self, status):
+        old = self.deploy_info.status
+        self.deploy_info.status = status
+        if self._dump_deploy_info():
+            return True
+        self.deploy_info.status = old
+        return False
+
+    def _update_deploy_config_status(self, status):
+        old = self.deploy_info.config_status
+        self.deploy_info.config_status = status
+        if self._dump_deploy_info():
+            return True
+        self.deploy_info.config_status = old
+        return False
+
+    def _dump_upgrade_meta_data(self):
+        path = self.get_upgrade_meta_path(self.config_dir)
+        self.stdio and getattr(self.stdio, 'verbose', print)('dump upgrade meta data to %s' % path)
+        try:
+            if self._uprade_meta:
+                with open(path, 'wb') as f:
+                    yaml.dump(self._uprade_meta, f)
+            else:
+                FileUtil.rm(path, self.stdio)
+            return True
+        except:
+            self.stdio and getattr(self.stdio, 'exception', print)('dump upgrade meta data to %s failed' % path)
+        return False
+
+    def start_upgrade(self, component, **uprade_ctx):
+        if self.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            return False
+        self._uprade_meta = {
+            'component': component,
+            'uprade_ctx': uprade_ctx
+        }
+        if self._dump_upgrade_meta_data() and self._update_deploy_status(DeployStatus.STATUS_UPRADEING):
+            return True
+        self._uprade_meta = None
+        return False
+
+    def update_upgrade_ctx(self, **uprade_ctx):
+        if self.deploy_info.status != DeployStatus.STATUS_UPRADEING:
+            return False
+        uprade_meta = deepcopy(self._get_uprade_meta())
+        self._uprade_meta['uprade_ctx'].update(uprade_ctx)
+        if self._dump_upgrade_meta_data():
+            return True
+        self._uprade_meta = uprade_meta
+        return False
+
+    def _update_componet_repository(self, component, repository):
+        if not self.deploy_config.update_component_package_hash(component, repository.hash, repository.version):
+            return False
+        self.use_model(component, repository)
+        return True
+
+    def stop_upgrade(self, dest_repository=None):
+        if self._update_deploy_status(DeployStatus.STATUS_RUNNING):
+            self._uprade_meta = None
+            self._dump_upgrade_meta_data()
+            if dest_repository:
+                self._update_componet_repository(dest_repository.name, dest_repository)
+            return True
+        return False
+
     def update_deploy_status(self, status):
         if isinstance(status, DeployStatus):
-            self.deploy_info.status = status
-            if DeployStatus.STATUS_DESTROYED == status:
-                self.deploy_info.components = {}
-            return self._dump_deploy_info()
+            if self._update_deploy_status(status):
+                if DeployStatus.STATUS_DESTROYED == status:
+                    self.deploy_info.components = {}
+                    self._dump_deploy_info()
+                return True
         return False
 
     def update_deploy_config_status(self, status):
         if isinstance(status, DeployConfigStatus):
-            self.deploy_info.config_status = status
-            return self._dump_deploy_info()
+            return self._update_deploy_config_status(status)
         return False
 
 
@@ -573,24 +711,36 @@ class DeployManager(Manager):
 
     RELATIVE_PATH = 'cluster/'
     
-    def __init__(self, home_path, stdio=None):
+    def __init__(self, home_path, lock_manager=None, stdio=None):
         super(DeployManager, self).__init__(home_path, stdio)
+        self.lock_manager = lock_manager
 
-    def get_deploy_configs(self):
+    def _lock(self, name, read_only=False):
+        if self.lock_manager:
+            if read_only:
+                return self.lock_manager.deploy_sh_lock(name)
+            else:
+                return self.lock_manager.deploy_ex_lock(name)
+        return True
+
+    def get_deploy_configs(self, read_only=True):
         configs = []
-        for file_name in os.listdir(self.path):
-            path = os.path.join(self.path, file_name)
+        for name in os.listdir(self.path):
+            path = os.path.join(self.path, name)
             if os.path.isdir(path):
+                self._lock(name, read_only)
                 configs.append(Deploy(path, self.stdio))
         return configs
 
-    def get_deploy_config(self, name):
+    def get_deploy_config(self, name, read_only=False):
+        self._lock(name, read_only)
         path = os.path.join(self.path, name)
         if os.path.isdir(path):
             return Deploy(path, self.stdio)
         return None
 
     def create_deploy_config(self, name, src_yaml_path):
+        self._lock(name)
         config_dir = os.path.join(self.path, name)
         target_src_path = Deploy.get_deploy_yaml_path(config_dir)
         self._mkdir(config_dir)
@@ -601,5 +751,6 @@ class DeployManager(Manager):
             return None
         
     def remove_deploy_config(self, name):
+        self._lock(name)
         config_dir = os.path.join(self.path, name)
         self._rm(config_dir)

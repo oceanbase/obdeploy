@@ -24,17 +24,22 @@ from __future__ import absolute_import, division, print_function
 def bootstrap(plugin_context, cursor, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
+    global_ret = True
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         for key in ['observer_sys_password', 'obproxy_sys_password']:
-            if server_config.get(key):
-                sql = 'alter proxyconfig set %s = %%s' % key
-                value = None
-                try:
-                    value = str(server_config[key])
-                    stdio.verbose('execute sql: %s' % (sql % value))
-                    cursor[server].execute(sql, [value])
-                except:
-                    stdio.exception('execute sql exception: %s' % (sql % (value)))
-                    stdio.warm('failed to set %s for obproxy(%s)' % (key, server))
-    plugin_context.return_true()
+            sql = 'alter proxyconfig set %s = %%s' % key
+            value = None
+            try:
+                value = server_config.get(key, '')
+                value = '' if value is None else str(value)
+                stdio.verbose('execute sql: %s' % (sql % value))
+                cursor[server].execute(sql, [value])
+            except:
+                stdio.exception('execute sql exception: %s' % (sql % (value)))
+                stdio.error('failed to set %s for obproxy(%s)' % (key, server))
+                global_ret = False
+    if global_ret:
+        plugin_context.return_true()
+    else:
+        plugin_context.return_false()

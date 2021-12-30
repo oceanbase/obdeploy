@@ -66,12 +66,35 @@ class LocalPackage(Package):
         self.md5 = None
         self.arch = arch if arch else getBaseArch()
         self.headers = {}
-        self.files = files
+        self.files = self.get_all_files(files)
         self.path = path
         self.package()
 
     def __hash__(self):
         return hash(self.path)
+
+    @staticmethod
+    def get_all_files(source_files):
+        files = {}
+        for src_path, target_path in source_files.items():
+            if not os.path.isdir(target_path) or os.path.islink(target_path):
+                files[src_path] = target_path
+            else:
+                files[src_path+'/'] = target_path
+                for fp in LocalPackage.list_dir(target_path):
+                    files[os.path.join(src_path, os.path.relpath(fp, target_path))] = fp
+        return files
+
+    @staticmethod
+    def list_dir(path):
+        files = []
+        for fn in os.listdir(path):
+            fp = os.path.join(path, fn)
+            if not os.path.isdir(fp) or os.path.islink(fp):
+                files.append(fp)
+            else:
+                files += LocalPackage.list_dir(fp)
+        return files
 
     def package(self):
         count = 0
@@ -90,21 +113,22 @@ class LocalPackage(Package):
                 dirnames.append(dirname)
                 dirnames_map[dirname] = count
                 count += 1
-            basenames.append(basename)
-            dirindexes.append(dirnames_map[dirname])
-            if os.path.islink(target_path):
-                filemd5s.append('')
-                filelinktos.append(os.readlink(target_path))
-                filemodes.append(-24065)
-            else:
-                m = hashlib.md5()
-                with open(target_path, 'rb') as f:
-                    m.update(f.read())
-                m_value = m.hexdigest().encode(sys.getdefaultencoding())
-                m_sum.update(m_value)
-                filemd5s.append(m_value)
-                filelinktos.append('')
-                filemodes.append(os.stat(target_path).st_mode)
+            if basename:
+                basenames.append(basename)
+                dirindexes.append(dirnames_map[dirname])
+                if os.path.islink(target_path):
+                    filemd5s.append('')
+                    filelinktos.append(os.readlink(target_path))
+                    filemodes.append(-24065)
+                else:
+                    m = hashlib.md5()
+                    with open(target_path, 'rb') as f:
+                        m.update(f.read())
+                    m_value = m.hexdigest().encode(sys.getdefaultencoding())
+                    m_sum.update(m_value)
+                    filemd5s.append(m_value)
+                    filelinktos.append('')
+                    filemodes.append(os.stat(target_path).st_mode)
         self.headers = {
             'dirnames': dirnames,
             'filemd5s': filemd5s,
@@ -152,7 +176,7 @@ class Repository(PackageInfo):
     def bin_list(self, plugin):
         files = []
         if self.version and self.hash:
-            for file_item in plugin.file_list():
+            for file_item in plugin.file_list(self):
                 if file_item.type == InstallPlugin.FileItemType.BIN:
                     files.append(os.path.join(self.repository_dir, file_item.target_path))
         return files
@@ -160,7 +184,7 @@ class Repository(PackageInfo):
     def file_list(self, plugin):
         files = []
         if self.version and self.hash:
-            for file_item in plugin.file_list():
+            for file_item in plugin.file_list(self):
                 path = os.path.join(self.repository_dir, file_item.target_path)
                 if file_item.type == InstallPlugin.FileItemType.DIR:
                     files += DirectoryUtil.list_dir(path)
@@ -189,6 +213,7 @@ class Repository(PackageInfo):
                 self.set_release(data.get('release'))
                 self.md5 = data.get('hash')
                 self.arch = data.get('arch')
+                self.install_time = data.get('install_time', 0)
         except:
             pass
 
@@ -205,6 +230,8 @@ class Repository(PackageInfo):
 
     def _dump(self):
         data = {'version': self.version, 'hash': self.hash, 'release': self.release, 'arch': self.arch}
+        if self.install_time:
+            data['install_time'] = self.install_time
         try:
             with open(self.data_file_path, 'w') as f:
                 YamlLoader().dump(data, f)
@@ -223,7 +250,7 @@ class Repository(PackageInfo):
         self.clear()
         try:
             with pkg.open() as rpm:
-                file_map = plugin.file_map
+                file_map = plugin.file_map(pkg)
                 need_dirs = {}
                 need_files = {}
                 for src_path in file_map:
@@ -268,7 +295,7 @@ class Repository(PackageInfo):
                     if filemd5s[idx]:
                         fd = rpm.extractfile(src_path)
                         self.stdio and getattr(self.stdio, 'verbose', print)('extract %s to %s' % (src_path, target_path))
-                        with FileUtil.open(target_path, 'wb', self.stdio) as f:
+                        with FileUtil.open(target_path, 'wb', stdio=self.stdio) as f:
                             FileUtil.copy_fileobj(fd, f)
                         mode = filemodes[idx] & 0x1ff
                         if mode != 0o744:
@@ -283,12 +310,15 @@ class Repository(PackageInfo):
                     os.symlink(links[link], link)
                 for n_dir in need_dirs:
                     path = os.path.join(self.repository_dir, need_dirs[n_dir])
+                    if not os.path.exists(path) and n_dir[:-1] in dirnames:
+                        DirectoryUtil.mkdir(path)
                     if not os.path.isdir(path):
-                        raise Exception('%s: No such dir: %s' % (pkg.path, n_dir))
+                        raise Exception('%s in %s is not dir.' % (pkg.path, n_dir))
             self.set_version(pkg.version)
             self.set_release(pkg.release)
             self.md5 = pkg.md5
             self.arch = pkg.arch
+            self.install_time = time.time()
             if self._dump():
                 return True
             else:
@@ -365,11 +395,12 @@ class ComponentRepository(object):
 
     def get_repository_by_tag(self, tag, version=None):
         path_partten = os.path.join(self.repository_dir, version if version else '*', tag)
+        repository = None
         for path in glob(path_partten):
-            repository = Repository(self.name, path, self.stdio)
-            if repository.hash:
-                return repository
-        return None
+            n_repository = Repository(self.name, path, self.stdio)
+            if n_repository.hash and n_repository > repository:
+                repository = n_repository
+        return repository
 
     def get_repository(self, version=None, tag=None):
         if tag:
@@ -391,7 +422,9 @@ class ComponentRepository(object):
         repositories = []
         path_partten = os.path.join(self.repository_dir, version, '*')
         for path in glob(path_partten):
-            repositories.append(Repository(self.name, path, self.stdio))
+            repository = Repository(self.name, path, self.stdio)
+            if repository.hash:
+                repositories.append(repository)
         return repositories
 
 
@@ -400,10 +433,19 @@ class RepositoryManager(Manager):
     RELATIVE_PATH = 'repository'
     # repository目录结构为 ./repository/{component_name}/{version}/{tag or hash}
 
-    def __init__(self, home_path, stdio=None):
+    def __init__(self, home_path, lock_manager=None, stdio=None):
         super(RepositoryManager, self).__init__(home_path, stdio=stdio)
         self.repositories = {}
         self.component_repositoies = {}
+        self.lock_manager = lock_manager
+
+    def _lock(self, read_only=False):
+        if self.lock_manager:
+            if read_only:
+                return self.lock_manager.mirror_and_repo_sh_lock()
+            else:
+                return self.lock_manager.mirror_and_repo_ex_lock()
+        return True
 
     def _get_repository_vo(self, repository):
         return RepositoryVO(
@@ -415,6 +457,13 @@ class RepositoryManager(Manager):
             repository.repository_dir,
             []
         )
+
+    def get_repositories(self, name, version=None, instance=True):
+        repositories = []
+        for repository in self.get_component_repositoy(name).get_repositories(version):
+            if instance and repository.is_shadow_repository() is False:
+                repositories.append(repository)
+        return repositories
 
     def get_repositories_view(self, name=None):
         if name:
@@ -440,6 +489,7 @@ class RepositoryManager(Manager):
 
     def get_component_repositoy(self, name):
         if name not in self.component_repositoies:
+            self._lock(True)
             path = os.path.join(self.path, name)
             self.component_repositoies[name] = ComponentRepository(name, path, self.stdio)
         return self.component_repositoies[name]
@@ -471,6 +521,7 @@ class RepositoryManager(Manager):
     def create_instance_repository(self, name, version, _hash):
         path = os.path.join(self.path, name, version, _hash)
         if path not in self.repositories:
+            self._lock()
             self._mkdir(path)
             repository = Repository(name, path, self.stdio)
             self.repositories[path] = repository
@@ -480,6 +531,7 @@ class RepositoryManager(Manager):
         path = os.path.join(self.path, name, version, tag if tag else name)
         if os.path.exists(path):
             if path not in self.repositories:
+                self._lock(True)
                 self.repositories[path] = Repository(name, path, self.stdio)
             return self.repositories[path]
         repository =  Repository(name, path, self.stdio)
@@ -489,6 +541,7 @@ class RepositoryManager(Manager):
     def create_tag_for_repository(self, repository, tag, force=False):
         if repository.is_shadow_repository():
             return False
+        self._lock()
         path = os.path.join(self.path, repository.name, repository.version, tag)
         if os.path.exists(path):
             if not os.path.islink(path):
@@ -509,6 +562,7 @@ class RepositoryManager(Manager):
     def get_instance_repository_from_shadow(self, repository):
         if not isinstance(repository, Repository) or not repository.is_shadow_repository():
             return repository
+        self._lock(True)
         try:
             path = os.readlink(repository.repository_dir)
             if path not in self.repositories:

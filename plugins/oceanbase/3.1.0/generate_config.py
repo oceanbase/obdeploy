@@ -56,8 +56,10 @@ def format_size(size, precision=1):
 def get_system_memory(memory_limit):
     if memory_limit <= (64 << 30):
         system_memory = memory_limit * 0.5
-    else:
+    elif memory_limit <= (150 << 30):
         system_memory = memory_limit * 0.4
+    else:
+        system_memory = memory_limit * 0.3
     system_memory = max(4 << 30, system_memory)
     return format_size(system_memory, 0)
 
@@ -143,7 +145,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                             free_memory = parse_size(str(v))
                     memory_limit = free_memory
                     if memory_limit < MIN_MEMORY:
-                        stdio.errorn('(%s) not enough memory. (Free: %s, Need: %s)' % (ip, format_size(free_memory), format_size(MIN_MEMORY)))
+                        stdio.error('(%s) not enough memory. (Free: %s, Need: %s)' % (ip, format_size(free_memory), format_size(MIN_MEMORY)))
                         success = False
                         continue
                     memory_limit = max(MIN_MEMORY, memory_limit * 0.9)
@@ -171,7 +173,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
             if ret and ret.stdout.strip().isdigit():
                 cpu_num = int(ret.stdout)
-                server_config['cpu_count'] = max(16, int(cpu_num * 0.8))
+                server_config['cpu_count'] = max(16, int(cpu_num * - 2))
             else:
                 server_config['cpu_count'] = 16
         
@@ -188,7 +190,19 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                         'avail': int(avail) << 10,
                         'need': 0,
                     }
-                
+            for include_dir in dirs.values():
+                while include_dir not in disk:
+                    ret = client.execute_command('df --block-size=1024 %s' % include_dir)
+                    if ret:
+                        for total, used, avail, puse, path in re.findall('(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
+                            disk[path] = {
+                                'total': int(total) << 10,
+                                'avail': int(avail) << 10,
+                                'need': 0,
+                            }
+                        break
+                    else:
+                        include_dir = os.path.dirname(include_dir)
             mounts = {}
             for key in dirs:
                 path = dirs[key]

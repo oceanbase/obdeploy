@@ -2,3 +2,6 @@
   target_path: bin/observer
   type: bin
   mode: 755
+- src_path: ./home/admin/oceanbase/etc
+  target_path: etc
+  type: dir

@@ -21,7 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 
-def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
+def connect(plugin_context, target_server=None, *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers

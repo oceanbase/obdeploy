@@ -153,6 +153,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         "cluster_name": "appname",
         "cluster_id": "cluster_id",
         "zone_name": "zone",
+        "ob_install_path": "home_path"
     }
 
     stdio.start_loading('Start obproxy')
@@ -196,97 +197,91 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
             continue
 
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s/conf/monagent.yaml' % home_path):
-            use_parameter = False
-        else:
-            use_parameter = True
+        for comp in ['oceanbase', 'oceanbase-ce']:
+            obs_config = cluster_config.get_depled_config(comp, server)
+            if obs_config is not None:
+                break
 
-        if use_parameter:
-            for comp in ['oceanbase', 'oceanbase-ce']:
-                obs_config = cluster_config.get_depled_config(comp, server)
-                if obs_config is not None:
-                    break
+        if obs_config is None:
+            obs_config = {}
 
-            if obs_config is None:
-                obs_config = {}
+        for key in config_map:
+            k = config_map[key]
+            if not server_config.get(key):
+                server_config[key] = obs_config.get(k, default_server_config.get(key))
 
-            for key in config_map:
-                k = config_map[key]
-                if not server_config.get(key):
-                    server_config[key] = obs_config.get(k, default_server_config.get(key))
+        for key in default_server_config:
+            if not server_config.get(key):
+                server_config[key] = default_server_config.get(key)
 
-            for key in default_server_config:
-                if not server_config.get(key):
-                    server_config[key] = default_server_config.get(key)
+        server_config['host_ip'] = server.ip
+        for key in server_config:
+            if server_config[key] is None:
+                server_config[key] = ''
+            if isinstance(server_config[key], bool):
+                server_config[key] = str(server_config[key]).lower()
+        
+        if server_config.get('crypto_method', 'plain').lower() == 'aes':
+            secret_key = generate_aes_b64_key()
+            crypto_path = server_config.get('crypto_path', 'conf/.config_secret.key')
+            crypto_path = os.path.join(home_path, crypto_path)
+            client.execute_command('echo "%s" > %s' % (secret_key.decode('utf-8') if isinstance(secret_key, bytes) else secret_key, crypto_path))
+            for key in need_encrypted:
+                value = server_config.get(key)
+                if value:
+                    server_config[key] = encrypt(secret_key, value)
 
-            server_config['host_ip'] = server.ip
-            for key in server_config:
-                if server_config[key] is None:
-                    server_config[key] = ''
-                if isinstance(server_config[key], bool):
-                    server_config[key] = str(server_config[key]).lower()
-            
-            if server_config.get('crypto_method', 'plain').lower() == 'aes':
-                secret_key = generate_aes_b64_key()
-                crypto_path = server_config.get('crypto_path', 'conf/.config_secret.key')
-                crypto_path = os.path.join(home_path, crypto_path)
-                client.execute_command('echo "%s" > %s' % (secret_key.decode('utf-8') if isinstance(secret_key, bytes) else secret_key, crypto_path))
-                for key in need_encrypted:
-                    value = server_config.get(key)
-                    if value:
-                        server_config[key] = encrypt(secret_key, value)
-
-            for path in config_files:
-                stdio.verbose('format %s' % path)
-                with tempfile.NamedTemporaryFile(suffix=".yaml", mode='w') as tf:
-                    text = config_files[path].format(**server_config)
-                    text = text.replace('\[[', '{').replace('\]]', '}')
-                    tf.write(text)
-                    tf.flush()
-                    if not client.put_file(tf.name, path.replace(repository_dir, home_path)):
-                        stdio.error('Fail to send config file to %s' % server)
-                        stdio.stop_loading('fail')
-                        return 
-
-            for path in glob(os.path.join(repository_dir, 'conf/*/*')):
-                if path.endswith('.yaml'):
-                    continue
-                if os.path.isdir(path):
-                    ret = client.put_dir(path, path.replace(repository_dir, home_path))
-                else:
-                    ret = client.put_file(path, path.replace(repository_dir, home_path))
-                if not ret:
+        for path in config_files:
+            stdio.verbose('format %s' % path)
+            with tempfile.NamedTemporaryFile(suffix=".yaml", mode='w') as tf:
+                text = config_files[path].format(**server_config)
+                text = text.replace('\[[', '{').replace('\]]', '}')
+                tf.write(text)
+                tf.flush()
+                if not client.put_file(tf.name, path.replace(repository_dir, home_path)):
                     stdio.error('Fail to send config file to %s' % server)
                     stdio.stop_loading('fail')
                     return 
-            
-            config = {
-                'log': {
-                    'level': server_config.get('log_level', 'info'),
-                    'filename': server_config.get('log_path', 'log/monagent.log'),
-                    'maxsize': int(server_config.get('log_size', 30)),
-                    'maxage': int(server_config.get('log_expire_day', 7)),
-                    'maxbackups': int(server_config.get('maxbackups', 10)),
-                    'localtime': True if server_config.get('log_use_localtime', True) else False,
-                    'compress': True if server_config.get('log_compress', True) else False
-                },
-                'server': {
-                    'address': '0.0.0.0:%d' % int(server_config.get('server_port', 8088)),
-                    'adminAddress': '0.0.0.0:%d' % int(server_config.get('pprof_port', 8089)),
-                    'runDir': 'run'
-                },
-                'cryptoMethod': server_config['crypto_method'] if server_config.get('crypto_method').lower() in ['aes', 'plain'] else 'plain',
-                'cryptoPath': server_config.get('crypto_path'),
-                'modulePath': 'conf/module_config',
-                'propertiesPath': 'conf/config_properties'
-            }
 
-            with tempfile.NamedTemporaryFile(suffix=".yaml") as tf:
-                yaml.dump(config, tf)
-                if not client.put_file(tf.name, os.path.join(home_path, 'conf/monagent.yaml')):
-                    stdio.error('Fail to send config file to %s' % server)
-                    stdio.stop_loading('fail')
-                    return 
+        for path in glob(os.path.join(repository_dir, 'conf/*/*')):
+            if path.endswith('.yaml'):
+                continue
+            if os.path.isdir(path):
+                ret = client.put_dir(path, path.replace(repository_dir, home_path))
+            else:
+                ret = client.put_file(path, path.replace(repository_dir, home_path))
+            if not ret:
+                stdio.error('Fail to send config file to %s' % server)
+                stdio.stop_loading('fail')
+                return 
+        
+        config = {
+            'log': {
+                'level': server_config.get('log_level', 'info'),
+                'filename': server_config.get('log_path', 'log/monagent.log'),
+                'maxsize': int(server_config.get('log_size', 30)),
+                'maxage': int(server_config.get('log_expire_day', 7)),
+                'maxbackups': int(server_config.get('maxbackups', 10)),
+                'localtime': True if server_config.get('log_use_localtime', True) else False,
+                'compress': True if server_config.get('log_compress', True) else False
+            },
+            'server': {
+                'address': '0.0.0.0:%d' % int(server_config.get('server_port', 8088)),
+                'adminAddress': '0.0.0.0:%d' % int(server_config.get('pprof_port', 8089)),
+                'runDir': 'run'
+            },
+            'cryptoMethod': server_config['crypto_method'] if server_config.get('crypto_method').lower() in ['aes', 'plain'] else 'plain',
+            'cryptoPath': server_config.get('crypto_path'),
+            'modulePath': 'conf/module_config',
+            'propertiesPath': 'conf/config_properties'
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".yaml") as tf:
+            yaml.dump(config, tf)
+            if not client.put_file(tf.name, os.path.join(home_path, 'conf/monagent.yaml')):
+                stdio.error('Fail to send config file to %s' % server)
+                stdio.stop_loading('fail')
+                return 
                 
         log_path = '%s/log/monagent_stdout.log' % home_path
         client.execute_command('cd %s;nohup %s/bin/monagent -c conf/monagent.yaml >> %s 2>&1 & echo $! > %s' % (home_path, home_path, log_path, remote_pid_path))

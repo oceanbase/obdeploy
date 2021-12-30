@@ -12,6 +12,7 @@
   default: 1
   min_value: 1
   max_value: 4294901759
+  modify_limit: modify
   need_restart: true
   description_en: ID of the cluster
   description_local: 本OceanBase集群ID
@@ -63,6 +64,7 @@
   default: 2882
   min_value: 1025
   max_value: 65535
+  modify_limit: modify
   need_restart: true
   description_en: the port number for RPC protocol.
   description_local: 集群内部通信的端口号
@@ -72,6 +74,7 @@
   default: 2881
   min_value: 1025
   max_value: 65535
+  modify_limit: modify
   need_restart: true
   description_en: port number for mysql connection
   description_local: SQL服务协议端口号
@@ -105,16 +108,6 @@
   need_restart: false
   description_en: separate system and user commit log. The default value is false.
   description_local: 是否把系统事务日志与用户事务日志分开存储
-- name: min_observer_version
-  require: false
-  type: STRING
-  default: 1.1.0
-  min_value: NULL
-  max_value: NULL
-  section: ROOT_SERVICE
-  need_restart: false
-  description_en: the min observer version
-  description_local: 本集群最小的observer程序版本号
 - name: sys_cpu_limit_trigger
   require: false
   type: INT
@@ -131,6 +124,7 @@
   default: 80
   min_value: 10
   max_value: 90
+  modify_limit: decrease
   section: OBSERVER
   need_restart: false
   description_en: memory limit percentage of the total physical memory
@@ -207,7 +201,7 @@
   description_local: 位置缓存刷新请求的最小间隔，防止产生过多刷新请求造成系统压力过大
 - name: trace_log_slow_query_watermark
   type: TIME
-  default: 100ms
+  default: 1s
   min_value: 1ms
   max_value: NULL
   section: OBSERVER
@@ -300,6 +294,7 @@
   default: 0
   min_value: 0M
   max_value: NULL
+  modify_limit: decrease
   section: SSTABLE
   need_restart: false
   description_en: size of the data file.
@@ -417,7 +412,7 @@
 - name: freeze_trigger_percentage
   require: false
   type: INT
-  default: 70
+  default: 50
   min_value: 1
   max_value: 99
   section: TENANT
@@ -856,7 +851,7 @@
 - name: enable_merge_by_turn
   require: false
   type: BOOL
-  default: true
+  default: false
   min_value: NULL
   max_value: NULL
   section: DAILY_MERGE
@@ -908,7 +903,7 @@
   type: INT
   default: 0
   min_value: 0
-  max_value: 64
+  max_value: 256
   section: OBSERVER
   need_restart: false
   description_en: worker thread num for compaction
@@ -926,9 +921,9 @@
 - name: net_thread_count
   require: false
   type: INT
-  default: 12
-  min_value: 1
-  max_value: 100
+  default: 0
+  min_value: 0
+  max_value: 128
   section: OBSERVER
   need_restart: true
   description_en: the number of rpc/mysql I/O threads for Libeasy.
@@ -946,7 +941,7 @@
 - name: minor_freeze_times
   require: false
   type: INT
-  default: 5
+  default: 100
   min_value: 0
   max_value: 65535
   section: TENANT
@@ -1286,7 +1281,7 @@
   description_local: 备副本的事务日志和主副本差距超过该阈值时，触发副本重建
 - name: system_memory
   type: CAPACITY
-  default: 16G
+  default: 30G
   min_value: 0M
   max_value: NULL
   section: OBSERVER
@@ -1346,7 +1341,7 @@
 - name: default_row_format
   require: false
   type: STRING
-  default: dynamic
+  default: compact
   min_value: NULL
   max_value: NULL
   section: OBSERVER
@@ -1399,6 +1394,7 @@
   default: 0
   min_value: NULL
   max_value: NULL
+  modify_limit: decrease
   section: OBSERVER
   need_restart: false
   description_en: the size of the memory reserved for internal use(for testing purpose)
@@ -1407,7 +1403,7 @@
   require: true
   type: INT
   default: 268435456
-  min_value: 536870912
+  min_value: 268435456
   max_value: 
   need_restart: false
   description_en: the minimum memory limit of the resource pool
@@ -1755,7 +1751,7 @@
 - name: clog_sync_time_warn_threshold
   require: false
   type: TIME
-  default: 100ms
+  default: 1s
   min_value: 1ms
   max_value: 10000ms
   section: TRANS
@@ -2028,6 +2024,7 @@
   default: 90
   min_value: 5
   max_value: 99
+  modify_limit: decrease
   section: SSTABLE
   need_restart: false
   description_en: the percentage of disk space used by the data files.
@@ -2035,7 +2032,7 @@
 - name: default_compress_func
   require: false
   type: STRING
-  default: zstd_1.0
+  default: zstd_1.3.8
   min_value: NULL
   max_value: NULL
   section: OBSERVER

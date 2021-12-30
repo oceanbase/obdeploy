@@ -58,7 +58,7 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
             sql = 'grant select on oceanbase.* to proxyro IDENTIFIED BY "%s"' % value
             stdio.verbose(sql)
             cursor.execute(sql)
-        if global_conf.get('root_password'):
+        if global_conf.get('root_password') is not None:
             sql = 'alter user "root" IDENTIFIED BY "%s"' % global_conf.get('root_password')
             stdio.verbose('execute sql: %s' % sql)
             cursor.execute(sql)

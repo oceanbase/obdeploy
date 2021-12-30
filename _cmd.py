@@ -36,7 +36,7 @@ from tool import DirectoryUtil, FileUtil
 
 
 ROOT_IO = IO(1)
-VERSION = '1.1.2'
+VERSION = '<VERSION>'
 REVISION = '<CID>'
 BUILD_BRANCH = '<B_BRANCH>'
 BUILD_TIME = '<B_TIME>'
@@ -90,6 +90,7 @@ class BaseCommand(object):
 class ObdCommand(BaseCommand):
 
     OBD_PATH = os.path.join(os.environ.get('OBD_HOME', os.getenv('HOME')), '.obd')
+    OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
 
     def init_home(self):
         version_path = os.path.join(self.OBD_PATH, 'version')
@@ -100,13 +101,13 @@ class ObdCommand(BaseCommand):
         if VERSION != version:
             obd_plugin_path = os.path.join(self.OBD_PATH, 'plugins')
             if DirectoryUtil.mkdir(self.OBD_PATH):
-                root_plugin_path = '/usr/obd/plugins'
+                root_plugin_path = os.path.join(self.OBD_INSTALL_PRE, 'usr/obd/plugins')
                 if os.path.exists(root_plugin_path):
                     DirectoryUtil.copy(root_plugin_path, obd_plugin_path, ROOT_IO)
             obd_mirror_path = os.path.join(self.OBD_PATH, 'mirror')
             obd_remote_mirror_path = os.path.join(self.OBD_PATH, 'mirror/remote')
             if DirectoryUtil.mkdir(obd_mirror_path):
-                root_remote_mirror = '/usr/obd/mirror/remote'
+                root_remote_mirror = os.path.join(self.OBD_INSTALL_PRE, 'usr/obd/mirror/remote')
                 if os.path.exists(root_remote_mirror):
                     DirectoryUtil.copy(root_remote_mirror, obd_remote_mirror_path, ROOT_IO)
             version_fobj.seek(0)
@@ -137,7 +138,7 @@ class ObdCommand(BaseCommand):
         except NotImplementedError:
             ROOT_IO.exception('command \'%s\' is not implemented' % self.prev_cmd)
         except IOError:
-            ROOT_IO.exception('OBD is running.')
+            ROOT_IO.exception('Another app is currently holding the obd lock.')
         except SystemExit:
             pass
         except:
@@ -247,18 +248,18 @@ class MirrorListCommand(ObdCommand):
             else:
                 repos = obd.mirror_manager.get_mirrors()
                 for repo in repos:
-                    if repo.name == name:
+                    if repo.section_name == name:
                         pkgs = repo.get_all_pkg_info()
                         self.show_pkg(name, pkgs)
                         return True
                 ROOT_IO.error('No such mirror repository: %s' % name)
                 return False
         else:
-            repos = obd.mirror_manager.get_mirrors()
+            repos = obd.mirror_manager.get_mirrors(is_enabled=None)
             ROOT_IO.print_list(
-                repos, 
-                ['Name', 'Type', 'Update Time'], 
-                lambda x: [x.name, x.mirror_type.value, time.strftime("%Y-%m-%d %H:%M", time.localtime(x.repo_age))],
+                repos,
+                ['SectionName', 'Type', 'Enabled','Update Time'], 
+                lambda x: [x.section_name, x.mirror_type.value, x.enabled, time.strftime("%Y-%m-%d %H:%M", time.localtime(x.repo_age))],
                 title='Mirror Repository List'
             )
         return True
@@ -271,15 +272,37 @@ class MirrorUpdateCommand(ObdCommand):
     
     def _do_command(self, obd):
         success = True
-        repos = obd.mirror_manager.get_remote_mirrors()
-        for repo in repos:
+        current = int(time.time())
+        mirrors = obd.mirror_manager.get_remote_mirrors()
+        for mirror in mirrors:
             try:
-                success = repo.update_mirror() and success
+                if mirror.enabled and mirror.repo_age < current:
+                    success = mirror.update_mirror() and success
             except:
                 success = False
                 ROOT_IO.stop_loading('fail')
-                ROOT_IO.exception('Fail to synchronize mirorr (%s)' % repo.name)
+                ROOT_IO.exception('Fail to synchronize mirorr (%s)' % mirror.name)
         return success
+
+
+class MirrorEnableCommand(ObdCommand):
+
+    def __init__(self):
+        super(MirrorEnableCommand, self).__init__('enable', 'Enable remote mirror repository.')
+    
+    def _do_command(self, obd):
+        name = self.cmds[0]
+        obd.mirror_manager.set_remote_mirror_enabled(name, True)
+
+
+class MirrorDisableCommand(ObdCommand):
+
+    def __init__(self):
+        super(MirrorDisableCommand, self).__init__('disable', 'Disable remote mirror repository.')
+    
+    def _do_command(self, obd):
+        name = self.cmds[0]
+        obd.mirror_manager.set_remote_mirror_enabled(name, False)
 
 
 class MirrorMajorCommand(MajorCommand):
@@ -290,6 +313,8 @@ class MirrorMajorCommand(MajorCommand):
         self.register_command(MirrorCloneCommand())
         self.register_command(MirrorCreateCommand())
         self.register_command(MirrorUpdateCommand())
+        self.register_command(MirrorEnableCommand())
+        self.register_command(MirrorDisableCommand())
 
 
 class RepositoryListCommand(ObdCommand):
@@ -428,10 +453,12 @@ class ClusterRestartCommand(ClusterMirrorCommand):
         super(ClusterRestartCommand, self).__init__('restart', 'Restart a started cluster.')
         self.parser.add_option('-s', '--servers', type='string', help="List the started servers. Multiple servers are separated with commas.")
         self.parser.add_option('-c', '--components', type='string', help="List the started components. Multiple components are separated with commas.")
-        self.parser.add_option('--without-parameter', '--wop', action='store_true', help='Start without parameters.')
+        self.parser.add_option('--with-parameter', '--wp', action='store_true', help='Restart with parameters.')
 
     def _do_command(self, obd):
         if self.cmds:
+            if not getattr(self.opts, 'with_parameter', False):
+                setattr(self.opts, 'without_parameter', True)
             return obd.restart_cluster(self.cmds[0], self.opts)
         else:
             return self._show_help()
@@ -491,7 +518,12 @@ class CLusterUpgradeCommand(ClusterMirrorCommand):
     def __init__(self):
         super(CLusterUpgradeCommand, self).__init__('upgrade', 'Upgrade a cluster.')
         self.parser.add_option('-f', '--force', action='store_true', help="Force upgrade.")
-        self.parser.add_option('-c', '--components', type='string', help="List the updated components. Multiple components are separated with commas.")
+        self.parser.add_option('-c', '--component', type='string', help="Component name to upgrade.")
+        self.parser.add_option('-V', '--version', type='string', help="Target version.")
+        self.parser.add_option('--skip-check', action='store_true', help="Skip all the possible checks.")
+        self.parser.add_option('--usable', type='string', help="Hash list for priority mirrors, separated with `,`.", default='')
+        self.parser.add_option('--disable', type='string', help="Hash list for disabled mirrors, separated with `,`.", default='')
+        self.parser.add_option('-e', '--executer-path', type='string', help="Executer path.", default=os.path.join(ObdCommand.OBD_INSTALL_PRE, 'usr/obd/lib/executer'))
 
     def _do_command(self, obd):
         if self.cmds:
@@ -627,7 +659,7 @@ class SysBenchCommand(TestMirrorCommand):
         self.parser.add_option('--database', type='string', help='Database for a test. [test]', default='test')
         self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
         self.parser.add_option('--sysbench-bin', type='string', help='Sysbench bin path. [sysbench]', default='sysbench')
-        self.parser.add_option('--script-name', type='string', help='Sysbench lua script file name. [point_select]', default='oltp_point_select.lua')
+        self.parser.add_option('--script-name', type='string', help='Sysbench lua script file name. [oltp_point_select]', default='oltp_point_select.lua')
         self.parser.add_option('--sysbench-script-dir', type='string', help='The directory of the sysbench lua script file. [/usr/sysbench/share/sysbench]', default='/usr/sysbench/share/sysbench')
         self.parser.add_option('--table-size', type='int', help='Number of data initialized per table. [20000]', default=20000)
         self.parser.add_option('--tables', type='int', help='Number of initialization tables. [30]', default=30)
@@ -704,7 +736,7 @@ class UpdateCommand(ObdCommand):
         return super(UpdateCommand, self).do_command()
 
     def _do_command(self, obd):
-        return obd.update_obd(VERSION)
+        return obd.update_obd(VERSION, self.OBD_INSTALL_PRE)
 
 
 class MainCommand(MajorCommand):
@@ -735,7 +767,7 @@ if __name__ == '__main__':
             pass
         reload(sys)
         sys.setdefaultencoding(defaultencoding)
-    sys.path.append('/usr/obd/lib/site-packages')
+    sys.path.append(os.path.join(ObdCommand.OBD_INSTALL_PRE, 'usr/obd/lib/site-packages'))
     ROOT_IO.track_limit += 2
     if MainCommand().init('obd', sys.argv[1:]).do_command():
         ROOT_IO.exit(0)

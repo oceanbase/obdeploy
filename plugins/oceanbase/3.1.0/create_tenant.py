@@ -202,11 +202,11 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     min_iops = get_option('min_iops', max_iops)
 
     if cpu_total < max_cpu:
-        return error('resource not enough: cpu (Avail: %s, Need: %s)' % (max_cpu, cpu_total))
+        return error('resource not enough: cpu (Avail: %s, Need: %s)' % (cpu_total, max_cpu))
     if mem_total < max_memory:
-        return error('resource not enough: memory (Avail: %s, Need: %s)' % (formate_size(max_memory), formate_size(mem_total)))
+        return error('resource not enough: memory (Avail: %s, Need: %s)' % (formate_size(mem_total), formate_size(max_memory)))
     if disk_total < max_disk_size:
-        return error('resource not enough: disk space (Avail: %s, Need: %s)' % (formate_size(max_disk_size), formate_size(disk_total)))
+        return error('resource not enough: disk space (Avail: %s, Need: %s)' % (formate_size(disk_total), formate_size(max_disk_size)))
    
     if max_iops < MIN_IOPS:
         return error('max_iops must greater than %d' % MIN_IOPS)

@@ -55,6 +55,7 @@ def stop(plugin_context, *args, **kwargs):
 
     servers = {}
     stdio.start_loading('Stop obproxy')
+    success = True
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
@@ -64,8 +65,8 @@ def stop(plugin_context, *args, **kwargs):
         remote_pid_path = '%s/run/obproxy-%s-%s.pid' % (server_config["home_path"], server.ip, server_config["listen_port"])
         obproxyd_pid_path = '%s/run/obproxyd-%s-%s.pid' % (server_config["home_path"], server.ip, server_config["listen_port"])
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
-        if remote_pid:
-            if client.execute_command('ls /proc/%s' % remote_pid):
+        if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
+            if client.execute_command('ls /proc/%s/fd' % remote_pid):
                 stdio.verbose('%s obproxy[pid:%s] stopping ...' % (server, remote_pid))
                 client.execute_command('cat %s | xargs kill -9; kill -9 -%s' % (obproxyd_pid_path, remote_pid))
                 servers[server] = {
@@ -75,8 +76,14 @@ def stop(plugin_context, *args, **kwargs):
                     'pid': remote_pid,
                     'path': remote_pid_path
                 }
+            else:
+                stdio.verbose('failed to stop obproxy[pid:%s] in %s, permission deny' % (remote_pid, server))
+                success = False
         else:
             stdio.verbose('%s obproxy is not running' % server)
+    if not success:
+        stdio.stop_loading('fail')
+        return plugin_context.return_false()
 
     count = 10
     check = lambda client, pid, port: confirm_port(client, pid, port) if count < 5 else get_port_socket_inode(client, port)

@@ -26,6 +26,7 @@ import bz2
 import sys
 import stat
 import gzip
+import fcntl
 import shutil
 from ssh import LocalClient
 
@@ -122,7 +123,7 @@ class ConfigUtil(object):
         try:
             # 不要使用 conf.get(key, default)来替换，这里还有类型转换的需求
             value = conf[key]
-            return transform_func(value) if transform_func else value
+            return transform_func(value) if value is not None and transform_func else value
         except:
             return default
 
@@ -132,12 +133,13 @@ class DirectoryUtil(object):
     @staticmethod
     def list_dir(path, stdio=None):
         files = []
-        for fn in os.listdir(path):
-            fp = os.path.join(path, fn)
-            if os.path.isdir(fp):
-                files += DirectoryUtil.list_dir(fp)
-            else:
-                files.append(fp)
+        if os.path.isdir(path):
+            for fn in os.listdir(path):
+                fp = os.path.join(path, fn)
+                if os.path.isdir(fp):
+                    files += DirectoryUtil.list_dir(fp)
+                else:
+                    files.append(fp)
         return files
 
     @staticmethod
@@ -312,7 +314,7 @@ class FileUtil(object):
             elif ztype == 'gz':
                 s_fn = gzip.GzipFile(source, 'r')
             else:
-                s_fn = open(unzip, 'r')
+                s_fn = open(source, 'r')
             return s_fn
         except:
             stdio and getattr(stdio, 'exception', print)('failed to unzip %s' % source)
@@ -333,6 +335,32 @@ class FileUtil(object):
     @staticmethod
     def move(src, dst, stdio=None):
         return shutil.move(src, dst)
+
+    @staticmethod
+    def share_lock_obj(obj, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('try to get share lock %s' % obj.name)
+        fcntl.flock(obj, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        return obj
+
+    @classmethod
+    def share_lock(cls, path, _type='w', stdio=None):
+        return cls.share_lock_obj(cls.open(path, _type=_type, stdio=stdio))
+
+    @staticmethod
+    def exclusive_lock_obj(obj, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('try to get exclusive lock %s' % obj.name)
+        fcntl.flock(obj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return obj
+
+    @classmethod
+    def exclusive_lock(cls, path, _type='w', stdio=None):
+        return cls.exclusive_lock_obj(cls.open(path, _type=_type, stdio=stdio))
+
+    @staticmethod
+    def unlock(obj, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('unlock %s' % obj.name)
+        fcntl.flock(obj, fcntl.LOCK_UN)
+        return obj
 
 
 class YamlLoader(YAML):

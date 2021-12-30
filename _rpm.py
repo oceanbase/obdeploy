@@ -100,6 +100,9 @@ class PackageInfo(object):
     def __cmp_value__(self):
         return [self.version, self.release]
 
+    def __hash__(self):
+        return hash(self.md5)
+
     def __eq__(self, value):
         if value is None:
             return False

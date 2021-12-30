@@ -211,10 +211,19 @@ class IO(object):
     ERROR_PREV = FormtatText.error('[ERROR]')
     IS_TTY = sys.stdin.isatty()
     
-    def __init__(self, level, msg_lv=MsgLevel.DEBUG, trace_logger=None, track_limit=0, root_io=None, stream=sys.stdout):
+    def __init__(self, 
+        level, 
+        msg_lv=MsgLevel.DEBUG, 
+        trace_logger=None, 
+        use_cache=False,
+        track_limit=0, 
+        root_io=None, 
+        stream=sys.stdout
+    ):
         self.level = level
         self.msg_lv = msg_lv
         self.trace_logger = trace_logger
+        self._log_cache = [] if use_cache else None
         self._root_io = root_io
         self.track_limit = track_limit
         self._verbose_prefix = '-' * self.level
@@ -224,6 +233,12 @@ class IO(object):
         self._cur_out_obj = self._out_obj
         self._before_critical = None
 
+    @property
+    def log_cache(self):
+        if self._root_io:
+            self._root_io.log_cache
+        return self._log_cache
+        
     def before_close(self):
         if self._before_critical:
             try:
@@ -231,8 +246,35 @@ class IO(object):
             except:
                 pass
 
-    def __del__(self):
+    def _close(self):
         self.before_close()
+        self._flush_log()
+
+    def __del__(self):
+        self._close()
+    
+    def exit(self, code):
+        self._close()
+        sys.exit(code)
+
+    def set_cache(self, status):
+        if status:
+            self._cache_on()
+    
+    def _cache_on(self):
+        if self._root_io:
+            return False
+        if self.log_cache is None:
+            self._log_cache = []
+        return True
+    
+    def _cache_off(self):
+        if self._root_io:
+            return False
+        if self.log_cache is not None:
+            self._flush_log()
+            self._log_cache = None
+        return True
 
     def get_cur_out_obj(self):
         if self._root_io:
@@ -303,7 +345,7 @@ class IO(object):
             return False
         self.sync_obj = self._start_sync_obj(IOHalo, lambda x: x.stop_loading('fail'), *arg, **kwargs)
         if self.sync_obj:
-            self._log(MsgLevel.INFO, text)
+            self.log(MsgLevel.INFO, text)
             return self.sync_obj.start(text)
 
     def stop_loading(self, stop_type, *arg, **kwargs):
@@ -319,7 +361,7 @@ class IO(object):
             return False
         self.sync_obj = self._start_sync_obj(IOProgressBar, lambda x: x.finish_progressbar(), text=text, maxval=maxval)
         if self.sync_obj:
-            self._log(MsgLevel.INFO, text)
+            self.log(MsgLevel.INFO, text)
             return self.sync_obj.start()
 
     def update_progressbar(self, value):
@@ -389,10 +431,31 @@ class IO(object):
         kwargs['file'] = self.get_cur_out_obj()
         kwargs['file'] and print(self._format(msg, *args), **kwargs)
         del kwargs['file']
-        self._log(msg_lv, msg, *args, **kwargs)
+        self.log(msg_lv, msg, *args, **kwargs)
     
+    def log(self, levelno, msg, *args, **kwargs):
+        self._cache_log(levelno, msg, *args, **kwargs)
+
+    def _cache_log(self, levelno, msg, *args, **kwargs):
+        if self.trace_logger:
+            log_cache = self.log_cache
+            lines = str(msg).split('\n')
+            for line in lines:
+                if log_cache is None:
+                    self._log(levelno, line, *args, **kwargs)
+                else:
+                    log_cache.append((levelno, line, args, kwargs))
+
+
+    def _flush_log(self):
+        if not self._root_io and self.trace_logger and self._log_cache:
+            for levelno, line, args, kwargs in self._log_cache:
+                self.trace_logger.log(levelno, line, *args, **kwargs)
+            self._log_cache = []
+
     def _log(self, levelno, msg, *args, **kwargs):
-        self.trace_logger and self.trace_logger.log(levelno, msg, *args, **kwargs)
+        if self.trace_logger:
+            self.trace_logger.log(levelno, msg, *args, **kwargs)
 
     def print(self, msg, *args, **kwargs):
         self._print(MsgLevel.INFO, msg, *args, **kwargs)
@@ -405,17 +468,13 @@ class IO(object):
 
     def critical(self, msg, *args, **kwargs):
         if self._root_io:
-            return self.critical(msg, *args, **kwargs)
+            return self._root_io.critical(msg, *args, **kwargs)
         self._print(MsgLevel.CRITICAL, '%s %s' % (self.ERROR_PREV, msg), *args, **kwargs)
         self.exit(kwargs['code'] if 'code' in kwargs else 255)
-    
-    def exit(self, code):
-        self.before_close()
-        sys.exit(code)
 
     def verbose(self, msg, *args, **kwargs):
         if self.level > self.VERBOSE_LEVEL:
-            self._log(MsgLevel.VERBOSE, '%s %s' % (self._verbose_prefix, msg), *args, **kwargs)
+            self.log(MsgLevel.VERBOSE, '%s %s' % (self._verbose_prefix, msg), *args, **kwargs)
             return
         self._print(MsgLevel.VERBOSE, '%s %s' % (self._verbose_prefix, msg), *args, **kwargs)
 
@@ -448,7 +507,7 @@ class IO(object):
             if self.level <= self.VERBOSE_LEVEL:
                 print_stack = lambda m: self._print(MsgLevel.ERROR, m)
             else:
-                print_stack = lambda m: self._log(MsgLevel.ERROR, m)
+                print_stack = lambda m: self.log(MsgLevel.ERROR, m)
             msg and self.error(msg)
             print_stack('\n'.join(exception_msg))
     else:
@@ -465,7 +524,7 @@ class IO(object):
             if self.level <= self.VERBOSE_LEVEL:
                 print_stack = lambda m: self._print(MsgLevel.ERROR, m)
             else:
-                print_stack = lambda m: self._log(MsgLevel.ERROR, m)
+                print_stack = lambda m: self.log(MsgLevel.ERROR, m)
             msg and self.error(msg)
             print_stack(''.join(lines))
 

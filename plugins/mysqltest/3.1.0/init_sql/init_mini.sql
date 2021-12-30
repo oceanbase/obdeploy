@@ -7,11 +7,6 @@ create database if not exists test;
 use test;
 grant all on *.* to 'admin' WITH GRANT OPTION;
 
-alter system set merger_warm_up_duration_time = '0s';
-alter system set zone_merge_concurrency = 2;
-alter system set merger_check_interval = '10s';
-alter system set enable_syslog_wf=false;
-alter system set _enable_split_partition = true;
 #FIXME: schema拆分模式建租户耗时增加，这里先加大语句超时时间先绕过
 set @@session.ob_query_timeout = 40000000;
 create resource unit box1 max_cpu 2, max_memory 805306368, max_iops 128, max_disk_size '5G', max_session_num 64, MIN_CPU=1, MIN_MEMORY=805306368, MIN_IOPS=128;

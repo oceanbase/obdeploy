@@ -100,8 +100,8 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
             remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
             client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
-            client.execute_command("ln -s %s/bin/* %s/bin" % (remote_repository_dir, home_path))
-            client.execute_command("ln -s %s/lib/* %s/lib" % (remote_repository_dir, home_path))
+            client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
+            client.execute_command("ln -fs %s/lib/* %s/lib" % (remote_repository_dir, home_path))
 
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
