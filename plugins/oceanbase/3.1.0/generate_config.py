@@ -56,8 +56,10 @@ def format_size(size, precision=1):
 def get_system_memory(memory_limit):
     if memory_limit <= (64 << 30):
         system_memory = memory_limit * 0.5
-    else:
+    elif memory_limit <= (150 << 30):
         system_memory = memory_limit * 0.4
+    else:
+        system_memory = memory_limit * 0.3
     system_memory = max(4 << 30, system_memory)
     return format_size(system_memory, 0)
 
@@ -171,7 +173,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
             if ret and ret.stdout.strip().isdigit():
                 cpu_num = int(ret.stdout)
-                server_config['cpu_count'] = max(16, int(cpu_num * 0.8))
+                server_config['cpu_count'] = max(16, int(cpu_num * - 2))
             else:
                 server_config['cpu_count'] = 16
         
