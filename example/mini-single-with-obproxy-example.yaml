@@ -1,5 +1,5 @@
 ## Only need to configure when remote login is required
-user:# user:
+# user:
 #   username: your username
 #   password: your password if need
 #   key_file: your ssh-key file path if need
@@ -8,10 +8,10 @@ user:# user:
 oceanbase-ce:
   servers:
     # Please don't use hostname, only IP can be supported
-    - 100.81.252.4
+    - 192.168.1.2
   global:
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
-    home_path: /home/rongfeng.frf/data/obd/t1/observer
+    home_path: /root/observer
     # The directory for data storage. The default value is $home_path/store.
     # data_dir: /data
     # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
@@ -19,7 +19,7 @@ oceanbase-ce:
     # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
     # if set severs as "127.0.0.1", please set devname as "lo"
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
-    devname: bond0
+    devname: eth0
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
     zone: zone1
@@ -54,14 +54,14 @@ obproxy:
   depends:
     - oceanbase-ce
   servers:
-    - 100.81.252.4
+    - 192.168.1.3
   global:
     listen_port: 2883 # External port. The default value is 2883.
     prometheus_listen_port: 2884 # The Prometheus port. The default value is 2884.
     home_path: /root/obproxy
     # oceanbase root server list
     # format: ip:mysql_port;ip:mysql_port. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
-    # rs_list: 192.168.1.2:2881;192.168.1.3:2881;192.168.1.4:2881
+    # rs_list: 192.168.1.2:2881
     enable_cluster_checkout: false
     # observer cluster name, consistent with oceanbase-ce's appname. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # cluster_name: obcluster
