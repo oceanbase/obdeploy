@@ -72,7 +72,7 @@ This table describes the corresponding options.
 
 | Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
-| -s/--servers | No | string |   | A list of machines, separated by `,`. Be used for specifying the start-up machines. If this option is disabled, all machines under the component will start without executing bootstrap.  |
+| -s/--servers | No | string |   | A list of machines, followed by the `name` value corresponding to `servers` in the `yaml` file, separated by `,`. Be used for specifying the start-up machines. If this option is disabled, all machines under the component will start without executing bootstrap.  |
 | -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If this option is disabled, all machines under the component will start without entering the running state.  |
 | --wop/--without-parameter | No | bool | false | Start without parameters. The node does not respond to this option when this node is starting for the first time.  |
 | -S/--strict-check | No | bool | false | Some components will do relevant checks before starting. OBD will throw an error when the check fails, but OBD will not force the process to stop. Using this option can return an error and directly exit the process when the component pre-check fails. We recommend that you enable this option to avoid startup failures due to insufficient resources.  |
@@ -123,7 +123,7 @@ This table describes the corresponding options.
 
 | Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
-| -s/--servers | No | string |   | A list of machines, separated by `,`.  |
+| -s/--servers | No | string |   | A list of machines, followed by the `name` value corresponding to `servers` in the `yaml` file, separated by `,`.  |
 | -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If this option is disabled, all machines under the component will start without entering the running state.  |
 | --wp/--with-parameter | No | bool | false | Restarts OBD with parameters. This option makes the parameters valid when you restart OBD.   |
 
@@ -153,7 +153,7 @@ This table describes the corresponding options.
 
 | Option | Required | Data type | Default value | Description |
 --- | --- | --- |--- | ---
-| -s/--servers | No | string |   | A list of machines, separated by `,`. Be used for specifying the start-up machines.  |
+| -s/--servers | No | string |   | A list of machines, followed by the `name` value corresponding to `servers` in the `yaml` file, separated by `,`. Be used for specifying the start-up machines.  |
 | -c/--components | No | string |   | A list of components, separated by `,`. Be used for specifying the start-up components. If not all components under the configuration start, this configuration will not enter the stopped state.  |
 
 ## `obd cluster destroy`
