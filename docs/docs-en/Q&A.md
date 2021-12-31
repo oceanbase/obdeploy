@@ -33,3 +33,23 @@ A: You can modify the startup plug-ins in the `~/.obd/plugins/oceanbase-ce/` dir
 ## Q：How to update OBD?
 
 A：You can use the `obd update` command to update OBD. When you are done with the update, use the `obd --version` command to confirm the version of OBD.
+
+## Q: How to upgrade OceanBase with OBD?
+ 
+ A: You can use the `Too many match` command to upgrade OceanBase.
+ 
+ For example, if you want upgrade OceanBase form V3.1.1 to V3.1.2, you can run these commands:
+
+  ```shell
+export LANG=en_US.UTF-8
+obd cluster upgrade s1 -V 3.1.2 -v -c oceanbase-ce
+```
+
+### error processing
+
+You may encounter a `Too many match` error, just select a `hash` on `Candidates`. For example:
+
+```shell
+export LANG=en_US.UTF-8
+obd cluster upgrade s1 -V 3.1.2 -v -c oceanbase-ce --usable 7fafba0fac1e90cbd1b5b7ae5fa129b64dc63aed
+```
