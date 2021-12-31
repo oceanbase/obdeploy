@@ -33,3 +33,23 @@ A：您可以修改 `~/.obd/plugins/oceanbase-ce/` 下的启动相关插件。�
 ## Q：如何升级 OBD？
 
 A：您可以使用 `obd update` 命令升级 OBD。当您升级完成后可以使用命令 `obd --version` 查看版本，确认是否升级成功。
+
+## Q：如何使用 OBD 升级 OceanBase 数据库？
+
+A：您可使用 `obd cluster upgrade` 命令升级 OceanBase 数据库。
+
+例如，若您想要从 OceanBase V3.1.1 升级到 V3.1.2，命令如下：
+
+```shell
+export LANG=en_US.UTF-8
+obd cluster upgrade s1 -V 3.1.2 -v -c oceanbase-ce
+```
+
+### 报错处理
+
+您可能会遇到 `Too many match` 的报错，这时只需在 `Candidates` 上选择一个 `hash` 即可。比如：
+
+```shell
+export LANG=en_US.UTF-8
+obd cluster upgrade s1 -V 3.1.2 -v -c oceanbase-ce --usable 7fafba0fac1e90cbd1b5b7ae5fa129b64dc63aed
+```
