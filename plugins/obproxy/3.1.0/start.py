@@ -217,7 +217,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     stdio.start_loading('obproxy program health check')
     failed = []
     servers = cluster_config.servers
-    count = 4
+    count = 8
     while servers and count:
         count -= 1
         tmp_servers = []
@@ -230,9 +230,14 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 for pid in remote_pid.split('\n'):
                     confirm = confirm_port(client, pid, int(server_config["listen_port"]))
                     if confirm:
-                        stdio.verbose('%s obproxy[pid: %s] started', server, pid)
-                        client.execute_command('echo %s > %s' % (pid, pid_path[server]))
-                        obproxyd(server_config["home_path"], client, server.ip, server_config["listen_port"])
+                        proxyd_Pid_path = os.path.join(server_config["home_path"], 'run/obproxyd-%s-%d.pid' % (server.ip, server_config["listen_port"]))
+                        if client.execute_command("pid=`cat %s` && ls /proc/$pid" % proxyd_Pid_path):
+                            stdio.verbose('%s obproxy[pid: %s] started', server, pid)
+                        else:
+                            client.execute_command('echo %s > %s' % (pid, pid_path[server]))
+                            obproxyd(server_config["home_path"], client, server.ip, server_config["listen_port"])
+                            client.execute_command('cat %s | xargs kill -9' % pid_path[server])
+                            tmp_servers.append(server)
                         break
                     stdio.verbose('failed to start %s obproxy, remaining retries: %d' % (server, count))
                     if count:
