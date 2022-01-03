@@ -1215,9 +1215,9 @@ class ObdHome(object):
             self._call_stdio('error', 'Deploy "%s" is %s. You could not reload an %s cluster.' % (name, deploy_info.status.value, deploy_info.status.value))
             return False
 
-        # if deploy_info.config_status != DeployConfigStatus.NEED_RELOAD:
-        #     self._call_stdio('error', 'Deploy config %s' % deploy_info.config_status.value)
-        #     return False
+        if deploy_info.config_status == DeployConfigStatus.UNCHNAGE:
+            self._call_stdio('print', 'Deploy config is UNCHNAGE')
+            return True
 
         self._call_stdio('verbose', 'Get deploy config')
         deploy_config = deploy.deploy_config
@@ -1542,9 +1542,9 @@ class ObdHome(object):
                     self._call_stdio('error', 'Not found %s in Deploy "%s" ' % (component, name))
                     return False
             else:
-                if len(deploy_info.components) == 1:
-                    component = deploy_info.components.keys()[0]
-                else:
+                for component in deploy_info.components:
+                    break
+                if not component:
                     self._call_stdio('error', 'Specify the components you want to upgrade.')
                     return False
 
