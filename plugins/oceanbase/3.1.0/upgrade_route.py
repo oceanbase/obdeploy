@@ -186,7 +186,7 @@ def upgrade_route(plugin_context, current_repository, dest_repository, *args, **
     yaml = YamlLoader(stdio)
 
     try:
-        with open(upgrade_dep_path) as f:
+        with open(upgrade_dep_path, encoding='utf-8') as f:
             data = yaml.load(f)
             graph = ObVersionGraph(data)
             route = graph.findShortestUpgradePath(current_repository, dest_repository)
