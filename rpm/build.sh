@@ -104,7 +104,7 @@ function build()
     cd2workdir
     DIR=`pwd`
     cd ..
-    VERSION=`grep 'Version:' ob-deploy.spec | head -n1 | awk -F' ' '{print $2}'`
+    VERSION=`grep 'Version:' rpm/ob-deploy.spec | head -n1 | awk -F' ' '{print $2}'`
     CID=`git log |head -n1 | awk -F' ' '{print $2}'`
     BRANCH=`git branch | grep -e "^\*" | awk -F' ' '{print $2}'`
     DATE=`date '+%b %d %Y %H:%M:%S'`
@@ -115,9 +115,9 @@ function build()
     mkdir -p $BUILD_DIR/mirror/remote
     wget https://mirrors.aliyun.com/oceanbase/OceanBase.repo -O $BUILD_DIR/mirror/remote/OceanBase.repo
     cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" | sed "s/<VERSION>/$VERSION/" > obd.py
-    pip install -r $req_fn.txt | exit 1
-    pip install -r plugins-$req_fn.txt --target=$BUILD_DIR/lib/site-packages | exit 1
-    pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py | exit 1
+    pip install -r $req_fn.txt || exit 1
+    pip install -r plugins-$req_fn.txt --target=$BUILD_DIR/lib/site-packages || exit 1
+    pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py || exit 1
     rm -f obd.py obd.spec
     cp -r plugins $BUILD_DIR/plugins
     rm -fr /usr/obd /usr/bin/obd
