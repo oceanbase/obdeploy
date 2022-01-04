@@ -1,5 +1,5 @@
 Name: ob-deploy
-Version: 1.2.0
+Version: 1.2.1
 Release: %(echo $RELEASE)%{?dist}
 # if you want use the parameter of rpm_create on build time,
 # uncomment below
@@ -95,12 +95,13 @@ cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mkdir -p
 %post
 # chkconfig: 2345 10 90
 # description: obd ....
-chmod +x /usr/bin/obd
 #mkdir -p /usr/obd/ && cp -rf /root/.obd/plugins /usr/obd/plugins
 #chmod 744 /root/.obd/plugins/*
 chmod -R 755 /usr/obd/*
 chown -R root:root /usr/obd/*
 find /usr/obd -type f -exec chmod 644 {} \;
+chmod +x /usr/bin/obd
+chmod +x /usr/obd/lib/executer/executer27/bin/executer
 echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d/obd.sh to enable it'
 #/sbin/chkconfig --add obd
 #/sbin/chkconfig obd on
