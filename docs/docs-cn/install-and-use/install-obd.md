@@ -37,3 +37,7 @@ pip install -r requirements3.txt
 sh build.sh
 source /etc/profile.d/obd.sh
 ```
+
+> **注意：** 为了与 release 版本区分开，源码安装产生的版本号为 4 位版本号，即在 rpm 包的版本号基础上加上安装时间，比如 1.2.0.1641267289。
+
+另外您可通过在安装前设置环境变量 `export OBD_DUBUG=1` 安装开启 DEBUG 模式的 OBD，该模式下每一条命令结束后都会输出对应的 trace id 以方便问题定位。
