@@ -108,7 +108,7 @@ function build()
     CID=`git log |head -n1 | awk -F' ' '{print $2}'`
     BRANCH=`git branch | grep -e "^\*" | awk -F' ' '{print $2}'`
     DATE=`date '+%b %d %Y %H:%M:%S'`
-    VERSION=$VERSION".`date +%s`"`
+    VERSION="$VERSION".`date +%s`
     BUILD_DIR="$DIR/.build"
     rm -fr $BUILD_DIR
     mkdir -p $BUILD_DIR/lib/site-packages
