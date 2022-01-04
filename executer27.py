@@ -20,6 +20,7 @@
 
 import os
 import sys
+import new
 import time
 import logging
 import getopt
@@ -45,4 +46,6 @@ if __name__ == '__main__':
 
     OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
     sys.path.append(os.path.join(OBD_INSTALL_PRE, 'usr/obd/lib/executer/executer27/site-packages'))
-    execfile(sys.argv[1])
+    del sys.argv[0]
+    sys.path.append(os.path.dirname(sys.argv[0]))
+    execfile(sys.argv[0])

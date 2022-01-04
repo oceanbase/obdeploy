@@ -62,7 +62,7 @@ class Exector(object):
     @property
     def cmd(self):
         if self._cmd is None:
-            self._cmd = 'alias python=%s; python %%s -h %s -P %s -u %s %s' % (self._exector, self.host, self.port, self.user, "-p '%s'" % self.pwd if self.pwd else '')
+            self._cmd = '%s %%s -h %s -P %s -u %s %s' % (self._exector, self.host, self.port, self.user, "-p '%s'" % self.pwd if self.pwd else '')
         return self._cmd
 
     @host.setter
