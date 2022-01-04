@@ -1,5 +1,5 @@
 Name: ob-deploy
-Version: 1.2.1
+Version: 1.2.0
 Release: %(echo $RELEASE)%{?dist}
 # if you want use the parameter of rpm_create on build time,
 # uncomment below
