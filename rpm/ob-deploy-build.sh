@@ -12,6 +12,8 @@ if [[ x"$PYTHON3_SWITCH" == x"" ]]; then
 fi
 
 CURDIR=$PWD
+DIR=`dirname $0`
+cd $DIR
 
 echo "[BUILD] args: CURDIR=${CURDIR} PROJECT_NAME=${PROJECT_NAME} VERSION=${VERSION} RELEASE=${RELEASE}"
 
