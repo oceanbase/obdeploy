@@ -38,7 +38,7 @@ A：You can use the `obd update` command to update OBD. When you are done with t
  
  A: You can use the `Too many match` command to upgrade OceanBase.
  
- For example, if you want upgrade OceanBase form V3.1.1 to V3.1.2, you can run these commands:
+ For example, if you want to upgrade OceanBase from V3.1.1 to V3.1.2, you can run these commands:
 
   ```shell
 export LANG=en_US.UTF-8
