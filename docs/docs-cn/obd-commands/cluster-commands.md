@@ -74,7 +74,7 @@ obd cluster start <deploy name> [flags]
 
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
--s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。用于指定启动的机器。如果组件下的机器没有全部启动，则 start 不会执行 bootstrap。
+-s/--servers | 否 | string | 空 | 机器列表，后跟 `yaml` 文件中 `servers` 对应的 `name` 值，用 `,` 间隔。用于指定启动的机器。如果组件下的机器没有全部启动，则 start 不会执行 bootstrap。
 -c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定启动的组件。如果配置下的组件没有全部启动，该配置不会进入 running 状态。
 --wop/--without-parameter | 否 | bool | false | 无参启动。启动的时候不带参数。节点第一次的启动时，不响应此选项。
 -S/--strict-check | 否 | bool | false | 部分组件在启动前会做相关的检查。检查不通过时，OBD 将发出告警，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。
@@ -125,7 +125,7 @@ obd cluster restart <deploy name>
 
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
--s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。
+-s/--servers | 否 | string | 空 | 机器列表，后跟 `yaml` 文件中 `servers` 对应的 `name` 值，用 `,` 间隔。
 -c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定启动的组件。如果配置下的组件没有全部启动，该配置不会进入 running 状态。
 --wp/--with-parameter | 否 | bool | false | 使用参数重启 OBD。用于在重启时使配置项生效。
 
@@ -155,7 +155,7 @@ obd cluster stop <deploy name>
 
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
--s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。用于指定停止的机器。
+-s/--servers | 否 | string | 空 | 机器列表，后跟 `yaml` 文件中 `servers` 对应的 `name` 值，用 `,` 间隔。用于指定停止的机器。
 -c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定停止的组件。如果配置下的组件没有全部停止，该配置不会进入 stopped 状态。
 
 ## `obd cluster destroy`
