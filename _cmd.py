@@ -763,8 +763,6 @@ class MySQLTestCommand(TestMirrorCommand):
 
     def __init__(self):
         super(MySQLTestCommand, self).__init__('mysqltest', 'Run a mysqltest for a deployment.')
-        self.parser.add_option('--mode', type='string', help='Test mode. Available values are mysql, oracle, and both.', default='both')
-        # self.parser.add_option('--case-mode', type='string', help='case run mode [mysql,oracle]', default='mysql')
         self.parser.add_option('--component', type='string', help='Components for mysqltest.')
         self.parser.add_option('--test-server', type='string', help='The server for mysqltest. By default, the first root server in the component is the mysqltest server.')
         self.parser.add_option('--user', type='string', help='Username for a test. [admin]', default='admin')
