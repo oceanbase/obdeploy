@@ -24,6 +24,8 @@ from __future__ import absolute_import, division, print_function
 import re
 import time
 
+from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
+
 
 def parse_size(size):
     _bytes = 0
@@ -121,7 +123,7 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
             count -= 1
             time.sleep(1)
         if count == 0:
-            stdio.error('server can not migrate in')
+            stdio.error(EC_OBSERVER_CAN_NOT_MIGRATE_IN)
             return
     except:
         exception('execute sql exception: %s' % sql)

@@ -218,7 +218,7 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
             if ret:
                 server_num = ret.get("server_num", server_num)
 
-            parallel_max_servers = int(max_cpu * 10)
+            parallel_max_servers = min(int(max_cpu * 10), 1800)
             parallel_servers_target = int(max_cpu * server_num * 8)
             tenant_variables = [
                 # [变量名, 新值, 旧值, 替换条件: lambda n, o: n != o]
@@ -260,6 +260,19 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
         parallel_num = int(max_cpu * unit_count)
         
         if not_test_only:
+            # 替换并发数
+            stdio.start_loading('Format DDL')
+            n_ddl_path = []
+            for fp in ddl_path:
+                _, fn = os.path.split(fp)
+                nfp = os.path.join(tmp_dir, fn)
+                ret = local_execute_command("sed %s -e 's/partitions cpu_num/partitions %d/' > %s" % (fp, cpu_total, nfp))
+                if not ret:
+                    raise Exception(ret.stderr)
+                n_ddl_path.append(nfp)
+            ddl_path = n_ddl_path
+            stdio.stop_loading('succeed')
+
             stdio.start_loading('Create table')
             for path in ddl_path:
                 path = os.path.abspath(path)

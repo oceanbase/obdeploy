@@ -26,14 +26,20 @@ import pickle
 import getpass
 from copy import deepcopy
 from enum import Enum
-from collections import OrderedDict
 
-from tool import ConfigUtil, FileUtil, YamlLoader
+from ruamel.yaml.comments import CommentedMap
+
+from tool import ConfigUtil, FileUtil, YamlLoader, OrderedDict
 from _manager import Manager
 from _repository import Repository
 
 
 yaml = YamlLoader()
+DEFAULT_CONFIG_PARSER_MANAGER = None
+
+
+class ParserError(Exception):
+    pass
 
 
 class UserConfig(object):
@@ -90,9 +96,212 @@ class ServerConfigFlyweightFactory(object):
         return ServerConfigFlyweightFactory._CACHE[_key]
 
 
+class InnerConfigItem(str):
+    pass
+
+
+class InnerConfig(object):
+
+    def __init__(self, path, yaml_loader):
+        self.path = path
+        self.yaml_loader = yaml_loader
+        self.config = {}
+        self._load()
+
+    def _load(self):
+        self.config = {}
+        try:
+            with FileUtil.open(self.path, 'rb') as f:
+                config = self.yaml_loader.load(f)
+                for component_name in config:
+                    self.config[component_name] = {}
+                    c_config = config[component_name]
+                    for server in c_config:
+                        i_config = {}
+                        s_config = c_config[server]
+                        for key in s_config:
+                            i_config[InnerConfigItem(key)] = s_config[key]
+                        self.config[component_name][server] = i_config
+        except:
+            pass
+
+    def _dump(self):
+        try:
+            stdio = self.yaml_loader.stdio if self.yaml_loader else None
+            with FileUtil.open(self.path, 'w', stdio=stdio) as f:
+                self.yaml_loader.dump(self.config, f)
+            return True
+        except:
+            pass
+        return False
+
+    def dump(self):
+        return self._dump()
+
+    def get_component_config(self, component_name):
+        return self.config.get(component_name, {})
+
+    def get_server_config(self, component_name, server):
+        return self.get_component(component_name).get(server, {})
+
+    def update_component_config(self, component_name, config):
+        self.config[component_name] = {}
+        for server in config:
+            c_config = {}
+            data = config[server]
+            for key in data:
+                if not isinstance(key, InnerConfigItem):
+                    key = InnerConfigItem(key)
+                c_config[key] = data[key]
+            self.config[component_name][server] = c_config
+
+
+class ConfigParser(object):
+
+    STYLE = ''
+    INNER_CONFIG_MAP = {}
+    PREFIX = '$_'
+
+    @classmethod
+    def _is_inner_item(cls, key):
+        return isinstance(key, InnerConfigItem) and key.startswith(cls.PREFIX)
+    
+    @classmethod
+    def extract_inner_config(cls, cluster_config, config):
+        return {}
+    
+    @classmethod
+    def _to_cluster_config(cls, component_name, config):
+        raise NotImplementedError
+
+    @classmethod
+    def to_cluster_config(cls, component_name, config):
+        cluster_config = cls._to_cluster_config(component_name, config)
+        cluster_config.parser = cls
+        return cluster_config
+
+    @classmethod
+    def _from_cluster_config(cls, conf, cluster_config):
+        raise NotImplementedError
+        
+    @classmethod
+    def from_cluster_config(cls, cluster_config):
+        if not cls.STYLE:
+            raise NotImplementedError('undefined Style ConfigParser')
+        
+        conf = CommentedMap()
+        conf['style'] = cls.STYLE
+        if cluster_config.origin_package_hash:
+            conf['package_hash'] = cluster_config.origin_package_hash
+        if cluster_config.origin_version:
+            conf['version'] = cluster_config.origin_version
+        if cluster_config.origin_tag:
+            conf['tag'] = cluster_config.origin_tag
+        if cluster_config.depends:
+            conf['depends'] = cluster_config.depends
+        conf = cls._from_cluster_config(conf, cluster_config)
+        inner_config = cls.extract_inner_config(cluster_config, conf)
+        return {
+            'inner_config': inner_config,
+            'config': conf
+        }
+    
+    @classmethod
+    def get_server_src_conf(cls, cluster_config, component_config, server):
+        if server.name not in component_config:
+            component_config[server.name] = {}
+        return component_config[server.name]
+
+    @classmethod
+    def get_global_src_conf(cls, cluster_config, component_config):
+        if 'global' not in component_config:
+            component_config['global'] = {}
+        return component_config['global']
+
+
+class DefaultConfigParser(ConfigParser):
+
+    STYLE = 'default'
+
+    @classmethod
+    def _to_cluster_config(cls, component_name, conf):
+        if 'servers' in conf and isinstance(conf['servers'], list):
+            servers = []
+            for server in conf['servers']:
+                if isinstance(server, dict):
+                    ip = ConfigUtil.get_value_from_dict(server, 'ip', transform_func=str)
+                    name = ConfigUtil.get_value_from_dict(server, 'name', transform_func=str)
+                else:
+                    ip = server
+                    name = None
+                if not re.match('^\d{1,3}(\\.\d{1,3}){3}$', ip):
+                    continue
+                server = ServerConfigFlyweightFactory.get_instance(ip, name)
+                if server not in servers:
+                    servers.append(server)
+        else:
+            servers = []
+        cluster_config = ClusterConfig(
+            servers,
+            component_name,
+            ConfigUtil.get_value_from_dict(conf, 'version', None, str),
+            ConfigUtil.get_value_from_dict(conf, 'tag', None, str),
+            ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str)
+        )
+        if 'global' in conf:
+            cluster_config.set_global_conf(conf['global'])
+        for server in servers:
+            if server.name in conf:
+                cluster_config.add_server_conf(server, conf[server.name])
+        return cluster_config
+
+    @classmethod
+    def extract_inner_config(cls, cluster_config, config):
+        inner_config = cluster_config.get_inner_config()
+        for server in cluster_config.servers:
+            if server.name not in inner_config:
+                inner_config[server.name] = {}
+
+        global_config = config.get('global', {})
+        keys = list(global_config.keys())
+        for key in keys:
+            if cls._is_inner_item(key):
+                for server in cluster_config.servers:
+                    inner_config[server.name][key] = global_config[key]
+                del global_config[key]
+        
+        for server in cluster_config.servers:
+            if server.name not in config:
+                continue
+            server_config = config[server.name]
+            keys = list(server_config.keys())
+            for key in keys:
+                if cls._is_inner_item(key):
+                    inner_config[server.name][key] = server_config[key]
+                    del server_config[key]
+        return inner_config
+
+    @classmethod
+    def _from_cluster_config(cls, conf, cluster_config):
+        conf['servers'] = []
+        for server in cluster_config.servers:
+            if server.name == server.ip:
+                conf['servers'].append(server.name)
+            else:
+                conf['servers'].append({'name': server.name, 'ip': server.ip})
+
+        if cluster_config.get_original_global_conf():
+            conf['global'] = cluster_config.get_original_global_conf()
+        for server in cluster_config.servers:
+            server_config = cluster_config.get_original_server_conf(server)
+            if server_config:
+                conf[server.name] = server_config
+        return conf
+
+
 class ClusterConfig(object):
 
-    def __init__(self, servers, name, version, tag, package_hash):
+    def __init__(self, servers, name, version, tag, package_hash, parser=None):
         self.version = version
         self.origin_version = version
         self.tag = tag
@@ -106,6 +315,8 @@ class ClusterConfig(object):
         self._server_conf = {}
         self._cache_server = {}
         self._original_global_conf = {}
+        self._inner_config = {}
+        servers = list(servers)
         self.servers = servers
         self._original_servers = servers # 保证顺序
         for server in servers:
@@ -113,18 +324,28 @@ class ClusterConfig(object):
             self._cache_server[server] = None
         self._deploy_config = None
         self._depends = {}
+        self.parser = parser
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
         return self._global_conf == other._global_conf and self._server_conf == other._server_conf
 
+    def __deepcopy__(self, memo):
+        cluster_config = self.__class__(deepcopy(self.servers), self.name, self.version, self.tag, self.package_hash, self.parser)
+        copy_attrs = ['origin_tag', 'origin_version', 'origin_package_hash', 'parser']
+        deepcopy_attrs = ['_temp_conf', '_default_conf', '_global_conf', '_server_conf', '_cache_server', '_original_global_conf', '_depends', '_original_servers', '_inner_config']
+        for attr in copy_attrs:
+            setattr(cluster_config, attr, getattr(self, attr))
+        for attr in deepcopy_attrs:
+            setattr(cluster_config, attr, deepcopy(getattr(self, attr)))
+        return cluster_config
+
     def set_deploy_config(self, _deploy_config):
         if self._deploy_config is None:
             self._deploy_config = _deploy_config
             return True
         return False
-
     @property
     def original_servers(self):
         return self._original_servers
@@ -133,26 +354,41 @@ class ClusterConfig(object):
     def depends(self):
         return self._depends.keys()
 
+    def _clear_cache_server(self):
+        for server in self._cache_server:
+            self._cache_server[server] = None
+
+    def get_inner_config(self):
+        return self._inner_config
+
+    def apply_inner_config(self, config):
+        self._inner_config = config
+        self._clear_cache_server()
+
     def add_depend(self, name, cluster_conf):
+        if self.name == name:
+            raise Exception('Can not set %s as %s\'s dependency' % (name, name))
+        if self.name in cluster_conf.depends:
+            raise Exception('Circular Dependency: %s and %s' % (self.name, name))
         self._depends[name] = cluster_conf
 
     def del_depend(self, name, component_name):
         if component_name in self._depends:
             del self._depends[component_name]
 
-    def get_depled_servers(self, name):
+    def get_depend_servers(self, name):
         if name not in self._depends:
             return None
         cluster_config = self._depends[name]
         return deepcopy(cluster_config.original_servers)
         
-    def get_depled_config(self, name, server=None):
+    def get_depend_config(self, name, server=None):
         if name not in self._depends:
             return None
         cluster_config = self._depends[name]
         config = cluster_config.get_server_conf_with_default(server) if server else cluster_config.get_global_conf()
         return deepcopy(config)
-        
+
     def update_server_conf(self, server, key, value, save=True):
         if self._deploy_config is None:
             return False
@@ -230,6 +466,12 @@ class ClusterConfig(object):
                 self._default_conf[key] = self._temp_conf[key].default
         self.set_global_conf(self._global_conf) # 更新全局配置
 
+    def get_temp_conf_item(self, key):
+        if self._temp_conf:
+            return self._temp_conf.get(key)
+        else:
+            return None
+    
     def check_param(self):
         error = []
         if self._temp_conf:
@@ -253,8 +495,7 @@ class ClusterConfig(object):
         self._original_global_conf = deepcopy(conf)
         self._global_conf = deepcopy(self._default_conf)
         self._global_conf.update(self._original_global_conf)
-        for server in self._cache_server:
-            self._cache_server[server] = None
+        self._clear_cache_server()
 
     def add_server_conf(self, server, conf):
         if server not in self.servers:
@@ -271,10 +512,14 @@ class ClusterConfig(object):
         if server not in self._server_conf:
             return None
         if self._cache_server[server] is None:
-            conf = deepcopy(self._global_conf)
+            conf = deepcopy(self._inner_config.get(server.name, {}))
+            conf.update(self._global_conf)
             conf.update(self._server_conf[server])
             self._cache_server[server] = conf
         return self._cache_server[server]
+
+    def get_original_global_conf(self):
+        return self._original_global_conf
 
     def get_original_server_conf(self, server):
         return self._server_conf.get(server)
@@ -319,19 +564,39 @@ class DeployInfo(object):
 
 class DeployConfig(object):
 
-    def __init__(self, yaml_path, yaml_loader=yaml):
+    def __init__(self, yaml_path, yaml_loader=yaml, inner_config=None, config_parser_manager=None):
         self._user = None
         self.unuse_lib_repository = False
         self.auto_create_tenant = False
+        self._inner_config = inner_config
         self.components = OrderedDict()
         self._src_data = None
         self.yaml_path = yaml_path
         self.yaml_loader = yaml_loader
+        self.config_parser_manager = config_parser_manager if config_parser_manager else DEFAULT_CONFIG_PARSER_MANAGER
+        if self.config_parser_manager is None:
+            raise ParserError('ConfigParaserManager Not Set')
         self._load()
 
     @property
     def user(self):
         return self._user
+
+    @property
+    def inner_config(self):
+        return self._inner_config
+
+    @inner_config.setter
+    def inner_config(self, inner_config):
+        if inner_config:
+            def get_inner_config(component_name):
+                return inner_config.get_component_config(component_name)
+        else:
+            def get_inner_config(component_name):
+                return {}
+        for component_name in self.components:
+            self.components[component_name].apply_inner_config(get_inner_config(component_name))
+        self._inner_config = inner_config
 
     def set_unuse_lib_repository(self, status):
         if self.unuse_lib_repository != status:
@@ -371,44 +636,59 @@ class DeployConfig(object):
         return False
 
     def _load(self):
-        try:
-            with open(self.yaml_path, 'rb') as f:
-                depends = {}
-                self._src_data = self.yaml_loader.load(f)
-                for key in self._src_data:
-                    if key == 'user':
-                        self.set_user_conf(UserConfig(
-                            ConfigUtil.get_value_from_dict(self._src_data[key], 'username'),
-                            ConfigUtil.get_value_from_dict(self._src_data[key], 'password'),
-                            ConfigUtil.get_value_from_dict(self._src_data[key], 'key_file'),
-                            ConfigUtil.get_value_from_dict(self._src_data[key], 'port', 0, int),
-                            ConfigUtil.get_value_from_dict(self._src_data[key], 'timeout', 0, int),
-                        ))
-                    elif key == 'unuse_lib_repository':
-                        self.unuse_lib_repository = self._src_data['unuse_lib_repository']
-                    elif key == 'auto_create_tenant':
-                        self.auto_create_tenant = self._src_data['auto_create_tenant']
-                    elif issubclass(type(self._src_data[key]), dict):
-                        self._add_component(key, self._src_data[key])
-                        depends[key] = self._src_data[key].get('depends', [])
-                for comp in depends:
-                    conf = self.components[comp]
-                    for name in depends[comp]:
-                        if name == comp:
-                            continue
-                        if name in self.components:
-                            conf.add_depend(name, self.components[name])
-        except:
-            pass
+        with open(self.yaml_path, 'rb') as f:
+            depends = {}
+            self._src_data = self.yaml_loader.load(f)
+            for key in self._src_data:
+                if key == 'user':
+                    self.set_user_conf(UserConfig(
+                        ConfigUtil.get_value_from_dict(self._src_data[key], 'username'),
+                        ConfigUtil.get_value_from_dict(self._src_data[key], 'password'),
+                        ConfigUtil.get_value_from_dict(self._src_data[key], 'key_file'),
+                        ConfigUtil.get_value_from_dict(self._src_data[key], 'port', 0, int),
+                        ConfigUtil.get_value_from_dict(self._src_data[key], 'timeout', 0, int),
+                    ))
+                elif key == 'unuse_lib_repository':
+                    self.unuse_lib_repository = self._src_data['unuse_lib_repository']
+                elif key == 'auto_create_tenant':
+                    self.auto_create_tenant = self._src_data['auto_create_tenant']
+                elif issubclass(type(self._src_data[key]), dict):
+                    self._add_component(key, self._src_data[key])
+                    depends[key] = self._src_data[key].get('depends', [])
+            for comp in depends:
+                conf = self.components[comp]
+                for name in depends[comp]:
+                    if name == comp:
+                        continue
+                    if name in self.components:
+                        conf.add_depend(name, self.components[name])
         if not self.user:
             self.set_user_conf(UserConfig())
+
+    def _separate_config(self):
+        if self.inner_config:
+            for component_name in self.components:
+                cluster_config = self.components[component_name]
+                src_data = self._src_data[component_name]
+                parser = cluster_config.parser
+                if parser:
+                    inner_config = parser.extract_inner_config(cluster_config, src_data)
+                    self.inner_config.update_component_config(component_name, inner_config)
+
+    def _dump_inner_config(self):
+        if self.inner_config:
+            self._separate_config()
+            self.inner_config.dump()
 
     def _dump(self):
         try:
             with open(self.yaml_path, 'w') as f:
+                self._dump_inner_config()
                 self.yaml_loader.dump(self._src_data, f)
             return True
         except:
+            import logging
+            logging.exception('')
             pass
         return False
 
@@ -452,68 +732,81 @@ class DeployConfig(object):
         cluster_config = self.components[component_name]
         if server not in cluster_config.servers:
             return False
-        component_config = self._src_data[component_name]
-        if server.name not in component_config:
-            component_config[server.name] = {key: value}
-        else:
-            component_config[server.name][key] = value
+        component_config = cluster_config.parser.get_server_src_conf(cluster_config, self._src_data[component_name], server)
+        component_config[key] = value
         return self.dump() if save else True
 
     def update_component_global_conf(self, component_name, key, value, save=True):
         if component_name not in self.components:
             return False
-        component_config = self._src_data[component_name]
-        if 'global' not in component_config:
-            component_config['global'] = {key: value}
-        else:
-            component_config['global'][key] = value
+        cluster_config = self.components[component_name]
+        component_config = cluster_config.parser.get_global_src_conf(cluster_config, self._src_data[component_name])
+        component_config[key] = value
         return self.dump() if save else True
 
-    def _add_component(self, component_name, conf):
-        if 'servers' in conf and isinstance(conf['servers'], list):
-            servers = []
-            for server in conf['servers']:
-                if isinstance(server, dict):
-                    ip = ConfigUtil.get_value_from_dict(server, 'ip', transform_func=str)
-                    name = ConfigUtil.get_value_from_dict(server, 'name', transform_func=str)
-                else:
-                    ip = server
-                    name = None
-                if not re.match('^\d{1,3}(\\.\d{1,3}){3}$', ip):
-                    continue
-                server = ServerConfigFlyweightFactory.get_instance(ip, name)
-                if server not in servers:
-                    servers.append(server)
+    def _set_component(self, cluster_config):
+        cluster_config.set_deploy_config(self)
+        if self.inner_config:
+            inner_config = self.inner_config.get_component_config(cluster_config.name)
+            if inner_config:
+                cluster_config.apply_inner_config(inner_config)
+        self.components[cluster_config.name] = cluster_config
+
+    def update_component(self, cluster_config):
+        component_name = cluster_config.name
+        if cluster_config.parser:
+            parser = cluster_config.parser
         else:
-            servers = []
-        cluster_conf = ClusterConfig(
-            servers,
-            component_name,
-            ConfigUtil.get_value_from_dict(conf, 'version', None, str),
-            ConfigUtil.get_value_from_dict(conf, 'tag', None, str),
-            ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str)
-        )
-        if 'global' in conf:
-            cluster_conf.set_global_conf(conf['global'])
-        for server in servers:
-            if server.name in conf:
-                cluster_conf.add_server_conf(server, conf[server.name])
-        cluster_conf.set_deploy_config(self)
-        self.components[component_name] = cluster_conf
+            conf = self._src_data.get('component_name', {})
+            style = conf.get('style', 'default')
+            parser = self.config_parser_manager.get_parser(component_name, style)
+
+        conf = parser.from_cluster_config(cluster_config)
+        if component_name in self.components:
+            self.components[component_name].set_deploy_config(None)
+        cluster_config = deepcopy(cluster_config)
+        cluster_config.apply_inner_config(conf['inner_config'])
+        if self.inner_config:
+            self.inner_config.update_component_config(component_name, conf['inner_config'])
+        self._src_data[component_name] = conf['config']
+        self._set_component(cluster_config)
+        return True
+
+    def _add_component(self, component_name, conf):
+        parser = self.config_parser_manager.get_parser(component_name, conf.get('style'))
+        cluster_config = parser.to_cluster_config(component_name, conf)
+        self._set_component(cluster_config)
+
+    def change_component_config_style(self, component_name, style):
+        if component_name not in self.components:
+            return False
+
+        parser = self.config_parser_manager.get_parser(component_name, style)
+        cluster_config = self.components[component_name]
+        if cluster_config.parser != parser:
+            new_config = parser.from_cluster_config(cluster_config)
+            self._add_component(component_name, new_config)
+            self.components[component_name].apply_inner_config(new_config['inner_config'])
+            if self.inner_config:
+                self.inner_config.update_component_config(component_name, new_config['inner_config'])
+            self._src_data[component_name] = new_config['config']
+        return True
 
 
 class Deploy(object):
 
     DEPLOY_STATUS_FILE = '.data'
     DEPLOY_YAML_NAME = 'config.yaml'
+    INNER_CONFIG_NAME = 'inner_config.yaml'
     UPRADE_META_NAME = '.upgrade'
 
-    def __init__(self, config_dir, stdio=None):
+    def __init__(self, config_dir, config_parser_manager=None, stdio=None):
         self.config_dir = config_dir
         self.name = os.path.split(config_dir)[1]
         self._info = None
         self._config = None
         self.stdio = stdio
+        self.config_parser_manager = config_parser_manager
         self._uprade_meta = None
 
     def use_model(self, name, repository, dump=True):
@@ -536,6 +829,10 @@ class Deploy(object):
         return os.path.join(path, Deploy.UPRADE_META_NAME)
 
     @staticmethod
+    def get_inner_config_path(path):
+        return os.path.join(path, Deploy.INNER_CONFIG_NAME)
+
+    @staticmethod
     def get_temp_deploy_yaml_path(path):
         return os.path.join(path, 'tmp_%s' % Deploy.DEPLOY_YAML_NAME)
 
@@ -556,24 +853,33 @@ class Deploy(object):
                 self._info = DeployInfo(self.name, DeployStatus.STATUS_CONFIGURED)
         return self._info
 
+    def _load_deploy_config(self, path):
+        yaml_loader = YamlLoader(stdio=self.stdio)
+        deploy_config = DeployConfig(path, yaml_loader=yaml_loader, config_parser_manager=self.config_parser_manager)
+        deploy_info = self.deploy_info
+        for component_name in deploy_info.components:
+            if component_name not in deploy_config.components:
+                continue
+            config = deploy_info.components[component_name]
+            cluster_config = deploy_config.components[component_name]
+            if 'version' in config and config['version']:
+                cluster_config.version = config['version']
+            if 'hash' in config and config['hash']:
+                cluster_config.package_hash = config['hash']
+
+        deploy_config.inner_config = InnerConfig(self.get_inner_config_path(self.config_dir), yaml_loader=yaml_loader)
+        return deploy_config
+                
+    @property
+    def temp_deploy_config(self):
+        path = self.get_temp_deploy_yaml_path(self.config_dir)
+        return self._load_deploy_config(path)
+
     @property
     def deploy_config(self):
         if self._config is None:
-            try:
-                path = self.get_deploy_yaml_path(self.config_dir)
-                self._config = DeployConfig(path, YamlLoader(stdio=self.stdio))
-                deploy_info = self.deploy_info
-                for component_name in deploy_info.components:
-                    if component_name not in self._config.components:
-                        continue
-                    config = deploy_info.components[component_name]
-                    cluster_config = self._config.components[component_name]
-                    if 'version' in config and config['version']:
-                        cluster_config.version = config['version']
-                    if 'hash' in config and config['hash']:
-                        cluster_config.package_hash = config['hash']
-            except:
-                pass
+            path = self.get_deploy_yaml_path(self.config_dir)
+            self._config = self._load_deploy_config(path)
         return self._config
 
     def _get_uprade_meta(self):
@@ -597,6 +903,7 @@ class Deploy(object):
         return uprade_meta.get('component') if uprade_meta else None
 
     def apply_temp_deploy_config(self):
+        self.stdio and getattr(self.stdio, 'verbose', print)('%s apply temp config' % self.name)
         src_yaml_path = self.get_temp_deploy_yaml_path(self.config_dir)
         target_src_path = self.get_deploy_yaml_path(self.config_dir)
         try:
@@ -677,7 +984,7 @@ class Deploy(object):
         self._uprade_meta = uprade_meta
         return False
 
-    def _update_componet_repository(self, component, repository):
+    def _update_component_repository(self, component, repository):
         if not self.deploy_config.update_component_package_hash(component, repository.hash, repository.version):
             return False
         self.use_model(component, repository)
@@ -688,7 +995,7 @@ class Deploy(object):
             self._uprade_meta = None
             self._dump_upgrade_meta_data()
             if dest_repository:
-                self._update_componet_repository(dest_repository.name, dest_repository)
+                self._update_component_repository(dest_repository.name, dest_repository)
             return True
         return False
 
@@ -706,6 +1013,79 @@ class Deploy(object):
             return self._update_deploy_config_status(status)
         return False
 
+    def effect_tip(self):
+        cmd_map = {
+            DeployConfigStatus.NEED_RELOAD: 'obd cluster reload %s' % self.name,
+            DeployConfigStatus.NEED_RESTART: 'obd cluster restart %s --wp' % self.name,
+            DeployConfigStatus.NEED_REDEPLOY: 'obd cluster redeploy %s' % self.name,
+        }
+        if self.deploy_info.config_status in cmd_map:
+            return '\nUse `%s` to make changes take effect.' % cmd_map[self.deploy_info.config_status]
+        return ''
+
+
+class ConfigParserManager(Manager):
+
+    RELATIVE_PATH = 'config_parser/'
+    
+    def __init__(self, home_path, stdio=None):
+        super(ConfigParserManager, self).__init__(home_path, stdio)
+        self.global_parsers = {
+            'default': DefaultConfigParser,
+        }
+        self.component_parsers = {}
+
+    def _formate_paraser_name(self, style):
+        style = style.title()
+        return '%sConfigParser' % style.replace('-', '').replace(' ', '').replace('_', '')
+
+    def _load_paraser(self, lib_path, style):
+        from tool import DynamicLoading
+        module_name = '%s_config_parser' % style
+        file_name = '%s.py' % module_name
+        path = os.path.join(lib_path, file_name)
+        if os.path.isfile(path):
+            DynamicLoading.add_lib_path(lib_path)
+            self.stdio and getattr(self.stdio, 'verbose', 'print')('load config parser: %s' % path)
+            module = DynamicLoading.import_module(module_name, self.stdio)
+            clz_name = self._formate_paraser_name(style)
+            try:
+                return getattr(module, clz_name)
+            except:
+                self.stdio and getattr(self.stdio, 'exception', 'print')('')
+                return None
+            finally:
+                DynamicLoading.remove_lib_path(lib_path)
+        else:
+            self.stdio and getattr(self.stdio, 'verbose', 'print')('No config parser: %s' % path)
+            return None
+
+    def _get_component_parser(self, component, style):
+        if component not in self.component_parsers:
+            self.component_parsers[component] = {}
+        component_parsers = self.component_parsers[component]
+        if style not in component_parsers:
+            lib_path = os.path.join(self.path, component)
+            component_parsers[style] = self._load_paraser(lib_path, style)
+        return component_parsers[style]
+
+    def _get_global_parser(self, style):
+        if style not in self.global_parsers:
+            self.global_parsers[style] = self._load_paraser(self.path, style)
+        return self.global_parsers[style]
+
+    def get_parser(self, component='', style=''):
+        if not style or style == 'default':
+            return self.global_parsers['default']
+        if component:
+            parser = self._get_component_parser(component, style)
+            if parser:
+                return parser
+        parser = self._get_global_parser(style)
+        if not parser:
+            raise ParserError('Unsupported configuration style: %s' % style)
+        return parser
+
 
 class DeployManager(Manager):
 
@@ -714,6 +1094,7 @@ class DeployManager(Manager):
     def __init__(self, home_path, lock_manager=None, stdio=None):
         super(DeployManager, self).__init__(home_path, stdio)
         self.lock_manager = lock_manager
+        self.config_parser_manager = ConfigParserManager(home_path, stdio)
 
     def _lock(self, name, read_only=False):
         if self.lock_manager:
@@ -729,14 +1110,14 @@ class DeployManager(Manager):
             path = os.path.join(self.path, name)
             if os.path.isdir(path):
                 self._lock(name, read_only)
-                configs.append(Deploy(path, self.stdio))
+                configs.append(Deploy(path, config_parser_manager=self.config_parser_manager, stdio=self.stdio))
         return configs
 
     def get_deploy_config(self, name, read_only=False):
         self._lock(name, read_only)
         path = os.path.join(self.path, name)
         if os.path.isdir(path):
-            return Deploy(path, self.stdio)
+            return Deploy(path, config_parser_manager=self.config_parser_manager, stdio=self.stdio)
         return None
 
     def create_deploy_config(self, name, src_yaml_path):
@@ -745,7 +1126,7 @@ class DeployManager(Manager):
         target_src_path = Deploy.get_deploy_yaml_path(config_dir)
         self._mkdir(config_dir)
         if FileUtil.copy(src_yaml_path, target_src_path, self.stdio):
-            return Deploy(config_dir, self.stdio)
+            return Deploy(config_dir, config_parser_manager=self.config_parser_manager, stdio=self.stdio)
         else:
             self._rm(config_dir)
             return None

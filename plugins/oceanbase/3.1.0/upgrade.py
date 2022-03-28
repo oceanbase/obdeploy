@@ -137,7 +137,7 @@ class Upgrader(object):
         self._connect_plugin = None
         self._start_plugin = None
         self._stop_plugin = None
-        self._display_plguin = None
+        self._display_plugin = None
         self.local_home_path = local_home_path
         self.exector_path = exector_path
         self.components = plugin_context.components
@@ -193,15 +193,15 @@ class Upgrader(object):
 
     @property
     def display_plugin(self):
-        if self._display_plguin is None:
-            self._display_plguin = self.search_py_script_plugin(self.route_index - 1, 'display')
-        return self._display_plguin
+        if self._display_plugin is None:
+            self._display_plugin = self.search_py_script_plugin(self.route_index - 1, 'display')
+        return self._display_plugin
 
     def _clear_plugin(self):
         self._connect_plugin = None
         self._start_plugin = None
         self._stop_plugin = None
-        self._display_plguin = None
+        self._display_plugin = None
 
     def run(self):
         total = len(self.route)
@@ -392,7 +392,7 @@ class Upgrader(object):
             client = self.clients[server]
             server_config = self.cluster_config.get_server_conf(server)
             home_path = server_config['home_path']
-            remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+            remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
             remote_repository_dir = repository_dir.replace(self.local_home_path, remote_home_path)
             client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
             client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))

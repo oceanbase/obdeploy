@@ -21,6 +21,8 @@
 from __future__ import absolute_import, division, print_function
 import os
 
+from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage
+
 
 stdio = None
 force = False
@@ -34,18 +36,18 @@ def critical(*arg, **kwargs):
 
 def init_dir(server, client, key, path, link_path=None):
     if force:
-        ret = client.execute_command('rm -fr %s/*' % path)
+        ret = client.execute_command('rm -fr %s' % path)
         if not ret:
-            critical('fail to initialize %s %s path: %s permission denied' % (server, key, ret.stderr))
+            critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s path' % key, msg=ret.stderr))
             return False
     else:
         if client.execute_command('mkdir -p %s' % path):
             ret = client.execute_command('ls %s' % (path))
             if not ret or ret.stdout.strip():
-                critical('fail to initialize %s %s path: %s is not empty' % (server, key, path))
+                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s path' % key, msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=path)))
                 return False
         else:
-            critical('fail to initialize %s %s path: create %s failed' % (server, key, path))
+            critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s path' % key, msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=path)))
             return False
     ret = client.execute_command('mkdir -p %s' % path)
     if ret:
@@ -53,7 +55,7 @@ def init_dir(server, client, key, path, link_path=None):
             client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (path, link_path, path, link_path))
         return True
     else:
-        critical('fail to initialize %s %s path: %s permission denied' % (server, key, ret.stderr))
+        critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s path' % key, msg=ret.stderr))
         return False
 
 
@@ -74,7 +76,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
         home_path = server_config['home_path']
-        remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+        remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
         remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
 
         if not server_config.get('data_dir'):
@@ -94,7 +96,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         for key in keys:
             path = server_config[key]
             if path in dirs:
-                critical('Configuration conflict %s: %s is used for %s\'s %s' % (server, path, dirs[path]['server'], dirs[path]['key']))
+                critical(EC_CONFIG_CONFLICT_DIR.format(server1=server, path=path, server2=dirs[path]['server'], key=dirs[path]['key']))
                 continue
             dirs[path] = {
                 'server': server,
@@ -105,16 +107,16 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         if force:
             ret = client.execute_command('rm -fr %s/*' % home_path)
             if not ret:
-                critical('failed to initialize %s home path: %s' % (server, ret.stderr))
+                critical(EC_FAIL_TO_INIT_PATH.format(server, key='home path', msg=ret.stderr))
                 continue
         else:
             if client.execute_command('mkdir -p %s' % home_path):
                 ret = client.execute_command('ls %s' % (home_path))
                 if not ret or ret.stdout.strip():
-                    critical('fail to init %s home path: %s is not empty' % (server, home_path))
+                    critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
                     continue
             else:
-                critical('fail to init %s home path: create %s failed' % (server, home_path))
+                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
         ret = client.execute_command('bash -c "mkdir -p %s/{etc,admin,.conf,log,bin,lib}"' % home_path) \
          and client.execute_command("if [ -d %s/bin ]; then ln -fs %s/bin/* %s/bin; fi" % (remote_repository_dir, remote_repository_dir, home_path)) \
          and client.execute_command("if [ -d %s/lib ]; then ln -fs %s/lib/* %s/lib; fi" % (remote_repository_dir, remote_repository_dir, home_path))
@@ -123,16 +125,16 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             if force:
                 ret = client.execute_command('rm -fr %s/*' % data_path)
                 if not ret:
-                    critical('fail to init %s data path: %s permission denied' % (server, ret.stderr))
+                    critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=data_path)))
                     continue
             else:
                 if client.execute_command('mkdir -p %s' % data_path):
                     ret = client.execute_command('ls %s' % (data_path))
                     if not ret or ret.stdout.strip():
-                        critical('fail to init %s data path: %s is not empty' % (server, data_path))
+                        critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=data_path)))
                         continue
                 else:
-                    critical('fail to init %s data path: create %s failed' % (server, data_path))
+                    critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=data_path)))
             ret = client.execute_command('bash -c "mkdir -p %s/sstable"' % data_path)
             if ret:
                 link_path = '%s/store' % home_path
@@ -143,26 +145,26 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     if force:
                         ret = client.execute_command('rm -fr %s/*' % log_dir)
                         if not ret:
-                            critical('fail to init %s %s dir: %s permission denied' % (server, key, ret.stderr))
+                            critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s dir' % key, msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=log_dir)))
                             continue
                     else:
                         if client.execute_command('mkdir -p %s' % log_dir):
                             ret = client.execute_command('ls %s' % (log_dir))
                             if not ret or ret.stdout.strip():
-                                critical('fail to init %s %s dir: %s is not empty' % (server, key, log_dir))
+                                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s dir' % key, msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=log_dir)))
                                 continue
                         else:
-                            critical('fail to init %s %s dir: create %s failed' % (server, key, log_dir))
+                            critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s dir' % key, msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=log_dir)))
                     ret = client.execute_command('mkdir -p %s' % log_dir)
                     if ret:
                         link_path = '%s/%s' % (data_path, key)
                         client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))
                     else:
-                        critical('failed to initialize %s %s dir' % (server, key))
+                        critical(EC_FAIL_TO_INIT_PATH.format(server, key='%s dir' % key, msg=ret.stderr))
             else:
-                critical('failed to initialize %s date path' % (server))
+                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.PATH_ONLY.format(path=data_path)))
         else:
-            critical('fail to init %s home path: %s permission denied' % (server, ret.stderr))
+            critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=home_path)))
     
     if global_ret:
         stdio.stop_loading('succeed')

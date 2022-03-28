@@ -46,7 +46,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
         if comp in depends:
             have_depend = True
             for server in cluster_config.servers:
-                obs_config = cluster_config.get_depled_config(comp, server)
+                obs_config = cluster_config.get_depend_config(comp, server)
                 if obs_config is not None:
                     server_depends[server].append(comp)
     

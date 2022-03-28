@@ -34,6 +34,7 @@ from Crypto import Random
 from Crypto.Cipher import AES
 
 from tool import YamlLoader
+from _errno import *
 
 
 stdio = None
@@ -155,7 +156,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         "zone_name": "zone",
     }
 
-    stdio.start_loading('Start obproxy')
+    stdio.start_loading('Start obagent')
     for server in cluster_config.servers:
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
@@ -203,7 +204,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
 
         if use_parameter:
             for comp in ['oceanbase', 'oceanbase-ce']:
-                obs_config = cluster_config.get_depled_config(comp, server)
+                obs_config = cluster_config.get_depend_config(comp, server)
                 if obs_config is not None:
                     break
 
@@ -244,7 +245,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     tf.write(text)
                     tf.flush()
                     if not client.put_file(tf.name, path.replace(repository_dir, home_path)):
-                        stdio.error('Fail to send config file to %s' % server)
+                        stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
                         stdio.stop_loading('fail')
                         return 
 
@@ -256,7 +257,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 else:
                     ret = client.put_file(path, path.replace(repository_dir, home_path))
                 if not ret:
-                    stdio.error('Fail to send config file to %s' % server)
+                    stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
                     stdio.stop_loading('fail')
                     return 
             
@@ -284,7 +285,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             with tempfile.NamedTemporaryFile(suffix=".yaml") as tf:
                 yaml.dump(config, tf)
                 if not client.put_file(tf.name, os.path.join(home_path, 'conf/monagent.yaml')):
-                    stdio.error('Fail to send config file to %s' % server)
+                    stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
                     stdio.stop_loading('fail')
                     return 
                 

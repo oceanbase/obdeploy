@@ -26,6 +26,8 @@ import time
 import requests
 from copy import deepcopy
 
+from _errno import EC_OBSERVER_FAIL_TO_START
+
 
 def config_url(ocp_config_server, appname, cid):
     cfg_url = '%s&Action=ObRootServiceInfo&ObCluster=%s' % (ocp_config_server, appname)
@@ -97,7 +99,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         home_path = server_config['home_path']
 
         if client.execute_command("bash -c 'if [ -f %s/bin/observer ]; then exit 1; else exit 0; fi;'" % home_path):
-            remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+            remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
             remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
             client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
             client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
@@ -139,7 +141,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             }
             not_cmd_opt = [
                 'home_path', 'obconfig_url', 'root_password', 'proxyro_password', 
-                'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir'
+                'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc'
             ]
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
             opt_str = []
@@ -168,7 +170,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         client.add_env('LD_LIBRARY_PATH', '', True)
         if not ret:
             stdio.stop_loading('fail')
-            stdio.error('failed to start %s observer: %s' % (server, ret.stderr))
+            stdio.error(EC_OBSERVER_FAIL_TO_START.format(server=server) + ': ' + ret.stderr)
             return
     stdio.stop_loading('succeed')
 
@@ -185,7 +187,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
             stdio.verbose('%s observer[pid: %s] started', server, remote_pid)
         else:
-            failed.append('failed to start %s observer' % server)
+            failed.append(EC_OBSERVER_FAIL_TO_START.format(server=server))
     if failed:
         stdio.stop_loading('fail')
         for msg in failed:

@@ -20,18 +20,20 @@
 
 from __future__ import absolute_import, division, print_function
 
+from _errno import EC_CLEAN_PATH_FAILED
+
 global_ret = True
 
 
 def destroy(plugin_context, *args, **kwargs):
     def clean(server, path):
         client = clients[server]
-        ret = client.execute_command('rm -fr %s/* %s/.conf' % (path, path))
+        ret = client.execute_command('rm -fr %s/' % (path))
         if not ret:
             # pring stderror
             global global_ret
             global_ret = False
-            stdio.warn('fail to clean %s:%s' % (server, path))
+            stdio.warn(EC_CLEAN_PATH_FAILED.format(server=server, path=path))
         else:
             stdio.verbose('%s:%s cleaned' % (server, path))
     cluster_config = plugin_context.cluster_config

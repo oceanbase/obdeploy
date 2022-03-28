@@ -36,6 +36,7 @@ if sys.version_info.major == 2:
     from backports import lzma
     setattr(sys.modules['rpmfile'], 'lzma', getattr(sys.modules[__name__], 'lzma'))
 
+
 class Version(str):
 
     def __init__(self, bytes_or_buffer, encoding=None, errors=None):

@@ -31,7 +31,9 @@ warnings.filterwarnings("ignore")
 
 from paramiko import AuthenticationException, SFTPClient
 from paramiko.client import SSHClient, AutoAddPolicy
-from paramiko.ssh_exception import NoValidConnectionsError
+from paramiko.ssh_exception import NoValidConnectionsError, SSHException
+
+from tool import DirectoryUtil
 
 
 __all__ = ("SshClient", "SshConfig", "LocalClient")
@@ -101,6 +103,14 @@ class LocalClient(object):
         if LocalClient.execute_command('mkdir -p %s && cp -fr %s %s' % (remote_dir, os.path.join(local_dir, '*'), remote_dir), stdio=stdio):
             return True
         return False
+
+    @staticmethod
+    def get_file(local_path, remote_path, stdio=None):
+        return LocalClient.put_file(remote_path, local_path, stdio=stdio)
+
+    @staticmethod
+    def get_dir(local_path, remote_path, stdio=None):
+        return LocalClient.put_dir(remote_path, local_path, stdio=stdio)
 
 
 class SshClient(object):
@@ -201,18 +211,36 @@ class SshClient(object):
 
     def __del__(self):
         self.close()
+
+    def _execute_command(self, command, retry, stdio):
+        if not self._login(stdio):
+            return SshReturn(255, '', 'connect failed')
+            
+        stdio = stdio if stdio else self.stdio
+        try:
+            return self.ssh_client.exec_command(command)
+        except SSHException as e:
+            if retry:
+                self.close()
+                return self._execute_command(command, retry-1, stdio)
+            else:
+                stdio and getattr(stdio, 'exception', print)('')
+                stdio and getattr(stdio, 'critical', print)('%s@%s connect failed: %s' % (self.config.username, self.config.host, e))
+                raise e
+        except Exception as e:
+            stdio and getattr(stdio, 'exception', print)('')
+            stdio and getattr(stdio, 'critical', print)('%s@%s connect failed: %s' % (self.config.username, self.config.host, e))
+            raise e
         
     def execute_command(self, command, stdio=None):
         if self._is_local():
-            return LocalClient.execute_command(command, self.env, self.config.timeout, stdio)
-        if not self._login(stdio):
-            return SshReturn(255, '', 'connect failed')
+            return LocalClient.execute_command(command, self.env, self.config.timeout, stdio=stdio)
 
         stdio = stdio if stdio else self.stdio
         verbose_msg = '%s execute: %s ' % (self.config, command)
         stdio and getattr(stdio, 'verbose', print)(verbose_msg, end='')
         command = '%s %s;echo -e "\n$?\c"' % (self.env_str, command.strip(';'))
-        stdin, stdout, stderr = self.ssh_client.exec_command(command)
+        stdin, stdout, stderr = self._execute_command(command, 3, stdio=stdio)
         output = stdout.read().decode(errors='replace')
         error = stderr.read().decode(errors='replace')
         if output:
@@ -223,23 +251,23 @@ class SshClient(object):
         else:
             code, stdout = 1, ''
         if code:
-            verbose_msg += ', error output:\n%s' % error
+            verbose_msg = 'exited code %s, error output:\n%s' % (code, error)
         stdio and getattr(stdio, 'verbose', print)(verbose_msg)
         return SshReturn(code, stdout, error)
- 
+
     def put_file(self, local_path, remote_path, stdio=None):
         stdio = stdio if stdio else self.stdio
-        if self._is_local():
-            return LocalClient.put_file(local_path, remote_path, stdio)
         if not os.path.isfile(local_path):
-            stdio and getattr(stdio, 'critical', print)('%s is not file' % local_path)
+            stdio and getattr(stdio, 'error', print)('%s is not file' % local_path)
             return False
+        if self._is_local():
+            return LocalClient.put_file(local_path, remote_path, stdio=stdio)
         if not self._open_sftp(stdio):
             return False
-        return self._put_file(local_path, remote_path, stdio)
+        return self._put_file(local_path, remote_path, stdio=stdio)
 
     def _put_file(self, local_path, remote_path, stdio=None):
-        if self.execute_command('mkdir -p %s && rm -fr %s' % (os.path.dirname(remote_path), remote_path), stdio):
+        if self.execute_command('mkdir -p %s && rm -fr %s' % (os.path.dirname(remote_path), remote_path), stdio=stdio):
             stdio and getattr(stdio, 'verbose', print)('send %s to %s' % (local_path, remote_path))
             if self.sftp.put(local_path, remote_path):
                 return self.execute_command('chmod %s %s' % (oct(os.stat(local_path).st_mode)[-3: ], remote_path))
@@ -248,10 +276,10 @@ class SshClient(object):
     def put_dir(self, local_dir, remote_dir, stdio=None):
         stdio = stdio if stdio else self.stdio
         if self._is_local():
-            return LocalClient.put_dir(local_dir, remote_dir, stdio)
+            return LocalClient.put_dir(local_dir, remote_dir, stdio=stdio)
         if not self._open_sftp(stdio):
             return False
-        if not self.execute_command('mkdir -p %s' % remote_dir, stdio):
+        if not self.execute_command('mkdir -p %s' % remote_dir, stdio=stdio):
             return False
 
         failed = []
@@ -267,16 +295,87 @@ class SshClient(object):
                 for name in files:
                     local_path = os.path.join(root, name)
                     remote_path = os.path.join(remote_dir, root[local_dir_path_len:].lstrip('/'), name)
-                    if not self._put_file(local_path, remote_path, stdio):
+                    if not self._put_file(local_path, remote_path, stdio=stdio):
                         failed.append(remote_path)
                 for name in dirs:
                     local_path = os.path.join(root, name)
                     remote_path = os.path.join(remote_dir, root[local_dir_path_len:].lstrip('/'), name)
-                    if not self.execute_command('mkdir -p %s' % remote_path, stdio):
+                    if not self.execute_command('mkdir -p %s' % remote_path, stdio=stdio):
                         failed_dirs.append(local_dir)
                         failed.append(remote_path)
 
         for path in failed:
-            stdio and getattr(stdio, 'critical', print)('send %s to %s@%s failed' % (path, self.config.username, self.config.host))
+            stdio and getattr(stdio, 'error', print)('send %s to %s@%s failed' % (path, self.config.username, self.config.host))
         return True
+
+    def get_file(self, local_path, remote_path, stdio=None):
+        stdio = stdio if stdio else self.stdio
+        dirname, _ = os.path.split(local_path)
+        if not dirname:
+            dirname = os.getcwd()
+            local_path = os.path.join(dirname, local_path)
+        if os.path.exists(dirname):
+            if not os.path.isdir(dirname):
+                stdio and getattr(stdio, 'error', print)('%s is not directory' % dirname)
+                return False
+        elif not DirectoryUtil.mkdir(dirname, stdio=stdio):
+            return False
+        if os.path.exists(local_path) and not os.path.isfile(local_path):
+            stdio and getattr(stdio, 'error', print)('%s is not file' % local_path)
+            return False
+        if self._is_local():
+            return LocalClient.get_file(local_path, remote_path, stdio=stdio)
+        if not self._open_sftp(stdio):
+            return False
+        return self._get_file(local_path, remote_path, stdio=stdio)
+
+    def _get_file(self, local_path, remote_path, stdio=None):
+        stdio and getattr(stdio, 'verbose', print)('get %s to %s' % (remote_path, local_path))
+        try:
+            self.sftp.get(remote_path, local_path)
+            stat = self.sftp.stat(remote_path)
+            os.chmod(local_path, stat.st_mode)
+            return True
+        except Exception as e:
+            stdio and getattr(stdio, 'exception', print)('from %s@%s get %s to %s failed: %s' % (self.config.username, self.config.host, remote_path, local_path, e))
+        return False
+
+    def get_dir(self, local_dir, remote_dir, stdio=None):
+        stdio = stdio if stdio else self.stdio
+        dirname, _ = os.path.split(local_dir)
+        if not dirname:
+            dirname = os.getcwd()
+            local_dir = os.path.join(dirname, local_dir)
+        if os.path.exists(dirname):
+            if not os.path.isdir(dirname):
+                stdio and getattr(stdio, 'error', print)('%s is not directory' % dirname)
+                return False
+        elif not DirectoryUtil.mkdir(dirname, stdio=stdio):
+            return False
+        if os.path.exists(local_dir) and not os.path.isdir(local_dir):
+            stdio and getattr(stdio, 'error', print)('%s is not directory' % local_dir)
+            return False
+        if self._is_local():
+            return LocalClient.get_dir(local_dir, remote_dir, stdio=stdio)
+        if not self._open_sftp(stdio):
+            return False
+        return self._get_dir(local_dir, remote_dir, stdio=stdio)
+
+    def _get_dir(self, local_dir, remote_dir, failed=[], stdio=None):
+        if DirectoryUtil.mkdir(local_dir, stdio=stdio):
+            try:
+                for fn in self.sftp.listdir(remote_dir):
+                    remote_path = os.path.join(remote_dir, fn)
+                    local_path = os.path.join(local_dir, fn)
+                    if self.execute_command('bash -c "if [ -f %s ]; then exit 0; else exit 1; fi;"' % remote_path):
+                        if not self._get_file(local_path, remote_path, stdio=stdio):
+                            failed.append(remote_path)
+                    else:
+                        self._get_dir(local_path, remote_path, failed=failed, stdio=stdio.sub_io())
+            except Exception as e:
+                stdio and getattr(stdio, 'exception', print)('Fail to get %s: %s' % (remote_dir, e))
+                failed.append(remote_dir)
+        else:
+            failed.append(remote_dir)
+        return not failed
 

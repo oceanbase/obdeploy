@@ -1,5 +1,16 @@
-create tablegroup if not exists tpch_tg_lineitem_order_group binding true partition by key 1 partitions 192;
-create tablegroup if not exists tpch_tg_partsupp_part binding true partition by key 1 partitions 192;
+drop table if exists lineitem;
+drop table if exists orders;
+drop table if exists partsupp;
+drop table if exists part;
+drop table if exists customer;
+drop table if exists supplier;
+drop table if exists nation;
+drop table if exists region;
+drop tablegroup if exists tpch_tg_lineitem_order_group;
+drop tablegroup if exists tpch_tg_partsupp_part;
+
+create tablegroup if not exists tpch_tg_lineitem_order_group binding true partition by key 1 partitions cpu_num;
+create tablegroup if not exists tpch_tg_partsupp_part binding true partition by key 1 partitions cpu_num;
 
 drop table if exists lineitem;
     create table lineitem (
@@ -21,7 +32,7 @@ drop table if exists lineitem;
     l_comment varchar(44) default null,
     primary key(l_orderkey, l_linenumber))
     tablegroup = tpch_tg_lineitem_order_group
-    partition by key (l_orderkey) partitions 192;
+    partition by key (l_orderkey) partitions cpu_num;
     create index I_L_ORDERKEY on lineitem(l_orderkey) local;
     create index I_L_SHIPDATE on lineitem(l_shipdate) local;
 
@@ -38,7 +49,7 @@ drop table if exists orders;
     o_comment varchar(79) default null,
     primary key (o_orderkey))
     tablegroup = tpch_tg_lineitem_order_group
-    partition by key(o_orderkey) partitions 192;
+    partition by key(o_orderkey) partitions cpu_num;
     create index I_O_ORDERDATE on orders(o_orderdate) local;
 
 
@@ -51,7 +62,7 @@ drop table if exists partsupp;
     ps_comment varchar(199) default null,
     primary key (ps_partkey, ps_suppkey))
     tablegroup tpch_tg_partsupp_part
-    partition by key(ps_partkey) partitions 192;
+    partition by key(ps_partkey) partitions cpu_num;
 
 
 drop table if exists part;
@@ -67,7 +78,7 @@ drop table if exists part;
   p_comment varchar(23) default null,
   primary key (p_partkey))
   tablegroup tpch_tg_partsupp_part
-  partition by key(p_partkey) partitions 192;
+  partition by key(p_partkey) partitions cpu_num;
 
 
 drop table if exists customer;
@@ -81,7 +92,7 @@ drop table if exists customer;
   c_mktsegment char(10) default null,
   c_comment varchar(117) default null,
   primary key (c_custkey))
-  partition by key(c_custkey) partitions 192;
+  partition by key(c_custkey) partitions cpu_num;
 
 drop table if exists supplier;
   create table supplier (
@@ -93,7 +104,7 @@ drop table if exists supplier;
   s_acctbal bigint default null,
   s_comment varchar(101) default null,
   primary key (s_suppkey)
-) partition by key(s_suppkey) partitions 192;
+) partition by key(s_suppkey) partitions cpu_num;
 
 
 drop table if exists nation;

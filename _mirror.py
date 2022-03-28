@@ -534,7 +534,7 @@ class RemoteMirrorRepository(MirrorRepository):
         if release and info.release != release:
             raise Exception ('break')
             return [0 ,]
-            
+
         c = [len(name) / len(info.name), info]
         return c
 
@@ -763,7 +763,7 @@ class LocalMirrorRepository(MirrorRepository):
             return [0 ,]
         if release and info.release != release:
             return [0 ,]
-            
+
         c = [len(name) / len(info.name), info]
         return c
 
@@ -1008,8 +1008,8 @@ class MirrorRepositoryManager(Manager):
         enabled_str = '1' if enabled else '0'
         self.stdio and getattr(self.stdio, 'start_loading')('%s %s' % (op, section_name))
         if section_name == 'local':
-            self.stdio and getattr(self.stdio, 'error', print)('%s is local mirror repository.' % (section_name))
-            return
+            self.stdio and getattr(self.stdio, 'error', print)('Local mirror repository CANNOT BE %sD.' % op.upper())
+            return False
         if section_name == 'remote':
             self._scan_repo_configs()
             for repo_config in self._cache_path_repo_config.values():
@@ -1024,21 +1024,22 @@ class MirrorRepositoryManager(Manager):
                     mirror_section.meta_data['enabled'] = enabled_str
                     mirror_section.meta_data['repo_age'] = repo_age
             self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
+            return True
         else:
             mirror_section = self._get_section(section_name)
             if not mirror_section:
                 self.stdio and getattr(self.stdio, 'error', print)('%s not found.' % (section_name))
                 self.stdio and getattr(self.stdio, 'stop_loading')('fail')
-                return
+                return False
             if mirror_section.is_enabled == enabled:
-                self.stdio and getattr(self.stdio, 'print', print)('%s is already %sd' % (section_name, op))
+                self.stdio and getattr(self.stdio, 'print', print)('%s is already %sd' % (section_name, op.lower()))
                 self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
-                return
+                return True
             repo_config = self._get_repo_config_by_section(section_name)
             if not repo_config:
                 self.stdio and getattr(self.stdio, 'error', print)('%s not found.' % (section_name))
                 self.stdio and getattr(self.stdio, 'stop_loading')('fail')
-                return
+                return False
 
             repo_config.parser.set(section_name, 'enabled', enabled_str)
             with FileUtil.open(repo_config.path, 'w', stdio=self.stdio) as confpp_obj:
@@ -1050,3 +1051,4 @@ class MirrorRepositoryManager(Manager):
             mirror_section.meta_data['enabled'] = enabled_str
             mirror_section.meta_data['repo_age'] = repo_age
             self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
+        return True

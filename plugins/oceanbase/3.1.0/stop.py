@@ -44,13 +44,16 @@ def get_port_socket_inode(client, port):
     return res.stdout.strip().split('\n')
 
 
-def confirm_port(client, pid, port):
+def port_release_check(client, pid, port, count):
     socket_inodes = get_port_socket_inode(client, port)
     if not socket_inodes:
-        return False
-    ret = client.execute_command("ls -l /proc/%s/fd/ |grep -E 'socket:\[(%s)\]'" % (pid, '|'.join(socket_inodes)))
-    if ret and ret.stdout.strip():
         return True
+    if count < 5:
+        ret = client.execute_command("ls -l /proc/%s/fd/ |grep -E 'socket:\[(%s)\]'" % (pid, '|'.join(socket_inodes)))
+        if ret:
+            return not ret.stdout.strip()
+        else:
+            return not client.execute_command("ls -l /proc/%s" % pid)
     return False
 
 
@@ -97,7 +100,6 @@ def stop(plugin_context, *args, **kwargs):
         else:
             stdio.verbose('%s observer is not running ...' % server)
     count = 30
-    check = lambda client, pid, port: confirm_port(client, pid, port) if count < 5 else get_port_socket_inode(client, port)
     time.sleep(1)
     while count and servers:
         tmp_servers = {}
@@ -106,7 +108,7 @@ def stop(plugin_context, *args, **kwargs):
             client = clients[server]
             stdio.verbose('%s check whether the port is released' % server)
             for key in ['rpc_port', 'mysql_port']:
-                if data[key] and check(data['client'], data['pid'], data[key]):
+                if data[key] and not port_release_check(data['client'], data['pid'], data[key], count):
                     tmp_servers[server] = data
                     break
                 data[key] = ''

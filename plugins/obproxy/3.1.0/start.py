@@ -100,12 +100,12 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
             root_servers = {}
-            ob_config = cluster_config.get_depled_config(comp)
+            ob_config = cluster_config.get_depend_config(comp)
             if not ob_config:
                 continue
             odp_config = cluster_config.get_global_conf()
-            for server in cluster_config.get_depled_servers(comp):
-                config = cluster_config.get_depled_config(comp, server)
+            for server in cluster_config.get_depend_servers(comp):
+                config = cluster_config.get_depend_config(comp, server)
                 zone = config['zone']
                 if zone not in root_servers:
                     root_servers[zone] = '%s:%s' % (server.ip, config['mysql_port'])
@@ -124,7 +124,6 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
 
     error = False
     for server in cluster_config.servers:
-        client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         if 'rs_list' not in server_config and 'obproxy_config_server_url' not in server_config:
             error = True
@@ -142,24 +141,26 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             need_bootstrap = True
             break
 
+    if getattr(options, 'without_parameter', False) and need_bootstrap is False:
+        use_parameter = False
+    else:
+        # Bootstrap is required when starting with parameter, ensure the passwords are correct.
+        need_bootstrap = True
+        use_parameter = True
+
     for server in cluster_config.servers:
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
 
         if client.execute_command("bash -c 'if [ -f %s/bin/obproxy ]; then exit 1; else exit 0; fi;'" % home_path):
-            remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+            remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
             remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
             client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
             client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
             client.execute_command("ln -fs %s/lib/* %s/lib" % (remote_repository_dir, home_path))
 
         pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (home_path, server.ip, server_config["listen_port"])
-
-        if getattr(options, 'without_parameter', False) and need_bootstrap is False:
-            use_parameter = False
-        else:
-            use_parameter = True
 
         if use_parameter:
             not_opt_str = [
@@ -170,7 +171,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             ]
             start_unuse = ['home_path', 'observer_sys_password', 'obproxy_sys_password', 'observer_root_password']
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
-            opt_str = ["obproxy_sys_password=e3fd448c516073714189b57233c9cf428ccb1bed"]
+            opt_str = ["obproxy_sys_password=''"]
             for key in server_config:
                 if key not in start_unuse and key not in not_opt_str:
                     value = get_value(key)
@@ -217,7 +218,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     stdio.start_loading('obproxy program health check')
     failed = []
     servers = cluster_config.servers
-    count = 8
+    count = 20
     while servers and count:
         count -= 1
         tmp_servers = []
@@ -236,7 +237,6 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                         else:
                             client.execute_command('echo %s > %s' % (pid, pid_path[server]))
                             obproxyd(server_config["home_path"], client, server.ip, server_config["listen_port"])
-                            client.execute_command('cat %s | xargs kill -9' % pid_path[server])
                             tmp_servers.append(server)
                         break
                     stdio.verbose('failed to start %s obproxy, remaining retries: %d' % (server, count))
