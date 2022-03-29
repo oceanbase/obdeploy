@@ -39,29 +39,29 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
     ocp_version = Version(ocp_version)
 
     if ocp_version < min_version:
-        stdio.error('当前插件版本不支持 OCP V%s' % ocp_version)
+        stdio.error('The current plugin version does not support OCP V%s' % ocp_version)
         return
 
     if ocp_version > max_version:
-        stdio.warn('OCP V%s 高于当前插件库支持版本，接管要求可能与本次检查不符' % ocp_version)
+        stdio.warn('The plugin library does not support OCP V%s. The takeover requirements are not applicable to the current check.' % ocp_version)
 
     for server in cluster_config.servers:
         client = clients[server]
         if is_admin and client.config.username != 'admin':
             is_admin = False
-            stdio.error('用户必须是admin用户。请使用edit-config修改user.username字段修改')
+            stdio.error('The current user must be the admin user. Run the edit-config command to modify the user.username field')
         if can_sudo and not client.execute_command('sudo whoami'):
             can_sudo = False
-            stdio.error('用户需要sudo免密权限')
+            stdio.error('The user must have the privilege to run sudo commands without a password.')
         if not client.execute_command('bash -c "if [ `pgrep observer | wc -l` -gt 1 ]; then exit 1; else exit 0;fi;"'):
             only_one = False
-            stdio.error('%s 存在多个 observer' % server)
+            stdio.error('%s Multiple OBservers exist.' % server)
 
     try:
         cursor.execute("select * from oceanbase.__all_user where user_name = 'root' and passwd = ''")
         if cursor.fetchone() and not cluster_config.get_global_conf().get("root_password"):
             pwd_not_empty = False
-            stdio.error('root@sys密码为空，请使用edit-config修改%s的root_password' % cluster_config.name)
+            stdio.error('The password of root@sys is empty. Run the edit-config command to modify the root_password value of %s.' % cluster_config.name)
     except:
         if not cluster_config.get_global_conf().get("root_password"):
             pwd_not_empty = False
@@ -83,10 +83,10 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
                     del zones[zone]
         if zones:
             if not cluster_config.parser or cluster_config.parser.STYLE == 'default':
-                stdio.error('zone: %s 缺少idc信息，请使用chst修改%s的配置风格为cluster，后再使用edit-config添加idc信息' % (','.join(zones.keys()), cluster_config.name))
+                stdio.error('Zone: IDC information is missing for %s. Run the chst command to change the configuration style of %s to cluster, and then run the edit-config command to add IDC information.' % (','.join(zones.keys()), cluster_config.name))
             else:
-                stdio.error('zone: %s 缺少idc信息，请使用edit-config修改' % ','.join(zones.keys()))
+                stdio.error('Zone: IDC information is missing for %s. Run the edit-config command to add IDC information.' % ','.join(zones.keys()))
 
     if is_admin and can_sudo and only_one and pwd_not_empty and not zones:
-        stdio.print('当前 %s 的配置生效后可以被ocp接管' % cluster_config.name if new_cluster_config else '当前 %s 的配置可以被ocp接管' % cluster_config.name)
+        stdio.print('Configurations of the %s can be taken over by OCP after they take effect.' % cluster_config.name if new_cluster_config else 'Configurations of the %s can be taken over by OCP.' % cluster_config.name)
         return plugin_context.return_true()

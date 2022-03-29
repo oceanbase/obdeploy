@@ -44,6 +44,7 @@ from _deploy import (
     DeployConfig, DeployConfigStatus,
     ParserError, Deploy
 )
+from _errno import EC_SOME_SERVER_STOPED
 from _lock import LockManager
 
 
@@ -414,7 +415,7 @@ class ObdHome(object):
                 config_status = DeployConfigStatus.UNCHNAGE
             elif is_deployed:
                 if deploy_config.components.keys() != deploy.deploy_config.components.keys() or is_server_list_change(deploy_config):
-                    if not self._call_stdio('confirm', '修改部署架构必须redeploy才能生效，确定要这样吗？'):
+                    if not self._call_stdio('confirm', 'Modifications to the deployment architecture take effect after you redeploy the architecture. Are you sure that you want to start a redeployment? '):
                         continue
                     config_status = DeployConfigStatus.NEED_REDEPLOY
                 else:
@@ -484,9 +485,9 @@ class ObdHome(object):
                                     errors.append('[%s] %s: %s' % (component_name, server, str(e)))
                     if errors:
                         self._call_stdio('print', '\n'.join(errors))
-                        if self._call_stdio('confirm', '以上修改必须redeploy才能生效，确定要这样吗？'):
+                        if self._call_stdio('confirm', 'Modifications take effect after a redeployment. Are you sure that you want to start a redeployment?'):
                             config_status = DeployConfigStatus.NEED_REDEPLOY
-                        elif self._call_stdio('confirm', '要继续编辑吗？'):
+                        elif self._call_stdio('confirm', 'Continue to edit?'):
                             continue
                         else:
                             return False
@@ -859,7 +860,7 @@ class ObdHome(object):
             
         version = getattr(options, 'version', '')
         if not version:
-            self._call_stdio('error', '请使用--version指定ocp版本')
+            self._call_stdio('error', 'Use the --version option to specify the required OCP version.')
             return False
 
         deploy_config = deploy.deploy_config
@@ -907,7 +908,7 @@ class ObdHome(object):
                 continue
             if repository not in ocp_check:
                 component_num -= 1
-                self._call_stdio('print', '%s 没有可用的检查插件' % repository.name)
+                self._call_stdio('print', '%s No check plugin available.' % repository.name)
                 continue
                 
             cluster_config = deploy_config.components[repository.name]
@@ -926,7 +927,7 @@ class ObdHome(object):
             self._call_stdio('verbose', 'Call %s for %s' % (ocp_check[repository], repository))
             if ocp_check[repository](deploy_config.components.keys(), ssh_clients, cluster_config, '', options, self.stdio, cursor=cursor, ocp_version=version, new_cluster_config=new_cluster_config, new_clients=new_ssh_clients):
                 component_num -= 1
-                self._call_stdio('print', '%s 检查通过' % repository.name)
+                self._call_stdio('print', '%s Check passed.' % repository.name)
         
         return component_num == 0
 
@@ -949,7 +950,7 @@ class ObdHome(object):
 
         style = getattr(options, 'style', '')
         if not style:
-            self._call_stdio('error', '请使用--style设置目标style')
+            self._call_stdio('error', 'Use the --style option to specify the preferred style.')
             return False
 
         components = getattr(options, 'components', '')
@@ -1142,7 +1143,7 @@ class ObdHome(object):
             self._call_stdio('error', 'Deploy needs redeploy')
             return False
         if deploy_info.config_status != DeployConfigStatus.UNCHNAGE and not getattr(options, 'without_parameter', False):
-            self._call_stdio('error', 'Deploy %s.%s\n如果您仍然需要启动集群请使用 `obd cluster start %s --wop` 选项进行无参启动。' % (deploy_info.config_status.value, deploy.effect_tip(), name))
+            self._call_stdio('error', 'Deploy %s.%s\nIf you still need to start the cluster, use the `obd cluster start %s --wop` option to start the cluster without loading parameters. ' % (deploy_info.config_status.value, deploy.effect_tip(), name))
             return False
 
         self._call_stdio('verbose', 'Get deploy config')
@@ -1396,12 +1397,12 @@ class ObdHome(object):
         new_deploy_config = deploy.temp_deploy_config
 
         if deploy_config.components.keys() != new_deploy_config.components.keys():
-            self._call_stdio('error', '部署架构发生变化，不能reload')
+            self._call_stdio('error', 'The deployment architecture is changed and cannot be reloaded.')
             return False
 
         for component_name in deploy_config.components:
             if deploy_config.components[component_name].servers != new_deploy_config.components[component_name].servers:
-                self._call_stdio('error', '部署架构发生变化，不能reload')
+                self._call_stdio('error', 'The deployment architecture is changed and cannot be reloaded.')
                 return False
 
         self._call_stdio('start_loading', 'Get local repositories and plugins')
@@ -1427,7 +1428,7 @@ class ObdHome(object):
         cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
         if cluster_status is False or cluster_status == 0:
             if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been stopped')
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
                 for repository in component_status:
                     cluster_status = component_status[repository]
                     for server in cluster_status:
@@ -1499,7 +1500,7 @@ class ObdHome(object):
         cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
         if cluster_status is False or cluster_status == 0:
             if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been stopped')
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
                 for repository in component_status:
                     cluster_status = component_status[repository]
                     for server in cluster_status:
@@ -1653,7 +1654,7 @@ class ObdHome(object):
                     return False
             if len(components) != len(deploy_info.components):
                 if apply_change:
-                    self._call_stdio('error', '配置发生变化必须应用到全部组件及server')
+                    self._call_stdio('error', 'Configurations are changed and must be applied to all components and servers.')
                     return False
                 update_deploy_status = False
         else:
@@ -1667,7 +1668,7 @@ class ObdHome(object):
                     cluster_config = deploy_config.components[repository.name]
                     for server in cluster_config.servers:
                         if server.name not in server_list:
-                            self._call_stdio('error', '配置发生变化必须应用到全部组件及server')
+                            self._call_stdio('error', 'Configurations are changed and must be applied to all components and servers.')
                             return False
         else:
             server_list = []
@@ -1693,7 +1694,7 @@ class ObdHome(object):
         cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
         if cluster_status is False or cluster_status == 0:
             if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been stopped')
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
                 for repository in component_status:
                     cluster_status = component_status[repository]
                     for server in cluster_status:
@@ -2236,7 +2237,7 @@ class ObdHome(object):
         cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
         if cluster_status is False or cluster_status == 0:
             if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been stopped')
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
                 for repository in component_status:
                     cluster_status = component_status[repository]
                     for server in cluster_status:
@@ -2400,7 +2401,7 @@ class ObdHome(object):
         cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
         if cluster_status is False or cluster_status == 0:
             if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been stopped')
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
                 for repository in component_status:
                     cluster_status = component_status[repository]
                     for server in cluster_status:
@@ -2517,7 +2518,7 @@ class ObdHome(object):
         cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
         if cluster_status is False or cluster_status == 0:
             if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been stopped')
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
                 for repository in component_status:
                     cluster_status = component_status[repository]
                     for server in cluster_status:
@@ -2627,7 +2628,7 @@ class ObdHome(object):
         cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
         if cluster_status is False or cluster_status == 0:
             if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been stopped')
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
                 for repository in component_status:
                     cluster_status = component_status[repository]
                     for server in cluster_status:

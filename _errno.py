@@ -23,6 +23,10 @@ from __future__ import absolute_import, division, print_function
 from enum import Enum
 
 
+class LockError(Exception):
+    pass
+
+
 class OBDErrorCode(object):
 
     def __init__(self, code, msg):
@@ -52,6 +56,7 @@ EC_CONFLICT_PORT = OBDErrorCode(1001, '{server}:{port} port is already used')
 EC_FAIL_TO_INIT_PATH = OBDErrorCode(1002, 'Fail to init {server} {key}{msg}')
 EC_CLEAN_PATH_FAILED = OBDErrorCode(1003, 'Fail to clean {server}:{path}')
 EC_CONFIG_CONFLICT_DIR = OBDErrorCode(1004, 'Configuration conflict {server1}: {path} is used for {server2}\'s {key}')
+EC_SOME_SERVER_STOPED = OBDErrorCode(1005, 'Some of the servers in the cluster have been stopped')
 
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCode(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
 EC_OBSERVER_CAN_NOT_MIGRATE_IN = OBDErrorCode(2001, 'server can not migrate in')
@@ -63,5 +68,5 @@ EC_MYSQLTEST_PARSE_CMD_FAILED = OBDErrorCode(3000, 'parse cmd failed: {path}')
 EC_MYSQLTEST_FAILE_NOT_FOUND = OBDErrorCode(3001, '{file} not found in {path}')
 
 EC_OBAGENT_RELOAD_FAILED = OBDErrorCode(4000, 'Fail to reload {server}')
-EC_OBAGENT_SEND_CONFIG_FAILED = OBDErrorCode(4001, 'Fail to send config file to {sever}')
+EC_OBAGENT_SEND_CONFIG_FAILED = OBDErrorCode(4001, 'Fail to send config file to {server}')
 

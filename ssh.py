@@ -218,7 +218,20 @@ class SshClient(object):
             
         stdio = stdio if stdio else self.stdio
         try:
-            return self.ssh_client.exec_command(command)
+            stdin, stdout, stderr = self.ssh_client.exec_command(command)
+            output = stdout.read().decode(errors='replace')
+            error = stderr.read().decode(errors='replace')
+            if output:
+                idx = output.rindex('\n')
+                code = int(output[idx:])
+                stdout = output[:idx]
+                verbose_msg = 'exited code %s' % code
+            else:
+                code, stdout = 1, ''
+            if code:
+                verbose_msg = 'exited code %s, error output:\n%s' % (code, error)
+            stdio and getattr(stdio, 'verbose', print)(verbose_msg)
+            return SshReturn(code, stdout, error)
         except SSHException as e:
             if retry:
                 self.close()
@@ -240,20 +253,7 @@ class SshClient(object):
         verbose_msg = '%s execute: %s ' % (self.config, command)
         stdio and getattr(stdio, 'verbose', print)(verbose_msg, end='')
         command = '%s %s;echo -e "\n$?\c"' % (self.env_str, command.strip(';'))
-        stdin, stdout, stderr = self._execute_command(command, 3, stdio=stdio)
-        output = stdout.read().decode(errors='replace')
-        error = stderr.read().decode(errors='replace')
-        if output:
-            idx = output.rindex('\n')
-            code = int(output[idx:])
-            stdout = output[:idx]
-            verbose_msg = 'exited code %s' % code
-        else:
-            code, stdout = 1, ''
-        if code:
-            verbose_msg = 'exited code %s, error output:\n%s' % (code, error)
-        stdio and getattr(stdio, 'verbose', print)(verbose_msg)
-        return SshReturn(code, stdout, error)
+        return self._execute_command(command, 3, stdio=stdio)
 
     def put_file(self, local_path, remote_path, stdio=None):
         stdio = stdio if stdio else self.stdio

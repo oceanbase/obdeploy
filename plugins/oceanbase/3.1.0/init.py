@@ -107,7 +107,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         if force:
             ret = client.execute_command('rm -fr %s/*' % home_path)
             if not ret:
-                critical(EC_FAIL_TO_INIT_PATH.format(server, key='home path', msg=ret.stderr))
+                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))
                 continue
         else:
             if client.execute_command('mkdir -p %s' % home_path):
@@ -160,7 +160,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                         link_path = '%s/%s' % (data_path, key)
                         client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))
                     else:
-                        critical(EC_FAIL_TO_INIT_PATH.format(server, key='%s dir' % key, msg=ret.stderr))
+                        critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s dir' % key, msg=ret.stderr))
             else:
                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.PATH_ONLY.format(path=data_path)))
         else:

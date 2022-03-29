@@ -38,7 +38,7 @@ def parse_size(size):
     return _bytes
 
 
-def formate_size(size, precision=1):
+def format_size(size, precision=1):
     units = ['B', 'K', 'M', 'G', 'T', 'P']
     idx = 0
     if precision:
@@ -190,9 +190,9 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     if cpu_total < MIN_CPU:
         return error('%s: resource not enough: cpu count less than %s' % (zone_list, MIN_CPU))
     if mem_total < MIN_MEMORY:
-        return error('%s: resource not enough: memory less than %s' % (zone_list, formate_size(MIN_MEMORY)))
+        return error('%s: resource not enough: memory less than %s' % (zone_list, format_size(MIN_MEMORY)))
     if disk_total < MIN_DISK_SIZE:
-        return error('%s: resource not enough: disk space less than %s' % (zone_list, formate_size(MIN_DISK_SIZE)))
+        return error('%s: resource not enough: disk space less than %s' % (zone_list, format_size(MIN_DISK_SIZE)))
 
     max_cpu = get_option('max_cpu', cpu_total)
     max_memory = parse_size(get_option('max_memory', mem_total))
@@ -206,9 +206,9 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     if cpu_total < max_cpu:
         return error('resource not enough: cpu (Avail: %s, Need: %s)' % (cpu_total, max_cpu))
     if mem_total < max_memory:
-        return error('resource not enough: memory (Avail: %s, Need: %s)' % (formate_size(mem_total), formate_size(max_memory)))
+        return error('resource not enough: memory (Avail: %s, Need: %s)' % (format_size(mem_total), format_size(max_memory)))
     if disk_total < max_disk_size:
-        return error('resource not enough: disk space (Avail: %s, Need: %s)' % (formate_size(disk_total), formate_size(max_disk_size)))
+        return error('resource not enough: disk space (Avail: %s, Need: %s)' % (format_size(disk_total), format_size(max_disk_size)))
    
     if max_iops < MIN_IOPS:
         return error('max_iops must greater than %d' % MIN_IOPS)

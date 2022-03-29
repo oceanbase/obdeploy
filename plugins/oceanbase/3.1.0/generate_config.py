@@ -23,6 +23,8 @@ from __future__ import absolute_import, division, print_function
 
 import re, os
 
+from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY
+
 
 def parse_size(size):
     _bytes = 0
@@ -145,7 +147,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                             free_memory = parse_size(str(v))
                     memory_limit = free_memory
                     if memory_limit < MIN_MEMORY:
-                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.formate(ip=ip, free=format_size(free_memory), need=format_size(MIN_MEMORY)))
+                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(free_memory), need=format_size(MIN_MEMORY)))
                         success = False
                         continue
                     memory_limit = max(MIN_MEMORY, memory_limit * 0.9)

@@ -24,7 +24,7 @@ import os
 import re
 import time
 
-from _errno import EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG, EC_CONFIG_CONFLICT_PORT
+from _errno import EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG, EC_CONFIG_CONFLICT_PORT, EC_OBSERVER_NOT_ENOUGH_MEMORY
 
 
 stdio = None
@@ -52,7 +52,7 @@ def parse_size(size):
     return _bytes
 
 
-def formate_size(size):
+def format_size(size):
     units = ['B', 'K', 'M', 'G', 'T', 'P']
     idx = 0
     while idx < 5 and size >= 1024:
@@ -277,7 +277,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             if need > 0 and threshold < 2:
                 alert('(%s) clog and data use the same disk (%s)' % (ip, p))
             if need > avail:
-                critical('(%s) %s not enough disk space. (Avail: %s, Need: %s)' % (ip, p, formate_size(avail), formate_size(need)))
+                critical('(%s) %s not enough disk space. (Avail: %s, Need: %s)' % (ip, p, format_size(avail), format_size(need)))
             elif 1.0 * (total - avail + need) / total > disk[p]['threshold']:
                 # msg = '(%s) %s not enough disk space for clog. Use `redo_dir` to set other disk for clog' % (ip, p)
                 # msg += ', or reduce the value of `datafile_size`' if need > 0 else '.'

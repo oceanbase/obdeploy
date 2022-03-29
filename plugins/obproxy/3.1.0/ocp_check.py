@@ -37,24 +37,24 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
     ocp_version = Version(ocp_version)
 
     if ocp_version < min_version:
-        stdio.error('当前插件版本不支持 OCP V%s' % ocp_version)
+        stdio.error('The current plugin version does not support OCP V%s' % ocp_version)
         return
 
     if ocp_version > max_version:
-        stdio.warn('OCP V%s 高于当前插件库支持版本，接管要求可能与本次检查不符' % ocp_version)
+        stdio.warn('The plugin library does not support OCP V%s. The takeover requirements are not applicable to the current check.' % ocp_version)
 
     for server in cluster_config.servers:
         client = clients[server]
         if is_admin and client.config.username != 'admin':
             is_admin = False
-            stdio.error('用户必须是admin用户。请使用edit-config修改user.username字段修改')
+            stdio.error('The current user must be the admin user. Run the edit-config command to modify the user.username field')
         if can_sudo and not client.execute_command('sudo whoami'):
             can_sudo = False
-            stdio.error('用户需要sudo免密权限')
+            stdio.error('The user must have the privilege to run sudo commands without a password.')
         if not client.execute_command('bash -c "if [ `pgrep obproxy | wc -l` -gt 1 ]; then exit 1; else exit 0;fi;"'):
             only_one = False
-            stdio.error('%s 存在多个 obproxy' % server)
+            stdio.error('%s Multiple OBProxies exist.' % server)
 
     if is_admin and can_sudo and only_one:
-        stdio.print('当前 obproxy 的配置生效后可以被ocp接管' if new_cluster_config else '当前 obproxy 的配置可以被ocp接管')
+        stdio.print('Configurations of the OBProxy can be taken over by OCP after they take effect.' if new_cluster_config else 'Configurations of the OBProxy can be taken over by OCP.')
         return plugin_context.return_true()

@@ -40,7 +40,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             ret = client.execute_command('rm -fr %s' % home_path)
             if not ret:
                 global_ret = False
-                stdio.error(EC_FAIL_TO_INIT_PATH.format(server, key='home path', msg=ret.stderr))
+                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))
                 continue
         if not (client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib}'" % (home_path)) \
          and client.execute_command("if [ -d %s/bin ]; then ln -fs %s/bin/* %s/bin; fi" % (remote_repository_dir, remote_repository_dir, home_path)) \

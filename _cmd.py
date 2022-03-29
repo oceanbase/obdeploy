@@ -32,7 +32,7 @@ from optparse import OptionParser, OptionGroup, BadOptionError, Option
 from core import ObdHome
 from _stdio import IO
 from log import Logger
-from _errno import DOC_LINK_MSG
+from _errno import DOC_LINK_MSG, LockError
 from tool import DirectoryUtil, FileUtil
 
 
@@ -192,7 +192,7 @@ class ObdCommand(BaseCommand):
                 ROOT_IO.print(DOC_LINK_MSG)
         except NotImplementedError:
             ROOT_IO.exception('command \'%s\' is not implemented' % self.prev_cmd)
-        except IOError:
+        except LockError:
             ROOT_IO.exception('Another app is currently holding the obd lock.')
         except SystemExit:
             pass
@@ -472,9 +472,9 @@ class ClusterMirrorCommand(ObdCommand):
 class ClusterConfigStyleChange(ClusterMirrorCommand):
 
     def __init__(self):
-        super(ClusterConfigStyleChange, self).__init__('chst', '修改一个Deploy的配置风格')
+        super(ClusterConfigStyleChange, self).__init__('chst', 'Change Deployment Configuration Style')
         self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas.")
-        self.parser.add_option('--style', type='string', help="目标风格")
+        self.parser.add_option('--style', type='string', help="Preferred Style")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -487,9 +487,9 @@ class ClusterConfigStyleChange(ClusterMirrorCommand):
 class ClusterCheckForOCPChange(ClusterMirrorCommand):
 
     def __init__(self):
-        super(ClusterCheckForOCPChange, self).__init__('check4ocp', '检查一个运行中的配置是否可以被OCP接管')
+        super(ClusterCheckForOCPChange, self).__init__('check4ocp', 'Check Whether OCP Can Take Over Configurations in Use')
         self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas.")
-        self.parser.add_option('-V', '--version', type='string', help="目标OCP版本", default='3.1.1')
+        self.parser.add_option('-V', '--version', type='string', help="OCP Version", default='3.1.1')
 
     def _do_command(self, obd):
         if self.cmds:
