@@ -37,8 +37,8 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
             root_servers = {}
-            ob_config = cluster_config.get_depled_config(comp)
-            new_ob_config = new_cluster_config.get_depled_config(comp)
+            ob_config = cluster_config.get_depend_config(comp)
+            new_ob_config = new_cluster_config.get_depend_config(comp)
             ob_config = {} if ob_config is None else ob_config
             new_ob_config = {} if new_ob_config is None else new_ob_config
             for key in config_map:
@@ -56,6 +56,18 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
         stdio.verbose('compare configuration of %s' % (server))
         for key in new_config:
             if key not in config or config[key] != new_config[key]:
+                item = cluster_config.get_temp_conf_item(key)
+                if item:
+                    if item.need_redeploy or item.need_restart:
+                        stdio.verbose('%s can not be reload' % key)
+                        global_ret = False
+                        continue
+                    try:
+                        item.modify_limit(config.get(key), new_config.get(key))
+                    except Exception as e:
+                        stdio.verbose('%s: %s' % (server, str(e)))
+                        global_ret = False
+                        continue
                 change_conf[server][key] = new_config[key]
                 if key not in global_change_conf:
                     global_change_conf[key] = 1
@@ -64,6 +76,7 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
                     
     servers_num = len(servers)
     stdio.verbose('apply new configuration')
+    stdio.start_load('Reload obproxy')
     success_conf = {}
     sql = ''
     value = None
@@ -87,4 +100,10 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
         for server in success_conf[key]:
             value = change_conf[server][key]
             cluster_config.update_server_conf(server,key, value, False)
-    return plugin_context.return_true() if global_ret else None
+            
+    if global_ret:
+        stdio.stop_load('succeed')
+        return plugin_context.return_true()
+    else:
+        stdio.stop_load('fail')
+        return

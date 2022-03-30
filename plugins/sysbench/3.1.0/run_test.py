@@ -170,7 +170,7 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
     tenant_variables_done = []
     odp_configs = [
         # [配置名, 新值, 旧值, 替换条件: lambda n, o: n != o]
-        ['enable_compression_protocol', False, False, lambda n, o: n != o],
+        # ['enable_compression_protocol', False, False, lambda n, o: n != o],
         ['proxy_mem_limited', format_size(min(max(threads * (8 << 10), 2 << 30), 4 << 30), 0), 0, lambda n, o: parse_size(n) > parse_size(o)],
         ['enable_prometheus', False, False, lambda n, o: n != o],
         ['enable_metadb_used', False, False, lambda n, o: n != o],

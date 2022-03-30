@@ -24,6 +24,8 @@ import os
 import re
 import time
 
+from _errno import EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG, EC_CONFIG_CONFLICT_PORT, EC_OBSERVER_NOT_ENOUGH_MEMORY
+
 
 stdio = None
 success = True
@@ -50,7 +52,7 @@ def parse_size(size):
     return _bytes
 
 
-def formate_size(size):
+def format_size(size):
     units = ['B', 'K', 'M', 'G', 'T', 'P']
     idx = 0
     while idx < 5 and size >= 1024:
@@ -120,7 +122,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
         for key in ['mysql_port', 'rpc_port']:
             port = int(server_config[key])
             if port in ports:
-                critical('Configuration conflict %s: %s port is used for %s\'s %s' % (server, port, ports[port]['server'], ports[port]['key']))
+                critical(EC_CONFIG_CONFLICT_PORT.format(server1=server, port=port, server2=ports[port]['server'], key=ports[port]['key']))
                 continue
             ports[port] = {
                 'server': server,
@@ -214,7 +216,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
                     free_memory = parse_size(str(v))
             total_use = servers_memory[ip]['percentage'] * total_memory / 100 + servers_memory[ip]['num']
             if total_use > free_memory:
-                critical('(%s) not enough memory. (Free: %s, Need: %s)' % (ip, formate_size(free_memory), formate_size(total_use)))
+                stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.formate(ip=ip, free=format_size(free_memory), need=format_size(total_use)))
         # disk
         disk = {'/': 0}
         ret = client.execute_command('df --block-size=1024')
@@ -275,11 +277,12 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             if need > 0 and threshold < 2:
                 alert('(%s) clog and data use the same disk (%s)' % (ip, p))
             if need > avail:
-                critical('(%s) %s not enough disk space. (Avail: %s, Need: %s)' % (ip, p, formate_size(avail), formate_size(need)))
+                critical('(%s) %s not enough disk space. (Avail: %s, Need: %s)' % (ip, p, format_size(avail), format_size(need)))
             elif 1.0 * (total - avail + need) / total > disk[p]['threshold']:
-                msg = '(%s) %s not enough disk space for clog. Use `redo_dir` to set other disk for clog' % (ip, p)
-                msg += ', or reduce the value of `datafile_size`' if need > 0 else '.'
-                critical(msg)
+                # msg = '(%s) %s not enough disk space for clog. Use `redo_dir` to set other disk for clog' % (ip, p)
+                # msg += ', or reduce the value of `datafile_size`' if need > 0 else '.'
+                # critical(msg)
+                critical(EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG.format(ip=ip, path=p))
 
     if success:
         for ip in servers_net_inferface:

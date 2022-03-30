@@ -21,6 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import signal
 import sys
 import traceback
 
@@ -28,7 +29,7 @@ from enum import Enum
 from halo import Halo, cursor
 from colorama import Fore
 from prettytable import PrettyTable
-from progressbar import Bar, ETA, FileTransferSpeed, Percentage, ProgressBar
+from progressbar import AdaptiveETA, Bar, SimpleProgress, ETA, FileTransferSpeed, Percentage, ProgressBar
 
 
 if sys.version_info.major == 3:
@@ -145,11 +146,19 @@ class IOHalo(Halo):
 
 class IOProgressBar(ProgressBar):
 
-    def __init__(self, maxval=None, text='', term_width=None, poll=1, left_justify=True, stream=None):
-        widgets=['%s: ' % text, Percentage(), ' ',
-                    Bar(marker='#', left='[', right=']'),
-                    ' ', ETA(), ' ', FileTransferSpeed()]
-        super(IOProgressBar, self).__init__(maxval=maxval, widgets=widgets, term_width=term_width, poll=poll, left_justify=left_justify, fd=stream)
+    @staticmethod
+    def _get_widgets(widget_type, text):
+        if widget_type == 'download':
+            return ['%s: ' % text, Percentage(), ' ', Bar(marker='#', left='[', right=']'), ' ', ETA(), ' ', FileTransferSpeed()]
+        elif widget_type == 'timer':
+            return ['%s: ' % text, Percentage(), ' ', Bar(marker='#', left='[', right=']'), ' ', AdaptiveETA()]
+        elif widget_type == 'simple_progress':
+            return ['%s: (' % text, SimpleProgress(sep='/'), ') ', Bar(marker='#', left='[', right=']')]
+        else:
+            return ['%s: ' % text, Percentage(), ' ', Bar(marker='#', left='[', right=']')]
+
+    def __init__(self, maxval=None, text='', term_width=None, poll=1, left_justify=True, stream=None, widget_type='download'):
+        super(IOProgressBar, self).__init__(maxval=maxval, widgets=self._get_widgets(widget_type, text), term_width=term_width, poll=poll, left_justify=left_justify, fd=stream)
 
     def start(self):
         self._hide_cursor()
@@ -159,8 +168,19 @@ class IOProgressBar(ProgressBar):
         return super(IOProgressBar, self).update(value=value)
 
     def finish(self):
+        if self.finished:
+            return
         self._show_cursor()
         return super(IOProgressBar, self).finish()
+
+    def interrupt(self):
+        if self.finished:
+            return
+        self._show_cursor()
+        self.finished = True
+        self.fd.write('\n')
+        if self.signal_set:
+            signal.signal(signal.SIGWINCH, signal.SIG_DFL)
 
     def _need_update(self):
         return (self.currval == self.maxval or self.currval == 0 or getattr(self.fd, 'isatty', lambda : False)()) \
@@ -356,10 +376,17 @@ class IO(object):
         else:
             return self._stop_sync_obj(IOHalo, 'stop')
 
-    def start_progressbar(self, text, maxval):
+    def update_loading_text(self, text):
+        if not isinstance(self.sync_obj, IOHalo):
+            return False
+        self.log(MsgLevel.VERBOSE, text)
+        self.sync_obj.text = text
+        return self.sync_obj
+
+    def start_progressbar(self, text, maxval, widget_type='download'):
         if self.sync_obj:
             return False
-        self.sync_obj = self._start_sync_obj(IOProgressBar, lambda x: x.finish_progressbar(), text=text, maxval=maxval)
+        self.sync_obj = self._start_sync_obj(IOProgressBar, lambda x: x.finish_progressbar(), text=text, maxval=maxval, widget_type=widget_type)
         if self.sync_obj:
             self.log(MsgLevel.INFO, text)
             return self.sync_obj.start()
@@ -373,6 +400,11 @@ class IO(object):
         if not isinstance(self.sync_obj, IOProgressBar):
             return False
         return self._stop_sync_obj(IOProgressBar, 'finish')
+
+    def interrupt_progressbar(self):
+        if not isinstance(self.sync_obj, IOProgressBar):
+            return False
+        return self._stop_sync_obj(IOProgressBar, 'interrupt')
     
     def sub_io(self, pid=None, msg_lv=None):
         if not pid:
@@ -381,7 +413,7 @@ class IO(object):
             msg_lv = self.msg_lv
         key = "%s-%s" % (pid, msg_lv)
         if key not in self.sub_ios:
-            self.sub_ios[key] = IO(
+            self.sub_ios[key] = self.__class__(
                 self.level + 1, 
                 msg_lv=msg_lv, 
                 trace_logger=self.trace_logger,

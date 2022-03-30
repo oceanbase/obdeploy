@@ -24,6 +24,8 @@ import re
 import os
 from ssh import LocalClient
 
+from _errno import EC_MYSQLTEST_FAILE_NOT_FOUND, EC_MYSQLTEST_PARSE_CMD_FAILED
+
 
 def parse_size(size):
     _bytes = 0
@@ -69,7 +71,7 @@ def init(plugin_context, env, *args, **kwargs):
     def exec_sql(cmd):
         ret = re.match('(.*\.sql)(?:\|([^\|]*))?(?:\|([^\|]*))?', cmd)
         if not ret:
-            stdio.error('parse cmd failed: %s' % cmd)
+            stdio.error(EC_MYSQLTEST_PARSE_CMD_FAILED.format(path=cmd))
             return False
         cmd = ret.groups()
         sql_file_path1 = os.path.join(init_sql_dir, cmd[0])
@@ -79,7 +81,7 @@ def init(plugin_context, env, *args, **kwargs):
         elif os.path.isfile(sql_file_path2):
             sql_file_path = sql_file_path2
         else:
-            stdio.error('%s not found in [%s, %s]' % (cmd[0], init_sql_dir, plugin_init_sql_dir))
+            stdio.error(EC_MYSQLTEST_FAILE_NOT_FOUND.format(file=cmd[0], path='[%s, %s]' % (init_sql_dir, plugin_init_sql_dir)))
             return False
         exec_sql_cmd = exec_sql_temp % (cmd[1] if cmd[1] else 'root', cmd[2] if cmd[2] else 'oceanbase', sql_file_path)
         ret = LocalClient.execute_command(exec_sql_cmd, stdio=stdio)

@@ -26,6 +26,7 @@ from enum import Enum
 
 from tool import FileUtil
 from _manager import Manager
+from _errno import LockError
 
 
 class LockType(Enum):
@@ -59,11 +60,17 @@ class MixLock(object):
 
     def _ex_lock(self):
         if self.lock_obj:
-            FileUtil.exclusive_lock_obj(self.lock_obj, stdio=self.stdio)
+            try:
+                FileUtil.exclusive_lock_obj(self.lock_obj, stdio=self.stdio)
+            except Exception as e:
+                raise LockError(e)
     
     def _sh_lock(self):
         if self.lock_obj:
-            FileUtil.share_lock_obj(self.lock_obj, stdio=self.stdio)
+            try:
+                FileUtil.share_lock_obj(self.lock_obj, stdio=self.stdio)
+            except Exception as e:
+                raise LockError(e)
 
     def sh_lock(self):
         if not self.locked:
@@ -80,7 +87,7 @@ class MixLock(object):
                 if self._sh_cnt:
                     self.lock_escalation(LockManager.TRY_TIMES)
                 else:
-                    raise e
+                    raise LockError(e)
         self._ex_cnt += 1
         self.stdio and getattr(self.stdio, 'verbose', print)('exclusive lock `%s`, count %s' % (self.path, self._ex_cnt))
         return True
@@ -92,7 +99,7 @@ class MixLock(object):
             self.stdio and getattr(self.stdio, 'stop_loading', print)('succeed')
         except Exception as e:
             self.stdio and getattr(self.stdio, 'stop_loading', print)('fail')
-            raise e
+            raise LockError(e)
             
     def _lock_escalation(self, try_times):
         stdio = self.stdio
@@ -107,13 +114,13 @@ class MixLock(object):
                 break
             except KeyboardInterrupt:
                 self.stdio = stdio
-                raise IOError('fail to get lock')
+                raise Exception('fail to get lock')
             except Exception as e:
                 if try_times:
                     time.sleep(LockManager.TRY_INTERVAL)
                 else:
                     self.stdio = stdio
-                    raise e
+                    raise LockError(e)
         self.stdio = stdio
 
     def _sh_unlock(self):
@@ -209,11 +216,18 @@ class LockManager(Manager):
     def __del__(self):
         for lock in self.locks[::-1]:
             lock.unlock()
+        self.locks = None
 
     def _get_mix_lock(self, path):
         if path not in self.LOCKS:
             self.LOCKS[path] = MixLock(path, stdio=self.stdio)
         return self.LOCKS[path]
+
+    @classmethod
+    def shutdown(cls):
+        for path in cls.LOCKS:
+            cls.LOCKS[path] = None
+        cls.LOCKS = None
 
     def _lock(self, path, clz):
         mix_lock = self._get_mix_lock(path)
@@ -248,3 +262,7 @@ class LockManager(Manager):
 
     def deploy_sh_lock(self, deploy_name):
         return self._sh_lock(self._deploy_lock_fp(deploy_name))
+
+
+import atexit
+atexit.register(LockManager.shutdown)

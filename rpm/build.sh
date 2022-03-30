@@ -106,7 +106,7 @@ function build()
     cd ..
     VERSION=`grep 'Version:' rpm/ob-deploy.spec | head -n1 | awk -F' ' '{print $2}'`
     CID=`git log |head -n1 | awk -F' ' '{print $2}'`
-    BRANCH=`git branch | grep -e "^\*" | awk -F' ' '{print $2}'`
+    BRANCH=`git rev-parse --abbrev-ref HEAD`
     DATE=`date '+%b %d %Y %H:%M:%S'`
     VERSION="$VERSION".`date +%s`
     BUILD_DIR="$DIR/.build"
@@ -120,11 +120,17 @@ function build()
     pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py || exit 1
     rm -f obd.py obd.spec
     cp -r plugins $BUILD_DIR/plugins
+    cp -r config_parser $BUILD_DIR/config_parser
+    rm -fr $BUILD_DIR/plugins/oceanbase-ce
+    rm -fr $BUILD_DIR/plugins/obproxy-ce
+    rm -fr $BUILD_DIR/config_parser/oceanbase-ce
     rm -fr /usr/obd /usr/bin/obd
     cp ./dist/obd /usr/bin/obd 
     cp -fr ./profile/* /etc/profile.d/
     mv $BUILD_DIR /usr/obd
     rm -fr dist
+    cd $BUILD_DIR/plugins && ln -s oceanbase oceanbase-ce && mkdir -p obproxy-ce && cp -fr obproxy/3.1.0 obproxy-ce/3.1.0
+    cd $BUILD_DIR/config_parser && ln -s oceanbase oceanbase-ce 
     chmod +x /usr/bin/obd
     chmod -R 755 /usr/obd/*
     chown -R root:root /usr/obd/*

@@ -19,6 +19,7 @@ function start() {
     if [ $? != 0 ]; then
         exit $?
     fi
+    kill -9 $pid
 
     while [ 1 ]; 
     do 

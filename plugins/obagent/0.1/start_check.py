@@ -20,6 +20,8 @@
 
 from __future__ import absolute_import, division, print_function
 
+from _errno import EC_CONFIG_CONFLICT_PORT
+
 
 stdio = None
 success = True
@@ -74,7 +76,7 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
             port = int(server_config[key])
             alert_f = alert if key == 'pprof_port' else critical
             if port in ports:
-                alert_f('Configuration conflict %s: %s port is used for %s\'s %s' % (server, port, ports[port]['server'], ports[port]['key']))
+                alert_f(EC_CONFIG_CONFLICT_PORT.format(server1=server, port=port, server2=ports[port]['server'], key=ports[port]['key']))
                 continue
             ports[port] = {
                 'server': server,

@@ -1,5 +1,5 @@
 Name: ob-deploy
-Version: 1.2.1
+Version: 1.3.0
 Release: %(echo $RELEASE)%{?dist}
 # if you want use the parameter of rpm_create on build time,
 # uncomment below
@@ -43,7 +43,7 @@ wget https://mirrors.aliyun.com/oceanbase/OceanBase.repo
 cd $SRC_DIR/
 rm -rf build.log build dist obd.spec
 CID=`git log |head -n1 | awk -F' ' '{print $2}'`
-BRANCH=`git branch | grep -e "^\*" | awk -F' ' '{print $2}'`
+BRANCH=`git rev-parse --abbrev-ref HEAD`
 DATE=`date '+%b %d %Y %H:%M:%S'`
 VERSION="$RPM_PACKAGE_VERSION"
 if  [ "$OBD_DUBUG" ]; then
@@ -59,11 +59,14 @@ pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py
 rm -f obd.py obd.spec
 \cp -rf $SRC_DIR/dist/obd ${RPM_BUILD_ROOT}/usr/bin/obd
 \cp -rf $SRC_DIR/plugins $BUILD_DIR/SOURCES/plugins
+\cp -rf $SRC_DIR/config_parser $BUILD_DIR/SOURCES/config_parser
 \rm -fr $BUILD_DIR/SOURCES/plugins/oceanbase-ce
 \rm -fr $BUILD_DIR/SOURCES/plugins/obproxy-ce
+\rm -fr $BUILD_DIR/SOURCES/config_parser/oceanbase-ce
 \cp -rf $SRC_DIR/profile/ $BUILD_DIR/SOURCES/
 \cp -rf $SRC_DIR/mirror/ $BUILD_DIR/SOURCES/
 \cp -rf $BUILD_DIR/SOURCES/plugins ${RPM_BUILD_ROOT}/usr/obd/
+\cp -rf $BUILD_DIR/SOURCES/config_parser ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/mirror ${RPM_BUILD_ROOT}/usr/obd/
 mkdir -p ${RPM_BUILD_ROOT}/etc/profile.d/
 \cp -rf $BUILD_DIR/SOURCES/profile/* ${RPM_BUILD_ROOT}/etc/profile.d/
@@ -72,6 +75,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
 cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mkdir -p obproxy-ce && cp -fr obproxy/3.1.0 obproxy-ce/3.1.0
+cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce 
 
 # package infomation
 %files
@@ -95,8 +99,6 @@ cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mkdir -p
 %post
 # chkconfig: 2345 10 90
 # description: obd ....
-#mkdir -p /usr/obd/ && cp -rf /root/.obd/plugins /usr/obd/plugins
-#chmod 744 /root/.obd/plugins/*
 chmod -R 755 /usr/obd/*
 chown -R root:root /usr/obd/*
 find /usr/obd -type f -exec chmod 644 {} \;
@@ -107,6 +109,24 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Wed Mar 30 2022 obd 1.3.0
+ - new features: support rotation restart
+ - new features:  support switching deployment users
+ - new features: obd cluster chst
+ - new features: obd cluster check4ocp
+ - fix bug: fixed the default path in tpch
+ - fix bug: fixed the default component in sysbench
+* Wed Jan 05 2022 obd 1.2.1
+- fix bug: fixed the upgrade path encoding error when you use the obd cluster upgrade command without setting the Chinese environment.
+- fix bug: fixed the problem caused by no mysqlt.connector dependency when you use the obd cluster upgrade command.
+- fix bug: fixed OBD cannot choose and upgrade the target component when you have only one component.
+* Fri Dec 31 2021 obd 1.2.0
+ - new features: obd mirror disable/enable
+ - new features: support obagent 1.1.0
+ - new features: parameter check
+ - new features: new option "--wp/--with-parameter" for restart
+ - new features: support cross version upgrade and rolling upgrade for oceanbase/oceanbase-ce
+ - fix bug: can not connect to root when sysbench useing obproxy node
 * Fri Dec 31 2021 obd 1.2.0
  - new features: obd mirror disable/enable
  - new features: support obagent 1.1.0

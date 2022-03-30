@@ -42,7 +42,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
-        remote_home_path = client.execute_command('echo $HOME/.obd').stdout.strip()
+        remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
         remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
         client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
         client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))

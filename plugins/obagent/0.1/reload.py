@@ -26,6 +26,8 @@ from copy import deepcopy
 from glob import glob
 from tool import YamlLoader
 
+from _errno import *
+
 
 def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
     stdio = plugin_context.stdio
@@ -46,8 +48,8 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
             root_servers = {}
-            ob_config = cluster_config.get_depled_config(comp)
-            new_ob_config = new_cluster_config.get_depled_config(comp)
+            ob_config = cluster_config.get_depend_config(comp)
+            new_ob_config = new_cluster_config.get_depend_config(comp)
             ob_config = {} if ob_config is None else ob_config
             new_ob_config = {} if new_ob_config is None else new_ob_config
             for key in config_map:
@@ -66,6 +68,7 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
                     config_kv[key] = key
 
     global_ret = True
+    stdio.start_load('Reload obagent')
     for server in servers:
         change_conf = deepcopy(global_change_conf)
         client = clients[server]
@@ -79,6 +82,18 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
             if key not in config_kv:
                 continue
             if key not in config or config[key] != new_config[key]:
+                item = cluster_config.get_temp_conf_item(key)
+                if item:
+                    if item.need_redeploy or item.need_restart:
+                        stdio.verbose('%s can not be reload' % key)
+                        global_ret = False
+                        continue
+                    try:
+                        item.modify_limit(config.get(key), new_config.get(key))
+                    except Exception as e:
+                        stdio.verbose('%s: %s' % (server, str(e)))
+                        global_ret = False
+                        continue
                 change_conf[config_kv[key]] = new_config[key]
         
         if change_conf:
@@ -93,6 +108,11 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
             )
             if not client.execute_command(cmd):
                 global_ret = False
-                stdio.error('fail to reload %s' % server)
+                stdio.error(EC_OBAGENT_RELOAD_FAILED.format(server=server))
     
-    return plugin_context.return_true() if global_ret else None
+    if global_ret:
+        stdio.stop_load('succeed')
+        return plugin_context.return_true()
+    else:
+        stdio.stop_load('fail')
+        return

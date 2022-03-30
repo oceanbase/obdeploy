@@ -77,14 +77,14 @@ def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
 
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
-            ob_config = cluster_config.get_depled_config(comp)
+            ob_config = cluster_config.get_depend_config(comp)
             if not ob_config:
                 continue
             odp_config = cluster_config.get_global_conf()
             config_map = {
                 'observer_sys_password': 'proxyro_password',
                 'cluster_name': 'appname',
-                'root_password': 'observer_root_password'
+                'observer_root_password': 'root_password'
             }
             for key in config_map:
                 ob_key = config_map[key]
@@ -101,14 +101,12 @@ def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
                 server_config = cluster_config.get_server_conf(server)
                 if sys_root:
                     pwd_key = 'obproxy_sys_password'
-                    default_pwd = 'proxysys'
                 else:
                     pwd_key = 'observer_root_password'
-                    default_pwd = ''
                 r_password = password if password else server_config.get(pwd_key)
                 if r_password is None:
                     r_password = ''
-                db, cursor = _connect(server.ip, server_config['listen_port'], user, r_password if count % 2 else default_pwd)
+                db, cursor = _connect(server.ip, server_config['listen_port'], user, r_password if count % 2 else '')
                 dbs[server] = db
                 cursors[server] = cursor
             except:

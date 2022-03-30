@@ -27,18 +27,52 @@ import sys
 import stat
 import gzip
 import fcntl
+import signal
 import shutil
-from ssh import LocalClient
 
 from ruamel.yaml import YAML, YAMLContextManager, representer
 
 if sys.version_info.major == 2:
+    from collections import OrderedDict
     from backports import lzma
+    class TimeoutError(OSError):
+        
+        def __init__(self, *args, **kwargs):
+            super(TimeoutError, self).__init__(*args, **kwargs)
 else:
     import lzma
 
+    class OrderedDict(dict):
+        pass
+
+
+__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict")
 
 _WINDOWS = os.name == 'nt'
+
+
+class Timeout:
+
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+
+    def _is_timeout(self):
+        return self.seconds and self.seconds > 0
+
+    def __enter__(self):
+        if self._is_timeout():
+            signal.signal(signal.SIGALRM, self.handle_timeout)
+            signal.alarm(self.seconds)
+
+    def __exit__(self, type, value, traceback):
+        if self._is_timeout():
+            signal.alarm(0)
+
+timeout = Timeout
 
 
 class DynamicLoading(object):
@@ -257,10 +291,11 @@ class FileUtil(object):
                     return True
         except Exception as e:
             if int(getattr(e, 'errno', -1)) == 26:
+                from ssh import LocalClient
                 if LocalClient.execute_command('/usr/bin/cp -f %s %s' % (src, dst), stdio=stdio):
                     return True
             elif stdio:
-                getattr(stdio, 'exception', print)('copy error')
+                getattr(stdio, 'exception', print)('copy error: %s' % e)
             else:
                 raise e
         return False
@@ -274,7 +309,7 @@ class FileUtil(object):
                 return True
         except Exception as e:
             if stdio:
-                getattr(stdio, 'exception', print)('link error')
+                getattr(stdio, 'exception', print)('link error: %s' % e)
             else:
                 raise e
         return False

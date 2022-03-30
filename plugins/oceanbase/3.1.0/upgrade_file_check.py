@@ -55,7 +55,7 @@ def upgrade_file_check(plugin_context, current_repository, repositories, route, 
                     succeed = False
                     stdio.error('No such file: %s .' % path)
         if cant_use:
-            stdio.error('%s 不可用于升级，可以使用--disable禁用该镜像' % repository)
+            stdio.error('%s cannot be used for the upgrade. You can use the --disable option to disable the image.' % repository)
         i += 1
     
     if succeed:
