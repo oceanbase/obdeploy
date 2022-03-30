@@ -2189,7 +2189,7 @@ class ObdHome(object):
         deploy_config = deploy.deploy_config
 
         if opts.component is None:
-            for component_name in ['obproxy', 'oceanbase', 'oceanbase-ce']:
+            for component_name in ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']:
                 if component_name in deploy_config.components:
                     opts.component = component_name
                     break
@@ -2357,7 +2357,7 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
 
-        allow_components = ['obproxy', 'oceanbase', 'oceanbase-ce']
+        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
@@ -2423,7 +2423,7 @@ class ObdHome(object):
         connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
 
         
-        if repository.name == 'obproxy':
+        if repository.name in ['obproxy', 'obproxy-ce']:
             ob_optimization = False
             allow_components = ['oceanbase', 'oceanbase-ce']
             for component_name in deploy_config.components:
@@ -2583,7 +2583,7 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
 
-        allow_components = ['obproxy', 'oceanbase', 'oceanbase-ce']
+        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
@@ -2649,7 +2649,7 @@ class ObdHome(object):
 
         connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
 
-        if repository.name == 'obproxy':
+        if repository.name in ['obproxy', 'obproxy-ce']:
             ob_optimization = False
             allow_components = ['oceanbase', 'oceanbase-ce']
             for component in deploy_info.components:

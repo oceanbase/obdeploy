@@ -75,15 +75,17 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
 
     if not cluster_config.get_global_conf().get('appname'):
         default_appname = 'obcluster'
-        if 'obproxy' in deploy_config.components:
-            obproxy_cluster_config = deploy_config.components['obproxy']
-            cluster_name = obproxy_cluster_config.get_global_conf().get('cluster_name')
-            if not cluster_name:
-                for server in obproxy_cluster_config.servers:
-                    server_config = obproxy_cluster_config.get_server_conf(server)
-                    if server_config.get('cluster_name'):
-                        default_appname = server_config['cluster_name']
-                        break
+        for componet_name in ['obproxy', 'obproxy-ce']:
+            if componet_name in deploy_config.components:
+                obproxy_cluster_config = deploy_config.components[componet_name]
+                cluster_name = obproxy_cluster_config.get_global_conf().get('cluster_name')
+                if not cluster_name:
+                    for server in obproxy_cluster_config.servers:
+                        server_config = obproxy_cluster_config.get_server_conf(server)
+                        if server_config.get('cluster_name'):
+                            default_appname = server_config['cluster_name']
+                            break
+                break
         cluster_config.update_global_conf('appname', default_appname, False)
 
     MIN_MEMORY = 8 << 30
