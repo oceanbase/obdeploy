@@ -109,6 +109,24 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Wed Mar 30 2022 obd 1.3.0
+ - new features: support rotation restart
+ - new features:  support switching deployment users
+ - new features: obd cluster chst
+ - new features: obd cluster check4ocp
+ - fix bug: fixed the default path in tpch
+ - fix bug: fixed the default component in sysbench
+* Wed Jan 05 2022 obd 1.2.1
+- fix bug: fixed the upgrade path encoding error when you use the obd cluster upgrade command without setting the Chinese environment.
+- fix bug: fixed the problem caused by no mysqlt.connector dependency when you use the obd cluster upgrade command.
+- fix bug: fixed OBD cannot choose and upgrade the target component when you have only one component.
+* Fri Dec 31 2021 obd 1.2.0
+ - new features: obd mirror disable/enable
+ - new features: support obagent 1.1.0
+ - new features: parameter check
+ - new features: new option "--wp/--with-parameter" for restart
+ - new features: support cross version upgrade and rolling upgrade for oceanbase/oceanbase-ce
+ - fix bug: can not connect to root when sysbench useing obproxy node
 * Fri Dec 31 2021 obd 1.2.0
  - new features: obd mirror disable/enable
  - new features: support obagent 1.1.0
