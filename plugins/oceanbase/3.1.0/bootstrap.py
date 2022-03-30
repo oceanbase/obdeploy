@@ -33,6 +33,11 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
     inner_config = {
         InnerConfigItem('$_zone_idc'): 'idc'
     }
+    has_obproxy = False
+    for componet_name in ['obproxy', 'obproxy-ce']:
+        if componet_name in plugin_context.components:
+            has_obproxy = True
+            break
     inner_keys = inner_config.keys()
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
@@ -67,7 +72,7 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
                 stdio.verbose('execute sql: %s' % sql)
                 cursor.execute(sql)
         global_conf = cluster_config.get_global_conf()
-        if 'proxyro_password' in global_conf or 'obproxy' in plugin_context.components:
+        if has_obproxy or 'proxyro_password' in global_conf:
             value = global_conf['proxyro_password'] if global_conf.get('proxyro_password') is not None else ''
             sql = 'create user "proxyro" IDENTIFIED BY %s'
             stdio.verbose(sql)
