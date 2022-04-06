@@ -43,16 +43,16 @@ def format_size(size, precision=1):
     idx = 0
     if precision:
         div = 1024.0
-        formate = '%.' + str(precision) + 'f%s'
+        format = '%.' + str(precision) + 'f%s'
         limit = 1024
     else:
         div = 1024
         limit = 1024
-        formate = '%d%s'
+        format = '%d%s'
     while idx < units_num and size >= limit:
         size /= div
         idx += 1
-    return formate % (size, units[idx])
+    return format % (size, units[idx])
 
 
 def get_system_memory(memory_limit):
