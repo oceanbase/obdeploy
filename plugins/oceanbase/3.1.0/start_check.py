@@ -216,7 +216,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
                     free_memory = parse_size(str(v))
             total_use = servers_memory[ip]['percentage'] * total_memory / 100 + servers_memory[ip]['num']
             if total_use > free_memory:
-                stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.formate(ip=ip, free=format_size(free_memory), need=format_size(total_use)))
+                stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(free_memory), need=format_size(total_use)))
         # disk
         disk = {'/': 0}
         ret = client.execute_command('df --block-size=1024')

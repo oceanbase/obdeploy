@@ -1035,7 +1035,7 @@ class ConfigParserManager(Manager):
         }
         self.component_parsers = {}
 
-    def _formate_paraser_name(self, style):
+    def _format_paraser_name(self, style):
         style = style.title()
         return '%sConfigParser' % style.replace('-', '').replace(' ', '').replace('_', '')
 
@@ -1048,7 +1048,7 @@ class ConfigParserManager(Manager):
             DynamicLoading.add_lib_path(lib_path)
             self.stdio and getattr(self.stdio, 'verbose', 'print')('load config parser: %s' % path)
             module = DynamicLoading.import_module(module_name, self.stdio)
-            clz_name = self._formate_paraser_name(style)
+            clz_name = self._format_paraser_name(style)
             try:
                 return getattr(module, clz_name)
             except:

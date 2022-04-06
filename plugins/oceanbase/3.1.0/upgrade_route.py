@@ -157,10 +157,10 @@ class ObVersionGraph(object):
         if len(res) == 1:
             res.insert(0, start_node)
         
-        return formate_route(res)
+        return format_route(res)
 
 
-def formate_route(routes):
+def format_route(routes):
     return [{
             'version': node.version,
             'release': None if node.release == VersionNode.RELEASE_NULL else node.release,
@@ -174,7 +174,7 @@ def upgrade_route(plugin_context, current_repository, dest_repository, *args, **
     repository_dir = dest_repository.repository_dir
 
     if current_repository.version == dest_repository.version:
-        return plugin_context.return_true(route=formate_route([current_repository, dest_repository]))
+        return plugin_context.return_true(route=format_route([current_repository, dest_repository]))
 
     upgrade_dep_name = 'etc/oceanbase_upgrade_dep.yml'
     upgrade_dep_path = os.path.join(repository_dir, upgrade_dep_name)

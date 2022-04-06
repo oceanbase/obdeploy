@@ -43,14 +43,14 @@ def format_size(size, precision=1):
     idx = 0
     if precision:
         div = 1024.0
-        formate = '%.' + str(precision) + 'f%s'
+        format = '%.' + str(precision) + 'f%s'
     else:
         div = 1024
-        formate = '%d%s'
+        format = '%d%s'
     while idx < 5 and size >= 1024:
         size /= 1024.0
         idx += 1
-    return formate % (size, units[idx])
+    return format % (size, units[idx])
 
 
 def create_tenant(plugin_context, cursor, *args, **kwargs):
