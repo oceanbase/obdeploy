@@ -52,16 +52,18 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     start_plugin = search_py_script_plugin([dest_repository], 'start')[dest_repository]
     connect_plugin = search_py_script_plugin([dest_repository], 'connect')[dest_repository]
     display_plugin = search_py_script_plugin([dest_repository], 'display')[dest_repository]
+    bootstrap_plugin = search_py_script_plugin([dest_repository], 'bootstrap')[dest_repository]
 
     apply_param_plugin(cur_repository)
     if not stop_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
         return 
 
     apply_param_plugin(dest_repository)
-    if not start_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
+    if not start_plugin(components, clients, cluster_config, cmd, options, stdio, need_bootstrap=True, *args, **kwargs):
         return 
     
     ret = connect_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs)
-    if ret and display_plugin(components, clients, cluster_config, cmd, options, stdio, ret.get_return('cursor'), *args, **kwargs):
-        upgrade_ctx['index'] = len(upgrade_repositories)
-        return plugin_context.return_true()
+    if ret:
+        if bootstrap_plugin(components, clients, cluster_config, cmd, options, stdio, ret.get_return('cursor'), *args, **kwargs) and display_plugin(components, clients, cluster_config, cmd, options, stdio, ret.get_return('cursor'), *args, **kwargs):
+            upgrade_ctx['index'] = len(upgrade_repositories)
+            return plugin_context.return_true()

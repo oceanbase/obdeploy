@@ -2,6 +2,7 @@
 
 python_bin='python'
 W_DIR=`pwd`
+VERSION=${VERSION:-'1.3.1'}
 
 
 function python_version()
@@ -59,11 +60,12 @@ function pacakge_obd()
     DIR=`pwd`
     RELEASE=${RELEASE:-'1'}
     export RELEASE=$RELEASE
+    export VERSION=$VERSION
     pip install -r ../requirements3.txt
     rm -fr rpmbuild
     mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
     rpmbuild --define "_topdir $DIR/rpmbuild" -bb ob-deploy.spec
-    rpms=`find rpmbuild/RPMS/ -name *.rpm` || exit 1
+    rpms=`find rpmbuild/RPMS/ -name ob-deploy-\*` || exit 1
     for rpm in ${rpms[@]}; do
         cp $rpm ./
     done
@@ -104,9 +106,13 @@ function build()
     cd2workdir
     DIR=`pwd`
     cd ..
-    VERSION=`grep 'Version:' rpm/ob-deploy.spec | head -n1 | awk -F' ' '{print $2}'`
-    CID=`git log |head -n1 | awk -F' ' '{print $2}'`
-    BRANCH=`git rev-parse --abbrev-ref HEAD`
+    if [ `git log |head -n1 | awk -F' ' '{print $2}'` ]; then
+        CID=`git log |head -n1 | awk -F' ' '{print $2}'`
+        BRANCH=`git rev-parse --abbrev-ref HEAD`
+    else
+        CID='UNKNOWN'
+        BRANCH='UNKNOWN'
+    fi
     DATE=`date '+%b %d %Y %H:%M:%S'`
     VERSION="$VERSION".`date +%s`
     BUILD_DIR="$DIR/.build"
@@ -129,7 +135,7 @@ function build()
     cp -fr ./profile/* /etc/profile.d/
     mv $BUILD_DIR /usr/obd
     rm -fr dist
-    cd $BUILD_DIR/plugins && ln -s oceanbase oceanbase-ce && mkdir -p obproxy-ce && cp -fr obproxy/3.1.0 obproxy-ce/3.1.0
+    cd $BUILD_DIR/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
     cd $BUILD_DIR/config_parser && ln -s oceanbase oceanbase-ce 
     chmod +x /usr/bin/obd
     chmod -R 755 /usr/obd/*

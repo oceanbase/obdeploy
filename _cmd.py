@@ -183,7 +183,7 @@ class ObdCommand(BaseCommand):
             handler.setFormatter(logging.Formatter("[%%(asctime)s.%%(msecs)03d] [%s] [%%(levelname)s] %%(message)s" % trace_id, "%Y-%m-%d %H:%M:%S"))
             logger.addHandler(handler)
             ROOT_IO.trace_logger = logger
-            obd = ObdHome(self.OBD_PATH, ROOT_IO)
+            obd = ObdHome(self.OBD_PATH, self.dev_mode, ROOT_IO)
             ROOT_IO.track_limit += 1
             ROOT_IO.verbose('cmd: %s' % self.cmds)
             ROOT_IO.verbose('opts: %s' % self.opts)

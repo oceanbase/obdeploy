@@ -61,7 +61,7 @@ oceanbase-ce:
     zone: zone2
   server3:
     zone: zone3
-obproxy:
+obproxy-ce:
   depends:
     - oceanbase-ce
   servers:

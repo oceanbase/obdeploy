@@ -52,8 +52,9 @@ class ObdHome(object):
 
     HOME_LOCK_RELATIVE_PATH = 'obd.conf'
 
-    def __init__(self, home_path, stdio=None, lock=True):
+    def __init__(self, home_path, dev_mode=False, stdio=None):
         self.home_path = home_path
+        self.dev_mode = dev_mode
         self._lock = None
         self._home_conf = None
         self._mirror_manager = None
@@ -81,7 +82,7 @@ class ObdHome(object):
     @property
     def plugin_manager(self):
         if not self._plugin_manager:
-            self._plugin_manager = PluginManager(self.home_path, self.stdio)
+            self._plugin_manager = PluginManager(self.home_path, self.dev_mode, self.stdio)
         return self._plugin_manager
 
     @property
@@ -1627,6 +1628,7 @@ class ObdHome(object):
         stop_plugins = self.search_py_script_plugin(repositories, 'stop')
         connect_plugins = self.search_py_script_plugin(repositories, 'connect')
         display_plugins = self.search_py_script_plugin(repositories, 'display')
+        bootstrap_plugins = self.search_py_script_plugin(repositories, 'bootstrap')
 
         self._call_stdio('stop_loading', 'succeed')
 
@@ -1774,7 +1776,8 @@ class ObdHome(object):
                     repository=repository, 
                     new_cluster_config=new_cluster_config, 
                     new_clients=new_ssh_clients,
-                    rollback=True
+                    rollback=True,
+                    bootstrap_plugin=bootstrap_plugins[repository],
                 ):
                     deploy_config.update_component(cluster_config)
 
@@ -2296,7 +2299,7 @@ class ObdHome(object):
                 else:
                     stdio = None
                 self._call_stdio('start_loading', 'Reboot')
-                obd = ObdHome(self.home_path, stdio=stdio, lock=False)
+                obd = ObdHome(self.home_path, self.dev_mode, stdio=stdio)
                 obd.lock_manager.set_try_times(-1)
                 if obd.redeploy_cluster(name):
                     self._call_stdio('stop_loading', 'succeed')
@@ -2645,11 +2648,13 @@ class ObdHome(object):
         odp_cursor = None
         ob_optimization = True
         ob_component = None
+        odp_component = None
         # ob_cluster_config = None
 
         connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
 
         if repository.name in ['obproxy', 'obproxy-ce']:
+            odp_component = repository.name
             ob_optimization = False
             allow_components = ['oceanbase', 'oceanbase-ce']
             for component in deploy_info.components:
@@ -2719,8 +2724,8 @@ class ObdHome(object):
                     return False
                 else:
                     kwargs.update(ret.kwargs)
-                if kwargs.get('odp_need_reboot'):
-                    components.append('obproxy')
+                if kwargs.get('odp_need_reboot') and odp_component:
+                    components.append(odp_component)
                 if kwargs.get('obs_need_reboot') and ob_component:
                     components.append(ob_component)
                 if components:
@@ -2731,7 +2736,7 @@ class ObdHome(object):
                     if odp_cursor:
                         odp_cursor.close()
                     self._call_stdio('start_loading', 'Restart cluster')
-                    obd = ObdHome(self.home_path, stdio=stdio, lock=False)
+                    obd = ObdHome(self.home_path, self.dev_mode, stdio=stdio)
                     obd.lock_manager.set_try_times(-1)
                     option = Values({'components': ','.join(components), 'without_parameter': True})
                     if obd.stop_cluster(name=name, options=option) and obd.start_cluster(name=name, options=option) and obd.display_cluster(name=name):

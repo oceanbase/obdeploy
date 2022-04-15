@@ -48,7 +48,7 @@ oceanbase-ce:
     appname: obcluster
     # root_password: # root user password, can be empty
     # proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
-obproxy:
+obproxy-ce:
   # Set dependent components for the component.
   # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
   depends:
@@ -66,5 +66,6 @@ obproxy:
     # observer cluster name, consistent with oceanbase-ce's appname. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # cluster_name: obcluster
     skip_proxy_sys_private_check: true
+    enable_strict_kernel_release: false
     # obproxy_sys_password: # obproxy sys user password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.

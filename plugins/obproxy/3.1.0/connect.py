@@ -107,6 +107,10 @@ def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
                 if r_password is None:
                     r_password = ''
                 db, cursor = _connect(server.ip, server_config['listen_port'], user, r_password if count % 2 else '')
+                if user in ['root', 'root@sys']:
+                    stdio.verbose('execute sql: select * from information_schema.TABLES limit 1')
+                    cursor.execute('select * from information_schema.TABLES limit 1')
+                    stdio.verbose("result: {}".format(cursor.fetchone()))
                 dbs[server] = db
                 cursors[server] = cursor
             except:
