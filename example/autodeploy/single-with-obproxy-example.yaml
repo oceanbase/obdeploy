@@ -50,7 +50,7 @@ oceanbase-ce:
     # root_password:
     # Password for proxyro. proxyro_password must be the same as observer_sys_password. The default value is empty.
     # proxyro_password:
-obproxy:
+obproxy-ce:
   depends:
     - oceanbase-ce
   servers:

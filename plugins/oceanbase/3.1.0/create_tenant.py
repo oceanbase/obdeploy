@@ -281,6 +281,7 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
         cursor.execute(sql)
     except:
         exception('faild to crate tenant, execute sql exception: %s' % sql)
+        return
         
     stdio.stop_loading('succeed')
     return plugin_context.return_true()

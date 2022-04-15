@@ -48,12 +48,13 @@ class Plugin(object):
     PLUGIN_TYPE = None
     FLAG_FILE = None
 
-    def __init__(self, component_name, plugin_path, version):
+    def __init__(self, component_name, plugin_path, version, dev_mode):
         if not self.PLUGIN_TYPE or not self.FLAG_FILE:
             raise NotImplementedError
         self.component_name = component_name
         self.plugin_path = plugin_path
         self.version = Version(version)
+        self.dev_mode = dev_mode
 
     def __str__(self):
         return '%s-%s-%s' % (self.component_name, self.PLUGIN_TYPE.name.lower(), self.version)
@@ -115,12 +116,14 @@ class PluginReturn(object):
 
 class PluginContext(object):
 
-    def __init__(self, components, clients, cluster_config, cmd, options, stdio):
+    def __init__(self, components, clients, cluster_config, cmd, options, dev_mode, stdio):
         self.components = components
         self.clients = clients
         self.cluster_config = cluster_config
         self.cmd = cmd
         self.options = options
+        # todo 怎么传入开发模式标识
+        self.dev_mode = dev_mode
         self.stdio = stdio
         self._return = PluginReturn()
 
@@ -169,8 +172,8 @@ class ScriptPlugin(Plugin):
                 return new_method
             return attr
 
-    def __init__(self, component_name, plugin_path, version):
-        super(ScriptPlugin, self).__init__(component_name, plugin_path, version)
+    def __init__(self, component_name, plugin_path, version, dev_mode):
+        super(ScriptPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
         self.context = None
 
     def __call__(self):
@@ -191,7 +194,7 @@ class ScriptPlugin(Plugin):
         sub_clients = {}
         for server in clients:
             sub_clients[server] = ScriptPlugin.ClientForScriptPlugin(clients[server], sub_stdio)
-        self.context = PluginContext(components, sub_clients, cluster_config, cmd, options, sub_stdio)
+        self.context = PluginContext(components, sub_clients, cluster_config, cmd, options, self.dev_mode, sub_stdio)
 
     def after_do(self, stdio, *arg, **kwargs):
         self._export(stdio)
@@ -221,10 +224,10 @@ class PyScriptPlugin(ScriptPlugin):
     LIBS_PATH = []
     PLUGIN_COMPONENT_NAME = None
 
-    def __init__(self, component_name, plugin_path, version):
+    def __init__(self, component_name, plugin_path, version, dev_mode):
         if not self.PLUGIN_COMPONENT_NAME:
             raise NotImplementedError
-        super(PyScriptPlugin, self).__init__(component_name, plugin_path, version)
+        super(PyScriptPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
         self.module = None
         self.libs_path = deepcopy(self.LIBS_PATH)
         self.libs_path.append(self.plugin_path)
@@ -493,8 +496,8 @@ class ParamPlugin(Plugin):
     DEF_PARAM_YAML = 'parameter.yaml'
     FLAG_FILE = DEF_PARAM_YAML
 
-    def __init__(self, component_name, plugin_path, version):
-        super(ParamPlugin, self).__init__(component_name, plugin_path, version)
+    def __init__(self, component_name, plugin_path, version, dev_mode):
+        super(ParamPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
         self.def_param_yaml_path = os.path.join(self.plugin_path, self.DEF_PARAM_YAML)
         self._src_data = None
         self._need_redploy_items = None
@@ -605,8 +608,8 @@ class InstallPlugin(Plugin):
     FLAG_FILE = FILES_MAP_YAML
     _KEYCRE = re.compile(r"\$(\w+)")
 
-    def __init__(self, component_name, plugin_path, version):
-        super(InstallPlugin, self).__init__(component_name, plugin_path, version)
+    def __init__(self, component_name, plugin_path, version, dev_mode):
+        super(InstallPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
         self.file_map_path = os.path.join(self.plugin_path, self.FILES_MAP_YAML)
         self._file_map = {}
 
@@ -671,7 +674,7 @@ class ComponentPluginLoader(object):
 
     PLUGIN_TYPE = None
 
-    def __init__(self, home_path, plugin_type=PLUGIN_TYPE, stdio=None):
+    def __init__(self, home_path, plugin_type=PLUGIN_TYPE, dev_mode=False, stdio=None):
         if plugin_type:
             self.PLUGIN_TYPE = plugin_type
         if not self.PLUGIN_TYPE:
@@ -679,6 +682,7 @@ class ComponentPluginLoader(object):
         self.plguin_cls = getattr(sys.modules[__name__], self.PLUGIN_TYPE.value, False)
         if not self.plguin_cls:
             raise ImportError(self.PLUGIN_TYPE.value)
+        self.dev_mode = dev_mode
         self.stdio = stdio
         self.path = home_path
         self.component_name = os.path.split(self.path)[1]
@@ -692,7 +696,7 @@ class ComponentPluginLoader(object):
             else:
                 path, _ = os.path.split(flag_path)
                 _, version = os.path.split(path)
-                plugin = self.plguin_cls(self.component_name, path, version)
+                plugin = self.plguin_cls(self.component_name, path, version, self.dev_mode)
                 self._plugins[flag_path] = plugin
                 plugins.append(plugin)
         return plugins
@@ -725,7 +729,7 @@ class PyScriptPluginLoader(ComponentPluginLoader):
 
     PLUGIN_TYPE = PluginType.PY_SCRIPT
 
-    def __init__(self, home_path, script_name=None, stdio=None):
+    def __init__(self, home_path, script_name=None, dev_mode=False, stdio=None):
         if not script_name:
             raise NotImplementedError
         type_name = 'PY_SCRIPT_%s' % script_name.upper()
@@ -733,7 +737,7 @@ class PyScriptPluginLoader(ComponentPluginLoader):
         self.PLUGIN_TYPE = PyScriptPluginLoader.PyScriptPluginType(type_name, type_value)
         if not getattr(sys.modules[__name__], type_value, False):
             self._create_(script_name)
-        super(PyScriptPluginLoader, self).__init__(home_path, stdio=stdio)
+        super(PyScriptPluginLoader, self).__init__(home_path, dev_mode=dev_mode, stdio=stdio)
 
     def _create_(self, script_name):
         exec('''
@@ -742,8 +746,8 @@ class %s(PyScriptPlugin):
     FLAG_FILE = '%s.py'
     PLUGIN_COMPONENT_NAME = '%s'
 
-    def __init__(self, component_name, plugin_path, version):
-        super(%s, self).__init__(component_name, plugin_path, version)
+    def __init__(self, component_name, plugin_path, version, dev_mode):
+        super(%s, self).__init__(component_name, plugin_path, version, dev_mode)
 
     @staticmethod
     def set_plugin_type(plugin_type):
@@ -764,8 +768,9 @@ class PluginManager(Manager):
     RELATIVE_PATH = 'plugins'
     # The directory structure for plugin is ./plugins/{component_name}/{version}
 
-    def __init__(self, home_path, stdio=None):
+    def __init__(self, home_path, dev_mode=False, stdio=None):
         super(PluginManager, self).__init__(home_path, stdio=stdio)
+        self.dev_mode = dev_mode
         self.component_plugin_loaders = {}
         self.py_script_plugin_loaders = {}
         for plugin_type in PluginType:
@@ -779,7 +784,7 @@ class PluginManager(Manager):
             return None
         loaders = self.component_plugin_loaders[plugin_type]
         if component_name not in loaders:
-            loaders[component_name] = ComponentPluginLoader(os.path.join(self.path, component_name), plugin_type, self.stdio)
+            loaders[component_name] = ComponentPluginLoader(os.path.join(self.path, component_name), plugin_type, self.dev_mode, self.stdio)
         loader = loaders[component_name]
         return loader.get_best_plugin(version)
 
@@ -792,6 +797,6 @@ class PluginManager(Manager):
             self.py_script_plugin_loaders[script_name] = {}
         loaders = self.py_script_plugin_loaders[script_name]
         if component_name not in loaders:
-            loaders[component_name] = PyScriptPluginLoader(os.path.join(self.path, component_name), script_name, self.stdio)
+            loaders[component_name] = PyScriptPluginLoader(os.path.join(self.path, component_name), script_name, self.dev_mode, self.stdio)
         loader = loaders[component_name]
         return loader.get_best_plugin(version)

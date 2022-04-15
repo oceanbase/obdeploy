@@ -49,7 +49,7 @@ class InitDirFailedErrorMessage(object):
     PERMISSION_DENIED = ': {path} permission denied .'
 
 
-DOC_LINK_MSG = 'See https://open.oceanbase.com/docs/obd-cn/V1.2.0/10000000000017237.'
+DOC_LINK_MSG = 'See https://open.oceanbase.com/docs/obd-cn/V1.3.0/10000000000099584.'
 
 EC_CONFIG_CONFLICT_PORT = OBDErrorCode(1000, 'Configuration conflict {server1}:{port} port is used for {server2}\'s {key}')
 EC_CONFLICT_PORT = OBDErrorCode(1001, '{server}:{port} port is already used')

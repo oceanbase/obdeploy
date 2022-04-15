@@ -1,5 +1,5 @@
 Name: ob-deploy
-Version: 1.3.0
+Version: %(echo $VERSION)
 Release: %(echo $RELEASE)%{?dist}
 # if you want use the parameter of rpm_create on build time,
 # uncomment below
@@ -42,8 +42,13 @@ rm -fr $SRC_DIR/mirror/remote && mkdir -p $SRC_DIR/mirror/remote && cd $SRC_DIR/
 wget https://mirrors.aliyun.com/oceanbase/OceanBase.repo
 cd $SRC_DIR/
 rm -rf build.log build dist obd.spec
-CID=`git log |head -n1 | awk -F' ' '{print $2}'`
-BRANCH=`git rev-parse --abbrev-ref HEAD`
+if [ `git log |head -n1 | awk -F' ' '{print $2}'` ]; then
+    CID=`git log |head -n1 | awk -F' ' '{print $2}'`
+    BRANCH=`git rev-parse --abbrev-ref HEAD`
+else
+    CID='UNKNOWN'
+    BRANCH='UNKNOWN'
+fi
 DATE=`date '+%b %d %Y %H:%M:%S'`
 VERSION="$RPM_PACKAGE_VERSION"
 if  [ "$OBD_DUBUG" ]; then
@@ -74,7 +79,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/
 \cp -rf $BUILD_DIR/SOURCES/site-packages ${RPM_BUILD_ROOT}/usr/obd/lib/site-packages
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
-cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mkdir -p obproxy-ce && cp -fr obproxy/3.1.0 obproxy-ce/3.1.0
+cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
 cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce 
 
 # package infomation

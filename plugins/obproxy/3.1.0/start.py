@@ -86,7 +86,7 @@ def obproxyd(home_path, client, ip, port):
     return False
 
 
-def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
+def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False, *args, **kwargs):
     global stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -95,7 +95,6 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     clusters_cmd = {}
     real_cmd = {}
     pid_path = {}
-    need_bootstrap = False
 
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
@@ -171,7 +170,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             ]
             start_unuse = ['home_path', 'observer_sys_password', 'obproxy_sys_password', 'observer_root_password']
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
-            opt_str = ["obproxy_sys_password=''"]
+            opt_str = ["obproxy_sys_password=''"] if need_bootstrap else []
             for key in server_config:
                 if key not in start_unuse and key not in not_opt_str:
                     value = get_value(key)

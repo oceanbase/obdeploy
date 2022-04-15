@@ -15,7 +15,7 @@ function _obd_complete_func
     tenant_cmd="create drop"
     mirror_cmd="clone create list update enable disable"
     repo_cmd="list"
-    test_cmd="mysqltest sysbench tpch tpcc"
+    test_cmd="mysqltest sysbench tpch"
     if [ -f "${OBD_HOME:-"$HOME"}/.obd/.dev_mode" ]; then
         obd_cmd="$obd_cmd devmode"
         devmode_cmd="enable disable"
@@ -38,7 +38,7 @@ function _obd_complete_func
             -c|--config)
                 filename=${cur##*/}
                 dirname=${cur%*$filename}
-                res=`ls -a -p $dirname 2>/dev/null | sed "s#^#$dirname#"`
+                res=`ls -p $dirname 2>/dev/null | sed "s#^#$dirname#"`
                 compopt -o nospace
                 COMPREPLY=( $(compgen -o filenames -W "${res}" -- ${cur}) )
             ;;

@@ -306,7 +306,7 @@ class SshClient(object):
 
         for path in failed:
             stdio and getattr(stdio, 'error', print)('send %s to %s@%s failed' % (path, self.config.username, self.config.host))
-        return True
+        return not failed
 
     def get_file(self, local_path, remote_path, stdio=None):
         stdio = stdio if stdio else self.stdio

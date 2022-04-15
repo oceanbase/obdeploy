@@ -79,6 +79,13 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             stdio.error(*arg, **kwargs)
         else:
             stdio.warn(*arg, **kwargs)
+    def error(*arg, **kwargs):
+        global success
+        if plugin_context.dev_mode:
+            stdio.warn(*arg, **kwargs)
+        else:
+            success = False
+            stdio.error(*arg, **kwargs)
     def critical(*arg, **kwargs):
         global success
         success = False
@@ -134,13 +141,13 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             try:
                 memory['num'] += parse_size(server_config['memory_limit'])
             except:
-                critical('memory_limit must be an integer')
+                error('memory_limit must be an integer')
                 return
         elif 'memory_limit_percentage' in server_config:
             try:
                 memory['percentage'] += int(parse_size(server_config['memory_limit_percentage']))
             except:
-                critical('memory_limit_percentage must be an integer')
+                error('memory_limit_percentage must be an integer')
                 return
         else:
             memory['percentage'] += 80
@@ -216,7 +223,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
                     free_memory = parse_size(str(v))
             total_use = servers_memory[ip]['percentage'] * total_memory / 100 + servers_memory[ip]['num']
             if total_use > free_memory:
-                stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(free_memory), need=format_size(total_use)))
+                error(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(free_memory), need=format_size(total_use)))
         # disk
         disk = {'/': 0}
         ret = client.execute_command('df --block-size=1024')

@@ -98,7 +98,38 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
         stdio.stop_loading('fail')
         stdio.exception('')
         return
-
+    stdio.start_loading('Server check')
+    try:
+        # check for observer
+        while True:
+            sql = "select * from oceanbase.__all_server where status != 'active' or stop_time > 0 or start_service_time = 0"
+            stdio.verbose('execute sql: %s' % sql)
+            cursor.execute(sql)
+            ret = cursor.fetchone()
+            if ret is None:
+                break
+            time.sleep(3)
+        # check for obproxy
+        if odp_cursor:
+            while True:
+                sql = "show proxycongestion all"
+                stdio.verbose('execute obproxy sql: %s' % sql)
+                odp_cursor.execute(sql)
+                proxy_congestions = odp_cursor.fetchall()
+                passed = True
+                for proxy_congestion in proxy_congestions:
+                    if proxy_congestion.get('dead_congested') != 0 or proxy_congestion.get('server_state') != 'ACTIVE':
+                        passed = False
+                        break
+                if passed:
+                    break
+                else:
+                    time.sleep(3)
+    except:
+        stdio.stop_loading('fail')
+        stdio.exception('')
+        return
+    stdio.stop_loading('succeed')
     # drop old tables
     bmsql_sql_path = kwargs.get('bmsql_sql_path', '')
     run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableDrops.sql'), force=True)

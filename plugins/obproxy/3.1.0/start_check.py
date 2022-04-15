@@ -45,6 +45,13 @@ def start_check(plugin_context, strict_check=False, *args, **kwargs):
             stdio.error(*arg, **kwargs)
         else:
             stdio.warn(*arg, **kwargs)
+    def error(*arg, **kwargs):
+        global success
+        if plugin_context.dev_mode:
+            stdio.warn(*arg, **kwargs)
+        else:
+            success = False
+            stdio.error(*arg, **kwargs)
     def critical(*arg, **kwargs):
         global success
         success = False
