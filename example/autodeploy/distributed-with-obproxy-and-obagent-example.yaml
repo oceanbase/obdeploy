@@ -69,6 +69,8 @@ obproxy-ce:
   global:
     # The working directory for obproxy. Obproxy is started under this directory. This is a required field.
     home_path: /root/obproxy
+    skip_proxy_sys_private_check: true
+    enable_strict_kernel_release: false
     # External port. The default value is 2883.
     # listen_port: 2883
     # The Prometheus port. The default value is 2884.
@@ -101,9 +103,7 @@ obagent:
     - oceanbase-ce
   global:
     # The working directory for obagent. obagent is started under this directory. This is a required field.
-    home_path: /root/observer
-    skip_proxy_sys_private_check: true
-    enable_strict_kernel_release: false
+    home_path: /root/obagent
     # The port that pulls and manages the metrics. The default port number is 8088.
     # server_port: 8088
     # Debug port for pprof. The default port number is 8089.
