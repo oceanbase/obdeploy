@@ -649,10 +649,11 @@ class ObdHome(object):
                 self._call_stdio('verbose', '%s %s installing' % (server, repository))
                 if not client.put_file(file_path, remote_file_path):
                     self._call_stdio('stop_loading', 'fail')
-                    return 
+                    return False
             client.put_file(repository.data_file_path, remote_repository_data_path)
             self._call_stdio('verbose', '%s %s installed' % (server, repository.name))
         self._call_stdio('stop_loading', 'succeed')
+        return True
 
     def servers_repository_lib_check(self, ssh_clients, servers, repository, install_plugin, msg_lv='error'):
         ret = True
