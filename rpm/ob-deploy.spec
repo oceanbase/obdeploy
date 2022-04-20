@@ -114,6 +114,8 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Wed Apr 20 2022 obd 1.3.2
+ - fix bug: remote install will return None when success
 * Wed Apr 20 2022 obd 1.3.1
  - new features: some alarm levels will be reduced when developer mode is turned on
  - fix bug: fail to connect obproxy when upgrade
