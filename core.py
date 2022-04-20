@@ -647,7 +647,9 @@ class ObdHome(object):
             for file_path in repository.file_list(install_plugin):
                 remote_file_path = file_path.replace(self.home_path, remote_home_path)
                 self._call_stdio('verbose', '%s %s installing' % (server, repository))
-                client.put_file(file_path, remote_file_path)
+                if not client.put_file(file_path, remote_file_path):
+                    self._call_stdio('stop_loading', 'fail')
+                    return 
             client.put_file(repository.data_file_path, remote_repository_data_path)
             self._call_stdio('verbose', '%s %s installed' % (server, repository.name))
         self._call_stdio('stop_loading', 'succeed')
@@ -694,7 +696,9 @@ class ObdHome(object):
                 remote_lib_repository_data_path = lib_repository.repository_dir.replace(self.home_path, remote_home_path)
             # lib installation
             self._call_stdio('verbose', 'Remote %s repository integrity check' % repository)
-            self.servers_repository_install(ssh_clients, cluster_config.servers, lib_repository, install_plugin)
+            if not self.servers_repository_install(ssh_clients, cluster_config.servers, lib_repository, install_plugin):
+                ret = False
+                break
             for server in cluster_config.servers:
                 client = ssh_clients[server]
                 remote_home_path = servers_obd_home[server]
