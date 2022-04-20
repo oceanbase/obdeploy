@@ -114,9 +114,14 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Wed Apr 20 2022 obd 1.3.1
+ - new features: some alarm levels will be reduced when developer mode is turned on
+ - fix bug: fail to connect obproxy when upgrade
+ - fix bug: change ilog/clog/slog owner when user change
+ - fix bug: typo: formate
 * Wed Mar 30 2022 obd 1.3.0
  - new features: support rotation restart
- - new features:  support switching deployment users
+ - new features: support switching deployment users
  - new features: obd cluster chst
  - new features: obd cluster check4ocp
  - fix bug: fixed the default path in tpch
