@@ -142,7 +142,7 @@ class Restart(object):
                 server_config = self.cluster_config.get_server_conf(server)
                 home_path = server_config['home_path']
                 chown_cmd = 'sudo chown -R %s:' % client.config.username
-                for key in ['home_path', 'data_dir', 'redo_dir']:
+                for key in ['home_path', 'data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir']:
                     if key in server_config:
                         chown_cmd += ' %s' % server_config[key]
                 new_client.execute_command(chown_cmd)
@@ -167,7 +167,7 @@ class Restart(object):
                 new_client = self.new_clients[server]
                 server_config = self.cluster_config.get_server_conf(server)
                 chown_cmd = 'sudo chown -R %s:' % new_client.config.username
-                for key in ['home_path', 'data_dir', 'redo_dir']:
+                for key in ['home_path', 'data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir']:
                     if key in server_config:
                         chown_cmd += ' %s' % server_config[key]
                 if not new_client.execute_command(chown_cmd):
