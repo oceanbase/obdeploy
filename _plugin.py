@@ -122,7 +122,6 @@ class PluginContext(object):
         self.cluster_config = cluster_config
         self.cmd = cmd
         self.options = options
-        # todo 怎么传入开发模式标识
         self.dev_mode = dev_mode
         self.stdio = stdio
         self._return = PluginReturn()
