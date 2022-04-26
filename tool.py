@@ -35,6 +35,7 @@ from ruamel.yaml import YAML, YAMLContextManager, representer
 if sys.version_info.major == 2:
     from collections import OrderedDict
     from backports import lzma
+    from io import open
     class TimeoutError(OSError):
         
         def __init__(self, *args, **kwargs):
@@ -315,11 +316,11 @@ class FileUtil(object):
         return False
 
     @staticmethod
-    def open(path, _type='r', stdio=None):
+    def open(path, _type='r', encoding=None, stdio=None):
         stdio and getattr(stdio, 'verbose', print)('open %s for %s' % (path, _type))
         if os.path.exists(path):
             if os.path.isfile(path):
-                return open(path, _type)
+                return open(path, _type, encoding=encoding)
             info = '%s is not file' % path
             if stdio:
                 getattr(stdio, 'error', print)(info)
@@ -328,7 +329,7 @@ class FileUtil(object):
                 raise IOError(info)
         dir_path, file_name = os.path.split(path)
         if not dir_path or DirectoryUtil.mkdir(dir_path, stdio=stdio):
-            return open(path, _type)
+            return open(path, _type, encoding=encoding)
         info = '%s is not file' % path
         if stdio:
             getattr(stdio, 'error', print)(info)

@@ -11,7 +11,7 @@ function _obd_complete_func
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     obd_cmd="mirror cluster test update repo"
-    cluster_cmd="autodeploy tenant start deploy redeploy restart reload destroy stop edit-config list display upgrade chst check4ocp"
+    cluster_cmd="autodeploy tenant start deploy redeploy restart reload destroy stop edit-config list display upgrade chst check4ocp change-repo"
     tenant_cmd="create drop"
     mirror_cmd="clone create list update enable disable"
     repo_cmd="list"

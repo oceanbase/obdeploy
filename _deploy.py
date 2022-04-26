@@ -984,10 +984,10 @@ class Deploy(object):
         self._uprade_meta = uprade_meta
         return False
 
-    def _update_component_repository(self, component, repository):
-        if not self.deploy_config.update_component_package_hash(component, repository.hash, repository.version):
+    def update_component_repository(self, repository):
+        if not self.deploy_config.update_component_package_hash(repository.name, repository.hash, repository.version):
             return False
-        self.use_model(component, repository)
+        self.use_model(repository.name, repository)
         return True
 
     def stop_upgrade(self, dest_repository=None):
@@ -995,7 +995,7 @@ class Deploy(object):
             self._uprade_meta = None
             self._dump_upgrade_meta_data()
             if dest_repository:
-                self._update_component_repository(dest_repository.name, dest_repository)
+                self.update_component_repository(dest_repository)
             return True
         return False
 

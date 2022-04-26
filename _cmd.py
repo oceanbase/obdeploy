@@ -659,11 +659,25 @@ class ClusterEditConfigCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterChangeRepositoryCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterChangeRepositoryCommand, self).__init__('change-repo', 'Change repository for a deployed component')
+        self.parser.add_option('-c', '--component', type='string', help="Component name to change repository.")
+        self.parser.add_option('--hash', type='string', help="Repository's hash")
+        self.parser.add_option('-f', '--force', action='store_true', help="force change even start failed.")
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.change_repository(self.cmds[0], self.opts)
+        else:
+            return self._show_help()
+
+
 class CLusterUpgradeCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(CLusterUpgradeCommand, self).__init__('upgrade', 'Upgrade a cluster.')
-        self.parser.add_option('-f', '--force', action='store_true', help="Force upgrade.")
         self.parser.add_option('-c', '--component', type='string', help="Component name to upgrade.")
         self.parser.add_option('-V', '--version', type='string', help="Target version.")
         self.parser.add_option('--skip-check', action='store_true', help="Skip all the possible checks.")
@@ -748,6 +762,7 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(ClusterEditConfigCommand())
         self.register_command(ClusterReloadCommand())
         self.register_command(CLusterUpgradeCommand())
+        self.register_command(ClusterChangeRepositoryCommand())
         self.register_command(ClusterTenantCommand())
 
 
