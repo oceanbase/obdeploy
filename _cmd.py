@@ -37,7 +37,7 @@ from tool import DirectoryUtil, FileUtil
 
 
 ROOT_IO = IO(1)
-VERSION = '<VERSION>'
+VERSION = u'<VERSION>'
 REVISION = '<CID>'
 BUILD_BRANCH = '<B_BRANCH>'
 BUILD_TIME = '<B_TIME>'
