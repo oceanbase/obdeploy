@@ -112,6 +112,13 @@ class MirrorRepository(object):
         info = self.get_exact_pkg_info(**pattern)
         return self.get_rpm_pkg_by_info(info) if info else None
 
+    def _pattern_check(self, pkg, **pattern):
+        for key in ['md5', 'name', 'version', 'release', 'arch']:
+            if pattern.get(key) is not None and getattr(pkg, key) != pattern[key]:
+                self.stdio and getattr(self.stdio, 'verbose', print)('pkg %s is %s, but %s is required' % (key, getattr(pkg, key), pattern[key]))
+                return None
+        return pkg
+            
     def get_rpm_pkg_by_info(self, pkg_info):
         return None
     
@@ -428,14 +435,14 @@ class RemoteMirrorRepository(MirrorRepository):
     def get_all_pkg_info(self):
         return [self.db[key] for key in self.db]
 
-    def get_rpm_info_by_md5(self, md5):
+    def get_rpm_info_by_md5(self, md5, **pattern):
         if md5 in self.db:
-            return self.db[md5]
+            return self._pattern_check(self.db[md5], **pattern)
         for key in self.db:
             info = self.db[key]
             if info.md5 == md5:
                 self.stdio and getattr(self.stdio, 'verbose', print)('%s translate info %s' % (md5, info.md5))
-                return info
+                return self._pattern_check(info, **pattern)
         return None
 
     def get_rpm_pkg_by_info(self, pkg_info):
@@ -464,7 +471,7 @@ class RemoteMirrorRepository(MirrorRepository):
     def get_exact_pkg_info(self, **pattern):
         if 'md5' in pattern and pattern['md5']:
             self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
-            return self.get_rpm_info_by_md5(pattern['md5'])
+            return self.get_rpm_info_by_md5(**pattern)
         self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
             self.stdio and getattr(self.stdio, 'verbose', print)('name is None')
@@ -499,7 +506,10 @@ class RemoteMirrorRepository(MirrorRepository):
         matchs = []
         if 'md5' in pattern and pattern['md5']:
             self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
-            return [self.db[pattern['md5']], (0xfffffffff, )] if pattern['md5'] in self.db else matchs
+            info = None
+            if pattern['md5'] in self.db:
+                info = self._pattern_check(self.db[pattern['md5']], **pattern)
+            return [info, (0xfffffffff, )] if info else matchs
         self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
             self.stdio and getattr(self.stdio, 'verbose', print)('name is None')
@@ -689,7 +699,10 @@ class LocalMirrorRepository(MirrorRepository):
     def get_exact_pkg_info(self, **pattern):
         if 'md5' in pattern and pattern['md5']:
             self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
-            return self.db[pattern['md5']] if pattern['md5'] in self.db else None
+            info = None
+            if pattern['md5'] in self.db:
+                info = self._pattern_check(self.db[pattern['md5']], **pattern)
+            return info
         self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
             self.stdio and getattr(self.stdio, 'verbose', print)('name is None')
@@ -730,7 +743,10 @@ class LocalMirrorRepository(MirrorRepository):
         matchs = []
         if 'md5' in pattern and pattern['md5']:
             self.stdio and getattr(self.stdio, 'verbose', print)('md5 is %s' % pattern['md5'])
-            return [self.db[pattern['md5']], (0xfffffffff, )] if pattern['md5'] in self.db else matchs
+            info = None
+            if pattern['md5'] in self.db:
+                info = self._pattern_check(self.db[pattern['md5']], **pattern)
+            return [info, (0xfffffffff, )] if info else matchs
         self.stdio and getattr(self.stdio, 'verbose', print)('md5 is None')
         if 'name' not in pattern and not pattern['name']:
             return matchs

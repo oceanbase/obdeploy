@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function
 import os
 
 from _rpm import Version, Release, PackageInfo
-from tool import YamlLoader
+from tool import YamlLoader, FileUtil
 
 
 class VersionNode(PackageInfo):
@@ -186,7 +186,7 @@ def upgrade_route(plugin_context, current_repository, dest_repository, *args, **
     yaml = YamlLoader(stdio)
 
     try:
-        with open(upgrade_dep_path, encoding='utf-8') as f:
+        with FileUtil.open(upgrade_dep_path, encoding='utf-8') as f:
             data = yaml.load(f)
             graph = ObVersionGraph(data)
             route = graph.findShortestUpgradePath(current_repository, dest_repository)

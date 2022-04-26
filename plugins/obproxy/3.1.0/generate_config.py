@@ -34,22 +34,39 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             stdio.error("obproxy %s: missing configuration 'home_path' in configuration file" % server)
             success = False
             continue
+        cluster_config.update_server_conf(server, 'enable_cluster_checkout', False)
     if not success:
         stdio.stop_loading('fail')
         return
 
-    global_config = cluster_config.get_global_conf()
-    if global_config.get('enable_cluster_checkout') is None:
-        cluster_config.update_global_conf('enable_cluster_checkout', False)
+    global_config = cluster_config.get_original_global_conf()
+    if 'skip_proxy_sys_private_check' not in global_config:
+        cluster_config.update_global_conf('skip_proxy_sys_private_check', True, False)
+    if 'enable_strict_kernel_release' not in global_config:
+        cluster_config.update_global_conf('enable_strict_kernel_release', False, False)
 
-    have_depend = False
-    depends = ['oceanbase', 'oceanbase-ce']
-
-    for comp in depends:
+    ob_cluster_config = None
+    for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in deploy_config.components:
-            deploy_config.add_depend_for_component('obagent', comp, False)
-            have_depend = True
+            ob_cluster_config = deploy_config.components[comp]
             break
+
+    if ob_cluster_config:
+        root_servers = {}
+        cluster_name = ob_cluster_config.get_global_conf().get('appname')
+        for server in ob_cluster_config.servers:
+            config = ob_cluster_config.get_server_conf_with_default(server)
+            zone = config['zone']
+            cluster_name = cluster_name if cluster_name else config.get('appname')
+            if zone not in root_servers:
+                root_servers[zone] = '%s:%s' % (server.ip, config['mysql_port'])
+        rs_list = ';'.join([root_servers[zone] for zone in root_servers])
+
+        cluster_name = cluster_name if cluster_name else 'obcluster'
+        if not global_config.get('rs_list'):
+            cluster_config.update_global_conf('rs_list', rs_list, False)
+        if not global_config.get('cluster_name'):
+            cluster_config.update_global_conf('cluster_name', cluster_name, False)
     
     stdio.stop_loading('succeed')
     return plugin_context.return_true()

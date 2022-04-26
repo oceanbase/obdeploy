@@ -219,6 +219,7 @@ def run_test(plugin_context, db, cursor, odp_db, odp_cursor=None, *args, **kwarg
             for config in system_configs:
                 if config[0] == 'sleep':
                     sleep(config[1])
+                    system_configs_done.append(config)
                     continue
                 sql = 'show parameters like "%s"' % config[0]
                 if config[4]:

@@ -114,6 +114,9 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Tue Apr 26 2022 obd 1.3.3
+ - new features: change repository for a deployed component
+ - fix bug: check kernel version when autdeploy obproxy
 * Wed Apr 20 2022 obd 1.3.2
  - fix bug: remote install will return None when success
 * Wed Apr 20 2022 obd 1.3.1

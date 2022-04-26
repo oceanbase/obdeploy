@@ -244,6 +244,7 @@ def optimize(plugin_context, cursor, odp_cursor, *args, **kwargs):
             for config in system_configs:
                 if config[0] == 'sleep':
                     sleep(config[1])
+                    system_configs_done.append(config)
                     continue
                 if not config[5] or optimization > 1:
                     sql = 'select value from oceanbase.__all_virtual_sys_parameter_stat where name="%s"' % config[0]
