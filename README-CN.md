@@ -25,6 +25,21 @@ source /etc/profile.d/obd.sh
 - openssl-devel
 - xz-devel
 - mysql-devel
+- pip
+- pyinstaller
+
+> 说明:
+> 
+> 您可以参考如下命令安装pip2:
+>   ```shell
+>   curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py
+>   sudo python get-pip.py
+>   ```
+> 
+> 然后使用如下pip命令安装pyinstaller:
+>   ```shell
+>   sudo pip install pyinstaller==3.2.1
+>   ```
   
 Python2.7 使用以下命令安装：
 
