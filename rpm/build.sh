@@ -76,6 +76,7 @@ function get_python()
 {
     if [ `id -u` != 0 ] ; then
         echo "Please use root to run"
+        exit 1
     fi
 
     obd_dir=`dirname $0`
