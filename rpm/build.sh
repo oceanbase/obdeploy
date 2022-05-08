@@ -136,8 +136,8 @@ function build()
     cp -fr ./profile/* /etc/profile.d/
     mv $BUILD_DIR /usr/obd
     rm -fr dist
-    cd $BUILD_DIR/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
-    cd $BUILD_DIR/config_parser && ln -s oceanbase oceanbase-ce 
+    cd /usr/obd/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
+    cd /usr/obd/config_parser && ln -s oceanbase oceanbase-ce
     chmod +x /usr/bin/obd
     chmod -R 755 /usr/obd/*
     chown -R root:root /usr/obd/*
