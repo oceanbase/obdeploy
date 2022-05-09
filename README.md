@@ -25,6 +25,23 @@ Before you install OBD by using the source code, make sure that you have install
 - openssl-devel
 - xz-devel
 - mysql-devel
+- pip
+- pyinstaller
+
+> Notes:
+> 
+> You can install pip for Python2.7 or Python3.8 refer below cmd:
+>   ```shell
+>   curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # for Python2.7 
+>   curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # for Python3.8 
+>   sudo python get-pip.py
+>   ```
+> 
+> then install pyinstaller as below:
+>   ```shell
+>   sudo pip install pyinstaller==3.6
+>   ```
+
 
 To install OBD on Python2.7, run these commands:
 

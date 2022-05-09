@@ -25,6 +25,22 @@ source /etc/profile.d/obd.sh
 - openssl-devel
 - xz-devel
 - mysql-devel
+- pip
+- pyinstaller
+
+> 说明:
+> 
+> 您可以参考如下命令在拥有 Python2.7 或 Python3.8 的环境中安装 pip:
+>   ```shell
+>   curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # 针对 Python2.7 环境
+>   curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # 针对 Python3.8 环境
+>   sudo python get-pip.py
+>   ```
+> 
+> 然后使用如下 pip 命令安装 pyinstaller:
+>   ```shell
+>   sudo pip install pyinstaller==3.6
+>   ```
   
 Python2.7 使用以下命令安装：
 
