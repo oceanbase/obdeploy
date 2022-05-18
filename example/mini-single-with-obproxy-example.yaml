@@ -25,8 +25,8 @@ oceanbase-ce:
     zone: zone1
     cluster_id: 1
     # please set memory limit to a suitable value which is matching resource. 
-    memory_limit: 8G # The maximum running memory for an observer
-    system_memory: 4G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
+    memory_limit: 6G # The maximum running memory for an observer
+    system_memory: 3G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
     stack_size: 512K
     cpu_count: 16
     cache_wash_threshold: 1G
