@@ -1,5 +1,5 @@
 rpmfile==1.0.8
-paramiko==2.7.2
+paramiko==2.10.1
 requests==2.25.1
 PyMySQL==1.0.2
 ruamel.yaml==0.17.4
