@@ -910,7 +910,7 @@ class TestMajorCommand(MajorCommand):
         self.register_command(MySQLTestCommand())
         self.register_command(SysBenchCommand())
         self.register_command(TPCHCommand())
-        # self.register_command(TPCCCommand())
+        self.register_command(TPCCCommand())
 
 
 class BenchMajorCommand(MajorCommand):
