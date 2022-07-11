@@ -69,20 +69,29 @@ class AllowUndefinedOptionParser(OptionParser):
 
     def _process_long_opt(self, rargs, values):
         try:
+            value = rargs[0]
             OptionParser._process_long_opt(self, rargs, values)
         except BadOptionError as e:
             if self.allow_undefine:
+                key = e.opt_str
+                value = value[len(key)+1:]
+                if rargs and rargs[0] == value:
+                    rargs.pop()
+                setattr(values, key.strip('-').replace('-', '_'), value)
                 return self.warn(e)
             else:
                 raise e
 
     def _process_short_opts(self, rargs, values):
         try:
+            value = rargs[0]
             OptionParser._process_short_opts(self, rargs, values)
         except BadOptionError as e:
             if self.allow_undefine:
+                key = e.opt_str
+                value = value[len(key)+1:]
+                setattr(values, key.strip('-').replace('-', '_'), value)
                 return self.warn(e)
-                return
             else:
                 raise e
 
@@ -787,6 +796,7 @@ class MySQLTestCommand(TestMirrorCommand):
         self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
         self.parser.add_option('--test-dir', type='string', help='Test case file directory. [./mysql_test/t]', default='./mysql_test/t')
         self.parser.add_option('--result-dir', type='string', help='Result case file directory. [./mysql_test/r]', default='./mysql_test/r')
+        self.parser.add_option('--record', action='store_true', help='record mysqltest execution results', default=False)
         self.parser.add_option('--record-dir', type='string', help='The directory of the result file for mysqltest.')
         self.parser.add_option('--log-dir', type='string', help='The log file directory. [./log]', default='./log')
         self.parser.add_option('--tmp-dir', type='string', help='Temporary directory for mysqltest. [./tmp]', default='./tmp')

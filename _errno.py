@@ -49,7 +49,7 @@ class InitDirFailedErrorMessage(object):
     PERMISSION_DENIED = ': {path} permission denied .'
 
 
-DOC_LINK_MSG = 'See https://open.oceanbase.com/docs/obd-cn/V1.3.0/10000000000099584.'
+DOC_LINK_MSG = 'See https://open.oceanbase.com/docs/obd-cn/V1.4.0/10000000000436999 .'
 
 EC_CONFIG_CONFLICT_PORT = OBDErrorCode(1000, 'Configuration conflict {server1}:{port} port is used for {server2}\'s {key}')
 EC_CONFLICT_PORT = OBDErrorCode(1001, '{server}:{port} port is already used')
@@ -57,6 +57,8 @@ EC_FAIL_TO_INIT_PATH = OBDErrorCode(1002, 'Fail to init {server} {key}{msg}')
 EC_CLEAN_PATH_FAILED = OBDErrorCode(1003, 'Fail to clean {server}:{path}')
 EC_CONFIG_CONFLICT_DIR = OBDErrorCode(1004, 'Configuration conflict {server1}: {path} is used for {server2}\'s {key}')
 EC_SOME_SERVER_STOPED = OBDErrorCode(1005, 'Some of the servers in the cluster have been stopped')
+EC_FAIL_TO_CONNECT = OBDErrorCode(1006, 'Failed to connect to {component}')
+EC_ULIMIT_CHECK = OBDErrorCode(1007, '({server}) {key} must not be less than {need} (Current value: {now})')
 
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCode(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
 EC_OBSERVER_CAN_NOT_MIGRATE_IN = OBDErrorCode(2001, 'server can not migrate in')
@@ -66,7 +68,11 @@ EC_OBSERVER_INVALID_MODFILY_GLOBAL_KEY = OBDErrorCode(2004, 'Invalid: {key} is n
 
 EC_MYSQLTEST_PARSE_CMD_FAILED = OBDErrorCode(3000, 'parse cmd failed: {path}')
 EC_MYSQLTEST_FAILE_NOT_FOUND = OBDErrorCode(3001, '{file} not found in {path}')
+EC_TPCC_LOAD_DATA_FAILED = OBDErrorCode(3002, 'Failed to load data.')
+EC_TPCC_RUN_TEST_FAILED = OBDErrorCode(3003, 'Failed to run TPC-C benchmark.')
 
 EC_OBAGENT_RELOAD_FAILED = OBDErrorCode(4000, 'Fail to reload {server}')
 EC_OBAGENT_SEND_CONFIG_FAILED = OBDErrorCode(4001, 'Fail to send config file to {server}')
 
+# WARN CODE 
+WC_ULIMIT_CHECK = OBDErrorCode(1007, '({server}) The recommended number of {key} is {need} (Current value: %s)')

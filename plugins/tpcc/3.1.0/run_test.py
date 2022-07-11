@@ -31,6 +31,7 @@ except:
     import subprocess
 
 from ssh import LocalClient
+from _errno import EC_TPCC_RUN_TEST_FAILED
 
 stdio = None
 
@@ -146,7 +147,7 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
                 if datetime.datetime.now() - start_time > timeout:
                     p.terminate()
                     stdio.verbose('Run benchmark sql timeout.')
-                    stdio.error('Failed to run TPC-C benchmark.')
+                    stdio.error(EC_TPCC_RUN_TEST_FAILED)
                     stdio.verbose('return code: {}'.format(p.returncode))
                     with open(log_path, 'r') as f:
                         out = f.read()
@@ -160,7 +161,7 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
         if code:
             verbose_msg += ', output: %s' % out
             stdio.verbose(verbose_msg)
-            stdio.error('Failed to run TPC-C benchmark.')
+            stdio.error(EC_TPCC_RUN_TEST_FAILED)
             stdio.stop_loading('fail')
             return
         stdio.verbose('stdout: %s' % out)
@@ -169,7 +170,7 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
                   r'Transaction Count']:
             matched = re.match(r'.*(%s)\s+=\s+(.*?)\n' % k, out, re.S)
             if not matched:
-                stdio.error('Failed to run TPC-C benchmark.')
+                stdio.error(EC_TPCC_RUN_TEST_FAILED)
                 return
             output += '{} : {}\n'.format(matched.group(1), matched.group(2))
         stdio.print(output)

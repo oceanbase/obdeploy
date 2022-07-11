@@ -204,7 +204,6 @@ def run_test(plugin_context, test, env, *args, **kwargs):
         if os.path.exists(result_file):
             opt['slave_cmp'] = 0
             opt['result_file'] = result_file
-    opt['record_file'] = os.path.join(opt['result_dir'], test + suffix + '.record')
     
     if len(test.split('.')) == 2:
         suite_name, test= test.split('.')
@@ -223,6 +222,7 @@ def run_test(plugin_context, test, env, *args, **kwargs):
                 opt['test_file'] = inner_test_file
                 opt['result_dir'] = get_result_dir(inner_result_dir)
 
+    opt['record_file'] = os.path.join(opt['result_dir'], test + suffix + '.record')
     opt['result_file'] = os.path.join(opt['result_dir'], test + suffix + '.result')
 
     if 'my_host' in opt or 'oracle_host' in opt:

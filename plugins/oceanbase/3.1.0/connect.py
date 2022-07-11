@@ -26,6 +26,7 @@ if sys.version_info.major == 2:
     import MySQLdb as mysql
 else:
     import pymysql as mysql
+from _errno import EC_FAIL_TO_CONNECT
 
 
 stdio = None
@@ -69,4 +70,5 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         time.sleep(3)
     
     stdio.stop_loading('fail')
+    stdio.error(EC_FAIL_TO_CONNECT.format(component=cluster_config.name))
     plugin_context.return_false()

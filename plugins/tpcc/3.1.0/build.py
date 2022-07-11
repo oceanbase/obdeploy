@@ -29,6 +29,7 @@ import time
 import re
 
 from ssh import LocalClient
+from _errno import EC_TPCC_LOAD_DATA_FAILED
 
 
 def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
@@ -168,7 +169,7 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
 
     # create new tables
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableCreates.sql')):
-        stdio.error('create tables failed')
+        stdio.error('Create tables failed')
         return False
 
     # load data
@@ -195,18 +196,18 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     stdio.verbose(verbose_msg)
     if code != 0:
         stdio.interrupt_progressbar()
-        stdio.error('Failed to load data.')
+        stdio.error(EC_TPCC_LOAD_DATA_FAILED)
         return
     if re.match(r'.*Worker \d+: ERROR: .*', output, re.S):
         stdio.interrupt_progressbar()
-        stdio.error('Failed to load data.')
+        stdio.error(EC_TPCC_LOAD_DATA_FAILED)
         return
     stdio.finish_progressbar()
 
     # create index
     stdio.start_loading('create index')
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'indexCreates.sql')):
-        stdio.error('create index failed')
+        stdio.error('Create index failed')
         stdio.stop_loading('fail')
         return
     stdio.stop_loading('succeed')
@@ -214,7 +215,7 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     # build finish
     stdio.start_loading('finish build')
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'buildFinish.sql')):
-        stdio.error('finish build failed')
+        stdio.error('Finish build failed')
         stdio.stop_loading('fail')
         return
     stdio.stop_loading('succeed')
@@ -228,6 +229,6 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     except Exception as e:
         stdio.stop_loading('fail')
         stdio.verbose(e)
-        stdio.error('check data failed.')
+        stdio.error('Check data failed.')
         return
     return plugin_context.return_true()

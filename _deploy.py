@@ -1083,7 +1083,7 @@ class ConfigParserManager(Manager):
                 return parser
         parser = self._get_global_parser(style)
         if not parser:
-            raise ParserError('Unsupported configuration style: %s' % style)
+            raise ParserError('Unsupported configuration style: %s %s' % (component, style))
         return parser
 
 
