@@ -1,21 +1,4 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
-#
-# This file is part of OceanBase Deploy.
-#
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import ctypes
 import struct
@@ -23,12 +6,13 @@ import struct
 _ppc64_native_is_best = True
 
 # dict mapping arch -> ( multicompat, best personality, biarch personality )
-multilibArches = { "x86_64":  ( "athlon", "x86_64", "athlon" ),
-                   "sparc64v": ( "sparcv9v", "sparcv9v", "sparc64v" ),
-                   "sparc64": ( "sparcv9", "sparcv9", "sparc64" ),
-                   "ppc64":   ( "ppc", "ppc", "ppc64" ),
-                   "s390x":   ( "s390", "s390x", "s390" ),
-                   }
+multilibArches = { 
+    "x86_64":  ( "athlon", "x86_64", "athlon" ),
+    "sparc64v": ( "sparcv9v", "sparcv9v", "sparc64v" ),
+    "sparc64": ( "sparcv9", "sparcv9", "sparc64" ),
+    "ppc64":   ( "ppc", "ppc", "ppc64" ),
+    "s390x":   ( "s390", "s390x", "s390" ),
+}
 if _ppc64_native_is_best:
     multilibArches["ppc64"] = ( "ppc", "ppc64", "ppc64" )
 
@@ -103,14 +87,15 @@ arches = {
     
     #itanium
     "ia64": "noarch",
-    }
+}
 
 #  Will contain information parsed from /proc/self/auxv via _parse_auxv().
 # Should move into rpm really.
 _aux_vector = {
     "platform": "",
     "hwcap": 0,
-    }
+}
+
     
 def _try_read_cpuinfo():
     """ Try to read /proc/cpuinfo ... if we can't ignore errors (ie. proc not
@@ -119,6 +104,7 @@ def _try_read_cpuinfo():
         return open("/proc/cpuinfo", "r")
     except:
         return []
+
 
 def _parse_auxv():
     """ Read /proc/self/auxv and parse it into global dict for easier access
@@ -146,6 +132,7 @@ def _parse_auxv():
             _aux_vector["hwcap"] = at_val
         offset = offset + fmtlen
 
+
 def getCanonX86Arch(arch):
     # 
     if arch == "i586":
@@ -171,6 +158,7 @@ def getCanonX86Arch(arch):
 
     return arch
 
+
 def getCanonARMArch(arch):
     # the %{_target_arch} macro in rpm will let us know the abi we are using 
     try:
@@ -181,6 +169,7 @@ def getCanonARMArch(arch):
     except:
         pass
     return arch
+
 
 def getCanonPPCArch(arch):
     # FIXME: should I do better handling for mac, etc?
@@ -211,6 +200,7 @@ def getCanonPPCArch(arch):
     if machine.find("iSeries") != -1:
         return "ppc64iseries"
     return arch
+
 
 def getCanonSPARCArch(arch):
     # Deal with sun4v, sun4u, sun4m cases
@@ -253,7 +243,8 @@ def getCanonX86_64Arch(arch):
     if vendor.find("GenuineIntel") != -1:
         return "ia32e"
     return arch
-        
+
+ 
 def getCanonArch(skipRpmPlatform = 0):
     if not skipRpmPlatform and os.access("/etc/rpm/platform", os.R_OK):
         try:
@@ -282,7 +273,9 @@ def getCanonArch(skipRpmPlatform = 0):
         return getCanonX86_64Arch(arch)
     return arch
 
+
 canonArch = getCanonArch()
+
 
 def isMultiLibArch(arch=None):
     """returns true if arch is a multilib arch, false if not"""
@@ -299,6 +292,7 @@ def isMultiLibArch(arch=None):
         return 1
     
     return 0
+
 
 def getBaseArch(myarch=None):
     """returns 'base' arch for myarch, if specified, or canonArch if not.
@@ -338,7 +332,8 @@ def getBaseArch(myarch=None):
             value = arches[basearch]
     
         return basearch
-          
+
+
 def getArchList(thisarch=None):
     # this returns a list of archs that are compatible with arch given
     if not thisarch:
