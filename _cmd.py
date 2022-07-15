@@ -75,9 +75,7 @@ class AllowUndefinedOptionParser(OptionParser):
             if self.allow_undefine:
                 key = e.opt_str
                 value = value[len(key)+1:]
-                if rargs and rargs[0] == value:
-                    rargs.pop()
-                setattr(values, key.strip('-').replace('-', '_'), value)
+                setattr(values, key.strip('-').replace('-', '_'), value if value != '' else True)
                 return self.warn(e)
             else:
                 raise e
@@ -90,7 +88,7 @@ class AllowUndefinedOptionParser(OptionParser):
             if self.allow_undefine:
                 key = e.opt_str
                 value = value[len(key)+1:]
-                setattr(values, key.strip('-').replace('-', '_'), value)
+                setattr(values, key.strip('-').replace('-', '_'), value if value != '' else True)
                 return self.warn(e)
             else:
                 raise e
