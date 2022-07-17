@@ -939,7 +939,6 @@ class ObdHome(object):
                 db = ret.get_return('connect')
                 cursor = ret.get_return('cursor')
             else:
-                self._call_stdio('error', 'Failed to connect %s' % repository.name)
                 break
             
             self._call_stdio('verbose', 'Call %s for %s' % (ocp_check[repository], repository))
@@ -1257,7 +1256,6 @@ class ObdHome(object):
                 db = ret.get_return('connect')
                 cursor = ret.get_return('cursor')
             else:
-                self._call_stdio('error', 'Failed to connect %s' % repository.name)
                 break
 
             if need_bootstrap and start_all:
@@ -1329,7 +1327,6 @@ class ObdHome(object):
                 db = ret.get_return('connect')
                 cursor = ret.get_return('cursor')
             if not db:
-                self._call_stdio('error', 'Failed to connect %s' % repository.name)
                 return False
 
             self._call_stdio('verbose', 'Call %s for %s' % (create_tenant_plugins[repository], repository))
@@ -1376,7 +1373,6 @@ class ObdHome(object):
                 db = ret.get_return('connect')
                 cursor = ret.get_return('cursor')
             if not db:
-                self._call_stdio('error', 'Failed to connect %s' % repository.name)
                 return False
 
             self._call_stdio('verbose', 'Call %s for %s' % (drop_tenant_plugins[repository], repository))
@@ -1466,7 +1462,6 @@ class ObdHome(object):
                 db = ret.get_return('connect')
                 cursor = ret.get_return('cursor')
             else:
-                self._call_stdio('error', 'Failed to connect %s' % repository.name)
                 continue
 
             self._call_stdio('verbose', 'Call %s for %s' % (reload_plugins[repository], repository))
@@ -1537,7 +1532,6 @@ class ObdHome(object):
                 db = ret.get_return('connect')
                 cursor = ret.get_return('cursor')
             if not db:
-                self._call_stdio('error', 'Failed to connect %s' % repository.name)
                 return False
 
             self._call_stdio('verbose', 'Call %s for %s' % (display_plugins[repository], repository))
@@ -2135,7 +2129,6 @@ class ObdHome(object):
                     db = ret.get_return('connect')
                     cursor = ret.get_return('cursor')
                 if not db:
-                    self._call_stdio('error', 'Failed to connect %s' % current_repository.name)
                     return False
                 self._call_stdio('verbose', 'Call %s for %s' % (upgrade_check_plugins[current_repository], current_repository))
                 if not upgrade_check_plugins[current_repository](
@@ -2369,7 +2362,6 @@ class ObdHome(object):
         connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
         ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, target_server=opts.test_server, sys_root=False)
         if not ret or not ret.get_return('connect'):
-            self._call_stdio('error', 'Failed to connect to the server')
             return False
         db = ret.get_return('connect')
         cursor = ret.get_return('cursor')
@@ -2430,7 +2422,6 @@ class ObdHome(object):
                 connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
                 ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, target_server=opts.test_server, sys_root=False)
                 if not ret or not ret.get_return('connect'):
-                    self._call_stdio('error', 'Failed to connect server')
                     break
                 db = ret.get_return('connect')
                 cursor = ret.get_return('cursor')
@@ -2482,6 +2473,14 @@ class ObdHome(object):
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
+                    if opts.test_server is not None:
+                        cluster_config = deploy_config.components[component_name]
+                        for server in cluster_config.servers:
+                            if server.name == opts.test_server:
+                                break
+                        else:
+                            continue
+                    self._call_stdio('verbose', 'Select component %s' % component_name)
                     opts.component = component_name
                     break
         elif opts.component not in allow_components:
@@ -2556,14 +2555,12 @@ class ObdHome(object):
                     break
             ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, target_server=opts.test_server)
             if not ret or not ret.get_return('connect'):
-                self._call_stdio('error', 'Failed to connect to the server')
                 return False
             odp_db = ret.get_return('connect')
             odp_cursor = ret.get_return('cursor')
 
         ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, target_server=opts.test_server, **env)
         if not ret or not ret.get_return('connect'):
-            self._call_stdio('error', 'Failed to connect to the server')
             return False
         db = ret.get_return('connect')
         cursor = ret.get_return('cursor')
@@ -2650,7 +2647,6 @@ class ObdHome(object):
         connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
         ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, target_server=opts.test_server)
         if not ret or not ret.get_return('connect'):
-            self._call_stdio('error', 'Failed to connect to the server')
             return False
         db = ret.get_return('connect')
         cursor = ret.get_return('cursor')
@@ -2786,7 +2782,6 @@ class ObdHome(object):
             ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio,
                                  target_server=opts.test_server)
             if not ret or not ret.get_return('connect'):
-                self._call_stdio('error', 'Failed to connect to the server')
                 return False
             odp_db = ret.get_return('connect')
             odp_cursor = ret.get_return('cursor')
@@ -2798,7 +2793,6 @@ class ObdHome(object):
         ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio,
                              target_server=opts.test_server, **env)
         if not ret or not ret.get_return('connect'):
-            self._call_stdio('error', 'Failed to connect to the server')
             return False
         db = ret.get_return('connect')
         cursor = ret.get_return('cursor')
@@ -2867,7 +2861,6 @@ class ObdHome(object):
                                              self.stdio,
                                              target_server=opts.test_server)
                         if not ret or not ret.get_return('connect'):
-                            self._call_stdio('error', 'Failed to connect to the server')
                             return False
                         odp_db = ret.get_return('connect')
                         odp_cursor = ret.get_return('cursor')
@@ -2875,7 +2868,6 @@ class ObdHome(object):
                                          self.stdio,
                                          target_server=opts.test_server, **env)
                     if not ret or not ret.get_return('connect'):
-                        self._call_stdio('error', 'Failed to connect to the server')
                         return False
                     db = ret.get_return('connect')
                     cursor = ret.get_return('cursor')

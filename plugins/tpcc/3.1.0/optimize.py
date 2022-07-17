@@ -85,7 +85,7 @@ def optimize(plugin_context, cursor, odp_cursor, *args, **kwargs):
             return
     except Exception as e:
         stdio.verbose(e)
-        stdio.error('fail to get tenant info')
+        stdio.error('Fail to get tenant info')
         stdio.stop_loading('fail')
         return
 

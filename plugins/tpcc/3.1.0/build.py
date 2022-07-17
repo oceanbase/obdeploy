@@ -29,6 +29,7 @@ import time
 import re
 
 from ssh import LocalClient
+from _errno import EC_TPCC_LOAD_DATA_FAILED
 
 
 def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
@@ -41,6 +42,18 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
 
     def local_execute_command(command, env=None, timeout=None):
         return LocalClient.execute_command(command, env, timeout, stdio)
+
+    def execute(cursor, query, args=None):
+        msg = query % tuple(args) if args is not None else query
+        stdio.verbose('execute sql: %s' % msg)
+        stdio.verbose("query: %s. args: %s" % (query, args))
+        try:
+            cursor.execute(query, args)
+            return cursor.fetchone()
+        except:
+            msg = 'execute sql exception: %s' % msg
+            stdio.exception(msg)
+            raise Exception(msg)
 
     def run_sql(sql_file, force=False):
         sql_cmd = "{obclient} -h{host} -P{port} -u{user}@{tenant} {password_arg} -A {db} {force_flag} < {sql_file}".format(
@@ -130,25 +143,33 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
         stdio.exception('')
         return
     stdio.stop_loading('succeed')
+
     # drop old tables
     bmsql_sql_path = kwargs.get('bmsql_sql_path', '')
     run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableDrops.sql'), force=True)
 
-    retries = 300
-    pending_free_count = -1
-    while pending_free_count != 0 and retries > 0:
-        retries -= 1
-        sql = 'select pending_free_count from oceanbase.__all_virtual_macro_block_marker_status'
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-        ret = cursor.fetchone()
-        stdio.verbose('sql result: %s' % ret)
-        pending_free_count = ret.get('pending_free_count', 0) if ret else 0
+    merge_version = execute(cursor, "select value from oceanbase.__all_zone where name='frozen_version'")['value']
+    stdio.start_loading('Merge')
+    execute(cursor, 'alter system major freeze')
+    sql = "select value from oceanbase.__all_zone where name='frozen_version' and value != %s" % merge_version
+    while True:
+        if execute(cursor, sql):
+            break
         time.sleep(1)
+
+    while True:
+        if not execute(cursor, """select * from  oceanbase.__all_zone 
+                        where name='last_merged_version'
+                        and value != (select value from oceanbase.__all_zone where name='frozen_version' limit 1)
+                        and zone in (select zone from  oceanbase.__all_zone where name='status' and info = 'ACTIVE')
+                        """):
+            break
+        time.sleep(5)
+    stdio.stop_loading('succeed')
 
     # create new tables
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableCreates.sql')):
-        stdio.error('create tables failed')
+        stdio.error('Create tables failed')
         return False
 
     # load data
@@ -175,18 +196,18 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     stdio.verbose(verbose_msg)
     if code != 0:
         stdio.interrupt_progressbar()
-        stdio.error('Failed to load data.')
+        stdio.error(EC_TPCC_LOAD_DATA_FAILED)
         return
     if re.match(r'.*Worker \d+: ERROR: .*', output, re.S):
         stdio.interrupt_progressbar()
-        stdio.error('Failed to load data.')
+        stdio.error(EC_TPCC_LOAD_DATA_FAILED)
         return
     stdio.finish_progressbar()
 
     # create index
     stdio.start_loading('create index')
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'indexCreates.sql')):
-        stdio.error('create index failed')
+        stdio.error('Create index failed')
         stdio.stop_loading('fail')
         return
     stdio.stop_loading('succeed')
@@ -194,7 +215,7 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     # build finish
     stdio.start_loading('finish build')
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'buildFinish.sql')):
-        stdio.error('finish build failed')
+        stdio.error('Finish build failed')
         stdio.stop_loading('fail')
         return
     stdio.stop_loading('succeed')
@@ -208,6 +229,6 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     except Exception as e:
         stdio.stop_loading('fail')
         stdio.verbose(e)
-        stdio.error('check data failed.')
+        stdio.error('Check data failed.')
         return
     return plugin_context.return_true()

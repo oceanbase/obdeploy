@@ -64,6 +64,7 @@ pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py
 rm -f obd.py obd.spec
 \cp -rf $SRC_DIR/dist/obd ${RPM_BUILD_ROOT}/usr/bin/obd
 \cp -rf $SRC_DIR/plugins $BUILD_DIR/SOURCES/plugins
+\cp -rf $SRC_DIR/example $BUILD_DIR/SOURCES/example
 \cp -rf $SRC_DIR/config_parser $BUILD_DIR/SOURCES/config_parser
 \rm -fr $BUILD_DIR/SOURCES/plugins/oceanbase-ce
 \rm -fr $BUILD_DIR/SOURCES/plugins/obproxy-ce
@@ -79,6 +80,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/
 \cp -rf $BUILD_DIR/SOURCES/site-packages ${RPM_BUILD_ROOT}/usr/obd/lib/site-packages
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
+\cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
 cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
 cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce 
 
@@ -114,6 +116,10 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Sun Jul 17 2022 obd 1.4.0
+ - new features: support tpcc
+ - new features: support mysqltest record
+ - fix bug: tpch ddl
 * Tue Apr 26 2022 obd 1.3.3
  - new features: change repository for a deployed component
  - fix bug: check kernel version when autdeploy obproxy

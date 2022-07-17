@@ -24,7 +24,7 @@ import os
 import re
 import time
 
-from _errno import EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG, EC_CONFIG_CONFLICT_PORT, EC_OBSERVER_NOT_ENOUGH_MEMORY
+from _errno import EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG, EC_CONFIG_CONFLICT_PORT, EC_OBSERVER_NOT_ENOUGH_MEMORY, EC_ULIMIT_CHECK, WC_ULIMIT_CHECK
 
 
 stdio = None
@@ -200,16 +200,36 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
                 alert('(%s) failed to get fs.aio-max-nr and fs.aio-nr' % ip)
                 stdio.exception('')
 
-        ret = client.execute_command('ulimit -n')
-        if not ret or not ret.stdout.strip().isdigit():
-            alert('(%s) failed to get open files number' % ip)
-        else:
-            max_of = int(ret.stdout)
-            need = server_num * 20000
-            if need > max_of:
-                critical('(%s) open files number must not be less than %s (Current value: %s)' % (ip, need, max_of))
-            elif max_of < 655350:
-                alert('(%s) The recommended number of open files is 655350 (Current value: %s)' % (ip, max_of))
+        ret = client.execute_command('ulimit -a')
+        ulimits_min = {
+            'open files': {
+                'need': lambda x: 20000 * x,
+                'recd': lambda x: 655350
+            },
+            'max user processes': {
+                'need': lambda x: 4096,
+                'recd': lambda x: 4096 * x
+            },
+        }
+        ulimits = {}
+        src_data = re.findall('\s?([a-zA-Z\s]+[a-zA-Z])\s+\([a-zA-Z\-,\s]+\)\s+([\d[a-zA-Z]+)', ret.stdout) if ret else []
+        for key, value in src_data:
+            ulimits[key] = value
+        for key in ulimits_min:
+            value = ulimits.get(key)
+            if value == 'unlimited':
+                continue
+            if not value or not (value.strip().isdigit()):
+                alert('(%s) failed to get %s' % (ip, key))
+            else:
+                value = int(value)
+                need = ulimits_min[key]['need'](server_num)
+                if need > value:
+                    critical(EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value))
+                else:
+                    need = ulimits_min[key]['recd'](server_num)
+                    if need > value:
+                        alert(WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value))
 
         # memory
         ret = client.execute_command('cat /proc/meminfo')

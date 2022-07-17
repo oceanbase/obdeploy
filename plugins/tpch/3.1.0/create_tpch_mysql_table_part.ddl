@@ -14,22 +14,22 @@ create tablegroup if not exists tpch_tg_partsupp_part binding true partition by 
 
 drop table if exists lineitem;
     create table lineitem (
-    l_orderkey bigint not null,
-    l_partkey bigint not null,
-    l_suppkey bigint not null,
-    l_linenumber bigint not null,
-    l_quantity bigint not null,
-    l_extendedprice bigint not null,
-    l_discount bigint not null,
-    l_tax bigint not null,
-    l_returnflag char(1) default null,
-    l_linestatus char(1) default null,
-    l_shipdate date not null,
-    l_commitdate date default null,
-    l_receiptdate date default null,
-    l_shipinstruct char(25) default null,
-    l_shipmode char(10) default null,
-    l_comment varchar(44) default null,
+    l_orderkey BIGINT NOT NULL,
+    l_partkey BIGINT NOT NULL,
+    l_suppkey INTEGER NOT NULL,
+    l_linenumber INTEGER NOT NULL,
+    l_quantity DECIMAL(15,2) NOT NULL,
+    l_extendedprice DECIMAL(15,2) NOT NULL,
+    l_discount DECIMAL(15,2) NOT NULL,
+    l_tax DECIMAL(15,2) NOT NULL,
+    l_returnflag char(1) DEFAULT NULL,
+    l_linestatus char(1) DEFAULT NULL,
+    l_shipdate date NOT NULL,
+    l_commitdate date DEFAULT NULL,
+    l_receiptdate date DEFAULT NULL,
+    l_shipinstruct char(25) DEFAULT NULL,
+    l_shipmode char(10) DEFAULT NULL,
+    l_comment varchar(44) DEFAULT NULL,
     primary key(l_orderkey, l_linenumber))
     tablegroup = tpch_tg_lineitem_order_group
     partition by key (l_orderkey) partitions cpu_num;

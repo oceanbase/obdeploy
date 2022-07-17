@@ -74,7 +74,7 @@ obd cluster start <deploy name> [flags]
 
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
--s/--servers | 否 | string | 空 | 机器列表，后跟 `yaml` 文件中 `servers` 对应的 `name` 值，用 `,` 间隔。用于指定启动的机器。如果组件下的机器没有全部启动，则 start 不会执行 bootstrap。
+-s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。用于指定启动的机器。如果组件下的机器没有全部启动，则 start 不会执行 bootstrap。
 -c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定启动的组件。如果配置下的组件没有全部启动，该配置不会进入 running 状态。
 --wop/--without-parameter | 否 | bool | false | 无参启动。启动的时候不带参数。节点第一次的启动时，不响应此选项。
 -S/--strict-check | 否 | bool | false | 部分组件在启动前会做相关的检查。检查不通过时，OBD 将发出告警，不会强制停止流程。使用该选项可开启检查失败报错直接退出。建议开启，可以避免一些资源不足导致的启动失败。
@@ -111,7 +111,7 @@ obd cluster reload <deploy name>
 
 ## `obd cluster restart`
 
-重启一个运行中集群。重启默认是无参数重启。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `restart` 命令应用修改。
+重启一个运行中集群。重启默认是无参重启。当您使用 edit-config 修改一个运行的集群的配置信息后，可以通过 `obd cluster restart <deploy name> --wp` 命令应用修改。
 
 > **注意：** 并非所有的配置项都可以通过 `restart` 来应用。有些配置项需要重部署集群才能生效。请根据 `edit-config` 后返回的信息进行操作。
 
@@ -125,9 +125,9 @@ obd cluster restart <deploy name>
 
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
--s/--servers | 否 | string | 空 | 机器列表，后跟 `yaml` 文件中 `servers` 对应的 `name` 值，用 `,` 间隔。
+-s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。
 -c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定启动的组件。如果配置下的组件没有全部启动，该配置不会进入 running 状态。
---wp/--with-parameter | 否 | bool | false | 使用参数重启 OBD。用于在重启时使配置项生效。
+--wp/--with-parameter | 否 | bool | false | 带参重启。用于让重启生效的配置项生效。
 
 ## `obd cluster redeploy`
 
@@ -155,7 +155,7 @@ obd cluster stop <deploy name>
 
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
--s/--servers | 否 | string | 空 | 机器列表，后跟 `yaml` 文件中 `servers` 对应的 `name` 值，用 `,` 间隔。用于指定停止的机器。
+-s/--servers | 否 | string | 空 | 机器列表，用 `,` 间隔。用于指定停止的机器。
 -c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定停止的组件。如果配置下的组件没有全部停止，该配置不会进入 stopped 状态。
 
 ## `obd cluster destroy`
@@ -175,7 +175,7 @@ obd cluster destroy <deploy name> [-f]
 升级一个已经启动的组件。
 
 ```shell
-obd cluster upgrade <deploy_name> -c <component_name> -V <version> [tags]
+obd cluster upgrade <deploy name> -c <component name> -V <version> [tags]
 ```
 
 参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
@@ -183,11 +183,27 @@ obd cluster upgrade <deploy_name> -c <component_name> -V <version> [tags]
 选项名 | 是否必选 | 数据类型 | 默认值 | 说明
 --- | --- | --- |--- |---
 -c/--component | 是 | string | 空 | 要升级的组件名。
--V/--version | 是 | string | 目标版本号。
+-V/--version | 是 | string | 空 | 目标版本号。
 --skip-check | 否 | bool | false | 跳过可以跳过的检查。
 --usable | 否 | string | 空 | 升级中使用到的镜像hash列表，用 `,` 间隔。
 --disable | 否 | string | 空 | 升级中禁用到的镜像hash列表，用 `,` 间隔。
 -e/--executer-path | 否 | string | /usr/obd/lib/executer | 升级脚本使用的解释器所在路径。
+
+## `obd cluster change-repo`
+
+修改一个已部署的组件的仓库。新的仓库必须与当前仓库版本号相同。仅在部署状态为running时，该命令在替换仓库后会使用无参启动，重新拉起组件。
+
+```shell
+obd cluster change-repo <deploy name> -c <component name> --hash <hash> [-f/--force]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+-c/--component | 是 | string | 空 | 要替换仓库的组件名。
+--hash | 是 | string | 空 | 目标仓库。必须必须与当前仓库版本号相同。
+-f/--force | 否 | bool | false | 启动失败也强制替换。
 
 ## `obd cluster tenant create`
 
@@ -234,3 +250,39 @@ obd cluster tenant drop <deploy name> [-n <tenant name>]
 参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
 
 选项 `-n` 为 `--tenant-name`。要删除的租户名。必填项。
+
+## `obd cluster chst`
+
+配置风格转换。
+
+```shell
+obd cluster chst <deploy name> --style <STYLE> [-c/--components]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+
+选项说明见下表：
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+--style | 是 | string | 无 | 目标配置风格。目前支持default和cluster
+-c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定转换风格的组件。
+
+## `obd cluster check4ocp`
+
+检查当前配置是否满足ocp接管的条件。
+
+```shell
+obd cluster check4ocp <deploy name> [-c/--components] [-V/--version]
+```
+
+参数 `deploy name` 为部署配置名称，可以理解为配置文件名称。
+
+
+选项说明见下表：
+
+选项名 | 是否必选 | 数据类型 | 默认值 | 说明
+--- | --- | --- |--- |---
+-c/--components | 否 | string | 空 | 组件列表，用 `,` 间隔。用于指定转换风格的组件。
+-V/--version | 是 | string | 3.1.0 | OCP版本号
