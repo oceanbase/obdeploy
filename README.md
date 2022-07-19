@@ -19,6 +19,7 @@ source /etc/profile.d/obd.sh
 
 Before you install OBD by using the source code, make sure that you have installed these dependencies:
 
+- git
 - gcc
 - wget
 - python-devel
@@ -42,10 +43,16 @@ Before you install OBD by using the source code, make sure that you have install
 >   sudo pip install pyinstaller==3.6
 >   ```
 
+Download the source code from GitHub:
+
+```shell
+git clone https://github.com/ChrisYuan/obdeploy.git
+```
 
 To install OBD on Python2.7, run these commands:
 
 ```shell
+cd obdeploy/
 sh rpm/build.sh build
 source /etc/profile.d/obd.sh
 ```
