@@ -5,3 +5,4 @@
 - src_path: ./home/admin/oceanbase/etc
   target_path: etc
   type: dir
+  install_method: cp

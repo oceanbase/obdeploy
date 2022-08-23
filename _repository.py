@@ -31,6 +31,7 @@ from _arch import getBaseArch
 from tool import DirectoryUtil, FileUtil, YamlLoader
 from _manager import Manager
 from _plugin import InstallPlugin
+from ssh import LocalClient
 
 
 class LocalPackage(Package):
@@ -121,10 +122,15 @@ class LocalPackage(Package):
                     filelinktos.append(os.readlink(target_path))
                     filemodes.append(-24065)
                 else:
-                    m = hashlib.md5()
-                    with open(target_path, 'rb') as f:
-                        m.update(f.read())
-                    m_value = m.hexdigest().encode(sys.getdefaultencoding())
+                    ret = LocalClient().execute_command('md5sum {}'.format(target_path))
+                    if ret:
+                        m_value = ret.stdout.strip().split(' ')[0].encode('utf-8')
+                    else:
+                        m = hashlib.md5()
+                        with open(target_path, 'rb') as f:
+                            m.update(f.read())
+                        m_value = m.hexdigest().encode(sys.getdefaultencoding())
+                        # raise Exception('Failed to get md5sum for {}, error: {}'.format(target_path, ret.stderr))
                     m_sum.update(m_value)
                     filemd5s.append(m_value)
                     filelinktos.append('')
@@ -158,7 +164,7 @@ class Repository(PackageInfo):
         return self.md5
 
     def __str__(self):
-        return '%s-%s-%s' % (self.name, self.version, self.hash)
+        return '%s-%s-%s-%s' % (self.name, self.version, self.release, self.hash)
 
     def __hash__(self):
         return hash(self.repository_dir)
@@ -380,48 +386,29 @@ class ComponentRepository(object):
                     repositories[repository.hash] = repository
         return repositories
 
-    def get_repository_by_version(self, version, tag=None):
-        if tag:
-            return self.get_repository_by_tag(tag, version)
-        repository = self.get_repository_by_tag(self.name, version)
-        if repository:
-            return repository
-        path_partten = os.path.join(self.repository_dir, version, tag if tag else '*')
-        for path in glob(path_partten):
-            n_repository = Repository(self.name, path, self.stdio)
-            if n_repository.hash and n_repository > repository:
-                repository = n_repository
-        return repository
-
-    def get_repository_by_tag(self, tag, version=None):
-        path_partten = os.path.join(self.repository_dir, version if version else '*', tag)
+    def search_repository(self, version=None, tag=None, release=None):
+        path_pattern = os.path.join(self.repository_dir, version or '*', tag or '*')
         repository = None
-        for path in glob(path_partten):
+        for path in glob(path_pattern):
             n_repository = Repository(self.name, path, self.stdio)
+            if release and release != n_repository.release:
+                continue
             if n_repository.hash and n_repository > repository:
                 repository = n_repository
         return repository
 
-    def get_repository(self, version=None, tag=None):
-        if tag:
-            return self.get_repository_by_tag(tag, version)
-        if version:
-            return self.get_repository_by_version(version, tag)
-        version = None
-        for rep_version in os.listdir(self.repository_dir):
-            rep_version = Version(rep_version)
-            if rep_version > version:
-                version = rep_version
-        if version:
-            return self.get_repository_by_version(version, tag)
-        return None
-        
+    def get_repository(self, version=None, tag=None, release=None):
+        if version or tag or release:
+            return self.search_repository(version=version, tag=tag, release=release)
+        else:
+            return self.search_repository(tag=self.name) or self.search_repository()
+
     def get_repositories(self, version=None):
         if not version:
             version = '*'
         repositories = []
-        path_partten = os.path.join(self.repository_dir, version, '*')
-        for path in glob(path_partten):
+        path_pattern = os.path.join(self.repository_dir, version, '*')
+        for path in glob(path_pattern):
             repository = Repository(self.name, path, self.stdio)
             if repository.hash:
                 repositories.append(repository)
@@ -436,7 +423,7 @@ class RepositoryManager(Manager):
     def __init__(self, home_path, lock_manager=None, stdio=None):
         super(RepositoryManager, self).__init__(home_path, stdio=stdio)
         self.repositories = {}
-        self.component_repositoies = {}
+        self.component_repositories = {}
         self.lock_manager = lock_manager
 
     def _lock(self, read_only=False):
@@ -460,20 +447,20 @@ class RepositoryManager(Manager):
 
     def get_repositories(self, name, version=None, instance=True):
         repositories = []
-        for repository in self.get_component_repositoy(name).get_repositories(version):
+        for repository in self.get_component_repository(name).get_repositories(version):
             if instance and repository.is_shadow_repository() is False:
                 repositories.append(repository)
         return repositories
 
     def get_repositories_view(self, name=None):
         if name:
-            repositories = self.get_component_repositoy(name).get_repositories()
+            repositories = self.get_component_repository(name).get_repositories()
         else:
             repositories = []
-            path_partten = os.path.join(self.path, '*')
-            for path in glob(path_partten):
+            path_pattern = os.path.join(self.path, '*')
+            for path in glob(path_pattern):
                 _, name = os.path.split(path)
-                repositories += self.get_component_repositoy(name).get_repositories()
+                repositories += self.get_component_repository(name).get_repositories()
 
         repositories_vo = {}
         for repository in repositories:
@@ -487,36 +474,46 @@ class RepositoryManager(Manager):
                 repositories_vo[repository] = self._get_repository_vo(repository)
         return list(repositories_vo.values())
 
-    def get_component_repositoy(self, name):
-        if name not in self.component_repositoies:
+    def get_component_repository(self, name):
+        if name not in self.component_repositories:
             self._lock(True)
             path = os.path.join(self.path, name)
-            self.component_repositoies[name] = ComponentRepository(name, path, self.stdio)
-        return self.component_repositoies[name]
+            self.component_repositories[name] = ComponentRepository(name, path, self.stdio)
+        return self.component_repositories[name]
 
-    def get_repository_by_version(self, name, version, tag=None, instance=True):
-        if not tag:
-            tag = name
-        path = os.path.join(self.path, name, version, tag)
-        if path not in self.repositories:
-            component_repositoy = self.get_component_repositoy(name)
-            repository = component_repositoy.get_repository(version, tag)
-            if repository:
-                self.repositories[repository.repository_dir] = repository
-                self.repositories[path] = repository
+    def get_repository(self, name, version=None, tag=None, release=None, package_hash=None, instance=True):
+        self.stdio.verbose(
+            "Search repository {name} version: {version}, tag: {tag}, release: {release}, package_hash: {package_hash}".format(
+                name=name, version=version, tag=tag, release=release, package_hash=package_hash))
+        tag = tag or package_hash
+        component_repository = self.get_component_repository(name)
+        if version and tag:
+            repository_dir = os.path.join(self.path, name, version, tag)
+            if repository_dir in self.repositories:
+                repository = self.repositories[repository_dir]
+            else:
+                repository = component_repository.get_repository(version=version, tag=tag, release=release)
         else:
-            repository = self.repositories[path]
+            repository = component_repository.get_repository(version=version, tag=tag, release=release)
+        if not repository:
+            return None
+        else:
+            if repository.repository_dir not in self.repositories:
+                self.repositories[repository.repository_dir] = repository
+            else:
+                repository = self.repositories[repository.repository_dir]
+            if not self._check_repository_pattern(repository, version=version, release=release, hash=package_hash):
+                return None
+        self.stdio.verbose("Found repository {}".format(repository))
         return self.get_instance_repository_from_shadow(repository) if instance else repository
 
-    def get_repository(self, name, version=None, tag=None, instance=True):
-        if version:
-            return self.get_repository_by_version(name, version, tag)
-
-        component_repositoy = self.get_component_repositoy(name)
-        repository = component_repositoy.get_repository(version, tag)
-        if repository:
-            self.repositories[repository.repository_dir] = repository
-        return self.get_instance_repository_from_shadow(repository) if repository and instance else repository
+    def _check_repository_pattern(self, repository, **kwargs):
+        for key in ["version", "release", "hash"]:
+            current_value = getattr(repository, key)
+            if kwargs.get(key) is not None and current_value != kwargs[key]:
+                self.stdio.verbose("repository {} is {}, but {} is required".format(key, current_value, kwargs[key]))
+                return False
+        return True
 
     def create_instance_repository(self, name, version, _hash):
         path = os.path.join(self.path, name, version, _hash)
@@ -534,7 +531,7 @@ class RepositoryManager(Manager):
                 self._lock(True)
                 self.repositories[path] = Repository(name, path, self.stdio)
             return self.repositories[path]
-        repository =  Repository(name, path, self.stdio)
+        repository = Repository(name, path, self.stdio)
         repository.set_version(version)
         return repository
 

@@ -243,18 +243,6 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
                     stdio.stop_loading('fail')
                     return 
-
-        for path in glob(os.path.join(repository_dir, 'conf/*/*')):
-            if path.endswith('.yaml'):
-                continue
-            if os.path.isdir(path):
-                ret = client.put_dir(path, path.replace(repository_dir, home_path))
-            else:
-                ret = client.put_file(path, path.replace(repository_dir, home_path))
-            if not ret:
-                stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
-                stdio.stop_loading('fail')
-                return 
         
         config = {
             'log': {

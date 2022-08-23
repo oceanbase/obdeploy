@@ -29,11 +29,13 @@ from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 
 def parse_size(size):
     _bytes = 0
+    if isinstance(size, str):
+        size = size.strip()
     if not isinstance(size, str) or size.isdigit():
         _bytes = int(size)
     else:
         units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'([1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
+        match = re.match(r'^([1-9][0-9]*)\s*([B,K,M,G,T])$', size.upper())
         _bytes = int(match.group(1)) * units[match.group(2)]
     return _bytes
 
@@ -59,6 +61,16 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
         if not value:
             value = default
         return value
+
+    def get_parsed_option(key, default=''):
+        value = get_option(key=key, default=default)
+        try:
+            parsed_value = parse_size(value)
+        except:
+            stdio.exception("")
+            raise Exception("Invalid option {}: {}".format(key, value))
+        return parsed_value
+
     def error(*arg, **kwargs):
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
@@ -69,6 +81,11 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     options = plugin_context.options
+
+    mode = get_option('mode', 'mysql').lower()
+    if not mode in ['mysql', 'oracle']:
+        error('No such tenant mode: %s.\n--mode must be `mysql` or `oracle`' % mode)
+        return 
 
     name = get_option('tenant_name', 'test')
     unit_name = '%s_unit' % name
@@ -153,7 +170,7 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
         exception('execute sql exception: %s' % sql)
         return
     
-    units_id = set()
+    units_id = {}
     res = cursor.fetchall()
     for row in res:
         if str(row['name']) == unit_name:
@@ -162,7 +179,8 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
             continue
         for zone in str(row['zone_list']).replace(';', ',').split(','):
             if zone in zones:
-                units_id.add(row['unit_config_id'])
+                unit_config_id = row['unit_config_id']
+                units_id[unit_config_id] = units_id.get(unit_config_id, 0) + 1
                 break
 
     sql = 'select * from oceanbase.__all_unit_config order by name'
@@ -178,8 +196,8 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
         if str(row['name']) == unit_name:
             unit_name += '1'
         if row['unit_config_id'] in units_id:
-            cpu_total -= row['max_cpu']
-            mem_total -= row['max_memory']
+            cpu_total -= row['max_cpu'] * units_id[row['unit_config_id']]
+            mem_total -= row['max_memory'] * units_id[row['unit_config_id']]
             # disk_total -= row['max_disk_size']
 
     MIN_CPU = 2
@@ -194,13 +212,18 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     if disk_total < MIN_DISK_SIZE:
         return error('%s: resource not enough: disk space less than %s' % (zone_list, format_size(MIN_DISK_SIZE)))
 
+    try:
+        max_memory = get_parsed_option('max_memory', mem_total)
+        max_disk_size = get_parsed_option('max_disk_size', disk_total)
+        min_memory = get_parsed_option('min_memory', max_memory)
+    except Exception as e:
+        error(e)
+        return
+
     max_cpu = get_option('max_cpu', cpu_total)
-    max_memory = parse_size(get_option('max_memory', mem_total))
     max_iops = get_option('max_iops', MIN_IOPS)
-    max_disk_size = parse_size(get_option('max_disk_size', disk_total))
     max_session_num = get_option('max_session_num', MIN_SESSION_NUM)
     min_cpu = get_option('min_cpu', max_cpu)
-    min_memory = parse_size(get_option('min_memory', max_memory))
     min_iops = get_option('min_iops', max_iops)
 
     if cpu_total < max_cpu:
@@ -258,7 +281,7 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
         stdio.verbose('execute sql: %s' % sql)
         cursor.execute(sql)
     except:
-        exception('faild to crate pool, execute sql exception: %s' % sql)
+        exception('failed to create pool, execute sql exception: %s' % sql)
         return
 
     # create tenant
@@ -274,8 +297,12 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
         sql += ", default tablegroup ='%s'" % tablegroup
     if locality:
         sql += ", locality = '%s'" % locality
+
+    set_mode = "ob_compatibility_mode = '%s'" % mode
     if variables:
-        sql += "set %s" % variables
+        sql += "set %s, %s" % (variables, set_mode)
+    else:
+        sql += "set %s" % set_mode
     try:
         stdio.verbose('execute sql: %s' % sql)
         cursor.execute(sql)

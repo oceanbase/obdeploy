@@ -226,7 +226,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     server_config[key] = ''
                 if isinstance(server_config[key], bool):
                     server_config[key] = str(server_config[key]).lower()
-            
+
             if server_config.get('crypto_method', 'plain').lower() == 'aes':
                 secret_key = generate_aes_b64_key()
                 crypto_path = server_config.get('crypto_path', 'conf/.config_secret.key')
@@ -247,20 +247,8 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     if not client.put_file(tf.name, path.replace(repository_dir, home_path)):
                         stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
                         stdio.stop_loading('fail')
-                        return 
+                        return
 
-            for path in glob(os.path.join(repository_dir, 'conf/*/*')):
-                if path.endswith('.yaml'):
-                    continue
-                if os.path.isdir(path):
-                    ret = client.put_dir(path, path.replace(repository_dir, home_path))
-                else:
-                    ret = client.put_file(path, path.replace(repository_dir, home_path))
-                if not ret:
-                    stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
-                    stdio.stop_loading('fail')
-                    return 
-            
             config = {
                 'log': {
                     'level': server_config.get('log_level', 'info'),
@@ -287,7 +275,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 if not client.put_file(tf.name, os.path.join(home_path, 'conf/monagent.yaml')):
                     stdio.error(EC_OBAGENT_SEND_CONFIG_FAILED.format(server=server))
                     stdio.stop_loading('fail')
-                    return 
+                    return
                 
         log_path = '%s/log/monagent_stdout.log' % home_path
         client.execute_command('cd %s;nohup %s/bin/monagent -c conf/monagent.yaml >> %s 2>&1 & echo $! > %s' % (home_path, home_path, log_path, remote_pid_path))

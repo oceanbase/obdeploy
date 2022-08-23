@@ -64,7 +64,7 @@ class MixLock(object):
                 FileUtil.exclusive_lock_obj(self.lock_obj, stdio=self.stdio)
             except Exception as e:
                 raise LockError(e)
-    
+
     def _sh_lock(self):
         if self.lock_obj:
             try:
@@ -100,7 +100,7 @@ class MixLock(object):
         except Exception as e:
             self.stdio and getattr(self.stdio, 'stop_loading', print)('fail')
             raise LockError(e)
-            
+
     def _lock_escalation(self, try_times):
         stdio = self.stdio
         while try_times:
