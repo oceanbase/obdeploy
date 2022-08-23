@@ -32,19 +32,28 @@ from optparse import OptionParser, OptionGroup, BadOptionError, Option
 from core import ObdHome
 from _stdio import IO
 from log import Logger
+from tool import DirectoryUtil, FileUtil, COMMAND_ENV
 from _errno import DOC_LINK_MSG, LockError
-from tool import DirectoryUtil, FileUtil
 
 
 ROOT_IO = IO(1)
-VERSION = u'<VERSION>'
+VERSION = '<VERSION>'
 REVISION = '<CID>'
 BUILD_BRANCH = '<B_BRANCH>'
 BUILD_TIME = '<B_TIME>'
 DEBUG = True if '<DEBUG>' else False
 
+CONST_OBD_HOME = "OBD_HOME"
+CONST_OBD_INSTALL_PRE = "OBD_INSTALL_PRE"
+FORBIDDEN_VARS = (CONST_OBD_HOME, CONST_OBD_INSTALL_PRE)
+
+OBD_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
+COMMAND_ENV.load(os.path.join(OBD_HOME_PATH, '.obd_environ'), ROOT_IO)
+DEV_MODE = "OBD_DEV_MODE"
+
 
 class AllowUndefinedOptionParser(OptionParser):
+    IS_TTY = sys.stdin.isatty()
 
     def __init__(self,
                 usage=None,
@@ -65,7 +74,10 @@ class AllowUndefinedOptionParser(OptionParser):
         self.allow_undefine = allow_undefine
 
     def warn(self, msg, file=None):
-        print ('warn: %s' % msg)
+        if self.IS_TTY:
+            print("%s %s" % (IO.WARNING_PREV, msg))
+        else:
+            print('warn: %s' % msg)
 
     def _process_long_opt(self, rargs, values):
         try:
@@ -88,7 +100,7 @@ class AllowUndefinedOptionParser(OptionParser):
             if self.allow_undefine:
                 key = e.opt_str
                 value = value[len(key)+1:]
-                setattr(values, key.strip('-').replace('-', '_'), value if value != '' else True)
+                setattr(values, key.strip('-').replace('-', '_'),  value if value != '' else True)
                 return self.warn(e)
             else:
                 raise e
@@ -141,9 +153,8 @@ class BaseCommand(object):
 
 class ObdCommand(BaseCommand):
 
-    OBD_PATH = os.path.join(os.environ.get('OBD_HOME', os.getenv('HOME')), '.obd')
-    OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
-    OBD_DEV_MODE_FILE = '.dev_mode'
+    OBD_PATH = OBD_HOME_PATH
+    OBD_INSTALL_PRE = os.environ.get(CONST_OBD_INSTALL_PRE, '/')
 
     def init_home(self):
         version_path = os.path.join(self.OBD_PATH, 'version')
@@ -165,12 +176,12 @@ class ObdCommand(BaseCommand):
         version_fobj.close()
 
     @property
-    def dev_mode_path(self):
-        return os.path.join(self.OBD_PATH, self.OBD_DEV_MODE_FILE)
-
-    @property
     def dev_mode(self):
-        return os.path.exists(self.dev_mode_path)
+        return COMMAND_ENV.get(DEV_MODE) == "1"
+
+    def parse_command(self):
+        self.parser.allow_undefine = self.dev_mode
+        return super(ObdCommand, self).parse_command()
 
     def parse_command(self):
         self.parser.allow_undefine = self.dev_mode
@@ -203,6 +214,8 @@ class ObdCommand(BaseCommand):
             ROOT_IO.exception('Another app is currently holding the obd lock.')
         except SystemExit:
             pass
+        except KeyboardInterrupt:
+            ROOT_IO.exception('Keyboard Interrupt')
         except:
             e = sys.exc_info()[1]
             ROOT_IO.exception('Running Error: %s' % e)
@@ -281,8 +294,7 @@ class DevModeEnableCommand(HiddenObdCommand):
         super(DevModeEnableCommand, self).__init__('enable', 'Enable Dev Mode')
 
     def _do_command(self, obd):
-        from tool import FileUtil
-        if FileUtil.open(self.dev_mode_path, _type='w', stdio=obd.stdio):
+        if COMMAND_ENV.set(DEV_MODE, "1", save=True, stdio=obd.stdio):
             obd.stdio.print("Dev Mode: ON")
             return True
         return False
@@ -294,8 +306,7 @@ class DevModeDisableCommand(HiddenObdCommand):
         super(DevModeDisableCommand, self).__init__('disable', 'Disable Dev Mode')
 
     def _do_command(self, obd):
-        from tool import FileUtil
-        if FileUtil.rm(self.dev_mode_path, stdio=obd.stdio):
+        if COMMAND_ENV.set(DEV_MODE, "0", save=True, stdio=obd.stdio):
             obd.stdio.print("Dev Mode: OFF")
             return True
         return False
@@ -307,6 +318,78 @@ class DevModeMajorCommand(HiddenMajorCommand):
         super(DevModeMajorCommand, self).__init__('devmode', 'Developer mode switch')
         self.register_command(DevModeEnableCommand())
         self.register_command(DevModeDisableCommand())
+
+
+class EnvironmentSetCommand(HiddenObdCommand):
+
+    def __init__(self):
+        super(EnvironmentSetCommand, self).__init__("set", "Set obd environment variable")
+
+    def init(self, cmd, args):
+        super(EnvironmentSetCommand, self).init(cmd, args)
+        self.parser.set_usage('%s [key] [value]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            key = self.cmds[0]
+            if key in FORBIDDEN_VARS:
+                obd.stdio.error("Set the environment variable {} is not allowed.".format(key))
+                return False
+            return COMMAND_ENV.set(key, self.cmds[1], save=True, stdio=obd.stdio)
+        else:
+            return self._show_help()
+
+
+class EnvironmentUnsetCommand(HiddenObdCommand):
+
+    def __init__(self):
+        super(EnvironmentUnsetCommand, self).__init__("unset", "Unset obd environment variable")
+
+    def init(self, cmd, args):
+        super(EnvironmentUnsetCommand, self).init(cmd, args)
+        self.parser.set_usage('%s [key] [value]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 1:
+            return COMMAND_ENV.delete(self.cmds[0], save=True, stdio=obd.stdio)
+        else:
+            return self._show_help()
+
+
+class EnvironmentShowCommand(HiddenObdCommand):
+
+    def __init__(self):
+        super(EnvironmentShowCommand, self).__init__("show", "Show obd environment variables")
+        self.parser.add_option('-A', '--all', action="store_true", help="Show all environment variables including system variables")
+
+    def _do_command(self, obd):
+        if self.opts.all:
+            envs = COMMAND_ENV.copy().items()
+        else:
+            envs = COMMAND_ENV.show_env().items()
+        obd.stdio.print_list(envs, ["Key", "Value"], title="Environ")
+        return True
+
+
+class EnvironmentClearCommand(HiddenObdCommand):
+
+    def __init__(self):
+        super(EnvironmentClearCommand, self).__init__("clear", "Clear obd environment variables")
+
+    def _do_command(self, obd):
+        return COMMAND_ENV.clear(stdio=obd.stdio)
+
+
+class EnvironmentMajorCommand(HiddenMajorCommand):
+
+    def __init__(self):
+        super(EnvironmentMajorCommand, self).__init__('env', 'Environment variables for OBD')
+        self.register_command(EnvironmentSetCommand())
+        self.register_command(EnvironmentUnsetCommand())
+        self.register_command(EnvironmentShowCommand())
+        self.register_command(EnvironmentClearCommand())
 
 
 class MirrorCloneCommand(ObdCommand):
@@ -382,7 +465,7 @@ class MirrorListCommand(ObdCommand):
             repos = obd.mirror_manager.get_mirrors(is_enabled=None)
             ROOT_IO.print_list(
                 repos,
-                ['SectionName', 'Type', 'Enabled','Update Time'], 
+                ['SectionName', 'Type', 'Enabled','Update Time'],
                 lambda x: [x.section_name, x.mirror_type.value, x.enabled, time.strftime("%Y-%m-%d %H:%M", time.localtime(x.repo_age))],
                 title='Mirror Repository List'
             )
@@ -413,7 +496,7 @@ class MirrorEnableCommand(ObdCommand):
 
     def __init__(self):
         super(MirrorEnableCommand, self).__init__('enable', 'Enable remote mirror repository.')
-    
+
     def _do_command(self, obd):
         name = self.cmds[0]
         return obd.mirror_manager.set_remote_mirror_enabled(name, True)
@@ -423,7 +506,7 @@ class MirrorDisableCommand(ObdCommand):
 
     def __init__(self):
         super(MirrorDisableCommand, self).__init__('disable', 'Disable remote mirror repository.')
-    
+
     def _do_command(self, obd):
         name = self.cmds[0]
         return obd.mirror_manager.set_remote_mirror_enabled(name, False)
@@ -451,7 +534,7 @@ class RepositoryListCommand(ObdCommand):
             repos,
             ['name', 'version', 'release', 'arch', 'md5', 'tags'], 
             lambda x: [x.name, x.version, x.release, x.arch, x.md5, ', '.join(x.tags)],
-            title='%s Local Repository List' % name if name else ''
+            title='%s Local Repository List' % name if name else 'Local Repository List'
         )
 
     def _do_command(self, obd):
@@ -511,6 +594,7 @@ class ClusterAutoDeployCommand(ClusterMirrorCommand):
         super(ClusterAutoDeployCommand, self).__init__('autodeploy', 'Deploy a cluster automatically by using a simple configuration file.')
         self.parser.add_option('-c', '--config', type='string', help="Path to the configuration file.")
         self.parser.add_option('-f', '--force', action='store_true', help="Force autodeploy, overwrite the home_path.")
+        self.parser.add_option('-C', '--clean', action='store_true', help="Clean the home path if the directory belong to you.", default=False)
         self.parser.add_option('-U', '--unuselibrepo', '--ulp', action='store_true', help="Disable OBD from installing the libs mirror automatically.")
         self.parser.add_option('-A', '--auto-create-tenant', '--act', action='store_true', help="Automatically create a tenant named `test` by using all the available resource of the cluster.")
         self.parser.add_option('--force-delete', action='store_true', help="Force delete, delete the registered cluster.")
@@ -518,6 +602,8 @@ class ClusterAutoDeployCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
+            if getattr(self.opts, 'force', False) or getattr(self.opts, 'clean', False):
+                setattr(self.opts, 'skip_cluster_status_check', True)
             name = self.cmds[0]
             if obd.genconfig(name, self.opts):
                 self.opts.config = ''
@@ -533,12 +619,15 @@ class ClusterDeployCommand(ClusterMirrorCommand):
         super(ClusterDeployCommand, self).__init__('deploy', 'Deploy a cluster by using the current deploy configuration or a deploy yaml file.')
         self.parser.add_option('-c', '--config', type='string', help="Path to the configuration yaml file.")
         self.parser.add_option('-f', '--force', action='store_true', help="Force deploy, overwrite the home_path.", default=False)
+        self.parser.add_option('-C', '--clean', action='store_true', help="Clean the home path if the directory belong to you.", default=False)
         self.parser.add_option('-U', '--unuselibrepo', '--ulp', action='store_true', help="Disable OBD from installing the libs mirror automatically.")
         self.parser.add_option('-A', '--auto-create-tenant', '--act', action='store_true', help="Automatically create a tenant named `test` by using all the available resource of the cluster.")
         # self.parser.add_option('-F', '--fuzzymatch', action='store_true', help="enable fuzzy match when search package")
 
     def _do_command(self, obd):
         if self.cmds:
+            if getattr(self.opts, 'force', False) or getattr(self.opts, 'clean', False):
+                setattr(self.opts, 'skip_cluster_status_check', True)
             return obd.deploy_cluster(self.cmds[0], self.opts)
         else:
             return self._show_help()
@@ -669,14 +758,14 @@ class ClusterEditConfigCommand(ClusterMirrorCommand):
 class ClusterChangeRepositoryCommand(ClusterMirrorCommand):
 
     def __init__(self):
-        super(ClusterChangeRepositoryCommand, self).__init__('change-repo', 'Change repository for a deployed component')
+        super(ClusterChangeRepositoryCommand, self).__init__('reinstall', 'Reinstall a deployed component')
         self.parser.add_option('-c', '--component', type='string', help="Component name to change repository.")
         self.parser.add_option('--hash', type='string', help="Repository's hash")
         self.parser.add_option('-f', '--force', action='store_true', help="force change even start failed.")
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.change_repository(self.cmds[0], self.opts)
+            return obd.reinstall(self.cmds[0], self.opts)
         else:
             return self._show_help()
 
@@ -703,15 +792,18 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterTenantCreateCommand, self).__init__('create', 'Create a tenant.')
-        self.parser.add_option('-n', '--tenant-name', type='string', help="The tenant name. The default tenant name is [test].", default='test')
+        self.parser.add_option('-t', '-n', '--tenant-name', type='string', help="The tenant name. The default tenant name is [test].", default='test')
         self.parser.add_option('--max-cpu', type='float', help="Max CPU unit number.")
         self.parser.add_option('--min-cpu', type='float', help="Mind CPU unit number.")
-        self.parser.add_option('--max-memory', type='int', help="Max memory unit size.")
-        self.parser.add_option('--min-memory', type='int', help="Min memory unit size.")
-        self.parser.add_option('--max-disk-size', type='int', help="Max disk unit size.")
-        self.parser.add_option('--max-iops', type='int', help="Max IOPS unit number. [128].", default=128)
+        self.parser.add_option('--max-memory', type='string', help="Max memory unit size. Not supported after version 4.0, use `--memory-size` instead")
+        self.parser.add_option('--min-memory', type='string', help="Min memory unit size. Not supported after version 4.0, use `--memory-size` instead")
+        self.parser.add_option('--memory-size', type='string', help="Memory unit size. Supported since version 4.0.")
+        self.parser.add_option('--max-disk-size', type='string', help="Max disk unit size. Not supported after version 4.0")
+        self.parser.add_option('--log-disk-size', type='string', help="Log disk unit size.")
+        self.parser.add_option('--max-iops', type='int', help="Max IOPS unit number.")
         self.parser.add_option('--min-iops', type='int', help="Min IOPS unit number.")
-        self.parser.add_option('--max-session-num', type='int', help="Max session unit number. [64].", default=64)
+        self.parser.add_option('--iops-weight', type='int', help="The weight of IOPS. When Max IOPS is greater than Min IOPS, the weight of idle resources available to the current tenant. Supported since version 4.0.")
+        self.parser.add_option('--max-session-num', type='int', help="Max session unit number. Not supported after version 4.0")
         self.parser.add_option('--unit-num', type='int', help="Pool unit number.")
         self.parser.add_option('-z', '--zone-list', type='string', help="Tenant zone list.")
         self.parser.add_option('--charset', type='string', help="Tenant charset.")
@@ -734,7 +826,7 @@ class ClusterTenantDropCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterTenantDropCommand, self).__init__('drop', 'Drop a tenant.')
-        self.parser.add_option('-n', '--tenant-name', type='string', help="Tenant name.")
+        self.parser.add_option('-t', '-n', '--tenant-name', type='string', help="Tenant name.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -793,23 +885,52 @@ class MySQLTestCommand(TestMirrorCommand):
         self.parser.add_option('--mysqltest-bin', type='string', help='Mysqltest bin path. [/u01/obclient/bin/mysqltest]', default='/u01/obclient/bin/mysqltest')
         self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
         self.parser.add_option('--test-dir', type='string', help='Test case file directory. [./mysql_test/t]', default='./mysql_test/t')
+        self.parser.add_option('--test-file-suffix', type='string', help='Test case file suffix. [.test]', default='.test')
         self.parser.add_option('--result-dir', type='string', help='Result case file directory. [./mysql_test/r]', default='./mysql_test/r')
+        self.parser.add_option('--result-file-suffix', type='string', help='Result file suffix. [.result]', default='.result')
         self.parser.add_option('--record', action='store_true', help='record mysqltest execution results', default=False)
-        self.parser.add_option('--record-dir', type='string', help='The directory of the result file for mysqltest.')
-        self.parser.add_option('--log-dir', type='string', help='The log file directory. [./log]', default='./log')
+        self.parser.add_option('--record-dir', type='string', help='The directory of the result file for mysqltest.', default='./record')
+        self.parser.add_option('--record-file-suffix', type='string', help='Result file suffix. [.record]', default='.record')
+        self.parser.add_option('--log-dir', type='string', help='The log file directory.')
         self.parser.add_option('--tmp-dir', type='string', help='Temporary directory for mysqltest. [./tmp]', default='./tmp')
         self.parser.add_option('--var-dir', type='string', help='Var directory to use when run mysqltest. [./var]', default='./var')
         self.parser.add_option('--test-set', type='string', help='test list, use `,` interval')
+        self.parser.add_option('--exclude', type='string', help='exclude list, use `,` interval')
         self.parser.add_option('--test-pattern', type='string', help='Pattern for test file.')
         self.parser.add_option('--suite', type='string', help='Suite list. Multiple suites are separated with commas.')
         self.parser.add_option('--suite-dir', type='string', help='Suite case directory. [./mysql_test/test_suite]', default='./mysql_test/test_suite')
-        self.parser.add_option('--init-sql-dir', type='string', help='Initiate sql directory. [../]', default='../')
+        self.parser.add_option('--init-sql-dir', type='string', help='Initiate sql directory. [./]', default='./')
         self.parser.add_option('--init-sql-files', type='string', help='Initiate sql file list.Multiple files are separated with commas.')
         self.parser.add_option('--need-init', action='store_true', help='Execute the init SQL file.', default=False)
+        self.parser.add_option('--init-only', action='store_true', help='Exit after executing init SQL.', default=False)
         self.parser.add_option('--auto-retry', action='store_true', help='Auto retry when fails.', default=False)
-        self.parser.add_option('--all', action='store_true', help='Run all suite-dir cases.', default=False)
+        self.parser.add_option('--all', action='store_true', help='Run all cases.', default=False)
         self.parser.add_option('--psmall', action='store_true', help='Run psmall cases.', default=False)
+        self.parser.add_option('--special-run', action='store_true', help='run mysqltest in special mode.', default=False)
+        self.parser.add_option('--sp-hint', type='string', help='run test with specified hint', default='')
+        self.parser.add_option('--sort-result', action='store_true', help='sort query result', default=False)
         # self.parser.add_option('--java', action='store_true', help='use java sdk', default=False)
+        self.parser.add_option('--slices', type='int', help='How many slices the test set should be')
+        self.parser.add_option('--slice-idx', type='int', help='The id of slices')
+        self.parser.add_option('--slb-host', type='string', help='The host of soft load balance.')
+        self.parser.add_option('--exec-id', type='string', help='The unique execute id.')
+        self.parser.add_option('--case-filter', type='string', help='The case filter file for mysqltest.')
+        self.parser.add_option('--psmall-test', type='string', help='The file maintain psmall cases.', default='./mysql_test/psmalltest.py')
+        self.parser.add_option('--psmall-source', type='string', help='The file maintain psmall source control.', default='./mysql_test/psmallsource.py')
+        self.parser.add_option('--ps', action='store_true', help='Run in ps mode.', default=False)
+        self.parser.add_option('--test-tags', type='string', help='The file maintain basic tags.', default='./mysql_test/test_tags.py')
+        self.parser.add_option('--tags', type='string', help='Run cases by tag.', default='')
+        self.parser.add_option('--regress-suite-map', type='string', help='The file maintain basic regress suite map', default='./regress_suite_map.py')
+        self.parser.add_option('--regress_suite', type='string', help='Run cases by regress_suite.', default='')
+        self.parser.add_option('--reboot-cases', type='string', help='The file maintain reboot cases')
+        self.parser.add_option('--reboot-timeout', type='int', help='The timeout of observer bootstrap', default=0)
+        self.parser.add_option('--reboot-retries', type='int', help='How many times to retry when rebooting failed', default=5)
+        self.parser.add_option('--collect-all', action='store_true', help='Collect servers log.', default=False)
+        self.parser.add_option('--collect-components', type='string', help='The components which need collect log, multiple components are separated with commas')
+        self.parser.add_option('--case-timeout', type='int', help='The timeout of mysqltest case')
+        self.parser.add_option('--log-pattern', type='string', help='The pattern for collected servers log ', default='*.log')
+        self.parser.add_option('--cluster-mode', type='string', help="The mode of mysqltest")
+        self.parser.add_option('--disable-reboot', action='store_true', help='Never reboot during test.', default=False)
 
     def _do_command(self, obd):
         if self.cmds:
@@ -826,7 +947,7 @@ class SysBenchCommand(TestMirrorCommand):
         self.parser.add_option('--test-server', type='string', help='The server for test. By default, the first root server in the component is the test server.')
         self.parser.add_option('--user', type='string', help='Username for a test. [root]', default='root')
         self.parser.add_option('--password', type='string', help='Password for a test.')
-        self.parser.add_option('--tenant', type='string', help='Tenant for a test. [test]', default='test')
+        self.parser.add_option('-t', '--tenant', type='string', help='Tenant for a test. [test]', default='test')
         self.parser.add_option('--database', type='string', help='Database for a test. [test]', default='test')
         self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
         self.parser.add_option('--sysbench-bin', type='string', help='Sysbench bin path. [sysbench]', default='sysbench')
@@ -858,7 +979,7 @@ class TPCHCommand(TestMirrorCommand):
         self.parser.add_option('--test-server', type='string', help='The server for a test. By default, the first root server in the component is the test server.')
         self.parser.add_option('--user', type='string', help='Username for a test. [root]', default='root')
         self.parser.add_option('--password', type='string', help='Password for a test.')
-        self.parser.add_option('--tenant', type='string', help='Tenant for a test. [test]', default='test')
+        self.parser.add_option('-t', '--tenant', type='string', help='Tenant for a test. [test]', default='test')
         self.parser.add_option('--database', type='string', help='Database for a test. [test]', default='test')
         self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
         self.parser.add_option('--dbgen-bin', type='string', help='dbgen bin path. [/usr/tpc-h-tools/tpc-h-tools/bin/dbgen]', default='/usr/tpc-h-tools/tpc-h-tools/bin/dbgen')
@@ -888,7 +1009,7 @@ class TPCCCommand(TestMirrorCommand):
         self.parser.add_option('--test-server', type='string', help='The server for a test. By default, the first root server in the component is the test server.')
         self.parser.add_option('--user', type='string', help='Username for a test. [root]', default='root')
         self.parser.add_option('--password', type='string', help='Password for a test.')
-        self.parser.add_option('--tenant', type='string', help='Tenant for a test. [test]', default='test')
+        self.parser.add_option('-t', '--tenant', type='string', help='Tenant for a test. [test]', default='test')
         self.parser.add_option('--database', type='string', help='Database for a test. [test]', default='test')
         self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
         self.parser.add_option('--java-bin', type='string', help='Java bin path. [java]', default='java')
@@ -897,10 +1018,10 @@ class TPCCCommand(TestMirrorCommand):
         self.parser.add_option('--bmsql-jar', type='string', help='BenchmarkSQL jar path.')
         self.parser.add_option('--bmsql-libs', type='string', help='BenchmarkSQL libs path.')
         self.parser.add_option('--bmsql-sql-dir', type='string', help='The directory of BenchmarkSQL sql scripts.')
-        self.parser.add_option('--warehouses', type='int', help='The number of warehouses.')
+        self.parser.add_option('--warehouses', type='int', help='The number of warehouses.[10]', default=10)
         self.parser.add_option('--load-workers', type='int', help='The number of workers to load data.')
         self.parser.add_option('--terminals', type='int', help='The number of terminals.')
-        self.parser.add_option('--run-mins', type='int', help='To run for specified minutes.', default=10)
+        self.parser.add_option('--run-mins', type='int', help='To run for specified minutes.[10]', default=10)
         self.parser.add_option('--test-only', action='store_true', help='Only testing SQLs are executed. No initialization is executed.')
         self.parser.add_option('-O', '--optimization', type='int', help='Optimization level {0/1/2}. [1] 0 - No optimization. 1 - Optimize some of the parameters which do not need to restart servers. 2 - Optimize all the parameters and maybe RESTART SERVERS for better performance.', default=1)
 
@@ -909,7 +1030,7 @@ class TPCCCommand(TestMirrorCommand):
             return obd.tpcc(self.cmds[0], self.opts)
         else:
             return self._show_help()
-        
+
 
 class TestMajorCommand(MajorCommand):
 
@@ -919,6 +1040,59 @@ class TestMajorCommand(MajorCommand):
         self.register_command(SysBenchCommand())
         self.register_command(TPCHCommand())
         self.register_command(TPCCCommand())
+
+
+class DbConnectCommand(HiddenObdCommand):
+
+    def init(self, cmd, args):
+        super(DbConnectCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def __init__(self):
+        super(DbConnectCommand, self).__init__('db_connect', 'Establish a database connection to the deployment.')
+        self.parser.add_option('-c', '--component', type='string', help='The component used by database connection.')
+        self.parser.add_option('-s', '--server', type='string',
+                               help='The server used by database connection. The first server in the configuration will be used by default')
+        self.parser.add_option('-u', '--user', type='string', help='The username used by d'
+                                                                   'atabase connection. [root]', default='root')
+        self.parser.add_option('-p', '--password', type='string', help='The password used by database connection.')
+        self.parser.add_option('-t', '--tenant', type='string', help='The tenant used by database connection. [sys]', default='sys')
+        self.parser.add_option('-D', '--database', type='string', help='The database name used by database connection.')
+        self.parser.add_option('--obclient-bin', type='string', help='OBClient bin path. [obclient]', default='obclient')
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.db_connect(self.cmds[0], self.opts)
+        else:
+            return self._show_help()
+
+
+class CommandsCommand(HiddenObdCommand):
+
+    def init(self, cmd, args):
+        super(CommandsCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <command> [options]' % self.prev_cmd)
+        return self
+
+    def __init__(self):
+        super(CommandsCommand, self).__init__('command', 'Common tool commands')
+        self.parser.add_option('-c', '--components', type='string', help='The components used by the command. The first component in the configuration will be used by default in interactive commands, and all available components will be used by default in non-interactive commands.')
+        self.parser.add_option('-s', '--servers', type='string', help='The servers used by the command. The first server in the configuration will be used by default in interactive commands, and all available servers will be used by default in non-interactive commands.')
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.commands(self.cmds[0], self.cmds[1], self.opts)
+        else:
+            return self._show_help()
+
+
+class ToolCommand(HiddenMajorCommand):
+
+    def __init__(self):
+        super(ToolCommand, self).__init__('tool', 'Tools')
+        self.register_command(DbConnectCommand())
+        self.register_command(CommandsCommand())
 
 
 class BenchMajorCommand(MajorCommand):
@@ -952,6 +1126,8 @@ class MainCommand(MajorCommand):
         self.register_command(RepositoryMajorCommand())
         self.register_command(TestMajorCommand())
         self.register_command(UpdateCommand())
+        self.register_command(EnvironmentMajorCommand())
+        self.register_command(ToolCommand())
         self.parser.version = '''OceanBase Deploy: %s
 REVISION: %s
 BUILD_BRANCH: %s
