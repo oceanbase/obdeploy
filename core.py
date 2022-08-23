@@ -33,14 +33,17 @@ from prettytable import PrettyTable
 from halo import Halo
 
 from ssh import SshClient, SshConfig
-from tool import ConfigUtil, FileUtil, DirectoryUtil, YamlLoader
+from tool import ConfigUtil, FileUtil, DirectoryUtil, YamlLoader, timeout, COMMAND_ENV
 from _stdio import MsgLevel
 from _rpm import Version
 from _mirror import MirrorRepositoryManager, PackageInfo
 from _plugin import PluginManager, PluginType, InstallPlugin
+from _repository import RepositoryManager, LocalPackage
+from _deploy import DeployManager, DeployStatus, DeployConfig, DeployConfigStatus, BASE_DIR_KEY, InnerConfigKeywords
+from _lock import LockManager
 from _repository import RepositoryManager, LocalPackage, Repository
 from _deploy import (
-    DeployManager, DeployStatus, 
+    DeployManager, DeployStatus,
     DeployConfig, DeployConfigStatus,
     ParserError, Deploy
 )
@@ -148,7 +151,7 @@ class ObdHome(object):
 
     def ssh_clients_connect(self, ssh_clients, servers, user_config):
         for server in servers:
-            if server.ip not in ssh_clients:
+            if server not in ssh_clients:
                 ssh_clients[server] = SshClient(
                     SshConfig(
                         server.ip,
@@ -226,9 +229,9 @@ class ObdHome(object):
             print_match and self._call_stdio(
                 'print_list',
                 matchs,
-                ['name', 'version', 'release', 'arch', 'md5'], 
+                ['name', 'version', 'release', 'arch', 'md5'],
                 lambda x: [matchs[x].name, matchs[x].version, matchs[x].release, matchs[x].arch, matchs[x].md5],
-                title='Search %s %s Result' % (component_name, version) 
+                title='Search %s %s Result' % (component_name, version)
             )
             for md5 in usable:
                 if md5 in matchs:
@@ -238,9 +241,9 @@ class ObdHome(object):
                 usable_matchs = [info[1] for info in sorted(matchs.items())]
                 if release_first:
                     usable_matchs = usable_matchs[:1]
-            
+
         return usable_matchs
-    
+
     def search_components_from_mirrors(self, deploy_config, fuzzy_match=False, only_info=True, update_if_need=None):
         pkgs = []
         errors = []
@@ -251,14 +254,18 @@ class ObdHome(object):
             # First, check if the component exists in the repository. If exists, check if the version is available. If so, use the repository directly.
 
             self._call_stdio('verbose', 'Get %s repository' % component)
-            repository = self.repository_manager.get_repository(component, config.version, config.package_hash if config.package_hash else config.tag)
+            repository = self.repository_manager.get_repository(name=component, version=config.version, tag=config.tag, release=config.release, package_hash=config.package_hash)
             if repository and not repository.hash:
                 repository = None
-            self._call_stdio('verbose', 'Search %s package from mirror' % component)
-            pkg = self.mirror_manager.get_best_pkg(name=component, version=config.version, md5=config.package_hash, fuzzy_match=fuzzy_match, only_info=only_info)
+            if not config.tag:
+                self._call_stdio('verbose', 'Search %s package from mirror' % component)
+                pkg = self.mirror_manager.get_best_pkg(
+                    name=component, version=config.version, md5=config.package_hash, release=config.release, fuzzy_match=fuzzy_match, only_info=only_info)
+            else:
+                pkg = None
             if repository or pkg:
                 if pkg:
-                    self._call_stdio('verbose', 'Found Package %s-%s-%s' % (pkg.name, pkg.version, pkg.md5))
+                    self._call_stdio('verbose', 'Found Package %s-%s-%s-%s' % (pkg.name, pkg.version, pkg.release, pkg.md5))
                 if repository:
                     if repository >= pkg or (
                         (
@@ -271,9 +278,9 @@ class ObdHome(object):
                         self._call_stdio('print', '%s-%s already installed.' % (repository.name, repository.version))
                         continue
                 if config.version and pkg.version != config.version:
-                    self._call_stdio('warn', 'No such package %s-%s. Use similar package %s-%s.' % (component, config.version, pkg.name, pkg.version))
+                    self._call_stdio('warn', 'No such package %s-%s-%s. Use similar package %s-%s-%s.' % (component, config.version, config.release, pkg.name, pkg.version, pkg.release))
                 else:
-                    self._call_stdio('print', 'Package %s-%s is available.' % (pkg.name, pkg.version))
+                    self._call_stdio('print', 'Package %s-%s-%s is available.' % (pkg.name, pkg.version, pkg.release))
                 repository = self.repository_manager.get_repository(pkg.name, pkg.md5)
                 if repository:
                     repositories.append(repository)
@@ -282,12 +289,14 @@ class ObdHome(object):
             else:
                 pkg_name = [component]
                 if config.version:
-                    pkg_name.append(config.version)
+                    pkg_name.append("version: %s" % config.version)
+                if config.release:
+                    pkg_name.append("release: %s" % config.release)
                 if config.package_hash:
-                    pkg_name.append(config.package_hash)
-                elif config.tag:
-                    pkg_name.append(config.tag)
-                errors.append('No such package %s.' % ('-'.join(pkg_name)))
+                    pkg_name.append("package hash: %s" % config.package_hash)
+                if config.tag:
+                    pkg_name.append("tag: %s" % config.tag)
+                errors.append('No such package name: %s.' % (', '.join(pkg_name)))
         return pkgs, repositories, errors
 
     def load_local_repositories(self, deploy_info, allow_shadow=True):
@@ -357,6 +366,7 @@ class ObdHome(object):
         initial_config = ''
         if deploy:
             try:
+                deploy.deploy_config.allow_include_error()
                 if deploy.deploy_info.config_status == DeployConfigStatus.UNCHNAGE:
                     path = deploy.deploy_config.yaml_path
                 else:
@@ -400,7 +410,12 @@ class ObdHome(object):
             subprocess_call([EDITOR, tf.name])
             self._call_stdio('verbose', 'Load %s' % tf.name)
             try:
-                deploy_config = DeployConfig(tf.name, yaml_loader=YamlLoader(self.stdio), config_parser_manager=self.deploy_manager.config_parser_manager)
+                deploy_config = DeployConfig(
+                    tf.name, yaml_loader=YamlLoader(self.stdio),
+                    config_parser_manager=self.deploy_manager.config_parser_manager,
+                    inner_config=deploy.deploy_config.inner_config if deploy else None
+                    )
+                deploy_config.allow_include_error()
             except Exception as e:
                 if confirm(e):
                     continue
@@ -419,16 +434,37 @@ class ObdHome(object):
                     if not self._call_stdio('confirm', 'Modifications to the deployment architecture take effect after you redeploy the architecture. Are you sure that you want to start a redeployment? '):
                         continue
                     config_status = DeployConfigStatus.NEED_REDEPLOY
-                else:
+
+                if config_status != DeployConfigStatus.NEED_REDEPLOY:
+                    comp_attr_changed = False
                     for component_name in deploy_config.components:
                         old_cluster_config = deploy.deploy_config.components[component_name]
                         new_cluster_config = deploy_config.components[component_name]
-                        if new_cluster_config.version != old_cluster_config.origin_version \
-                            or new_cluster_config.package_hash != old_cluster_config.origin_package_hash \
-                            or new_cluster_config.tag != old_cluster_config.origin_tag:
+                        if new_cluster_config.version != old_cluster_config.config_version \
+                            or new_cluster_config.package_hash != old_cluster_config.config_package_hash \
+                            or new_cluster_config.release != old_cluster_config.config_release \
+                            or new_cluster_config.tag != old_cluster_config.tag:
+                            comp_attr_changed = True
                             config_status = DeployConfigStatus.NEED_REDEPLOY
                             break
-                    
+                    if comp_attr_changed:
+                        if not self._call_stdio('confirm', 'Modifications to the version, release or hash of the component take effect after you redeploy the cluster. Are you sure that you want to start a redeployment? '):
+                            continue
+                        config_status = DeployConfigStatus.NEED_REDEPLOY
+
+                if config_status != DeployConfigStatus.NEED_REDEPLOY:
+                    rsync_conf_changed = False
+                    for component_name in deploy_config.components:
+                        old_cluster_config = deploy.deploy_config.components[component_name]
+                        new_cluster_config = deploy_config.components[component_name]
+                        if new_cluster_config.get_rsync_list() != old_cluster_config.get_rsync_list():
+                            rsync_conf_changed = True
+                            break
+                    if rsync_conf_changed:
+                        if not self._call_stdio('confirm', 'Modifications to the rsync config of a deployed cluster take effect after you redeploy the cluster. Are you sure that you want to start a redeployment? '):
+                            continue
+                        config_status = DeployConfigStatus.NEED_REDEPLOY
+
             # Loading the parameter plugins that are available to the application
             self._call_stdio('start_loading', 'Search param plugin and load')
             if not is_deployed or config_status == DeployConfigStatus.NEED_REDEPLOY:
@@ -492,7 +528,7 @@ class ObdHome(object):
                             continue
                         else:
                             return False
-                    
+
                 for component_name in deploy_config.components:
                     if config_status == DeployConfigStatus.NEED_REDEPLOY:
                         break
@@ -817,7 +853,7 @@ class ObdHome(object):
             self._call_stdio('error', 'Deploy configuration is empty.\nIt may be caused by a failure to resolve the configuration.\nPlease check your configuration file.')
             return False
 
-        # Check the best suitable mirror for the components and installation plguins. Install locally
+        # Check the best suitable mirror for the components and installation plugins. Install locally
         repositories, install_plugins = self.search_components_from_mirrors_and_install(deploy_config)
         if not install_plugins or not repositories:
             return False
@@ -869,13 +905,13 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-            
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Deploy status judge')
         if deploy_info.status != DeployStatus.STATUS_RUNNING:
             self._call_stdio('error', 'Deploy "%s" not RUNNING' % (name))
             return False
-            
+
         version = getattr(options, 'version', '')
         if not version:
             self._call_stdio('error', 'Use the --version option to specify the required OCP version.')
@@ -912,7 +948,7 @@ class ObdHome(object):
             new_deploy_config = None
 
         self._call_stdio('stop_loading', 'succeed')
-        
+
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
         if new_deploy_config and deploy_config.user.username != new_deploy_config.user.username:
@@ -928,11 +964,11 @@ class ObdHome(object):
                 component_num -= 1
                 self._call_stdio('print', '%s No check plugin available.' % repository.name)
                 continue
-                
+
             cluster_config = deploy_config.components[repository.name]
             new_cluster_config = new_deploy_config.components[repository.name] if new_deploy_config else None
             cluster_servers = cluster_config.servers
-            
+
             self._call_stdio('verbose', 'Call %s for %s' % (connect_plugins[repository], repository))
             ret = connect_plugins[repository](deploy_config.components.keys(), ssh_clients, cluster_config, '', options, self.stdio)
             if ret:
@@ -940,12 +976,12 @@ class ObdHome(object):
                 cursor = ret.get_return('cursor')
             else:
                 break
-            
+
             self._call_stdio('verbose', 'Call %s for %s' % (ocp_check[repository], repository))
             if ocp_check[repository](deploy_config.components.keys(), ssh_clients, cluster_config, '', options, self.stdio, cursor=cursor, ocp_version=version, new_cluster_config=new_cluster_config, new_clients=new_ssh_clients):
                 component_num -= 1
                 self._call_stdio('print', '%s Check passed.' % repository.name)
-        
+
         return component_num == 0
 
     def change_deploy_config_style(self, name, options=Values()):
@@ -954,7 +990,7 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-            
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Deploy config status judge')
         if deploy_info.config_status != DeployConfigStatus.UNCHNAGE:
@@ -995,10 +1031,9 @@ class ObdHome(object):
                 return True
         except Exception as e:
             self._call_stdio('exception', e)
-        
+
         self._call_stdio('stop_loading', 'fail')
         return False
-
 
     def deploy_cluster(self, name, opt=Values()):
         self._call_stdio('verbose', 'Get Deploy by name')
@@ -1015,7 +1050,7 @@ class ObdHome(object):
                 if not deploy.apply_temp_deploy_config():
                     self._call_stdio('error', 'Failed to apply new deploy configuration')
                     return False
-        
+
         config_path = getattr(opt, 'config', '')
         unuse_lib_repo = getattr(opt, 'unuselibrepo', False)
         auto_create_tenant = getattr(opt, 'auto_create_tenant', False)
@@ -1026,10 +1061,10 @@ class ObdHome(object):
             if not deploy:
                 self._call_stdio('error', 'Failed to create deploy: %s. please check you configuration file' % name)
                 return False
+
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s. you can input configuration path to create a new deploy' % name)
             return False
-
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
         if not deploy_config:
@@ -1045,8 +1080,28 @@ class ObdHome(object):
                 self._call_stdio('error', '%s\'s servers list is empty.' % component_name)
                 return False
 
-        # Check the best suitable mirror for the components and installation plguins. Install locally
+        if self.dev_mode:
+            base_dir = COMMAND_ENV.get(BASE_DIR_KEY, '')
+            deploy_config.enable_cp_install_mode(save=False)
+        else:
+            base_dir = ''
+            deploy_config.enable_ln_install_mode(save=False)
+        deploy_config.set_base_dir(base_dir, save=False)
+
+        # Check the best suitable mirror for the components and installation plugins. Install locally
         repositories, install_plugins = self.search_components_from_mirrors_and_install(deploy_config)
+        if not repositories or not install_plugins:
+            return False
+
+        if unuse_lib_repo and not deploy_config.unuse_lib_repository:
+            deploy_config.set_unuse_lib_repository(True)
+        if auto_create_tenant and not deploy_config.auto_create_tenant:
+            deploy_config.set_auto_create_tenant(True)
+        return self._deploy_cluster(deploy, repositories, opt)
+
+    def _deploy_cluster(self, deploy, repositories, opt=Values()):
+        deploy_config = deploy.deploy_config
+        install_plugins = self.search_plugins(repositories, PluginType.INSTALL)
         if not install_plugins:
             return False
 
@@ -1062,7 +1117,7 @@ class ObdHome(object):
         self._call_stdio('start_loading', 'Repository integrity check')
         for repository in repositories:
             if not repository.file_check(install_plugins[repository]):
-                errors.append('%s intstall failed' % repository.name)
+                errors.append('%s install failed' % repository.name)
         if errors:
             self._call_stdio('stop_loading', 'fail')
             self._call_stdio('error', '\n'.join(errors))
@@ -1081,23 +1136,103 @@ class ObdHome(object):
             self._call_stdio('error', '\n'.join(errors))
             return False
         self._call_stdio('stop_loading', 'succeed')
-        
-        if unuse_lib_repo and not deploy_config.unuse_lib_repository:
-            deploy_config.set_unuse_lib_repository(True)
-        if auto_create_tenant and not deploy_config.auto_create_tenant:
-            deploy_config.set_auto_create_tenant(True)
-        
+
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
 
+        # Check the status for the deployed cluster
+        if not getattr(opt, 'skip_cluster_status_check', False):
+            component_status = {}
+            cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
+            if cluster_status is False or cluster_status == 1:
+                if self.stdio:
+                    self._call_stdio('error', 'Some of the servers in the cluster have been started')
+                    for repository in component_status:
+                        cluster_status = component_status[repository]
+                        for server in cluster_status:
+                            if cluster_status[server] == 1:
+                                self._call_stdio('print', '%s %s is started' % (server, repository.name))
+                return False
+
+        self._call_stdio('verbose', 'Search init plugin')
+        init_plugins = self.search_py_script_plugin(repositories, 'init')
+        component_num = len(repositories)
+        for repository in repositories:
+            cluster_config = deploy_config.components[repository.name]
+            init_plugin = init_plugins[repository]
+            self._call_stdio('verbose', 'Exec %s init plugin' % repository)
+            self._call_stdio('verbose', 'Apply %s for %s-%s' % (init_plugin, repository.name, repository.version))
+            if init_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], opt, self.stdio, self.home_path, repository.repository_dir):
+                component_num -= 1
+        if component_num != 0:
+            return False
+
+        # Install repository to servers
+        if not self.install_repositories_to_servers(deploy_config, repositories, install_plugins, ssh_clients, opt):
+            return False
+
+        # Sync runtime dependencies
+        if not self.sync_runtime_dependencies(deploy_config, repositories, ssh_clients, opt):
+            return False
+
+        for repository in repositories:
+            deploy.use_model(repository.name, repository, False)
+
+        if deploy.update_deploy_status(DeployStatus.STATUS_DEPLOYED) and deploy_config.dump():
+            self._call_stdio('print', '%s deployed' % deploy.name)
+            return True
+        return False
+
+    def install_repository_to_servers(self, components, cluster_config, repository, ssh_clients, options=Values(), unuse_lib_repository=False):
+        install_repo_plugin = self.plugin_manager.get_best_py_script_plugin('install_repo', 'general', '0.1')
+        install_plugins = self.search_plugins([repository], PluginType.INSTALL)
+        if not install_plugins:
+            return False
+        install_plugin = install_plugins[repository]
+        check_file_map = install_plugin.file_map(repository)
+        ret = install_repo_plugin(components, ssh_clients, cluster_config, [], options, self.stdio,
+                                  obd_home=self.home_path, install_repository=repository,
+                                  install_plugin=install_plugin, check_repository=repository,
+                                  check_file_map=check_file_map,
+                                  msg_lv='error' if unuse_lib_repository else 'warn')
+        if not ret:
+            return False
+        elif ret.get_return('checked'):
+            return True
+        elif unuse_lib_repository:
+            return False
+        self._call_stdio('print', 'Try to get lib-repository')
+        repositories_lib_map = self.install_lib_for_repositories([repository])
+        if repositories_lib_map is False:
+            self._call_stdio('error', 'Failed to install lib package for local')
+            return False
+        lib_repository = repositories_lib_map[repository]['repositories']
+        install_plugin = repositories_lib_map[repository]['install_plugin']
+        ret = install_repo_plugin(components, ssh_clients, cluster_config, [], options,
+                                  self.stdio,
+                                  obd_home=self.home_path, install_repository=lib_repository,
+                                  install_plugin=install_plugin, check_repository=repository,
+                                  check_file_map=check_file_map, msg_lv='error')
+        if not ret or not ret.get_return('checked'):
+            self._call_stdio('error', 'Failed to install lib package for cluster servers')
+            return False
+
+    def install_repositories_to_servers(self, deploy_config, repositories, install_plugins, ssh_clients, options):
+        install_repo_plugin = self.plugin_manager.get_best_py_script_plugin('install_repo', 'general', '0.1')
+        check_file_maps = {}
         need_lib_repositories = []
         for repository in repositories:
             cluster_config = deploy_config.components[repository.name]
-            # cluster files check
-            self.servers_repository_install(ssh_clients, cluster_config.servers, repository, install_plugins[repository])
-            # lib check 
-            msg_lv = 'error' if deploy_config.unuse_lib_repository else 'warn'
-            if not self.servers_repository_lib_check(ssh_clients, cluster_config.servers, repository, install_plugins[repository], msg_lv):
+            install_plugin = install_plugins[repository]
+            check_file_map = check_file_maps[repository] = install_plugin.file_map(repository)
+            ret = install_repo_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio,
+                                      obd_home=self.home_path, install_repository=repository,
+                                      install_plugin=install_plugin, check_repository=repository,
+                                      check_file_map=check_file_map,
+                                      msg_lv='error' if deploy_config.unuse_lib_repository else 'warn')
+            if not ret:
+                return False
+            if not ret.get_return('checked'):
                 need_lib_repositories.append(repository)
 
         if need_lib_repositories:
@@ -1109,39 +1244,28 @@ class ObdHome(object):
             if repositories_lib_map is False:
                 self._call_stdio('error', 'Failed to install lib package for local')
                 return False
-            if self.servers_apply_lib_repository_and_check(ssh_clients, deploy_config, need_lib_repositories, repositories_lib_map):
-                self._call_stdio('error', 'Failed to install lib package for cluster servers')
-                return False
+            for need_lib_repository in need_lib_repositories:
+                cluster_config = deploy_config.components[need_lib_repository.name]
+                check_file_map = check_file_maps[need_lib_repository]
+                lib_repository = repositories_lib_map[need_lib_repository]['repositories']
+                install_plugin = repositories_lib_map[need_lib_repository]['install_plugin']
+                ret = install_repo_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], options,
+                                          self.stdio,
+                                          obd_home=self.home_path, install_repository=lib_repository,
+                                          install_plugin=install_plugin, check_repository=need_lib_repository,
+                                          check_file_map=check_file_map, msg_lv='error')
+                if not ret or not ret.get_return('checked'):
+                    self._call_stdio('error', 'Failed to install lib package for cluster servers')
+                    return False
+        return True
 
-        # Check the status for the deployed cluster
-        component_status = {}
-        cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
-        if cluster_status is False or cluster_status == 1:
-            if self.stdio:
-                self._call_stdio('error', 'Some of the servers in the cluster have been started')
-                for repository in component_status:
-                    cluster_status = component_status[repository]
-                    for server in cluster_status:
-                        if cluster_status[server] == 1:
-                            self._call_stdio('print', '%s %s is started' % (server, repository.name))
-            return False
-            
-        self._call_stdio('verbose', 'Search init plugin')
-        init_plugins = self.search_py_script_plugin(repositories, 'init')
-        component_num = len(repositories)
+    def sync_runtime_dependencies(self, deploy_config, repositories, ssh_clients, option):
+        rsync_plugin = self.plugin_manager.get_best_py_script_plugin('rsync', 'general', '0.1')
+        ret = True
         for repository in repositories:
             cluster_config = deploy_config.components[repository.name]
-            init_plugin = init_plugins[repository]
-            self._call_stdio('verbose', 'Exec %s init plugin' % repository)
-            self._call_stdio('verbose', 'Apply %s for %s-%s' % (init_plugin, repository.name, repository.version))
-            if init_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], opt, self.stdio, self.home_path, repository.repository_dir):
-                deploy.use_model(repository.name, repository, False)
-                component_num -= 1
-        
-        if component_num == 0 and deploy.update_deploy_status(DeployStatus.STATUS_DEPLOYED):
-            self._call_stdio('print', '%s deployed' % name)
-            return True
-        return False
+            ret = rsync_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], option, self.stdio) and ret
+        return ret
 
     def start_cluster(self, name, cmd=[], options=Values()):
         self._call_stdio('verbose', 'Get Deploy by name')
@@ -1163,8 +1287,18 @@ class ObdHome(object):
             self._call_stdio('error', 'Deploy %s.%s\nIf you still need to start the cluster, use the `obd cluster start %s --wop` option to start the cluster without loading parameters. ' % (deploy_info.config_status.value, deploy.effect_tip(), name))
             return False
 
+        self._call_stdio('start_loading', 'Get local repositories')
+
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info, False)
+        self._call_stdio('stop_loading', 'succeed')
+        return self._start_cluster(deploy, repositories, cmd, options)
+
+    def _start_cluster(self, deploy, repositories, cmd=None, options=Values()):
         self._call_stdio('verbose', 'Get deploy config')
         deploy_config = deploy.deploy_config
+        deploy_info = deploy.deploy_info
+        name = deploy.name
 
         update_deploy_status = True
         components = getattr(options, 'components', '')
@@ -1182,11 +1316,7 @@ class ObdHome(object):
         servers = getattr(options, 'servers', '')
         server_list = servers.split(',') if servers else []
 
-        self._call_stdio('start_loading', 'Get local repositories and plugins')
-
-        # Get the repository
-        repositories = self.load_local_repositories(deploy_info, False)
-
+        self._call_stdio('start_loading', 'Search plugins')
         start_check_plugins = self.search_py_script_plugin(repositories, 'start_check', no_found_act='warn')
         create_tenant_plugins = self.search_py_script_plugin(repositories, 'create_tenant', no_found_act='ignore') if deploy_config.auto_create_tenant else {}
         start_plugins = self.search_py_script_plugin(repositories, 'start')
@@ -1553,8 +1683,18 @@ class ObdHome(object):
         if deploy_info.status not in status:
             self._call_stdio('error', 'Deploy "%s" is %s. You could not stop an %s cluster.' % (name, deploy_info.status.value, deploy_info.status.value))
             return False
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        self._call_stdio('stop_loading', 'succeed')
+        return self._stop_cluster(deploy, repositories, options)
+
+    def _stop_cluster(self, deploy, repositories, options=Values()):
         self._call_stdio('verbose', 'Get deploy config')
         deploy_config = deploy.deploy_config
+        deploy_info = deploy.deploy_info
+        name = deploy.name
 
         update_deploy_status = True
         components = getattr(options, 'components', '')
@@ -1572,10 +1712,7 @@ class ObdHome(object):
         servers = getattr(options, 'servers', '')
         server_list = servers.split(',') if servers else []
 
-        self._call_stdio('start_loading', 'Get local repositories and plugins')
-        # Get the repository
-        repositories = self.load_local_repositories(deploy_info)
-
+        self._call_stdio('start_loading', 'Search plugins')
         # Check whether the components have the parameter plugins and apply the plugins
 
         self.search_param_plugin_and_apply(repositories, deploy_config)
@@ -1657,7 +1794,7 @@ class ObdHome(object):
 
         self._call_stdio('stop_loading', 'succeed')
 
-        update_deploy_status = True 
+        update_deploy_status = True
         components = getattr(options, 'components', '')
         if components:
             components = components.split(',')
@@ -1675,7 +1812,7 @@ class ObdHome(object):
 
         servers = getattr(options, 'servers', '')
         if servers:
-            server_list = servers.split(',') 
+            server_list = servers.split(',')
             if apply_change:
                 for repository in repositories:
                     cluster_config = deploy_config.components[repository.name]
@@ -1739,13 +1876,13 @@ class ObdHome(object):
             if restart_plugins[repository](
                 deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio,
                 local_home_path=self.home_path,
-                start_plugin=start_plugins[repository], 
+                start_plugin=start_plugins[repository],
                 reload_plugin=reload_plugins[repository],
-                stop_plugin=stop_plugins[repository], 
-                connect_plugin=connect_plugins[repository], 
+                stop_plugin=stop_plugins[repository],
+                connect_plugin=connect_plugins[repository],
                 display_plugin=display_plugins[repository],
-                repository=repository, 
-                new_cluster_config=new_cluster_config, 
+                repository=repository,
+                new_cluster_config=new_cluster_config,
                 new_clients=new_ssh_clients
             ):
                 component_num -= 1
@@ -1755,7 +1892,7 @@ class ObdHome(object):
                     deploy_config.update_component(new_cluster_config)
             else:
                 break
-        
+
         if component_num == 0:
             if len(components) != len(repositories) or servers:
                 self._call_stdio('print', "succeed")
@@ -1779,13 +1916,13 @@ class ObdHome(object):
                 if restart_plugins[repository](
                     deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio,
                     local_home_path=self.home_path,
-                    start_plugin=start_plugins[repository], 
+                    start_plugin=start_plugins[repository],
                     reload_plugin=reload_plugins[repository],
-                    stop_plugin=stop_plugins[repository], 
-                    connect_plugin=connect_plugins[repository], 
+                    stop_plugin=stop_plugins[repository],
+                    connect_plugin=connect_plugins[repository],
                     display_plugin=display_plugins[repository],
-                    repository=repository, 
-                    new_cluster_config=new_cluster_config, 
+                    repository=repository,
+                    new_cluster_config=new_cluster_config,
                     new_clients=new_ssh_clients,
                     rollback=True,
                     bootstrap_plugin=bootstrap_plugins[repository],
@@ -1795,8 +1932,44 @@ class ObdHome(object):
             self._call_stdio('stop_loading', 'succeed')
         return False
 
-    def redeploy_cluster(self, name, opt=Values()):
-        return self.destroy_cluster(name, opt) and self.deploy_cluster(name) and self.start_cluster(name)
+    def redeploy_cluster(self, name, opt=Values(), search_repo=True):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+        deploy_info = deploy.deploy_info
+
+        self._call_stdio('verbose', 'Get deploy configuration')
+        deploy_config = deploy.deploy_config
+        self._call_stdio('start_loading', 'Get local repositories')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        self._call_stdio('stop_loading', 'succeed')
+
+        self._call_stdio('verbose', 'Check deploy status')
+        if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
+            if not self._stop_cluster(deploy, repositories, options=Values({'force': True})):
+                return False
+        elif deploy_info.status not in [DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_DEPLOYED]:
+            self._call_stdio('error', 'Deploy "%s" is %s. You could not destroy an undeployed cluster' % (
+                name, deploy_info.status.value))
+            return False
+
+        # Check whether the components have the parameter plugins and apply the plugins
+        self.search_param_plugin_and_apply(repositories, deploy_config)
+        if not self._destroy_cluster(deploy, repositories, opt):
+            return False
+        if search_repo:
+            if deploy_info.config_status != DeployConfigStatus.UNCHNAGE and not deploy.apply_temp_deploy_config():
+                self._call_stdio('error', 'Failed to apply new deploy configuration')
+                return False
+            self._call_stdio('verbose', 'Get deploy configuration')
+            deploy_config = deploy.deploy_config
+            repositories, install_plugins = self.search_components_from_mirrors_and_install(deploy_config)
+            if not repositories or not install_plugins:
+                return False
+        return self._deploy_cluster(deploy, repositories, opt) and self._start_cluster(deploy, repositories)
 
     def destroy_cluster(self, name, opt=Values()):
         self._call_stdio('verbose', 'Get Deploy by name')
@@ -1804,28 +1977,37 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+
         deploy_info = deploy.deploy_info
+
+        self._call_stdio('verbose', 'Get deploy configuration')
+        deploy_config = deploy.deploy_config
+        # allow included file not exist
+        deploy_config.allow_include_error()
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        self._call_stdio('stop_loading', 'succeed')
+
         self._call_stdio('verbose', 'Check deploy status')
         if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
-            if not self.stop_cluster(name, Values({'force': True})):
+            if not self._stop_cluster(deploy, repositories, Values({'force': True})):
                 return False
         elif deploy_info.status not in [DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_DEPLOYED]:
             self._call_stdio('error', 'Deploy "%s" is %s. You could not destroy an undeployed cluster' % (name, deploy_info.status.value))
             return False
-        self._call_stdio('verbose', 'Get deploy configuration')
-        deploy_config = deploy.deploy_config
-
-        self._call_stdio('start_loading', 'Get local repositories and plugins')
-        # Get the repository
-        repositories = self.load_local_repositories(deploy_info)
 
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
+        return self._destroy_cluster(deploy, repositories, opt)
 
+    def _destroy_cluster(self, deploy, repositories, opt=Values()):
+        deploy_config = deploy.deploy_config
+        self._call_stdio('start_loading', 'Search plugins')
+        # Get the repository
         plugins = self.search_py_script_plugin(repositories, 'destroy')
         self._call_stdio('stop_loading', 'succeed')
-
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
 
@@ -1837,7 +2019,7 @@ class ObdHome(object):
                 self._call_stdio('verbose', 'Try to stop cluster')
                 status = deploy.deploy_info.status
                 deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
-                if not self.stop_cluster(name):
+                if not self._stop_cluster(deploy, repositories):
                     deploy.update_deploy_status(status)
                     self._call_stdio('error', 'Fail to stop cluster')
                     return False
@@ -1857,13 +2039,13 @@ class ObdHome(object):
             self._call_stdio('verbose', 'Call %s for %s' % (plugins[repository], repository))
             plugins[repository](deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio)
         
-        self._call_stdio('verbose', 'Set %s deploy status to destroyed' % name)
+        self._call_stdio('verbose', 'Set %s deploy status to destroyed' % deploy.name)
         if deploy.update_deploy_status(DeployStatus.STATUS_DESTROYED):
-            self._call_stdio('print', '%s destroyed' % name)
+            self._call_stdio('print', '%s destroyed' % deploy.name)
             return True
         return False
 
-    def change_repository(self, name, options=Values()):
+    def reinstall(self, name, options=Values()):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
         if not deploy:
@@ -1879,10 +2061,7 @@ class ObdHome(object):
         component = getattr(options, 'component')
         usable = getattr(options, 'hash')
         if not component:
-            self._call_stdio('error', 'Specify the components you want to change.')
-            return False
-        if not usable:
-            self._call_stdio('error', 'Specify the hash you want to upgrade.')
+            self._call_stdio('error', 'Specify the components you want to reinstall.')
             return False
         if component not in deploy_info.components:
             self._call_stdio('error', 'Not found %s in Deploy "%s" ' % (component, name))
@@ -1899,77 +2078,81 @@ class ObdHome(object):
 
         stop_plugins = self.search_py_script_plugin([current_repository], 'stop')
         start_plugins = self.search_py_script_plugin([current_repository], 'start')
-        change_repo_plugin = self.plugin_manager.get_best_py_script_plugin('change_repo', 'general', '0.1')
+
         self._call_stdio('stop_loading', 'succeed')
-
-        self._call_stdio('verbose', 'search target repository')
-        dest_repository = self.repository_manager.get_repository(current_repository.name, version=current_repository.version, tag=usable)
-        if not dest_repository:
-            pkg = self.mirror_manager.get_exact_pkg(name=current_repository.name, version=current_repository.version, md5=usable)
-            if not pkg:
-                self._call_stdio('error', 'No such package %s-%s-%s' % (component, current_repository.version, usable))
-                return False
-            repositories = []
-            install_plugins = self.get_install_plugin_and_install(repositories, [pkg])
-            if not install_plugins:
-                return False
-            dest_repository = repositories[0]
-        else:
-            install_plugins = self.search_plugins([dest_repository], PluginType.INSTALL)
-
-        if dest_repository is None:
-            self._call_stdio('error', 'Target version not found')
-            return False
-
-        if dest_repository == current_repository:
-            self._call_stdio('print', 'The current version is already %s.\nNoting to do.' % current_repository)
-            return False
-            
         # Get the client
         ssh_clients = self.get_clients(deploy_config, [current_repository])
-        cluster_config = deploy_config.components[current_repository.name]
 
-        self._call_stdio('start_loading', 'Load cluster param plugin')
-        # Check whether the components have the parameter plugins and apply the plugins
-        self.search_param_plugin_and_apply(repositories, deploy_config)
-        self._call_stdio('stop_loading', 'succeed')
+        current_cluster_config = deploy_config.components[current_repository.name]
+        need_sync = bool(current_cluster_config.get_rsync_list())
+        need_change_repo = bool(usable)
+        sync_repositories = [current_repository]
+        repository = current_repository
+        cluster_config = current_cluster_config
 
-        cluster_config = deploy_config.components[dest_repository.name]
-        # cluster files check
-        self.servers_repository_install(ssh_clients, cluster_config.servers, dest_repository, install_plugins[dest_repository])
-        # lib check
-        if not self.servers_repository_lib_check(ssh_clients, cluster_config.servers, dest_repository, install_plugins[dest_repository], 'warn'):
-            self._call_stdio('print', 'Try to get lib-repository')
-            repositories_lib_map = self.install_lib_for_repositories([dest_repository])
-            if repositories_lib_map is False:
-                self._call_stdio('error', 'Failed to install lib package for local')
+        # search repo and install
+        if usable:
+            self._call_stdio('verbose', 'search target repository')
+            dest_repository = self.repository_manager.get_repository(current_repository.name, version=current_repository.version, tag=usable)
+            if not dest_repository:
+                pkg = self.mirror_manager.get_exact_pkg(name=current_repository.name, version=current_repository.version, md5=usable)
+                if not pkg:
+                    self._call_stdio('error', 'No such package %s-%s-%s' % (component, current_repository.version, usable))
+                    return False
+                repositories = []
+                install_plugins = self.get_install_plugin_and_install(repositories, [pkg])
+                if not install_plugins:
+                    return False
+                dest_repository = repositories[0]
+            else:
+                install_plugins = self.search_plugins([dest_repository], PluginType.INSTALL)
+
+            if dest_repository is None:
+                self._call_stdio('error', 'Target version not found')
                 return False
-            if self.servers_apply_lib_repository_and_check(ssh_clients, deploy_config, [dest_repository], repositories_lib_map):
-                self._call_stdio('error', 'Failed to install lib package for cluster servers')
+
+            if dest_repository == current_repository:
+                self._call_stdio('print', 'The current version is already %s.\nNoting to do.' % current_repository)
+                need_change_repo = False
+            else:
+                self._call_stdio('start_loading', 'Load cluster param plugin')
+                # Check whether the components have the parameter plugins and apply the plugins
+                self.search_param_plugin_and_apply(repositories, deploy_config)
+                self._call_stdio('stop_loading', 'succeed')
+                cluster_config = deploy_config.components[dest_repository.name]
+        need_restart = need_sync or need_change_repo
+        # stop cluster if needed
+        if need_restart:
+            # Check the status for the deployed cluster
+            component_status = {}
+            cluster_status = self.cluster_status_check(ssh_clients, deploy_config, [current_repository], component_status)
+            if cluster_status is False or cluster_status == 1:
+                self._call_stdio('verbose', 'Call %s for %s' % (stop_plugins[current_repository], current_repository))
+                if not stop_plugins[current_repository](deploy_config.components.keys(), ssh_clients, current_cluster_config, [], options, self.stdio):
+                    return False
+
+        # install repo to remote servers
+        if need_change_repo:
+            if not self.install_repositories_to_servers(deploy_config, [dest_repository, ], install_plugins, ssh_clients, options):
                 return False
+            sync_repositories = [dest_repository]
+            repository = dest_repository
 
-
-        # Check the status for the deployed cluster
-        component_status = {}
-        cluster_status = self.cluster_status_check(ssh_clients, deploy_config, [current_repository], component_status)
-        if cluster_status is False or cluster_status == 1:
-            self._call_stdio('verbose', 'Call %s for %s' % (stop_plugins[current_repository], current_repository))
-            if not stop_plugins[current_repository](deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio):
-                return False
-
-        self._call_stdio('verbose', 'Call %s for %s' % (change_repo_plugin, dest_repository))
-        if not change_repo_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio, self.home_path, dest_repository):
+        # sync runtime dependencies
+        if not self.sync_runtime_dependencies(deploy_config, sync_repositories, ssh_clients, options):
             return False
 
-        if deploy_info.status == DeployStatus.STATUS_RUNNING:
-            self._call_stdio('verbose', 'Call %s for %s' % (start_plugins[current_repository], dest_repository))
+        # start cluster if needed
+        if need_restart and deploy_info.status == DeployStatus.STATUS_RUNNING:
+            self._call_stdio('verbose', 'Call %s for %s' % (start_plugins[current_repository], repository))
             setattr(options, 'without_parameter', True)
-            if not start_plugins[current_repository](deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio, self.home_path, dest_repository.repository_dir) and getattr(options, 'force', False) is False:
-                self._call_stdio('verbose', 'Call %s for %s' % (change_repo_plugin, current_repository))
-                change_repo_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio, self.home_path, current_repository)
+            if not start_plugins[current_repository](deploy_config.components.keys(), ssh_clients, cluster_config, [], options, self.stdio, self.home_path, repository.repository_dir) and getattr(options, 'force', False) is False:
+                self.install_repositories_to_servers(deploy_config, [current_repository, ], install_plugins, ssh_clients, options)
                 return False
-        
-        deploy.update_component_repository(dest_repository)
+
+        # update deploy info
+        if need_change_repo:
+            deploy.use_model(dest_repository.name, dest_repository)
         return True
 
     def upgrade_cluster(self, name, options=Values()):
@@ -1978,13 +2161,13 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Deploy status judge')
         if deploy_info.status not in [DeployStatus.STATUS_UPRADEING, DeployStatus.STATUS_RUNNING]:
             self._call_stdio('error', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
             return False
-        
+
         deploy_config = deploy.deploy_config
 
         self._call_stdio('start_loading', 'Get local repositories and plugins')
@@ -2037,9 +2220,9 @@ class ObdHome(object):
                 self._call_stdio(
                     'print_list',
                     images,
-                    ['name', 'version', 'release', 'arch', 'md5'], 
+                    ['name', 'version', 'release', 'arch', 'md5'],
                     lambda x: [x.name, x.version, x.release, x.arch, x.md5],
-                    title='%s %s Candidates' % (component, version) 
+                    title='%s %s Candidates' % (component, version)
                 )
                 self._call_stdio('error', 'Too many match')
                 return False
@@ -2056,11 +2239,11 @@ class ObdHome(object):
                 repositories = []
                 pkg = self.mirror_manager.get_exact_pkg(name=images[0].name, md5=images[0].md5)
                 pkgs = [pkg]
-                
+
             install_plugins = self.get_install_plugin_and_install(repositories, pkgs)
             if not install_plugins:
                 return False
-            
+
             dest_repository = repositories[0]
             if dest_repository is None:
                 self._call_stdio('error', 'Target version not found')
@@ -2082,17 +2265,24 @@ class ObdHome(object):
                 if not route:
                     return False
                 for node in route[1: -1]:
-                    images = self.search_images(component, version=node.get('version'), release=node.get('release'), disable=disable, usable=usable, release_first=True)
+                    _version = node.get('version')
+                    _release = node.get('release')
+                    images = self.search_images(component, version=_version, release=_release, disable=disable, usable=usable, release_first=True)
                     if not images:
-                        self._call_stdio('error', 'No such package %s-%s' % (component, version))
+                        pkg_name = component
+                        if _version:
+                            pkg_name = pkg_name + '-' + str(_version)
+                        if _release:
+                            pkg_name = pkg_name + '-' + str(_release)
+                        self._call_stdio('error', 'No such package %s' % pkg_name)
                         return False
                     if len(images) > 1:
                         self._call_stdio(
                             'print_list',
                             images,
-                            ['name', 'version', 'release', 'arch', 'md5'], 
+                            ['name', 'version', 'release', 'arch', 'md5'],
                             lambda x: [x.name, x.version, x.release, x.arch, x.md5],
-                            title='%s %s Candidates' % (component, version) 
+                            title='%s %s Candidates' % (component, version)
                         )
                         self._call_stdio('error', 'Too many match')
                         return False
@@ -2106,7 +2296,7 @@ class ObdHome(object):
                 if isinstance(image, Repository):
                     upgrade_repositories.append(image)
                 else:
-                    repository = self.repository_manager.get_repository_by_version(name=image.name, version=image.version, tag=image.md5)
+                    repository = self.repository_manager.get_repository(name=image.name, version=image.version, package_hash=image.md5)
                     if repository:
                         upgrade_repositories.append(repository)
                     else:
@@ -2132,7 +2322,7 @@ class ObdHome(object):
                     return False
                 self._call_stdio('verbose', 'Call %s for %s' % (upgrade_check_plugins[current_repository], current_repository))
                 if not upgrade_check_plugins[current_repository](
-                    deploy_config.components.keys(), ssh_clients, cluster_config, {}, options, self.stdio, 
+                    deploy_config.components.keys(), ssh_clients, cluster_config, {}, options, self.stdio,
                     current_repository=current_repository,
                     repositories=upgrade_repositories,
                     route=route,
@@ -2145,17 +2335,17 @@ class ObdHome(object):
             self._call_stdio(
                 'print_list',
                 upgrade_repositories,
-                ['name', 'version', 'release', 'arch', 'md5', 'mark'], 
+                ['name', 'version', 'release', 'arch', 'md5', 'mark'],
                 lambda x: [x.name, x.version, x.release, x.arch, x.md5, 'start' if x == current_repository else 'dest' if x == dest_repository else ''],
-                title='Packages Will Be Used' 
+                title='Packages Will Be Used'
             )
-                    
+
             if not self._call_stdio('confirm', 'If you use a non-official release, we cannot guarantee a successful upgrade or technical support when you fail. Make sure that you want to use the above package to upgrade.'):
                 return False
 
             index = 1
             upgrade_ctx = {
-                'route': route, 
+                'route': route,
                 'upgrade_repositories': [
                     {
                     'version': repository.version,
@@ -2178,29 +2368,13 @@ class ObdHome(object):
             # Get the client
             ssh_clients = self.get_clients(deploy_config, [current_repository])
             cluster_config = deploy_config.components[current_repository.name]
-        
+
         install_plugins = self.get_install_plugin_and_install(upgrade_repositories, [])
         if not install_plugins:
             return False
 
-        need_lib_repositories = []
-        for repository in upgrade_repositories[1:]:
-            cluster_config = deploy_config.components[repository.name]
-            # cluster files check
-            self.servers_repository_install(ssh_clients, cluster_config.servers, repository, install_plugins[repository])
-            # lib check
-            if not self.servers_repository_lib_check(ssh_clients, cluster_config.servers, repository, install_plugins[repository], 'warn'):
-                need_lib_repositories.append(repository)
-
-        if need_lib_repositories:
-            self._call_stdio('print', 'Try to get lib-repository')
-            repositories_lib_map = self.install_lib_for_repositories(need_lib_repositories)
-            if repositories_lib_map is False:
-                self._call_stdio('error', 'Failed to install lib package for local')
-                return False
-            if self.servers_apply_lib_repository_and_check(ssh_clients, deploy_config, need_lib_repositories, repositories_lib_map):
-                self._call_stdio('error', 'Failed to install lib package for cluster servers')
-                return False
+        if not self.install_repositories_to_servers(deploy_config, upgrade_repositories[1:], install_plugins, ssh_clients, options):
+            return False
 
         n = len(upgrade_repositories)
         while upgrade_ctx['index'] < n:
@@ -2215,7 +2389,9 @@ class ObdHome(object):
                     current_repository=current_repository,
                     upgrade_repositories=upgrade_repositories,
                     apply_param_plugin=lambda repository: self.search_param_plugin_and_apply([repository], deploy_config),
-                    upgrade_ctx=upgrade_ctx
+                    upgrade_ctx=upgrade_ctx,
+                    install_repository_to_servers=self.install_repository_to_servers,
+                    unuse_lib_repository=deploy_config.unuse_lib_repository
                 )
             deploy.update_upgrade_ctx(**upgrade_ctx)
             if not ret:
@@ -2250,11 +2426,15 @@ class ObdHome(object):
         for item in plugin.file_list(info):
             path = os.path.join(repo_path, item.src_path)
             path = os.path.normcase(path)
-            if not os.path.exists(path):
+            if not os.path.exists(path) or os.path.isdir(path) != (item.type == InstallPlugin.FileItemType.DIR):
                 path = os.path.join(repo_path, item.target_path)
                 path = os.path.normcase(path)
                 if not os.path.exists(path):
                     self._call_stdio('error', 'need %s: %s ' % ('dir' if item.type == InstallPlugin.FileItemType.DIR else 'file', path))
+                    success = False
+                    continue
+                if os.path.isdir(path) != (item.type == InstallPlugin.FileItemType.DIR):
+                    self._call_stdio('error', 'need %s, but %s is %s' % (item.type, path, 'file' if item.type == InstallPlugin.FileItemType.DIR else 'dir'))
                     success = False
                     continue
             files[item.src_path] = path
@@ -2336,9 +2516,14 @@ class ObdHome(object):
 
         self._call_stdio('start_loading', 'Get local repositories and plugins')
         # Get the repository
-        repositories = self.get_local_repositories({opts.component: deploy_config.components[opts.component]})
-        repository = repositories[0]
-
+        # repositories = self.get_local_repositories({opts.component: deploy_config.components[opts.component]})
+        repositories = self.load_local_repositories(deploy_info)
+        for repository in repositories:
+            if repository.name == opts.component:
+                break
+        else:
+            self._call_stdio('error', 'Can not find the component for mysqltest, use `--component` to select component')
+            return False
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
         self._call_stdio('stop_loading', 'succeed')
@@ -2370,6 +2555,7 @@ class ObdHome(object):
         mysqltest_check_opt_plugin = self.plugin_manager.get_best_py_script_plugin('check_opt', 'mysqltest', repository.version)
         mysqltest_check_test_plugin = self.plugin_manager.get_best_py_script_plugin('check_test', 'mysqltest', repository.version)
         mysqltest_run_test_plugin = self.plugin_manager.get_best_py_script_plugin('run_test', 'mysqltest', repository.version)
+        mysqltest_collect_log_plugin = self.plugin_manager.get_best_py_script_plugin('collect_log', 'mysqltest', repository.version)
 
         env = opts.__dict__
         env['cursor'] = cursor
@@ -2379,66 +2565,84 @@ class ObdHome(object):
         ret = mysqltest_check_opt_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, env)
         if not ret:
             return False
-        self._call_stdio('verbose', 'Call %s for %s' % (mysqltest_check_test_plugin, repository))
-        ret = mysqltest_check_test_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, env)
-        if not ret:
-            self._call_stdio('error', 'Failed to get test set')
-            return False
-        if not env['test_set']:
-            self._call_stdio('error', 'Test set is empty')
-            return False
+        if not env['init_only']:
+            self._call_stdio('verbose', 'Call %s for %s' % (mysqltest_check_test_plugin, repository))
+            ret = mysqltest_check_test_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, env)
+            if not ret:
+                self._call_stdio('error', 'Failed to get test set')
+                return False
+            if env['test_set'] is None:
+                self._call_stdio('error', 'Test set is empty')
+                return False
 
-        if env['need_init']:
+        if env['need_init'] or env['init_only']:
             self._call_stdio('verbose', 'Call %s for %s' % (mysqltest_init_plugin, repository))
             if not mysqltest_init_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, env):
                 self._call_stdio('error', 'Failed to init for mysqltest')
                 return False
-        
-        result = []
-        for test in env['test_set']:
+            if env['init_only']:
+                return True
+
+        self._call_stdio('verbose', 'test set: {}'.format(env['test_set']))
+        self._call_stdio('verbose', 'total: {}'.format(len(env['test_set'])))
+        reboot_success = True
+        while True:
             self._call_stdio('verbose', 'Call %s for %s' % (mysqltest_run_test_plugin, repository))
-            ret = mysqltest_run_test_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, test, env)
+            ret = mysqltest_run_test_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, env)
             if not ret:
                 break
-            case_result = ret.get_return('result')
-            if case_result['ret'] != 0 and opts.auto_retry:
+            self._call_stdio('verbose', 'Call %s for %s' % (mysqltest_collect_log_plugin, repository))
+            mysqltest_collect_log_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {},
+                                         self.stdio, env)
+            if ret.get_return('finished'):
+                break
+            if ret.get_return('reboot') and not env['disable_reboot']:
                 cursor.close()
                 db.close()
                 if getattr(self.stdio, 'sub_io'):
                     stdio = self.stdio.sub_io(msg_lv=MsgLevel.ERROR)
                 else:
                     stdio = None
-                self._call_stdio('start_loading', 'Reboot')
-                obd = ObdHome(self.home_path, self.dev_mode, stdio=stdio)
-                obd.lock_manager.set_try_times(-1)
-                if obd.redeploy_cluster(name):
-                    self._call_stdio('stop_loading', 'succeed')
-                else:
-                    self._call_stdio('stop_loading', 'fail')
-                    result.append(case_result)
+                reboot_timeout = getattr(opts, 'reboot_timeout', 0)
+                reboot_retries = getattr(opts, 'reboot_retries', 5)
+                reboot_success = False
+                while reboot_retries and not reboot_success:
+                    reboot_retries -= 1
+                    with timeout(reboot_timeout):
+                        self._call_stdio('start_loading', 'Reboot')
+                        obd = ObdHome(self.home_path, self.dev_mode, stdio=stdio)
+                        obd.lock_manager.set_try_times(-1)
+                        if obd.redeploy_cluster(
+                                name,
+                                opt=Values({'force_kill': True, 'force': True, 'force_delete': True}), search_repo=False):
+                            self._call_stdio('stop_loading', 'succeed')
+                        else:
+                            self._call_stdio('stop_loading', 'fail')
+                            continue
+                        obd.lock_manager.set_try_times(6000)
+                        obd = None
+                        connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
+                        ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {},
+                                             self.stdio, target_server=opts.test_server, sys_root=False)
+                        if not ret or not ret.get_return('connect'):
+                            self._call_stdio('error', 'Failed to connect server')
+                            continue
+                        db = ret.get_return('connect')
+                        cursor = ret.get_return('cursor')
+                        env['cursor'] = cursor
+                        self._call_stdio('verbose', 'Call %s for %s' % (mysqltest_init_plugin, repository))
+                        if mysqltest_init_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {},
+                                                     self.stdio, env):
+                            reboot_success = True
+                        else:
+                            self._call_stdio('error', 'Failed to prepare for mysqltest')
+                if not reboot_success:
+                    env['collect_log'] = True
+                    mysqltest_collect_log_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, env, test_name='reboot_failed')
                     break
-                obd.lock_manager.set_try_times(6000)
-                obd = None
-                connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
-                ret = connect_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, target_server=opts.test_server, sys_root=False)
-                if not ret or not ret.get_return('connect'):
-                    break
-                db = ret.get_return('connect')
-                cursor = ret.get_return('cursor')
-                env['cursor'] = cursor
-                self._call_stdio('verbose', 'Call %s for %s' % (mysqltest_init_plugin, repository))
-                if not mysqltest_init_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, env):
-                    self._call_stdio('error', 'Failed to prepare for mysqltest')
-                    break
-                ret = mysqltest_run_test_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], {}, self.stdio, test, env)
-                if not ret:
-                    break
-                case_result = ret.get_return('result')
-
-            result.append(case_result)
-
+        result = env.get('case_results', [])
         passcnt = len(list(filter(lambda x: x["ret"] == 0, result)))
-        totalcnt = len(env['test_set'])
+        totalcnt = len(env.get('run_test_cases', []))
         failcnt = totalcnt - passcnt
         if result:
             self._call_stdio(
@@ -2447,7 +2651,9 @@ class ObdHome(object):
                 title='Result (Total %d, Passed %d, Failed %s)' % (totalcnt, passcnt, failcnt), 
                 align={'Cost (s)': 'r'}
             )
-        if failcnt:
+        if failcnt or not reboot_success:
+            if not reboot_success:
+                self._call_stdio('error', 'reboot cluster failed')
             self._call_stdio('print', 'Mysqltest failed')
         else:
             self._call_stdio('print', 'Mysqltest passed')
@@ -2529,10 +2735,16 @@ class ObdHome(object):
                             self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
             return False
 
-        for repository in repositories:
-            if repository.name == opts.component:
-                break
-        
+        ob_repository = None
+        repository = None
+        for tmp_repository in repositories:
+            if tmp_repository.name in ["oceanbase", "oceanbase-ce"]:
+                ob_repository = tmp_repository
+            if tmp_repository.name == opts.component:
+                repository = tmp_repository
+
+        plugin_version = ob_repository.version if ob_repository else repository.version
+
         env = {'sys_root': False}
         db = None
         cursor = None
@@ -2542,7 +2754,6 @@ class ObdHome(object):
 
         connect_plugin = self.search_py_script_plugin(repositories, 'connect')[repository]
 
-        
         if repository.name in ['obproxy', 'obproxy-ce']:
             ob_optimization = False
             allow_components = ['oceanbase', 'oceanbase-ce']
@@ -2564,8 +2775,8 @@ class ObdHome(object):
             return False
         db = ret.get_return('connect')
         cursor = ret.get_return('cursor')
-    
-        run_test_plugin = self.plugin_manager.get_best_py_script_plugin('run_test', 'sysbench', repository.version)
+
+        run_test_plugin = self.plugin_manager.get_best_py_script_plugin('run_test', 'sysbench', plugin_version)
 
         setattr(opts, 'host', opts.test_server.ip)
         setattr(opts, 'port', db.port)
@@ -2685,6 +2896,95 @@ class ObdHome(object):
             return True
         return False
 
+    def tpcds(self, name, opts):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        self._call_stdio('verbose', 'Check deploy status')
+        if deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
+            return False
+        self._call_stdio('verbose', 'Get deploy configuration')
+        deploy_config = deploy.deploy_config
+
+        db_component = None
+        db_components = ['oceanbase', 'oceanbase-ce']
+        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
+        if opts.component is None:
+            for component_name in allow_components:
+                if component_name in deploy_config.components:
+                    opts.component = component_name
+                    break
+        elif opts.component not in allow_components:
+            self._call_stdio('error', '%s not support. %s is allowed' % (opts.component, allow_components))
+            return False
+        if opts.component not in deploy_config.components:
+            self._call_stdio('error', 'Can not find the component for tpcds, use `--component` to select component')
+            return False
+        
+        for component_name in db_components:
+            if component_name in deploy_config.components:
+                db_component = component_name
+        if db_component is None:
+            self._call_stdio('error', 'Missing database component (%s) in deploy' % ','.join(db_components))
+            return False
+
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        # Get the repository
+        # repositories = self.get_local_repositories({opts.component: deploy_config.components[opts.component]})
+        repositories = self.load_local_repositories(deploy_info)
+
+        # Check whether the components have the parameter plugins and apply the plugins
+        self.search_param_plugin_and_apply(repositories, deploy_config)
+        self._call_stdio('stop_loading', 'succeed')
+
+        # Get the client
+        ssh_clients = self.get_clients(deploy_config, repositories)
+
+        # Check the status for the deployed cluster
+        component_status = {}
+        cluster_status = self.cluster_status_check(ssh_clients, deploy_config, repositories, component_status)
+        if cluster_status is False or cluster_status == 0:
+            if self.stdio:
+                self._call_stdio('error', EC_SOME_SERVER_STOPED)
+                for repository in component_status:
+                    cluster_status = component_status[repository]
+                    for server in cluster_status:
+                        if cluster_status[server] == 0:
+                            self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
+            return False
+
+        db_cluster_config =  deploy_config.components[db_component]
+        cluster_config =  deploy_config.components[opts.component]
+
+        if opts.test_server is None:
+            opts.test_server = cluster_config.servers[0]
+        else:
+            for server in cluster_config.servers:
+                if server.name == opts.test_server:
+                    opts.test_server = server
+                    break
+            else:
+                self._call_stdio('error', '%s is not a server in %s' % (opts.test_server, opts.component))
+                return False
+
+        check_opt_plugin = self.plugin_manager.get_best_py_script_plugin('check_opt', 'tpcds', db_cluster_config.version)
+        load_data_plugin = self.plugin_manager.get_best_py_script_plugin('load_data', 'tpcds', cluster_config.version)
+        run_test_plugin = self.plugin_manager.get_best_py_script_plugin('run_test', 'tpcds', cluster_config.version)
+
+        self._call_stdio('verbose', 'Call %s for %s' % (check_opt_plugin, cluster_config.name))
+        if not check_opt_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], opts, self.stdio, db_cluster_config=db_cluster_config):
+            return False
+        self._call_stdio('verbose', 'Call %s for %s' % (load_data_plugin, db_cluster_config.name))
+        if not load_data_plugin(deploy_config.components.keys(), ssh_clients, db_cluster_config, [], opts, self.stdio):
+            return False
+        self._call_stdio('verbose', 'Call %s for %s' % (run_test_plugin, cluster_config.name))
+        return run_test_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], opts, self.stdio)
+
     def tpcc(self, name, opts):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
@@ -2730,8 +3030,8 @@ class ObdHome(object):
 
         self._call_stdio('start_loading', 'Get local repositories and plugins')
         # Get the repository
-        repositories = self.get_local_repositories({opts.component: deploy_config.components[opts.component]})
-        repository = repositories[0]
+        # repositories = self.get_local_repositories({opts.component: deploy_config.components[opts.component]})
+        repositories = self.load_local_repositories(deploy_info)
 
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
@@ -2753,9 +3053,15 @@ class ObdHome(object):
                             self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
             return False
 
-        for repository in repositories:
-            if repository.name == opts.component:
-                break
+        ob_repository = None
+        repository = None
+        for tmp_repository in repositories:
+            if tmp_repository.name in ["oceanbase", "oceanbase-ce"]:
+                ob_repository = tmp_repository
+            if tmp_repository.name == opts.component:
+                repository = tmp_repository
+
+        plugin_version = ob_repository.version if ob_repository else repository.version
 
         env = {'sys_root': False}
         odp_db = None
@@ -2796,12 +3102,11 @@ class ObdHome(object):
             return False
         db = ret.get_return('connect')
         cursor = ret.get_return('cursor')
-
-        pre_test_plugin = self.plugin_manager.get_best_py_script_plugin('pre_test', 'tpcc', repository.version)
-        optimize_plugin = self.plugin_manager.get_best_py_script_plugin('optimize', 'tpcc', repository.version)
-        build_plugin = self.plugin_manager.get_best_py_script_plugin('build', 'tpcc', repository.version)
-        run_test_plugin = self.plugin_manager.get_best_py_script_plugin('run_test', 'tpcc', repository.version)
-        recover_plugin = self.plugin_manager.get_best_py_script_plugin('recover', 'tpcc', repository.version)
+        pre_test_plugin = self.plugin_manager.get_best_py_script_plugin('pre_test', 'tpcc', plugin_version)
+        optimize_plugin = self.plugin_manager.get_best_py_script_plugin('optimize', 'tpcc', plugin_version)
+        build_plugin = self.plugin_manager.get_best_py_script_plugin('build', 'tpcc', plugin_version)
+        run_test_plugin = self.plugin_manager.get_best_py_script_plugin('run_test', 'tpcc', plugin_version)
+        recover_plugin = self.plugin_manager.get_best_py_script_plugin('recover', 'tpcc', plugin_version)
 
         setattr(opts, 'host', opts.test_server.ip)
         setattr(opts, 'port', db.port)
@@ -2919,3 +3224,106 @@ class ObdHome(object):
 
 
 
+
+    def db_connect(self, name, opts):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name, read_only=True)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+
+        self._call_stdio('verbose', 'Get deploy configuration')
+        deploy_config = deploy.deploy_config
+        deploy_info = deploy.deploy_info
+
+        if deploy_info.status in (DeployStatus.STATUS_DESTROYED, DeployStatus.STATUS_CONFIGURED):
+            self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
+            return False
+
+        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
+        if opts.component is None:
+            for component_name in allow_components:
+                if component_name in deploy_config.components:
+                    opts.component = component_name
+                    break
+        elif opts.component not in allow_components:
+            self._call_stdio('error', '%s not support. %s is allowed' % (opts.component, allow_components))
+            return False
+        if opts.component not in deploy_config.components:
+            self._call_stdio('error', 'Can not find the component for tpch, use `--component` to select component')
+            return False
+
+        cluster_config = deploy_config.components[opts.component]
+        if not cluster_config.servers:
+            self._call_stdio('error', '%s server list is empty' % opts.component)
+            return False
+        if opts.server is None:
+            opts.server = cluster_config.servers[0]
+        else:
+            for server in cluster_config.servers:
+                if server.name == opts.server:
+                    opts.server = server
+                    break
+            else:
+                self._call_stdio('error', '%s is not a server in %s' % (opts.server, opts.component))
+                return False
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        # Get the repository
+        repositories = self.get_local_repositories({opts.component: deploy_config.components[opts.component]})
+        repository = repositories[0]
+
+        # Check whether the components have the parameter plugins and apply the plugins
+        self.search_param_plugin_and_apply(repositories, deploy_config)
+        self._call_stdio('stop_loading', 'succeed')
+
+        sync_config_plugin = self.plugin_manager.get_best_py_script_plugin('sync_cluster_config', 'general', '0.1')
+        sync_config_plugin(deploy_config.components.keys(), [], cluster_config, [],  opts, self.stdio)
+        db_connect_plugin = self.plugin_manager.get_best_py_script_plugin('db_connect', 'general', '0.1')
+        return db_connect_plugin(deploy_config.components.keys(), [], cluster_config, [],  opts, self.stdio)
+
+    def commands(self, name, cmd_name, opts):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name, read_only=True)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+        self._call_stdio('verbose', 'Get deploy configuration')
+        deploy_config = deploy.deploy_config
+        deploy_info = deploy.deploy_info
+
+        if deploy_info.status in (DeployStatus.STATUS_DESTROYED, DeployStatus.STATUS_CONFIGURED):
+            self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
+            return False
+
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        # Check whether the components have the parameter plugins and apply the plugins
+        self.search_param_plugin_and_apply(repositories, deploy_config)
+        self._call_stdio('stop_loading', 'succeed')
+
+        check_opt_plugin = self.plugin_manager.get_best_py_script_plugin('check_opt', 'commands', '0.1')
+        prepare_variables_plugin = self.plugin_manager.get_best_py_script_plugin('prepare_variables', 'commands', '0.1')
+        commands_plugin = self.plugin_manager.get_best_py_script_plugin('commands', 'commands', '0.1')
+        ssh_clients = self.get_clients(deploy_config, repositories)
+        sync_config_plugin = self.plugin_manager.get_best_py_script_plugin('sync_cluster_config', 'general', '0.1')
+
+        cluster_config = deploy_config.components[repositories[0].name]
+        context = {}
+        sync_config_plugin(deploy_config.components.keys(), [], cluster_config, [], opts, self.stdio)
+        ret = check_opt_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], opts, self.stdio, name=cmd_name, context=context)
+        if not ret:
+            return
+        for component in context['components']:
+            cluster_config = deploy_config.components[component]
+            for server in context['servers']:
+                ret = prepare_variables_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], opts, self.stdio, name=cmd_name, component=component, server=server, context=context)
+                if not ret:
+                    return
+                if not ret.get_return("skip"):
+                    ret = commands_plugin(deploy_config.components.keys(), ssh_clients, cluster_config, [], opts, self.stdio, context=context)
+        if context.get('interactive'):
+            return bool(ret)
+        results = context.get('results', [])
+        self._call_stdio("print_list", results, ["Component", "Server", cmd_name.title()], title=cmd_name.title())
+        return not context.get('failed')

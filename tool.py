@@ -29,27 +29,66 @@ import gzip
 import fcntl
 import signal
 import shutil
+import re
+import json
 
 from ruamel.yaml import YAML, YAMLContextManager, representer
 
+from _stdio import SafeStdio
+_open = open
 if sys.version_info.major == 2:
     from collections import OrderedDict
     from backports import lzma
-    from io import open
+    from io import open as _open
+
+    def encoding_open(path, _type, encoding=None, *args, **kwrags):
+        if encoding:
+            kwrags['encoding'] = encoding
+            return _open(path, _type, *args, **kwrags)
+        else:
+            return open(path, _type, *args, **kwrags)
+
     class TimeoutError(OSError):
-        
+
         def __init__(self, *args, **kwargs):
             super(TimeoutError, self).__init__(*args, **kwargs)
+
 else:
     import lzma
+    encoding_open = open
 
     class OrderedDict(dict):
         pass
 
 
-__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict")
+__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict", "COMMAND_ENV")
 
 _WINDOWS = os.name == 'nt'
+
+
+class Timeout(object):
+
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+
+    def _is_timeout(self):
+        return self.seconds and self.seconds > 0
+
+    def __enter__(self):
+        if self._is_timeout():
+            signal.signal(signal.SIGALRM, self.handle_timeout)
+            signal.alarm(self.seconds)
+
+    def __exit__(self, type, value, traceback):
+        if self._is_timeout():
+            signal.alarm(0)
+
+
+timeout = Timeout
 
 
 class Timeout:
@@ -161,6 +200,17 @@ class ConfigUtil(object):
             return transform_func(value) if value is not None and transform_func else value
         except:
             return default
+
+    @staticmethod
+    def get_list_from_dict(conf, key, transform_func=None):
+        try:
+            return_list = conf[key]
+            if transform_func:
+                return [transform_func(value) for value in return_list]
+            else:
+                return return_list
+        except:
+            return []
 
 
 class DirectoryUtil(object):
@@ -320,7 +370,7 @@ class FileUtil(object):
         stdio and getattr(stdio, 'verbose', print)('open %s for %s' % (path, _type))
         if os.path.exists(path):
             if os.path.isfile(path):
-                return open(path, _type, encoding=encoding)
+                return encoding_open(path, _type, encoding=encoding)
             info = '%s is not file' % path
             if stdio:
                 getattr(stdio, 'error', print)(info)
@@ -329,7 +379,7 @@ class FileUtil(object):
                 raise IOError(info)
         dir_path, file_name = os.path.split(path)
         if not dir_path or DirectoryUtil.mkdir(dir_path, stdio=stdio):
-            return open(path, _type, encoding=encoding)
+            return encoding_open(path, _type, encoding=encoding)
         info = '%s is not file' % path
         if stdio:
             getattr(stdio, 'error', print)(info)
@@ -422,3 +472,116 @@ class YamlLoader(YAML):
             if getattr(self.stdio, 'exception', False):
                 self.stdio.exception('dump error:\n%s' % e)
             raise e
+
+
+_KEYCRE = re.compile(r"\$(\w+)")
+
+
+def var_replace(string, var, pattern=_KEYCRE):
+    if not var:
+        return string
+    done = []
+
+    while string:
+        m = pattern.search(string)
+        if not m:
+            done.append(string)
+            break
+
+        varname = m.group(1).lower()
+        replacement = var.get(varname, m.group())
+
+        start, end = m.span()
+        done.append(string[:start])
+        done.append(str(replacement))
+        string = string[end:]
+
+    return ''.join(done)
+
+class CommandEnv(SafeStdio):
+
+    def __init__(self):
+        self.source_path = None
+        self._env = os.environ.copy()
+        self._cmd_env = {}
+
+    def load(self, source_path, stdio=None):
+        if self.source_path:
+            stdio.error("Source path of env already set.")
+            return False
+        self.source_path = source_path
+        try:
+            if os.path.exists(source_path):
+                with FileUtil.open(source_path, 'r') as f:
+                    self._cmd_env = json.load(f)
+        except:
+            stdio.exception("Failed to load environments from {}".format(source_path))
+            return False
+        return True
+
+    def save(self, stdio=None):
+        if self.source_path is None:
+            stdio.error("Command environments need to load at first.")
+            return False
+        stdio.verbose("save environment variables {}".format(self._cmd_env))
+        try:
+            with FileUtil.open(self.source_path, 'w', stdio=stdio) as f:
+                json.dump(self._cmd_env, f)
+        except:
+            stdio.exception('Failed to save environment variables')
+            return False
+        return True
+
+    def get(self, key, default=""):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return default
+
+    def set(self, key, value, save=False, stdio=None):
+        stdio.verbose("set environment variable {} value {}".format(key, value))
+        self._cmd_env[key] = str(value)
+        if save:
+            return self.save(stdio=stdio)
+        return True
+
+    def delete(self, key, save=False, stdio=None):
+        stdio.verbose("delete environment variable {}".format(key))
+        if key in self._cmd_env:
+            del self._cmd_env[key]
+        if save:
+            return self.save(stdio=stdio)
+        return True
+
+    def clear(self, save=True, stdio=None):
+        self._cmd_env = {}
+        if save:
+            return self.save(stdio=stdio)
+        return True
+
+    def __getitem__(self, item):
+        value = self._cmd_env.get(item)
+        if value is None:
+            value = self._env.get(item)
+        if value is None:
+            raise KeyError(item)
+        return value
+
+    def __contains__(self, item):
+        if item in self._cmd_env:
+            return True
+        elif item in self._env:
+            return True
+        else:
+            return False
+
+    def copy(self):
+        result = dict(self._env)
+        result.update(self._cmd_env)
+        return result
+
+    def show_env(self):
+        return self._cmd_env
+
+
+COMMAND_ENV = CommandEnv()

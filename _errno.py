@@ -49,7 +49,8 @@ class InitDirFailedErrorMessage(object):
     PERMISSION_DENIED = ': {path} permission denied .'
 
 
-DOC_LINK_MSG = 'See https://open.oceanbase.com/docs/obd-cn/V1.4.0/10000000000436999 .'
+DOC_LINK = '<DOC_LINK>'
+DOC_LINK_MSG = 'See {}'.format(DOC_LINK if DOC_LINK else "https://open.oceanbase.com/docs/obd-cn/V1.3.0/10000000000099584")
 
 EC_CONFIG_CONFLICT_PORT = OBDErrorCode(1000, 'Configuration conflict {server1}:{port} port is used for {server2}\'s {key}')
 EC_CONFLICT_PORT = OBDErrorCode(1001, '{server}:{port} port is already used')
@@ -68,8 +69,6 @@ EC_OBSERVER_INVALID_MODFILY_GLOBAL_KEY = OBDErrorCode(2004, 'Invalid: {key} is n
 
 EC_MYSQLTEST_PARSE_CMD_FAILED = OBDErrorCode(3000, 'parse cmd failed: {path}')
 EC_MYSQLTEST_FAILE_NOT_FOUND = OBDErrorCode(3001, '{file} not found in {path}')
-EC_TPCC_LOAD_DATA_FAILED = OBDErrorCode(3002, 'Failed to load data.')
-EC_TPCC_RUN_TEST_FAILED = OBDErrorCode(3003, 'Failed to run TPC-C benchmark.')
 
 EC_OBAGENT_RELOAD_FAILED = OBDErrorCode(4000, 'Fail to reload {server}')
 EC_OBAGENT_SEND_CONFIG_FAILED = OBDErrorCode(4001, 'Fail to send config file to {server}')

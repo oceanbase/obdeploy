@@ -29,6 +29,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     stdio = plugin_context.stdio
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
+    clean = getattr(plugin_context.options, 'clean', False)
     stdio.start_loading('Initializes obagent work home')
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
@@ -37,7 +38,18 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
         remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
         stdio.verbose('%s init cluster work home', server)
-        if force:
+        need_clean = force
+        if clean and not force:
+            if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
+                owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
+                global_ret = False
+                err_msg = ' {} is not empty, and the owner is {}'.format(home_path, owner)
+                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err_msg))
+                continue
+            need_clean = True
+
+        if need_clean:
+            client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/monagent -c conf/monagent.yaml'" % home_path)
             ret = client.execute_command('rm -fr %s' % home_path)
             if not ret:
                 global_ret = False
@@ -55,10 +67,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
                 continue
 
-        if not (client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib,conf,log}'" % (home_path)) \
-         and client.execute_command("cp -r %s/conf %s/" % (remote_repository_dir, home_path)) \
-         and client.execute_command("if [ -d %s/bin ]; then ln -fs %s/bin/* %s/bin; fi" % (remote_repository_dir, remote_repository_dir, home_path)) \
-         and client.execute_command("if [ -d %s/lib ]; then ln -fs %s/lib/* %s/lib; fi" % (remote_repository_dir, remote_repository_dir, home_path))):
+        if not client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib,conf,log}'" % home_path):
             global_ret = False
             stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.PATH_ONLY.format(path=home_path)))
             

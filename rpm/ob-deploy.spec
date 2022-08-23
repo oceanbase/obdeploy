@@ -55,6 +55,7 @@ if  [ "$OBD_DUBUG" ]; then
     VERSION=$VERSION".`date +%s`"
 fi
 cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" | sed "s/<VERSION>/$VERSION/" > obd.py
+sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
 mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
 mkdir -p $BUILD_DIR/SOURCES/{site-packages}
 mkdir -p ${RPM_BUILD_ROOT}/usr/bin
@@ -64,10 +65,8 @@ pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py
 rm -f obd.py obd.spec
 \cp -rf $SRC_DIR/dist/obd ${RPM_BUILD_ROOT}/usr/bin/obd
 \cp -rf $SRC_DIR/plugins $BUILD_DIR/SOURCES/plugins
-\cp -rf $SRC_DIR/example $BUILD_DIR/SOURCES/example
 \cp -rf $SRC_DIR/config_parser $BUILD_DIR/SOURCES/config_parser
 \rm -fr $BUILD_DIR/SOURCES/plugins/oceanbase-ce
-\rm -fr $BUILD_DIR/SOURCES/plugins/obproxy-ce
 \rm -fr $BUILD_DIR/SOURCES/config_parser/oceanbase-ce
 \cp -rf $SRC_DIR/profile/ $BUILD_DIR/SOURCES/
 \cp -rf $SRC_DIR/mirror/ $BUILD_DIR/SOURCES/
@@ -80,8 +79,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/
 \cp -rf $BUILD_DIR/SOURCES/site-packages ${RPM_BUILD_ROOT}/usr/obd/lib/site-packages
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
-\cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
-cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
+cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && \cp -rf obproxy/3.1.0 obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
 cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce 
 
 # package infomation
@@ -116,10 +114,6 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
-* Sun Jul 17 2022 obd 1.4.0
- - new features: support tpcc
- - new features: support mysqltest record
- - fix bug: tpch ddl
 * Tue Apr 26 2022 obd 1.3.3
  - new features: change repository for a deployed component
  - fix bug: check kernel version when autdeploy obproxy

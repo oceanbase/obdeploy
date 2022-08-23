@@ -38,16 +38,6 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     repository_dir = dest_repository.repository_dir
     kwargs['repository_dir'] = repository_dir
 
-    for server in cluster_config.servers:
-        client = clients[server]
-        server_config = cluster_config.get_server_conf(server)
-        home_path = server_config['home_path']
-        remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
-        remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
-        client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
-        client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
-        client.execute_command("ln -fs %s/lib/* %s/lib" % (remote_repository_dir, home_path))
-
     stop_plugin = search_py_script_plugin([cur_repository], 'stop')[cur_repository]
     start_plugin = search_py_script_plugin([dest_repository], 'start')[dest_repository]
     connect_plugin = search_py_script_plugin([dest_repository], 'connect')[dest_repository]

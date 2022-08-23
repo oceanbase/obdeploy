@@ -24,12 +24,16 @@ import os
 import signal
 import sys
 import traceback
+import inspect2
+import six
 
 from enum import Enum
 from halo import Halo, cursor
 from colorama import Fore
 from prettytable import PrettyTable
 from progressbar import AdaptiveETA, Bar, SimpleProgress, ETA, FileTransferSpeed, Percentage, ProgressBar
+from types import MethodType
+from inspect2 import Parameter
 
 
 if sys.version_info.major == 3:
@@ -74,8 +78,8 @@ class FormtatText(object):
         return FormtatText.format(text, Fore.RED)
 
 
-class LogSymbols(Enum): 
-    
+class LogSymbols(Enum):
+
     INFO = FormtatText.info('!')
     SUCCESS = FormtatText.success('ok')
     WARNING = FormtatText.warning('!!')
@@ -112,7 +116,7 @@ class IOTable(PrettyTable):
                 val = 'l'
             for field in self._field_names:
                 self._align[field] = val
-    
+
 
 class IOHalo(Halo):
 
@@ -230,14 +234,14 @@ class IO(object):
     WARNING_PREV = FormtatText.warning('[WARN]')
     ERROR_PREV = FormtatText.error('[ERROR]')
     IS_TTY = sys.stdin.isatty()
-    
-    def __init__(self, 
-        level, 
-        msg_lv=MsgLevel.DEBUG, 
-        trace_logger=None, 
+
+    def __init__(self,
+        level,
+        msg_lv=MsgLevel.DEBUG,
+        trace_logger=None,
         use_cache=False,
-        track_limit=0, 
-        root_io=None, 
+        track_limit=0,
+        root_io=None,
         stream=sys.stdout
     ):
         self.level = level
@@ -258,7 +262,7 @@ class IO(object):
         if self._root_io:
             self._root_io.log_cache
         return self._log_cache
-        
+
     def before_close(self):
         if self._before_critical:
             try:
@@ -272,7 +276,7 @@ class IO(object):
 
     def __del__(self):
         self._close()
-    
+
     def exit(self, code):
         self._close()
         sys.exit(code)
@@ -280,14 +284,14 @@ class IO(object):
     def set_cache(self, status):
         if status:
             self._cache_on()
-    
+
     def _cache_on(self):
         if self._root_io:
             return False
         if self.log_cache is None:
             self._log_cache = []
         return True
-    
+
     def _cache_off(self):
         if self._root_io:
             return False
@@ -359,7 +363,7 @@ class IO(object):
             finally:
                 self._clear_sync_ctx()
         return ret
-        
+
     def start_loading(self, text, *arg, **kwargs):
         if self.sync_obj:
             return False
@@ -405,7 +409,7 @@ class IO(object):
         if not isinstance(self.sync_obj, IOProgressBar):
             return False
         return self._stop_sync_obj(IOProgressBar, 'interrupt')
-    
+
     def sub_io(self, pid=None, msg_lv=None):
         if not pid:
             pid = os.getpid()
@@ -414,16 +418,20 @@ class IO(object):
         key = "%s-%s" % (pid, msg_lv)
         if key not in self.sub_ios:
             self.sub_ios[key] = self.__class__(
-                self.level + 1, 
-                msg_lv=msg_lv, 
+                self.level + 1,
+                msg_lv=msg_lv,
                 trace_logger=self.trace_logger,
                 track_limit=self.track_limit,
                 root_io=self._root_io if self._root_io else self
             )
         return self.sub_ios[key]
 
-    def print_list(self, ary, field_names=None, exp=lambda x: x if isinstance(x, list) else [x], show_index=False, start=0, **kwargs):
+    def print_list(self, ary, field_names=None, exp=lambda x: x if isinstance(x, (list, tuple)) else [x], show_index=False, start=0, **kwargs):
         if not ary:
+            title = kwargs.get("title", "")
+            empty_msg = kwargs.get("empty_msg", "{} is empty.".format(title))
+            if empty_msg:
+                self.print(empty_msg)
             return
         show_index = field_names is not None and show_index
         if show_index:
@@ -464,7 +472,7 @@ class IO(object):
         kwargs['file'] and print(self._format(msg, *args), **kwargs)
         del kwargs['file']
         self.log(msg_lv, msg, *args, **kwargs)
-    
+
     def log(self, levelno, msg, *args, **kwargs):
         self._cache_log(levelno, msg, *args, **kwargs)
 
@@ -478,13 +486,11 @@ class IO(object):
                 else:
                     log_cache.append((levelno, line, args, kwargs))
 
-
     def _flush_log(self):
         if not self._root_io and self.trace_logger and self._log_cache:
             for levelno, line, args, kwargs in self._log_cache:
                 self.trace_logger.log(levelno, line, *args, **kwargs)
             self._log_cache = []
-
     def _log(self, levelno, msg, *args, **kwargs):
         if self.trace_logger:
             self.trace_logger.log(levelno, msg, *args, **kwargs)
@@ -560,3 +566,146 @@ class IO(object):
             msg and self.error(msg)
             print_stack(''.join(lines))
 
+
+class _Empty(object):
+    pass
+
+
+EMPTY = _Empty()
+del _Empty
+
+
+class FakeReturn(object):
+
+    def __call__(self, *args, **kwargs):
+        return None
+
+    def __len__(self):
+        return 0
+
+
+FAKE_RETURN = FakeReturn()
+
+
+class StdIO(object):
+
+    def __init__(self, io=None):
+        self.io = io
+        self._attrs = {}
+        self._warn_func = getattr(self.io, "warn", print)
+
+    def __getattr__(self, item):
+        if self.io is None:
+            return FAKE_RETURN
+        if item not in self._attrs:
+            attr = getattr(self.io, item, EMPTY)
+            if attr is not EMPTY:
+                self._attrs[item] = attr
+            else:
+                self._warn_func(FormtatText.warning("WARNING: {} has no attribute '{}'".format(self.io, item)))
+                self._attrs[item] = FAKE_RETURN
+        return self._attrs[item]
+
+
+FAKE_IO = StdIO()
+
+
+def get_stdio(io_obj):
+    if io_obj is None:
+        return FAKE_IO
+    elif isinstance(io_obj, StdIO):
+        return io_obj
+    else:
+        return StdIO(io_obj)
+
+
+def safe_stdio_decorator(default_stdio=None):
+
+    def decorated(func):
+        is_bond_method = False
+        _type = None
+        if isinstance(func, (staticmethod, classmethod)):
+            is_bond_method = True
+            _type = type(func)
+            func = func.__func__
+        all_parameters = inspect2.signature(func).parameters
+        if "stdio" in all_parameters:
+            default_stdio_in_params = all_parameters["stdio"].default
+            if not isinstance(default_stdio_in_params, Parameter.empty):
+                _default_stdio = default_stdio_in_params or default_stdio
+
+            def func_wrapper(*args, **kwargs):
+                _params_keys = list(all_parameters.keys())
+                _index = _params_keys.index("stdio")
+                if "stdio" not in kwargs and len(args) > _index:
+                    stdio = get_stdio(args[_index])
+                    tmp_args = list(args)
+                    tmp_args[_index] = stdio
+                    args = tuple(tmp_args)
+                else:
+                    stdio = get_stdio(kwargs.get("stdio", _default_stdio))
+                    kwargs["stdio"] = stdio
+                return func(*args, **kwargs)
+            return _type(func_wrapper) if is_bond_method else func_wrapper
+        else:
+            return _type(func) if is_bond_method else func
+    return decorated
+
+
+class SafeStdioMeta(type):
+
+    @staticmethod
+    def _init_wrapper_func(func):
+        def wrapper(*args, **kwargs):
+            setattr(args[0], "_wrapper_func", {})
+            func(*args, **kwargs)
+            if "stdio" in args[0].__dict__:
+                args[0].__dict__["stdio"] = get_stdio(args[0].__dict__["stdio"])
+
+        if func.__name__ != wrapper.__name__:
+            return wrapper
+        else:
+            return func
+
+    def __new__(mcs, name, bases, attrs):
+
+        for key, attr in attrs.items():
+            if key.startswith("__") and key.endswith("__"):
+                continue
+            if isinstance(attr, (staticmethod, classmethod)):
+                attrs[key] = safe_stdio_decorator()(attr)
+        cls = type.__new__(mcs, name, bases, attrs)
+        cls.__init__ = mcs._init_wrapper_func(cls.__init__)
+        return cls
+
+
+class _StayTheSame(object):
+    pass
+
+
+STAY_THE_SAME = _StayTheSame()
+
+del _StayTheSame
+
+
+class SafeStdio(six.with_metaclass(SafeStdioMeta)):
+    _wrapper_func = {}
+
+    def __getattribute__(self, item):
+        _wrapper_func = super(SafeStdio, self).__getattribute__("_wrapper_func")
+        if item not in _wrapper_func:
+            attr = super(SafeStdio, self).__getattribute__(item)
+            if (not item.startswith("__") or not item.endswith("__")) and isinstance(attr, MethodType):
+                if "stdio" in inspect2.signature(attr).parameters:
+                    _wrapper_func[item] = safe_stdio_decorator(default_stdio=getattr(self, "stdio", None))(attr)
+                    return _wrapper_func[item]
+            _wrapper_func[item] = STAY_THE_SAME
+            return attr
+        if _wrapper_func[item] is STAY_THE_SAME:
+            return super(SafeStdio, self).__getattribute__(item)
+        return _wrapper_func[item]
+
+    def __setattr__(self, key, value):
+        if key in self._wrapper_func:
+            del self._wrapper_func[key]
+        return super(SafeStdio, self).__setattr__(key, value)

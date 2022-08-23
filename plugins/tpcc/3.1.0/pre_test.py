@@ -176,7 +176,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
             cpu_total += cpu_count
     except Exception as e:
         stdio.exception(e)
-        stdio.error('Fail to get server status')
+        stdio.error('fail to get server status')
         return
 
     stdio.verbose('cpu total in all servers is %d' % cpu_total)
@@ -203,7 +203,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
         max_cpu = int(tenant_unit['max_cpu'])
     except Exception as e:
         stdio.verbose(e)
-        stdio.error('Fail to get tenant info')
+        stdio.error('fail to get tenant info')
         return
 
     host = get_option('host', '127.0.0.1')
@@ -212,7 +212,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     user = get_option('user', 'root')
     password = get_option('password', '')
     warehouses = get_option('warehouses', cpu_total * 20)
-    load_workers = get_option('load_workers', int(min(min_cpu, (max_memory >> 30) / 2)))
+    load_workers = get_option('load_workers', int(max(min(min_cpu, (max_memory >> 30) / 2), 1)))
     terminals = get_option('terminals', min(cpu_total * 15, warehouses * 10))
     run_mins = get_option('run_mins', 10)
     test_only = get_option('test_only')

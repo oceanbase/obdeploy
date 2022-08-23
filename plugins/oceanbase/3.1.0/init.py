@@ -34,6 +34,7 @@ def critical(*arg, **kwargs):
     global_ret = False
     stdio.error(*arg, **kwargs)
 
+
 def init_dir(server, client, key, path, link_path=None):
     if force:
         ret = client.execute_command('rm -fr %s' % path)
@@ -66,6 +67,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     stdio = plugin_context.stdio
     servers_dirs = {}
     force = getattr(plugin_context.options, 'force', False)
+    clean = getattr(plugin_context.options, 'clean', False)
     stdio.verbose('option `force` is %s' % force)
     stdio.start_loading('Initializes observer work home')
     for server in cluster_config.servers:
@@ -102,9 +104,20 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 'server': server,
                 'key': key,
             }
-            
+
         stdio.verbose('%s initializes observer work home' % server)
-        if force:
+        need_clean = force
+        if clean and not force:
+            if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
+                owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
+                err_msg = ' {} is not empty, and the owner is {}'.format(home_path, owner)
+                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err_msg))
+                continue
+            need_clean = True
+
+        if need_clean:
+            client.execute_command(
+                "pkill -9 -u `whoami` -f '^%s/bin/observer -p %s'" % (home_path, server_config['mysql_port']))
             ret = client.execute_command('rm -fr %s/*' % home_path)
             if not ret:
                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))
@@ -117,12 +130,10 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     continue
             else:
                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
-        ret = client.execute_command('bash -c "mkdir -p %s/{etc,admin,.conf,log,bin,lib}"' % home_path) \
-         and client.execute_command("if [ -d %s/bin ]; then ln -fs %s/bin/* %s/bin; fi" % (remote_repository_dir, remote_repository_dir, home_path)) \
-         and client.execute_command("if [ -d %s/lib ]; then ln -fs %s/lib/* %s/lib; fi" % (remote_repository_dir, remote_repository_dir, home_path))
+        ret = client.execute_command('bash -c "mkdir -p %s/{etc,admin,.conf,log,bin,lib}"' % home_path)
         if ret:
             data_path = server_config['data_dir']
-            if force:
+            if need_clean:
                 ret = client.execute_command('rm -fr %s/*' % data_path)
                 if not ret:
                     critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=data_path)))
@@ -165,7 +176,6 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.PATH_ONLY.format(path=data_path)))
         else:
             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=home_path)))
-    
     if global_ret:
         stdio.stop_loading('succeed')
         plugin_context.return_true()
