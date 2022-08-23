@@ -28,6 +28,8 @@ from copy import deepcopy
 
 from _errno import EC_OBSERVER_FAIL_TO_START
 
+from collections import OrderedDict
+
 
 def config_url(ocp_config_server, appname, cid):
     cfg_url = '%s&Action=ObRootServiceInfo&ObCluster=%s' % (ocp_config_server, appname)
@@ -57,7 +59,27 @@ def init_config_server(ocp_config_server, appname, cid, force_delete, stdio):
         if post(register_to_config_url) != 200:
             return False
     return cfg_url
-        
+
+
+class EnvVariables(object):
+
+    def __init__(self, environments, client):
+        self.environments = environments
+        self.client = client
+        self.env_done = {}
+
+    def __enter__(self):
+        for env_key, env_value in self.environments.items():
+            self.env_done[env_key] = self.client.get_env(env_key)
+            self.client.add_env(env_key, env_value, True)
+
+    def __exit__(self, *args, **kwargs):
+        for env_key, env_value in self.env_done.items():
+            if env_value is not None:
+                self.client.add_env(env_key, env_value, True)
+            else:
+                self.client.del_env(env_key)
+
 
 def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
@@ -75,12 +97,12 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
     if obconfig_url:
         if not appname or not cluster_id:
             stdio.error('need appname and cluster_id')
-            return 
+            return
         try:
             cfg_url = init_config_server(obconfig_url, appname, cluster_id, getattr(options, 'force_delete', False), stdio)
             if not cfg_url:
                 stdio.error('failed to register cluster. %s may have been registered in %s.' % (appname, obconfig_url))
-                return 
+                return
         except:
             stdio.exception('failed to register cluster')
             return
@@ -98,19 +120,12 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
 
-        if client.execute_command("bash -c 'if [ -f %s/bin/observer ]; then exit 1; else exit 0; fi;'" % home_path):
-            remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
-            remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
-            client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
-            client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
-            client.execute_command("ln -fs %s/lib/* %s/lib" % (remote_repository_dir, home_path))
-
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
 
         if client.execute_command('ls %s/ilog/' % server_config['data_dir']).stdout.strip():
             need_bootstrap = False
-        
+
         remote_pid_path = '%s/run/observer.pid' % home_path
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid:
@@ -125,10 +140,10 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
 
         cmd = []
         if use_parameter:
-            not_opt_str = {
-                'zone': '-z',
+            not_opt_str = OrderedDict({
                 'mysql_port': '-p',
                 'rpc_port': '-P',
+                'zone': '-z',
                 'nodaemon': '-N',
                 'appname': '-n',
                 'cluster_id': '-c',
@@ -138,9 +153,9 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 'ipv6': '-6',
                 'mode': '-m',
                 'scn': '-f'
-            }
+            })
             not_cmd_opt = [
-                'home_path', 'obconfig_url', 'root_password', 'proxyro_password', 
+                'home_path', 'obconfig_url', 'root_password', 'proxyro_password',
                 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc'
             ]
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
@@ -153,21 +168,25 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 opt_str.append('obconfig_url=\'%s\'' % cfg_url)
             else:
                 cmd.append(rs_list_opt)
-            cmd.append('-o %s' % ','.join(opt_str))
             for key in not_opt_str:
                 if key in server_config:
                     value = get_value(key)
                     cmd.append('%s %s' % (not_opt_str[key], value))
+            cmd.append('-o %s' % ','.join(opt_str))
+        else:
+            cmd.append('-p %s' % server_config['mysql_port'])
 
         clusters_cmd[server] = 'cd %s; %s/bin/observer %s' % (home_path, home_path, ' '.join(cmd))
-        
+
     for server in clusters_cmd:
+        environments = deepcopy(cluster_config.get_environments())
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         stdio.verbose('starting %s observer', server)
-        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % server_config['home_path'], True)
-        ret = client.execute_command(clusters_cmd[server])
-        client.add_env('LD_LIBRARY_PATH', '', True)
+        if 'LD_LIBRARY_PATH' not in environments:
+            environments['LD_LIBRARY_PATH'] = '%s/lib:' % server_config['home_path']
+        with EnvVariables(environments, client):
+            ret = client.execute_command(clusters_cmd[server])
         if not ret:
             stdio.stop_loading('fail')
             stdio.error(EC_OBSERVER_FAIL_TO_START.format(server=server) + ': ' + ret.stderr)

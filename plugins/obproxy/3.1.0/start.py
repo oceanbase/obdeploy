@@ -22,7 +22,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import time
-
+from copy import deepcopy
 
 stdio = None
 
@@ -49,7 +49,7 @@ def confirm_port(client, pid, port):
 
 def confirm_command(client, pid, command):
     command = command.replace(' ', '').strip()
-    if client.execute_command('bash -c \'cmd=`cat /proc/%s/cmdline`; if [ "$cmd" != "%s" ]; then exot 1; fi\'' % (pid, command)):
+    if client.execute_command('bash -c \'cmd=`cat /proc/%s/cmdline`; if [ "$cmd" != "%s" ]; then exit 1; fi\'' % (pid, command)):
         return True
     return False
 
@@ -84,6 +84,26 @@ def obproxyd(home_path, client, ip, port):
         shell = '''bash %s %s %s %s''' % (retmoe_path, home_path, ip, port)
         return client.put_file(path, retmoe_path) and client.execute_command(shell)
     return False
+
+
+class EnvVariables(object):
+
+    def __init__(self, environments, client):
+        self.environments = environments
+        self.client = client
+        self.env_done = {}
+
+    def __enter__(self):
+        for env_key, env_value in self.environments.items():
+            self.env_done[env_key] = self.client.get_env(env_key)
+            self.client.add_env(env_key, env_value, True)
+
+    def __exit__(self, *args, **kwargs):
+        for env_key, env_value in self.env_done.items():
+            if env_value is not None:
+                self.client.add_env(env_key, env_value, True)
+            else:
+                self.client.del_env(env_key)
 
 
 def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False, *args, **kwargs):
@@ -152,13 +172,6 @@ def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False,
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
 
-        if client.execute_command("bash -c 'if [ -f %s/bin/obproxy ]; then exit 1; else exit 0; fi;'" % home_path):
-            remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
-            remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
-            client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
-            client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
-            client.execute_command("ln -fs %s/lib/* %s/lib" % (remote_repository_dir, home_path))
-
         pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (home_path, server.ip, server_config["listen_port"])
 
         if use_parameter:
@@ -187,6 +200,7 @@ def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False,
         clusters_cmd[server] = 'cd %s; %s' % (home_path, real_cmd[server])
 
     for server in clusters_cmd:
+        environments = deepcopy(cluster_config.get_environments())
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         port = int(server_config["listen_port"])
@@ -204,9 +218,10 @@ def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False,
                 return plugin_context.return_false()
 
         stdio.verbose('starting %s obproxy', server)
-        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % server_config['home_path'], True)
-        ret = client.execute_command(clusters_cmd[server])
-        client.add_env('LD_LIBRARY_PATH', '', True)
+        if 'LD_LIBRARY_PATH' not in environments:
+            environments['LD_LIBRARY_PATH'] = '%s/lib:' % server_config['home_path']
+        with EnvVariables(environments, client):
+            ret = client.execute_command(clusters_cmd[server])
         if not ret:
             stdio.stop_loading('fail')
             stdio.error('failed to start %s obproxy: %s' % (server, ret.stderr))

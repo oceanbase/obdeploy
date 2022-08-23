@@ -43,7 +43,7 @@ function pacakge_executer27()
     rm -fr executer27
     mkdir -p ./executer27/{site-packages,bin}
     cd executer27
-    pip install mysql-connector-python==8.0.21 --target=./site-packages -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com || exit 1
+    pip install -r ../../executer27-requirements.txt --target=./site-packages -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com || exit 1
     pyinstaller -F ../../executer27.py
     if [ -e dist/executer27 ]; then
         cp dist/executer27 ./bin/executer
@@ -76,7 +76,6 @@ function get_python()
 {
     if [ `id -u` != 0 ] ; then
         echo "Please use root to run"
-        exit 1
     fi
 
     obd_dir=`dirname $0`
@@ -122,6 +121,7 @@ function build()
     mkdir -p $BUILD_DIR/mirror/remote
     wget https://mirrors.aliyun.com/oceanbase/OceanBase.repo -O $BUILD_DIR/mirror/remote/OceanBase.repo
     cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" | sed "s/<VERSION>/$VERSION/" > obd.py
+    sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
     pip install -r $req_fn.txt || exit 1
     pip install -r plugins-$req_fn.txt --target=$BUILD_DIR/lib/site-packages || exit 1
     pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py || exit 1
@@ -129,15 +129,14 @@ function build()
     cp -r plugins $BUILD_DIR/plugins
     cp -r config_parser $BUILD_DIR/config_parser
     rm -fr $BUILD_DIR/plugins/oceanbase-ce
-    rm -fr $BUILD_DIR/plugins/obproxy-ce
     rm -fr $BUILD_DIR/config_parser/oceanbase-ce
     rm -fr /usr/obd /usr/bin/obd
     cp ./dist/obd /usr/bin/obd 
     cp -fr ./profile/* /etc/profile.d/
-    cd $BUILD_DIR/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
-    cd $BUILD_DIR/config_parser && ln -s oceanbase oceanbase-ce
     mv $BUILD_DIR /usr/obd
     rm -fr dist
+    cd $BUILD_DIR/plugins && ln -s oceanbase oceanbase-ce && cp -rf obproxy/3.1.0 obproxy-ce/ && cp -rf $DIR/plugins/obproxy-ce/* obproxy-ce/
+    cd $BUILD_DIR/config_parser && ln -s oceanbase oceanbase-ce
     chmod +x /usr/bin/obd
     chmod -R 755 /usr/obd/*
     chown -R root:root /usr/obd/*

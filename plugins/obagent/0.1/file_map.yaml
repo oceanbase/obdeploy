@@ -5,3 +5,4 @@
 - src_path: ./home/admin/obagent/conf
   target_path: conf
   type: dir
+  install_method: cp

@@ -40,11 +40,10 @@ except:
 
 from _arch import getArchList, getBaseArch
 from _rpm import Package, PackageInfo
-from tool import ConfigUtil, FileUtil
+from tool import ConfigUtil, FileUtil, var_replace
 from _manager import Manager
 
 
-_KEYCRE = re.compile(r"\$(\w+)")
 _ARCH = getArchList()
 _RELEASE = None
 SUP_MAP = {
@@ -118,7 +117,7 @@ class MirrorRepository(object):
                 self.stdio and getattr(self.stdio, 'verbose', print)('pkg %s is %s, but %s is required' % (key, getattr(pkg, key), pattern[key]))
                 return None
         return pkg
-            
+
     def get_rpm_pkg_by_info(self, pkg_info):
         return None
     
@@ -286,14 +285,20 @@ class RemoteMirrorRepository(MirrorRepository):
         if self._db is None:
             fp = FileUtil.unzip(file_path, stdio=self.stdio)
             if not fp:
+                FileUtil.rm(file_path, stdio=self.stdio)
                 return []
             self._db = {}
-            parser = cElementTree.iterparse(fp)
-            for event, elem in parser:
-                if RemoteMirrorRepository.ns_cleanup(elem.tag) == 'package' and elem.attrib.get('type') == 'rpm':
-                    info = RemotePackageInfo(elem)
-                    self._db[info.md5] = info
-            self._dump_db_cache()
+            try:
+                parser = cElementTree.iterparse(fp)
+                for event, elem in parser:
+                    if RemoteMirrorRepository.ns_cleanup(elem.tag) == 'package' and elem.attrib.get('type') == 'rpm':
+                        info = RemotePackageInfo(elem)
+                        self._db[info.md5] = info
+                self._dump_db_cache()
+            except:
+                FileUtil.rm(file_path, stdio=self.stdio)
+                self.stdio and self.stdio.critical('failed to parse file %s, please retry later.' % file_path)
+                return []
         return self._db
 
     def _load_db_cache(self, path):
@@ -340,29 +345,6 @@ class RemoteMirrorRepository(MirrorRepository):
     @staticmethod
     def get_db_cache_file(mirror_path):
         return os.path.join(mirror_path, RemoteMirrorRepository.DB_CACHE_FILE)
-
-    @staticmethod
-    def var_replace(string, var):
-        if not var:
-            return string
-        done = []                      
-
-        while string:
-            m = _KEYCRE.search(string)
-            if not m:
-                done.append(string)
-                break
-
-            varname = m.group(1).lower()
-            replacement = var.get(varname, m.group())
-
-            start, end = m.span()
-            done.append(string[:start])
-            done.append(str(replacement))
-            string = string[end:]
-
-        return ''.join(done)
-        
 
     def _load_repo_age(self):
         try:
@@ -817,8 +799,8 @@ class MirrorRepositorySection(object):
 
     def get_mirror(self, server_vars, stdio=None):
         meta_data = self.meta_data
-        meta_data['name'] = RemoteMirrorRepository.var_replace(meta_data['name'], server_vars)
-        meta_data['baseurl'] = RemoteMirrorRepository.var_replace(meta_data['baseurl'], server_vars)
+        meta_data['name'] = var_replace(meta_data['name'], server_vars)
+        meta_data['baseurl'] = var_replace(meta_data['baseurl'], server_vars)
         mirror_path = os.path.join(self.remote_path, meta_data['name'])
         mirror = RemoteMirrorRepository(mirror_path, meta_data, stdio)
         return mirror
@@ -947,9 +929,9 @@ class MirrorRepositoryManager(Manager):
 
     def get_mirrors(self, is_enabled=True):
         self._lock()
-        mirros = self.get_remote_mirrors(is_enabled=is_enabled)
-        mirros.append(self.local_mirror)
-        return mirros
+        mirrors = self.get_remote_mirrors(is_enabled=is_enabled)
+        mirrors.append(self.local_mirror)
+        return mirrors
 
     def get_exact_pkg(self, **pattern):
         only_info = 'only_info' in pattern and pattern['only_info']

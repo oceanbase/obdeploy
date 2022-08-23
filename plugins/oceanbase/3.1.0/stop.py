@@ -20,7 +20,6 @@
 
 from __future__ import absolute_import, division, print_function
 
-import json
 import time
 import requests
 
@@ -29,9 +28,11 @@ def config_url(ocp_config_server, appname, cid):
     cfg_url = '%s&Action=ObRootServiceInfo&ObCluster=%s' % (ocp_config_server, appname)
     proxy_cfg_url = '%s&Action=GetObProxyConfig&ObRegionGroup=%s' % (ocp_config_server, appname)
     # 清除集群URL内容命令
-    cleanup_config_url_content = '%s&Action=DeleteObRootServiceInfoByClusterName&ClusterName=%s' % (ocp_config_server, appname)
+    cleanup_config_url_content = '%s&Action=DeleteObRootServiceInfoByClusterName&ClusterName=%s' % (
+        ocp_config_server, appname)
     # 注册集群信息到Config URL命令
-    register_to_config_url = '%s&Action=ObRootServiceRegister&ObCluster=%s&ObClusterId=%s' % (ocp_config_server, appname, cid)
+    register_to_config_url = '%s&Action=ObRootServiceRegister&ObCluster=%s&ObClusterId=%s' % (
+        ocp_config_server, appname, cid)
     return cfg_url, cleanup_config_url_content, register_to_config_url
 
 
@@ -40,7 +41,7 @@ def get_port_socket_inode(client, port):
     cmd = "bash -c 'cat /proc/net/{tcp,udp}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
-        return False
+        return []
     return res.stdout.strip().split('\n')
 
 
@@ -61,7 +62,6 @@ def stop(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-    global_config = cluster_config.get_global_conf()
     global_config = cluster_config.get_global_conf()
     appname = global_config['appname'] if 'appname' in global_config else None
     cluster_id = global_config['cluster_id'] if 'cluster_id' in global_config else None
@@ -118,6 +118,14 @@ def stop(plugin_context, *args, **kwargs):
         servers = tmp_servers
         count -= 1
         if count and servers:
+            if count == 5:
+                for server in servers:
+                    data = servers[server]
+                    server_config = cluster_config.get_server_conf(server)
+                    client = clients[server]
+                    client.execute_command(
+                        "if [[ -d /proc/%s ]]; then pkill -9 -u `whoami` -f '%s/bin/observer -p %s';fi" %
+                        (data['pid'], server_config['home_path'], server_config['mysql_port']))
             time.sleep(3)
 
     if servers:

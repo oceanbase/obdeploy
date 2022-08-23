@@ -55,6 +55,7 @@ if  [ "$OBD_DUBUG" ]; then
     VERSION=$VERSION".`date +%s`"
 fi
 cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" | sed "s/<VERSION>/$VERSION/" > obd.py
+sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
 mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
 mkdir -p $BUILD_DIR/SOURCES/{site-packages}
 mkdir -p ${RPM_BUILD_ROOT}/usr/bin
@@ -82,7 +83,8 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
 \cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
 cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && mv obproxy obproxy-ce
-cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce 
+rm -rf obproxy
+cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce
 
 # package infomation
 %files
@@ -116,6 +118,12 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Wed Aug 17 2022 obd 1.5.0
+ - new features: obd cluster reinstall
+ - new features: obd tool
+ - new features: support rsync
+ - new keyword: include
+ - more option: obd test mysqltest
 * Sun Jul 17 2022 obd 1.4.0
  - new features: support tpcc
  - new features: support mysqltest record

@@ -30,6 +30,23 @@ def check_opt(plugin_context, opt, *args, **kwargs):
     server = opt['test_server']
     obclient_bin = opt['obclient_bin']
     mysqltest_bin = opt['mysqltest_bin']
+    reboot_retries = opt['reboot_retries']
+
+    if int(reboot_retries) <= 0:
+        stdio.error('invalid reboot-retries')
+        return
+
+    case_filter = opt.get('case_filter')
+    default_case_filter = './mysql_test/filter.py'
+    if case_filter is None and os.path.exists(default_case_filter):
+        stdio.verbose('case-filter not set and {} exists, use it'.format(default_case_filter))
+        opt['case_filter'] = default_case_filter
+
+    case_filter = opt.get('reboot_cases')
+    default_reboot_case = './mysql_test/rebootcases.py'
+    if case_filter is None and os.path.exists(default_reboot_case):
+        stdio.verbose('reboot-cases not set and {} exists, use it'.format(default_reboot_case))
+        opt['reboot_cases'] = default_reboot_case
 
     if not server:
         stdio.error('test server is None. please use `--test-server` to set')
@@ -42,7 +59,7 @@ def check_opt(plugin_context, opt, *args, **kwargs):
     if not ret:
         mysqltest_bin = opt['mysqltest_bin'] = 'mysqltest'
         if not LocalClient.execute_command('%s --help' % mysqltest_bin, stdio=stdio):
-            stdio.error('%s\n%s is not an executable file. please use `--mysqltest-bin` to set\nYou may not have obclient installed' % (ret.stderr, mysqltest_bin))
+            stdio.error('%s\n%s is not an executable file. please use `--mysqltest-bin` to set\nYou may not have mysqltest installed' % (ret.stderr, mysqltest_bin))
             return
 
     if 'suite_dir' not in opt or not os.path.exists(opt['suite_dir']):
@@ -55,5 +72,37 @@ def check_opt(plugin_context, opt, *args, **kwargs):
 
     if 'slb' in opt:
         opt['slb_host'], opt['slb_id'] = opt['slb'].split(',')
-    
+
+    if 'exclude' in opt and opt['exclude']:
+        opt['exclude'] = opt['exclude'].split(',')
+
+    cluster_config = plugin_context.cluster_config
+
+    is_obproxy = opt["component"].startswith("obproxy")
+    if is_obproxy:
+        intersection = list({'oceanbase', 'oceanbase-ce'}.intersection(set(cluster_config.depends)))
+        if not intersection:
+            stdio.warn('observer config not in the depends.')
+            return
+        ob_component = intersection[0]
+        global_config = cluster_config.get_depend_config(ob_component)
+    else:
+        global_config = cluster_config.get_global_conf()
+    cursor = opt['cursor']
+    opt['_enable_static_typing_engine'] = None
+    if '_enable_static_typing_engine' in global_config:
+        stdio.verbose('load engine from config')
+        opt['_enable_static_typing_engine'] = global_config['_enable_static_typing_engine']
+    else:
+        try:
+            sql = "select value from oceanbase.__all_virtual_sys_parameter_stat where name like '_enable_static_typing_engine';"
+            stdio.verbose('execute sql: {}'.format(sql))
+            cursor.execute(sql)
+            ret = cursor.fetchone()
+            stdio.verbose('query engine ret: {}'.format(ret))
+            if ret:
+                opt['_enable_static_typing_engine'] = ret.get('value')
+        except:
+            stdio.exception('')
+    stdio.verbose('_enable_static_typing_engine: {}'.format(opt['_enable_static_typing_engine']))
     return plugin_context.return_true()

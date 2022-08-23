@@ -29,6 +29,7 @@ from copy import deepcopy
 
 from _manager import Manager
 from _rpm import Version
+from ssh import ConcurrentExecutor
 from tool import ConfigUtil, DynamicLoading, YamlLoader
 
 
@@ -124,6 +125,7 @@ class PluginContext(object):
         self.options = options
         self.dev_mode = dev_mode
         self.stdio = stdio
+        self.concurrent_exector = ConcurrentExecutor(32)
         self._return = PluginReturn()
 
     def get_return(self):
@@ -164,7 +166,8 @@ class ScriptPlugin(Plugin):
 
         def __getattr__(self, key):
             def new_method(*args, **kwargs):
-                kwargs['stdio'] = self.stdio
+                if "stdio" not in kwargs:
+                    kwargs['stdio'] = self.stdio
                 return attr(*args, **kwargs)
             attr = getattr(self.client, key)
             if hasattr(attr, '__call__'):
@@ -595,12 +598,18 @@ class InstallPlugin(Plugin):
         DIR = 1
         BIN = 2
 
+    class InstallMethod(Enum):
+
+        ANY = 0
+        CP = 1
+
     class FileItem(object):
 
-        def __init__(self, src_path, target_path, _type):
+        def __init__(self, src_path, target_path, _type, install_method):
             self.src_path = src_path
             self.target_path = target_path
             self.type = _type if _type else InstallPlugin.FileItemType.FILE
+            self.install_method = install_method or InstallPlugin.InstallMethod.ANY
 
     PLUGIN_TYPE = PluginType.INSTALL
     FILES_MAP_YAML = 'file_map.yaml'
@@ -611,6 +620,7 @@ class InstallPlugin(Plugin):
         super(InstallPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
         self.file_map_path = os.path.join(self.plugin_path, self.FILES_MAP_YAML)
         self._file_map = {}
+        self._file_map_data = None
 
     @classmethod
     def var_replace(cls, string, var):
@@ -634,6 +644,13 @@ class InstallPlugin(Plugin):
 
         return ''.join(done)
 
+    @property
+    def file_map_data(self):
+        if self._file_map_data is None:
+            with open(self.file_map_path, 'rb') as f:
+                self._file_map_data = yaml.load(f)
+        return self._file_map_data
+
     def file_map(self, package_info):
         var = {
             'name': package_info.name,
@@ -646,17 +663,17 @@ class InstallPlugin(Plugin):
         if not self._file_map.get(key):
             try:
                 file_map = {}
-                with open(self.file_map_path, 'rb') as f:
-                    for data in yaml.load(f):
-                        k = data['src_path']
-                        if k[0] != '.':
-                            k = '.%s' % os.path.join('/', k)
-                        k = self.var_replace(k, var)
-                        file_map[k] = InstallPlugin.FileItem(
-                            k,
-                            ConfigUtil.get_value_from_dict(data, 'target_path', k),
-                            getattr(InstallPlugin.FileItemType, ConfigUtil.get_value_from_dict(data, 'type', 'FILE').upper(), None)
-                        )
+                for data in self.file_map_data:
+                    k = data['src_path']
+                    if k[0] != '.':
+                        k = '.%s' % os.path.join('/', k)
+                    k = self.var_replace(k, var)
+                    file_map[k] = InstallPlugin.FileItem(
+                        k,
+                        ConfigUtil.get_value_from_dict(data, 'target_path', k),
+                        getattr(InstallPlugin.FileItemType, ConfigUtil.get_value_from_dict(data, 'type', 'FILE').upper(), None),
+                        getattr(InstallPlugin.InstallMethod, ConfigUtil.get_value_from_dict(data, 'install_method', 'ANY').upper(), None),
+                    )
                 self._file_map[key] = file_map
             except:
                 pass

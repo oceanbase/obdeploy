@@ -28,7 +28,7 @@ global_ret = True
 def destroy(plugin_context, *args, **kwargs):
     def clean(server, path):
         client = clients[server]
-        ret = client.execute_command('rm -fr %s/' % (path))
+        ret = client.execute_command('rm -fr %s/' % (path), timeout=-1)
         if not ret:
             global global_ret
             global_ret = False
