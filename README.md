@@ -135,3 +135,6 @@ A：You can use the `obd update` command to update OBD. When you are done with t
 ## Protocol
 
 OBD complies with [GPL-3.0](/LICENSE).
+
+## TPC-C
+- [Run TPC-C benchmark test on OceanBase](https://github.com/oceanbase/oceanbase-doc/blob/V3.1.4/en-US/1.Get-Started/5.Experience-OceanBase-Advanced-Features/1.Experience-Scalable-OLTP/1.Run-the-TPC-C-benchmark-test-in-OceanBase-Database.md)
