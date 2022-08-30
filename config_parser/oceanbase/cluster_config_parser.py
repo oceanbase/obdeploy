@@ -30,7 +30,9 @@ from _deploy import (
     ServerConfigFlyweightFactory, 
     ClusterConfig, 
     ConfigParser,
-    CommentedMap
+    CommentedMap,
+    RsyncConfig,
+    ENV
 )
 
 
@@ -85,11 +87,12 @@ class ClusterConfigParser(ConfigParser):
                     server_config['zone'] = zone_name
                     servers[server] = server_config
 
-        cluster_conf = ClusterConfig(
+        cluster_config = ClusterConfig(
             servers.keys(),
             component_name,
             ConfigUtil.get_value_from_dict(conf, 'version', None, str),
             ConfigUtil.get_value_from_dict(conf, 'tag', None, str),
+            ConfigUtil.get_value_from_dict(conf, 'release', None, str),
             ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str)
         )
         global_config = {}
@@ -99,11 +102,17 @@ class ClusterConfigParser(ConfigParser):
             global_config['appname'] = str(conf['name'])
         if 'config' in conf:
             global_config.update(conf['config'])
-        cluster_conf.set_global_conf(global_config)
+        cluster_config.set_global_conf(global_config)
+
+        if RsyncConfig.RSYNC in conf:
+            cluster_config.set_rsync_list(conf[RsyncConfig.RSYNC])
+
+        if ENV in conf:
+            cluster_config.set_environments(conf[ENV])
 
         for server in servers:
-            cluster_conf.add_server_conf(server, servers[server])
-        return cluster_conf
+            cluster_config.add_server_conf(server, servers[server])
+        return cluster_config
 
     @classmethod
     def extract_inner_config(cls, cluster_config, config):

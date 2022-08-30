@@ -22,9 +22,10 @@ from __future__ import absolute_import, division, print_function
 
 import os
 from tool import DirectoryUtil
+from _stdio import SafeStdio
 
 
-class Manager(object):
+class Manager(SafeStdio):
 
     RELATIVE_PATH = ''
 

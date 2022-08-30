@@ -212,7 +212,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     user = get_option('user', 'root')
     password = get_option('password', '')
     warehouses = get_option('warehouses', cpu_total * 20)
-    load_workers = get_option('load_workers', int(min(min_cpu, (max_memory >> 30) / 2)))
+    load_workers = get_option('load_workers', int(max(min(min_cpu, (max_memory >> 30) / 2), 1)))
     terminals = get_option('terminals', min(cpu_total * 15, warehouses * 10))
     run_mins = get_option('run_mins', 10)
     test_only = get_option('test_only')

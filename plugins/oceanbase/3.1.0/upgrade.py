@@ -126,7 +126,7 @@ class Exector(object):
 
 class Upgrader(object):
 
-    def __init__(self, plugin_context, search_py_script_plugin, apply_param_plugin, upgrade_ctx, upgrade_repositories, local_home_path, exector_path):
+    def __init__(self, plugin_context, search_py_script_plugin, apply_param_plugin, upgrade_ctx, upgrade_repositories, local_home_path, exector_path, install_repository_to_servers, unuse_lib_repository):
         self._search_py_script_plugin = search_py_script_plugin
         self.apply_param_plugin = apply_param_plugin
         self.plugin_context = plugin_context
@@ -138,6 +138,8 @@ class Upgrader(object):
         self._start_plugin = None
         self._stop_plugin = None
         self._display_plugin = None
+        self.install_repository_to_servers = install_repository_to_servers
+        self.unuse_lib_repository = unuse_lib_repository
         self.local_home_path = local_home_path
         self.exector_path = exector_path
         self.components = plugin_context.components
@@ -386,18 +388,6 @@ class Upgrader(object):
             time.sleep(3)
         return True
 
-    def _replace_repository(self, servers, repository):
-        repository_dir = repository.repository_dir
-        for server in servers:
-            client = self.clients[server]
-            server_config = self.cluster_config.get_server_conf(server)
-            home_path = server_config['home_path']
-            remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
-            remote_repository_dir = repository_dir.replace(self.local_home_path, remote_home_path)
-            client.execute_command("bash -c 'mkdir -p %s/{bin,lib}'" % (home_path))
-            client.execute_command("ln -fs %s/bin/* %s/bin" % (remote_repository_dir, home_path))
-            client.execute_command("ln -fs %s/lib/* %s/lib" % (remote_repository_dir, home_path))
-
     def upgrade_zone(self):
         zones_servers = {}
         for server in self.cluster_config.servers:
@@ -426,7 +416,8 @@ class Upgrader(object):
         self.stdio.start_loading('Upgrade')
         repository = self.repositories[self.next_stage]
         repository_dir = repository.repository_dir
-        self._replace_repository(self.cluster_config.servers, repository)
+        self.install_repository_to_servers(self.components, self.cluster_config, repository, self.clients,
+                                           self.unuse_lib_repository)
 
         if not self.stop_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.stdio):
             self.stdio.stop_loading('stop_loading', 'fail')
@@ -473,7 +464,8 @@ class Upgrader(object):
             self.stop_zone(zone)
 
             self.stdio.print('upgrade zone "%s"' % zone)
-            self._replace_repository(self.cluster_config.servers, repository)
+            self.install_repository_to_servers(self.components, self.cluster_config, repository, self.clients, self.unuse_lib_repository)
+
 
             if pre_zone:
                 self.apply_param_plugin(self.repositories[self.route_index - 1])
@@ -524,7 +516,7 @@ class Upgrader(object):
         return self._exec_script_dest_only('upgrade_post_checker.py')
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, unuse_lib_repository, *args, **kwargs):
     components = plugin_context.components
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
@@ -535,9 +527,18 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     upgrade_ctx = kwargs.get('upgrade_ctx')
     local_home_path = kwargs.get('local_home_path')
     upgrade_repositories = kwargs.get('upgrade_repositories')
-    exector_path = getattr(options, 'exector_path', '/usr/obd/lib/executer')
+    exector_path = getattr(options, 'executer_path', '/usr/obd/lib/executer')
 
-    upgrader = Upgrader(plugin_context, search_py_script_plugin, apply_param_plugin, upgrade_ctx, upgrade_repositories, local_home_path, exector_path)
+    upgrader = Upgrader(
+        plugin_context=plugin_context,
+        search_py_script_plugin=search_py_script_plugin,
+        apply_param_plugin=apply_param_plugin,
+        upgrade_ctx=upgrade_ctx,
+        upgrade_repositories=upgrade_repositories,
+        local_home_path=local_home_path,
+        exector_path=exector_path,
+        install_repository_to_servers=install_repository_to_servers,
+        unuse_lib_repository=unuse_lib_repository)
     if upgrader.run():
         if upgrader.route_index >= len(upgrader.route):
             upgrader.display_plugin(components, clients, cluster_config, cmd, options, stdio, upgrader.cursor, *args, **kwargs)
