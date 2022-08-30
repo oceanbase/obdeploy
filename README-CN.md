@@ -28,19 +28,21 @@ source /etc/profile.d/obd.sh
 - pip
 - pyinstaller
 
-> 说明:
-> 
+> **说明**
+>
 > 您可以参考如下命令在拥有 Python2.7 或 Python3.8 的环境中安装 pip:
->   ```shell
->   curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # 针对 Python2.7 环境
->   curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # 针对 Python3.8 环境
->   sudo python get-pip.py
->   ```
-> 
+>
+> ```shell
+> curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # 针对 Python2.7 环境
+> curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # 针对 Python3.8 环境
+> sudo python get-pip.py
+> ```
+>
 > 然后使用如下 pip 命令安装 pyinstaller:
->   ```shell
->   sudo pip install pyinstaller==3.6
->   ```
+>
+> ```shell
+> sudo pip install pyinstaller==3.6
+> ```
   
 Python2.7 使用以下命令安装：
 
@@ -74,7 +76,7 @@ source /etc/profile.d/obd.sh
 - 您的机器内存应该不低于 8 G。
 - 您的机器 CPU 数目应该不低于 2。
 
-> **说明：** 如果以上条件不满足，请参考[使用 OBD 启动 OceanBase 数据库集群](./docs/docs-cn/install-and-use/start-OceanBase-cluster-with-obd.md)。
+> **说明：** 如果以上条件不满足，请参考[使用 OBD 启动 OceanBase 数据库集群](./docs/zh-CN/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md)。
 
 > **注意：** 此处为了方便使用 root，OBD 和 OceanBase 数据库没有对运行用户做出任何限制，我们不建议生产中直接使用 root。
 
@@ -87,15 +89,15 @@ mysql -h127.1 -uroot -P2883
 
 ## 使用 OBD 启动 OceanBase 数据库集群
 
-如何使用 OBD 启动 OceanBase 数据库集群，请参考文档[使用 OBD 启动 OceanBase 数据库集群](./docs/docs-cn/install-and-use/start-OceanBase-cluster-with-obd.md)
+如何使用 OBD 启动 OceanBase 数据库集群，请参考文档[使用 OBD 启动 OceanBase 数据库集群](./docs/zh-CN/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md)
 
 ## 其他 OBD 命令
 
 OBD 有多级命令，您可以在每个层级中使用 `-h/--help` 选项查看子命令的帮助信息。
 
-- [镜像和仓库命令组](./docs/docs-cn/obd-commands/mirror-and-repository-commands.md)
-- [集群命令组](./docs/docs-cn/obd-commands/cluster-commands.md)
-- [测试命令组](./docs/docs-cn/obd-commands/testing-commands.md)
+- [镜像和仓库命令组](./docs/zh-CN/3.user-guide/3.obd-command/2.command-group-for-mirroring-and-warehousing.md)
+- [集群命令组](./docs/zh-CN/3.user-guide/3.obd-command/1.cluster-command-groups.md)
+- [测试命令组](./docs/zh-CN/3.user-guide/3.obd-command/3.test-command-group.md)
 
 ## Q&A
 
