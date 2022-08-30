@@ -19,6 +19,7 @@ source /etc/profile.d/obd.sh
 
 使用源码安装 OBD 之前，请确认您已安装以下依赖：
 
+- git
 - gcc
 - wget
 - python-devel
@@ -41,10 +42,17 @@ source /etc/profile.d/obd.sh
 >   ```shell
 >   sudo pip install pyinstaller==3.6
 >   ```
-  
+
+从 GitHub 下载源码:
+
+```shell
+git clone https://github.com/ChrisYuan/obdeploy.git
+```
+
 Python2.7 使用以下命令安装：
 
 ```shell
+cd obdeploy/ 
 sh rpm/build.sh build
 source /etc/profile.d/obd.sh
 ```
