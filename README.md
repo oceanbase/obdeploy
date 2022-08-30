@@ -29,19 +29,20 @@ Before you install OBD by using the source code, make sure that you have install
 - pyinstaller
 
 > Notes:
-> 
+>
 > You can install pip for Python2.7 or Python3.8 refer below cmd:
->   ```shell
->   curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # for Python2.7 
->   curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # for Python3.8 
->   sudo python get-pip.py
->   ```
-> 
+>
+> ```shell
+> curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # for Python2.7 
+> curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # for Python3.8 
+> sudo python get-pip.py
+> ```
+>
 > then install pyinstaller as below:
->   ```shell
->   sudo pip install pyinstaller==3.6
->   ```
-
+>
+> ```shell
+> sudo pip install pyinstaller==3.6
+> ```
 
 To install OBD on Python2.7, run these commands:
 
@@ -73,7 +74,7 @@ Before you run the commands, make sure that these conditions are met:
 - Your server has at least 8 GB of memory.
 - Your server has at least 2 CPU cores.
 
-> **NOTE:** If the preceding conditions are not met, see [Use OBD to start an OceanBase cluster](./docs/docs-en/install-and-use/start-OceanBase-cluster-with-obd.md).
+> **NOTE:** If the preceding conditions are not met, see [Use OBD to start an OceanBase cluster](./docs/en-US/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md).
 
 > **NOTE:** For the convenience of using root here, OBD and OceanBase database do not have any restrictions on running users. We do not recommend that you use root in production.
 
@@ -86,15 +87,15 @@ mysql -h127.1 -uroot -P2883
 
 ## Use OBD to start an OceanBase cluster
 
-If you want to know how to use OBD to start an OceanBase cluster, please see [Use OBD to start an OceanBase cluster](./docs/docs-en/install-and-use/start-OceanBase-cluster-with-obd.md).
+If you want to know how to use OBD to start an OceanBase cluster, please see [Use OBD to start an OceanBase cluster](./docs/en-US/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md).
 
 ## Other OBD commands
 
 OBD provides multiple-level commands. You can use the`-h/--help` option to view the help information of sub-commands.
 
-- [Mirror and repository commands](./docs/docs-en/obd-commands/mirror-and-repository-commands.md)
-- [Cluster commands](./docs/docs-en/obd-commands/cluster-commands.md)
-- [Testing commands](./docs/docs-en/obd-commands/testing-commands.md)
+- [Mirror and repository commands](./docs/en-US/3.user-guide/3.obd-command/2.command-group-for-mirroring-and-warehousing.md)
+- [Cluster commands](./docs/en-US/3.user-guide/3.obd-command/1.cluster-command-groups.md)
+- [Testing commands](./docs/en-US/3.user-guide/3.obd-command/3.test-command-group.md)
 
 ## Q&A
 
@@ -137,4 +138,5 @@ A：You can use the `obd update` command to update OBD. When you are done with t
 OBD complies with [GPL-3.0](/LICENSE).
 
 ## TPC-C
+
 - [Run TPC-C benchmark test on OceanBase](https://github.com/oceanbase/oceanbase-doc/blob/V3.1.4/en-US/1.Get-Started/5.Experience-OceanBase-Advanced-Features/1.Experience-Scalable-OLTP/1.Run-the-TPC-C-benchmark-test-in-OceanBase-Database.md)
