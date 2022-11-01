@@ -22,20 +22,11 @@ oceanbase-ce:
     cluster_id: 1
     # please set memory limit to a suitable value which is matching resource. 
     memory_limit: 6G # The maximum running memory for an observer
-    system_memory: 3G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
-    stack_size: 512K
+    system_memory: 1G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
+    datafile_size: 20G # Size of the data file. 
+    log_disk_size: 24G # The size of disk space used by the clog files.
     cpu_count: 16
-    cache_wash_threshold: 1G
-    __min_full_resource_pool_memory: 268435456
-    workers_per_cpu_quota: 10
-    schema_history_expire_time: 1d
-    # The value of net_thread_count had better be same as cpu's core number. 
-    net_thread_count: 4
-    major_freeze_duty_time: Disable
-    minor_freeze_times: 10
-    enable_separate_sys_clog: 0
-    enable_merge_by_turn: FALSE
-    datafile_disk_percentage: 20 # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.
+    production_mode: true
     syslog_level: INFO # System log level. The default value is INFO.
     enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
     enable_syslog_recycle: true # Enable auto system log recycling or not. The default value is false.

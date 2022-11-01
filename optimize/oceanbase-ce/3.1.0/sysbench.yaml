@@ -1,0 +1,67 @@
+test:
+  system_config:
+  - name: enable_auto_leader_switch
+    value: false
+    value_type: BOOL
+  - name: enable_one_phase_commit
+    value: false
+    value_type: BOOL
+  - name: weak_read_version_refresh_interval
+    value: 5s
+  - name: syslog_level
+    value: PERF
+  - name: max_syslog_file_count
+    value: 100
+  - name: enable_syslog_recycle
+    value: true
+    value_type: BOOL
+  - name: trace_log_slow_query_watermark
+    value: 10s
+  - name: large_query_threshold
+    value: 1s
+  - name: clog_sync_time_warn_threshold
+    value: 200ms
+  - name: syslog_io_bandwidth_limit
+    value: 10M
+  - name: enable_sql_audit
+    value: false
+    value_type: BOOL
+  - name: sleep
+    value: 1
+    optimizer: sleep
+  - name: enable_perf_event
+    value: false
+    value_type: BOOL
+  - name: clog_max_unconfirmed_log_count
+    value: 5000
+  - name: autoinc_cache_refresh_interval
+    value: 86400s
+  - name: enable_early_lock_release
+    value: false
+    tenant: true
+    value_type: BOOL
+  - name: default_compress_func
+    value: lz4_1.0
+  - name: _clog_aggregation_buffer_amount
+    value: 4
+  - name: _flush_clog_aggregation_buffer_timeout
+    value: 1ms
+  variables:
+  - name: ob_timestamp_service
+    value: 1
+  - name: autocommit
+    value: 1
+  - name: ob_query_timeout
+    value: 36000000000
+  - name: ob_trx_timeout
+    value: 36000000000
+  - name: max_allowed_packet
+    value: 67108864
+  - name: ob_sql_work_area_percentage
+    value: 100
+  - name: parallel_max_servers
+    value: int(max_cpu * 10)
+    expression: true
+  - name: parallel_servers_target
+    value: int(max_cpu * server_num * 8)
+    expression: true

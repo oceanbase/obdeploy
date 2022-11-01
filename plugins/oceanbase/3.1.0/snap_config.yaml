@@ -1,0 +1,5 @@
+backup:
+  - etc/observer.config.bin
+  - store
+clean:
+  - log

@@ -39,8 +39,8 @@ oceanbase-ce:
     # system_memory: 22G
     # The size of a data file. When ignored, autodeploy calculates this value based on the current server available resource.
     # datafile_size: 200G
-    # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.
-    # datafile_disk_percentage: 90
+    # The size of disk space used by the clog files. When ignored, autodeploy calculates this value based on the current server available resource.
+    # log_disk_size: 66G
     # System log level. The default value is INFO.
     # syslog_level: INFO
     # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true. The default value for autodeploy mode is false.

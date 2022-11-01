@@ -1,0 +1,84 @@
+- name: home_path
+  require: true
+  type: STRING
+  need_redeploy: true
+  description_en: working directory for grafana
+  description_local: grafana工作目录
+- name: login_password
+  require: true
+  type: STRING
+  need_reload: true
+  description_en: password for Grafana
+  description_local: Grafana 登录密码
+- name: data_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used)
+  description_local: 用来存储sqlite3、临时文件、会话等路径
+- name: logs_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: Directory where grafana can store logs
+  description_local: grafana可以存放日志的目录
+- name: plugins_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: Directory where grafana will automatically scan and look for plugins
+  description_local: grafana 将自动扫描并查找插件的目录
+- name: provisioning_dir
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: folder that contains provisioning config files that grafana will apply on startup and while running
+  description_local: 包含 grafana 将在启动和运行时应用的配置文件的文件夹。
+- name: temp_data_lifetime
+  type: TIME
+  default: 24h
+  need_restart: true
+  description_en: How long temporary images in data directory should be kept. Supported modifiers h (hours), m (minutes), Use 0 to never clean up temporary files.
+  description_local: 数据目录中的临时图像应保留多长时间。 支持的修饰符 h(小时)、m(分钟)，使用 0 从不清理临时文件。
+- name: log_max_days
+  type: INT
+  default: 7
+  min_value: 1
+  max_value: 30
+  need_restart: true
+  description_en: Expired days of log file(delete after max days)
+  description_local: 日志文件的过期天数（最多天后删除）
+- name: domain
+  type: STRING
+  default: localhost
+  need_restart: true
+  description_en: The ip address to bind to
+  description_local: 要绑定的ip地址
+- name: port
+  type: INT
+  require: true
+  default: 3000
+  min_value: 1
+  max_value: 65535
+  need_restart: true
+  description_en: The http port to use
+  description_local: 要使用的 http 端口
+- name: datasources
+  type: LIST
+  need_restart: true
+  description_en: list of datasources to insert/update
+  description_local: 要插入/更新的数据源列表
+- name: providers
+  type: LIST
+  need_restart: true
+  description_en: dashboard template import settings
+  description_local: dashboard 模板导入设置
+- name: customize_config
+  type: DICT
+  need_restart: true
+  description_en: The configuration for grafana
+  description_local: grafana 配置项

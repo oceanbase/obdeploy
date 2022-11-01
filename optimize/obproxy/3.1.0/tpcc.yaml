@@ -1,0 +1,24 @@
+build:
+  system_config:
+  - name: automatic_match_work_thread
+    value: false
+    need_restart: true
+    value_type: BOOL
+  - name: proxy_mem_limited
+    value: 4G
+  - name: enable_compression_protocol
+    value: false
+    need_restart: true
+    value_type: BOOL
+  - name: slow_proxy_process_time_threshold
+    value: 500ms
+  - name: enable_ob_protocol_v2
+    value: false
+    need_restart: true
+    value_type: BOOL
+  - name: enable_qos
+    value: false
+    value_type: BOOL
+  - name: syslog_level
+    value: error
+    query_key: level
