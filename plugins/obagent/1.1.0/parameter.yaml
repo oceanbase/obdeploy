@@ -151,7 +151,7 @@
 - name: monitor_password
   require: false
   type: STRING
-  default: NULL
+  default: ''
   min_value: NULL
   max_value: NULL
   need_restart: false
@@ -265,3 +265,9 @@
   need_restart: false
   description_en: Working directory for OceanBase Database, needed when log alarm is enabled.
   description_local: OceanBase 安装路径, 当日志报警开启时需要
+- name: target_sync_configs
+  require: false
+  type: LIST
+  need_restart: true
+  description_en:
+  description_local: 将地址同步至指定远端目录

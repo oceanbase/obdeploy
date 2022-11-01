@@ -31,6 +31,8 @@ import signal
 import shutil
 import re
 import json
+import hashlib
+from io import BytesIO
 
 from ruamel.yaml import YAML, YAMLContextManager, representer
 
@@ -298,6 +300,25 @@ class FileUtil(object):
     COPY_BUFSIZE = 1024 * 1024 if _WINDOWS else 64 * 1024
 
     @staticmethod
+    def checksum(target_path, stdio=None):
+        from ssh import LocalClient
+        if not os.path.isfile(target_path):
+            info = 'No such file: ' + target_path
+            if stdio:
+                getattr(stdio, 'error', print)(info)
+                return False
+            else:
+                raise IOError(info)
+        ret = LocalClient.execute_command('md5sum {}'.format(target_path), stdio=stdio)
+        if ret:
+            return ret.stdout.strip().split(' ')[0].encode('utf-8')
+        else:
+            m = hashlib.md5()
+            with open(target_path, 'rb') as f:
+                m.update(f.read())
+            return m.hexdigest().encode(sys.getdefaultencoding())
+
+    @staticmethod
     def copy_fileobj(fsrc, fdst):
         fsrc_read = fsrc.read
         fdst_write = fdst.write
@@ -465,12 +486,38 @@ class YamlLoader(YAML):
                 self.stdio.exception('Parsing error:\n%s' % e)
             raise e
 
+    def loads(self, yaml_content):
+        try:
+            stream = BytesIO()
+            yaml_content = str(yaml_content).encode()
+            stream.write(yaml_content)
+            stream.seek(0)
+            return self.load(stream)
+        except Exception as e:
+            if getattr(self.stdio, 'exception', False):
+                self.stdio.exception('Parsing error:\n%s' % e)
+            raise e
+
     def dump(self, data, stream=None, transform=None):
         try:
             return super(YamlLoader, self).dump(data, stream=stream, transform=transform)
         except Exception as e:
             if getattr(self.stdio, 'exception', False):
                 self.stdio.exception('dump error:\n%s' % e)
+            raise e
+
+    def dumps(self, data, transform=None):
+        try:
+            stream = BytesIO()
+            self.dump(data, stream=stream, transform=transform)
+            stream.seek(0)
+            content = stream.read()
+            if sys.version_info.major == 2:
+                return content
+            return content.decode()
+        except Exception as e:
+            if getattr(self.stdio, 'exception', False):
+                self.stdio.exception('dumps error:\n%s' % e)
             raise e
 
 

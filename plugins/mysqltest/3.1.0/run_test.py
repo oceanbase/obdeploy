@@ -215,6 +215,7 @@ def run_test(plugin_context, env, *args, **kwargs):
                 continue
             run_test_cases.append(test)
             if test in reboot_cases:
+                stdio.print('Reboot cluster because case "{}" is in the reboot cases list.'.format(test))
                 need_reboot = True
         if need_reboot:
             need_reboot = False
@@ -324,6 +325,11 @@ def run_test(plugin_context, env, *args, **kwargs):
                 opt['slave_cmp'] = 0
                 opt['result_file'] = result_file
 
+        if not opt['is_business']:
+            ce_result_file = re.sub(r'\.result$', '.ce.result', opt['result_file'])
+            if os.path.exists(ce_result_file):
+                opt['result_file'] = ce_result_file
+
         if 'my_host' in opt or 'oracle_host' in opt:
             # compare mode
             pass
@@ -335,13 +341,21 @@ def run_test(plugin_context, env, *args, **kwargs):
         stdio.verbose('query engine result: {}'.format(result.stdout))
         if not result:
             stdio.error('engine failed, exit code %s. error msg: %s' % (result.code, result.stderr))
+        obmysql_ms0_dev = str(opt['host'])
+        if ':' in opt['host']:
+            # todo: obproxy没有网卡设备选项，可能会遇到问题。如果obproxy支持IPv6后续进行改造
+            devname = cluster_config.get_server_conf(opt['test_server']).get('devname')
+            if devname:
+                obmysql_ms0_dev = '{}%{}'.format(opt['host'], devname)
         update_env = {
             'OBMYSQL_PORT': str(opt['port']),
             'OBMYSQL_MS0': str(opt['host']),
+            'OBMYSQL_MS0_DEV': obmysql_ms0_dev,
             'OBMYSQL_PWD': str(opt['password']),
             'OBMYSQL_USR': opt['user'],
             'PATH': os.getenv('PATH'),
-            'OBSERVER_DIR': cluster_config.get_server_conf(opt['test_server'])['home_path']
+            'OBSERVER_DIR': cluster_config.get_server_conf(opt['test_server'])['home_path'],
+            'IS_BUSINESS': str(opt['is_business'])
         }
         test_env = deepcopy(os.environ.copy())
         test_env.update(update_env)
@@ -443,4 +457,3 @@ def run_test(plugin_context, env, *args, **kwargs):
             is_retry = True
             need_reboot = True
     return return_true(finished=True)
-

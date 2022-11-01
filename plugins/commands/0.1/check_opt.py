@@ -91,10 +91,10 @@ def check_opt(plugin_context, name, context, *args, **kwargs):
     if not clients:
         stdio.error("{} server list is empty".format(','.join(components)))
         return
-
     if servers is None:
         if interactive:
-            servers = [None, ]
+            servers = cluster_config.servers[:1]
+            stdio.verbose("Server {} will be used according to the order in the deploy configuration yaml.".format(servers[0]))
         else:
             servers = list(clients.keys())
             stdio.verbose("Server {} will be used because {} is a non-interactive command".format(", ".join([str(s) for s in servers]), name))

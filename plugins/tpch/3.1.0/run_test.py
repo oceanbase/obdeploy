@@ -45,24 +45,6 @@ def parse_size(size):
     return _bytes
 
 
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G']
-    units_num = len(units) - 1
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-        limit = 1024
-    else:
-        div = 1024
-        limit = 1024
-        format = '%d%s'
-    while idx < units_num and size >= limit:
-        size /= div
-        idx += 1
-    return format % (size, units[idx])
-
-
 def exec_cmd(cmd):
     stdio.verbose('execute: %s' % cmd)
     process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -101,7 +83,6 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
     clients = plugin_context.clients
     options = plugin_context.options
 
-    optimization = get_option('optimization') > 0
     not_test_only = not get_option('test_only')
 
     host = get_option('host', '127.0.0.1')
@@ -118,30 +99,10 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
 
     sql_path = sorted(sql_path, key=lambda x: (len(x), x))
 
-    sql = "select * from oceanbase.gv$tenant where tenant_name = %s"
-    max_cpu = 2
+    max_cpu = kwargs.get('max_cpu', 2)
+    tenant_id = kwargs.get('tenant_id')
+    unit_count = kwargs.get('unit_count', 0)
     cpu_total = 0
-    min_memory = 0
-    unit_count = 0
-    tenant_meta = None
-    tenant_unit = None
-    try:
-        stdio.verbose('execute sql: %s' % (sql % tenant_name))
-        cursor.execute(sql, [tenant_name])
-        tenant_meta = cursor.fetchone()
-        if not tenant_meta:
-            stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
-            return
-        sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta['tenant_id']
-        pool = execute(cursor, sql)
-        sql = "select * from oceanbase.__all_unit_config where unit_config_id = %d" % pool['unit_config_id']
-        tenant_unit = execute(cursor, sql)
-        max_cpu = tenant_unit['max_cpu']
-        min_memory = tenant_unit['min_memory']
-        unit_count = pool['unit_count']
-    except:
-        stdio.error('fail to get tenant info')
-        return
 
     if not_test_only:
         sql_cmd_prefix = '%s -h%s -P%s -u%s@%s %s -A' % (obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
@@ -158,7 +119,6 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
         stdio.error(ret.stderr)
         return
 
-
     for server in cluster_config.servers:
         client = clients[server]
         ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
@@ -167,96 +127,17 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
         else:
             server_config = cluster_config.get_server_conf(server)
             cpu_total += int(server_config.get('cpu_count', 0))
-
-    sql = ''
-    system_configs_done = []
-    tenant_variables_done = []
-
     try:
-        cache_wash_threshold = format_size(int(min_memory * 0.2), 0)
-        system_configs = [
-            # [配置名, 新值, 旧值, 替换条件: lambda n, o: n != o, 是否是租户级]
-            ['syslog_level', 'PERF', 'PERF', lambda n, o: n != o, False],
-            ['max_syslog_file_count', 100, 100, lambda n, o: n != o, False],
-            ['enable_syslog_recycle', True, True, lambda n, o: n != o, False],
-            ['enable_merge_by_turn', False, False, lambda n, o: n != o, False],
-            ['trace_log_slow_query_watermark', '100s', '100s', lambda n, o: n != o, False],
-            ['max_kept_major_version_number', 1, 1, lambda n, o: n != o, False],
-            ['enable_sql_operator_dump', True, True, lambda n, o: n != o, False],
-            ['_hash_area_size', '3g', '3g', lambda n, o: n != o, False],
-            ['memstore_limit_percentage', 50, 50, lambda n, o: n != o, False],
-            ['enable_rebalance', False, False, lambda n, o: n != o, False],
-            ['memory_chunk_cache_size', '1g', '1g', lambda n, o: n != o, False],
-            ['minor_freeze_times', 5, 5, lambda n, o: n != o, False],
-            ['merge_thread_count', 20, 20, lambda n, o: n != o, False],
-            ['cache_wash_threshold', cache_wash_threshold, cache_wash_threshold, lambda n, o: n != o, False],
-            ['ob_enable_batched_multi_statement', True, True, lambda n, o: n != o, False],
-        ]
-
-        tenant_q = ' tenant="%s"' % tenant_name
-        server_num = len(cluster_config.servers)
-        if optimization:
-            for config in system_configs:
-                if config[0] == 'sleep':
-                    time.sleep(config[1])
-                    system_configs_done.append(config)
-                    continue
-                sql = 'show parameters like "%s"' % config[0]
-                if config[4]:
-                    sql += tenant_q
-                ret = execute(cursor, sql)
-                if ret:
-                    config[2] = ret['value']
-                    if config[3](config[1], config[2]):
-                        sql = 'alter system set %s=%%s' % config[0]
-                        if config[4]:
-                            sql += tenant_q
-                        system_configs_done.append(config)
-                        execute(cursor, sql, [config[1]])
-
-            sql = "select count(1) server_num from oceanbase.__all_server where status = 'active'"
-            ret = execute(cursor, sql)
-            if ret:
-                server_num = ret.get("server_num", server_num)
-
-            parallel_max_servers = min(int(max_cpu * 10), 1800)
-            parallel_servers_target = int(max_cpu * server_num * 8)
-            tenant_variables = [
-                # [变量名, 新值, 旧值, 替换条件: lambda n, o: n != o]
-                ['ob_sql_work_area_percentage', 80, 80, lambda n, o: n != o],
-                ['optimizer_use_sql_plan_baselines', True, True, lambda n, o: n != o],
-                ['optimizer_capture_sql_plan_baselines', True, True, lambda n, o: n != o],
-                ['ob_query_timeout', 36000000000, 36000000000, lambda n, o: n != o],
-                ['ob_trx_timeout', 36000000000, 36000000000, lambda n, o: n != o],
-                ['max_allowed_packet', 67108864, 67108864, lambda n, o: n != o],
-                ['secure_file_priv', "", "", lambda n, o: n != o],
-                ['parallel_max_servers', parallel_max_servers, parallel_max_servers, lambda n, o: n != o],
-                ['parallel_servers_target', parallel_servers_target, parallel_servers_target, lambda n, o: n != o]
-            ]
-            select_sql_t = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = '%%s'" % tenant_meta['tenant_id']
-            update_sql_t = "ALTER TENANT %s SET VARIABLES %%s = %%%%s" % tenant_name
-
-            for config in tenant_variables:
-                sql = select_sql_t % config[0]
-                ret = execute(cursor, sql)
-                if ret:
-                    value = ret['value']
-                    config[2] = int(value) if isinstance(value, str) and value.isdigit() else value
-                    if config[3](config[1], config[2]):
-                        sql = update_sql_t % config[0]
-                        tenant_variables_done.append(config)
-                        execute(cursor, sql, [config[1]])
-        else:
-            sql = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = 'secure_file_priv'" % tenant_meta['tenant_id']
-            ret = execute(cursor, sql)['value']
-            if ret is None:
-                stdio.error('Access denied. Please set `secure_file_priv` to "".')
-                return
-            if ret:
-                for path in tbl_path:
-                    if not path.startswith(ret):
-                        stdio.error('Access denied. Please set `secure_file_priv` to "".')
-                        return
+        sql = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = 'secure_file_priv'" % tenant_id
+        ret = execute(cursor, sql)['value']
+        if ret is None:
+            stdio.error('Access denied. Please set `secure_file_priv` to "".')
+            return
+        if ret:
+            for path in tbl_path:
+                if not path.startswith(ret):
+                    stdio.error('Access denied. Please set `secure_file_priv` to "".')
+                    return
 
         parallel_num = int(max_cpu * unit_count)
         
@@ -331,7 +212,7 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
         for path in sql_path:
             _, fn = os.path.split(path)
             log_path = os.path.join(tmp_dir, '%s.log' % fn)
-            ret = local_execute_command('source %s | %s -c > %s' % (path, sql_cmd_prefix, log_path))
+            ret = local_execute_command('echo source %s | %s -c > %s' % (path, sql_cmd_prefix, log_path))
             if not ret:
                 raise Exception(ret.stderr)
         stdio.stop_loading('succeed')
@@ -350,28 +231,9 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
             if not ret:
                 raise Exception(ret.stderr)
         stdio.print('Total Cost: %.1fs' % total_cost)
-
+        return plugin_context.return_true()
     except KeyboardInterrupt:
         stdio.stop_loading('fail')
     except Exception as e:
         stdio.stop_loading('fail')
         stdio.exception(str(e))
-    finally:
-        try:
-            if optimization:
-                for config in tenant_variables_done[::-1]:
-                    if config[3](config[1], config[2]):
-                        sql = update_sql_t % config[0]
-                        execute(cursor, sql, [config[2]])
-
-                for config in system_configs_done[::-1]:
-                    if config[0] == 'sleep':
-                        time.sleep(config[1])
-                        continue
-                    if config[3](config[1], config[2]):
-                        sql = 'alter system set %s=%%s' % config[0]
-                        if config[4]:
-                            sql += tenant_q
-                        execute(cursor, sql, [config[2]])
-        except:
-            pass

@@ -1,5 +1,5 @@
 rpmfile==1.0.8
-paramiko==2.7.2
+paramiko==2.10.1
 requests==2.25.1
 PyMySQL==1.0.2
 ruamel.yaml==0.17.4
@@ -11,3 +11,5 @@ pycryptodome==3.10.1
 inspect2==0.1.2
 six==1.16.0
 pyinstaller>=4.3
+bcrypt==4.0.0
+configparser>=5.2.0

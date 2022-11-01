@@ -21,7 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 
-def generate_config(plugin_context, deploy_config, *args, **kwargs):
+def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -44,12 +44,25 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
         cluster_config.update_global_conf('skip_proxy_sys_private_check', True, False)
     if 'enable_strict_kernel_release' not in global_config:
         cluster_config.update_global_conf('enable_strict_kernel_release', False, False)
+    
+    if getattr(plugin_context.options, 'mini', False):
+        if 'proxy_mem_limited' not in global_config:
+            cluster_config.update_global_conf('proxy_mem_limited', '200M', False)
 
+    ob_comps = ['oceanbase', 'oceanbase-ce']
     ob_cluster_config = None
-    for comp in ['oceanbase', 'oceanbase-ce']:
+    for comp in ob_comps:
+        if comp in cluster_config.depends:
+            stdio.stop_loading('succeed')
+            return plugin_context.return_true()
         if comp in deploy_config.components:
             ob_cluster_config = deploy_config.components[comp]
-            break
+
+    if auto_depend:
+        for depend in ['oceanbase', 'oceanbase-ce']:
+            if cluster_config.add_depend_component(depend):
+                stdio.stop_loading('succeed')
+                return plugin_context.return_true()
 
     if ob_cluster_config:
         root_servers = {}

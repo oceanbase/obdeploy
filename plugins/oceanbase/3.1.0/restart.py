@@ -96,7 +96,7 @@ class Restart(object):
     def wait(self):
         if not self.connect():
             return False
-        self.stdio.verbose('server cneck')
+        self.stdio.verbose('server check')
         self.broken_sql("select * from oceanbase.__all_server where status != 'active' or stop_time > 0 or start_service_time = 0")
         self.broken_sql("select * from oceanbase.__all_virtual_clog_stat where is_in_sync= 0 and is_offline = 0")
         return True

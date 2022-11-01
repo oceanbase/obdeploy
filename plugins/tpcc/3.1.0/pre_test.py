@@ -174,6 +174,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
             cpu_count = int(serv.get('cpu_total', 0) + 2)
             min_cpu = cpu_count if min_cpu is None else min(cpu_count, min_cpu)
             cpu_total += cpu_count
+        server_num = len(all_services)
     except Exception as e:
         stdio.exception(e)
         stdio.error('Fail to get server status')
@@ -278,5 +279,15 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
         warehouses=warehouses,
         cpu_total=cpu_total,
         max_memory=max_memory,
-        max_cpu=max_cpu
+        max_cpu=max_cpu,
+        tenant_id=tenant_meta['tenant_id'],
+        tenant=tenant_name,
+        tmp_dir=tmp_dir,
+        server_num=server_num,
+        obclient_bin=obclient_bin,
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        database=db_name
     )

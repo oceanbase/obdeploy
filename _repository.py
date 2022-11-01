@@ -25,13 +25,14 @@ import sys
 import time
 import hashlib
 from glob import glob
+from multiprocessing import cpu_count
+from multiprocessing.pool import Pool
 
 from _rpm import Package, PackageInfo, Version
 from _arch import getBaseArch
 from tool import DirectoryUtil, FileUtil, YamlLoader
 from _manager import Manager
 from _plugin import InstallPlugin
-from ssh import LocalClient
 
 
 class LocalPackage(Package):
@@ -122,15 +123,7 @@ class LocalPackage(Package):
                     filelinktos.append(os.readlink(target_path))
                     filemodes.append(-24065)
                 else:
-                    ret = LocalClient().execute_command('md5sum {}'.format(target_path))
-                    if ret:
-                        m_value = ret.stdout.strip().split(' ')[0].encode('utf-8')
-                    else:
-                        m = hashlib.md5()
-                        with open(target_path, 'rb') as f:
-                            m.update(f.read())
-                        m_value = m.hexdigest().encode(sys.getdefaultencoding())
-                        # raise Exception('Failed to get md5sum for {}, error: {}'.format(target_path, ret.stderr))
+                    m_value = FileUtil.checksum(target_path)
                     m_sum.update(m_value)
                     filemd5s.append(m_value)
                     filelinktos.append('')
@@ -147,6 +140,73 @@ class LocalPackage(Package):
 
     def open(self):
         return self.RpmObject(self.headers, self.files)
+
+
+class ExtractFileInfo(object):
+
+    def __init__(self, src_path, target_path, mode):
+        self.src_path = src_path
+        self.target_path = target_path
+        self.mode = mode
+
+
+class ParallerExtractWorker(object):
+
+    def __init__(self, pkg, files, stdio=None):
+        self.pkg = pkg
+        self.files = files
+        self.stdio = stdio
+    
+    @staticmethod
+    def extract(worker):
+        with worker.pkg.open() as rpm:
+            for info in worker.files:
+                if os.path.exists(info.target_path):
+                    continue
+                fd = rpm.extractfile(info.src_path)
+                with FileUtil.open(info.target_path, 'wb', stdio=worker.stdio) as f:
+                    FileUtil.copy_fileobj(fd, f)
+                if info.mode != 0o744:
+                    os.chmod(info.target_path, info.mode)
+
+
+class ParallerExtractor(object):
+
+    MAX_PARALLER = cpu_count()
+
+    def __init__(self, pkg, files, stdio=None):
+        self.pkg = pkg
+        self.files = files
+        self.stdio = stdio
+
+    def extract(self):
+        workers = []
+        file_num = len(self.files)
+        paraler = min(self.MAX_PARALLER, file_num)
+        size = min(100, file_num / paraler)
+        size = max(10, size)
+        index = 0
+        while index < file_num:
+            p_index = index + size
+            workers.append(ParallerExtractWorker(
+                self.pkg,
+                self.files[index:p_index],
+                stdio=self.stdio
+            ))
+            index = p_index
+        
+        pool = Pool(processes=paraler)
+        try:
+            results = pool.map(ParallerExtractWorker.extract, workers)
+            for r in results:
+                if not r:
+                    return False
+        except KeyboardInterrupt:
+            if pool:
+                pool.close()
+                pool = None
+        finally:
+            pool and pool.close()
 
 
 class Repository(PackageInfo):
@@ -251,7 +311,7 @@ class Repository(PackageInfo):
             self.stdio and getattr(self.stdio, 'print', '%s is a shadow repository' % self)
             return False
         hash_path = os.path.join(self.repository_dir, '.hash')
-        if self.hash == pkg.md5 and self.file_check(plugin):
+        if self.hash == pkg.md5 and self.file_check(plugin) and self.install_time > plugin.check_value:
             return True
         self.clear()
         try:
@@ -291,6 +351,8 @@ class Repository(PackageInfo):
                             if path.startswith(n_dir):
                                 need_files[path] = os.path.join(need_dirs[n_dir], path[len(n_dir):])
                                 break
+                
+                need_extract_files = []
                 for src_path in need_files:
                     if src_path not in files:
                         raise Exception('%s not found in packge' % src_path)
@@ -299,17 +361,17 @@ class Repository(PackageInfo):
                         return
                     idx = files[src_path]
                     if filemd5s[idx]:
-                        fd = rpm.extractfile(src_path)
-                        self.stdio and getattr(self.stdio, 'verbose', print)('extract %s to %s' % (src_path, target_path))
-                        with FileUtil.open(target_path, 'wb', stdio=self.stdio) as f:
-                            FileUtil.copy_fileobj(fd, f)
-                        mode = filemodes[idx] & 0x1ff
-                        if mode != 0o744:
-                            os.chmod(target_path, mode)
+                        need_extract_files.append(ExtractFileInfo(
+                            src_path,
+                            target_path,
+                            filemodes[idx] & 0x1ff
+                        ))
                     elif filelinktos[idx]:
                         links[target_path] = filelinktos[idx]
                     else:
                         raise Exception('%s is directory' % src_path)
+                
+                ParallerExtractor(pkg, need_extract_files, stdio=self.stdio).extract()
 
                 for link in links:
                     self.stdio and getattr(self.stdio, 'verbose', print)('link %s to %s' % (links[link], link))

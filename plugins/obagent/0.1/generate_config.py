@@ -21,7 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 
-def generate_config(plugin_context, deploy_config, *args, **kwargs):
+def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -60,6 +60,11 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 cluster_config.update_server_conf(server, 'ob_monitor_status', 'inactive', False)
     else:
         cluster_config.update_global_conf('ob_monitor_status', 'inactive', False)
+        if auto_depend:
+            for depend in depends:
+                if cluster_config.add_depend_component(depend):
+                    cluster_config.update_global_conf('ob_monitor_status', 'active', False)
+                    break
 
     stdio.stop_loading('succeed')
     plugin_context.return_true()

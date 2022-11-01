@@ -23,9 +23,13 @@ from __future__ import absolute_import, division, print_function
 import os
 import signal
 import sys
+import fcntl
 import traceback
 import inspect2
 import six
+import logging
+from copy import deepcopy
+from logging import handlers
 
 from enum import Enum
 from halo import Halo, cursor
@@ -34,6 +38,8 @@ from prettytable import PrettyTable
 from progressbar import AdaptiveETA, Bar, SimpleProgress, ETA, FileTransferSpeed, Percentage, ProgressBar
 from types import MethodType
 from inspect2 import Parameter
+
+from log import Logger
 
 
 if sys.version_info.major == 3:
@@ -53,6 +59,87 @@ class BufferIO(object):
         s = ''.join(self._buffer)
         self._buffer = []
         return s
+
+
+class SysStdin(object):
+
+    NONBLOCK = False
+    STATS = None
+    FD = None
+
+    @classmethod
+    def fileno(cls):
+        if cls.FD is None:
+            cls.FD = sys.stdin.fileno()
+        return cls.FD
+
+    @classmethod
+    def stats(cls):
+        if cls.STATS is None:
+            cls.STATS = fcntl.fcntl(cls.fileno(), fcntl.F_GETFL)
+        return cls.STATS
+
+    @classmethod
+    def nonblock(cls):
+        if cls.NONBLOCK is False:
+            fcntl.fcntl(cls.fileno(), fcntl.F_SETFL, cls.stats() | os.O_NONBLOCK)
+            cls.NONBLOCK = True
+
+    @classmethod
+    def block(cls):
+        if cls.NONBLOCK:
+            fcntl.fcntl(cls.fileno(), fcntl.F_SETFL, cls.stats())
+            cls.NONBLOCK = True
+
+    @classmethod
+    def readline(cls, blocked=False):
+        if blocked:
+            cls.block()
+        else:
+            cls.nonblock()
+        return cls._readline()
+
+    @classmethod
+    def read(cls, blocked=False):
+        return ''.join(cls.readlines(blocked=blocked))
+
+    @classmethod
+    def readlines(cls, blocked=False):
+        if blocked:
+            cls.block()
+        else:
+            cls.nonblock()
+        return cls._readlines()
+
+    @classmethod
+    def _readline(cls):
+        if cls.NONBLOCK:
+            try:
+                for line in sys.stdin:
+                    return line
+            except IOError:
+                return ''
+            finally:
+                cls.block()
+        else:
+            return sys.stdin.readline()
+
+    @classmethod
+    def _readlines(cls):
+        if cls.NONBLOCK:
+            lines = []
+            try:
+                for line in sys.stdin:
+                    lines.append(line)
+            except IOError:
+                pass
+            finally:
+                cls.block()
+            return lines
+        else:
+            return sys.stdin.readlines()
+
+
 
 
 class FormtatText(object):
@@ -234,11 +321,11 @@ class IO(object):
     WARNING_PREV = FormtatText.warning('[WARN]')
     ERROR_PREV = FormtatText.error('[ERROR]')
     IS_TTY = sys.stdin.isatty()
+    INPUT = SysStdin
 
     def __init__(self,
         level,
         msg_lv=MsgLevel.DEBUG,
-        trace_logger=None,
         use_cache=False,
         track_limit=0,
         root_io=None,
@@ -246,7 +333,11 @@ class IO(object):
     ):
         self.level = level
         self.msg_lv = msg_lv
-        self.trace_logger = trace_logger
+        self.log_path = None
+        self.trace_id = None
+        self.log_name = 'default'
+        self.log_path = None
+        self._trace_logger = None
         self._log_cache = [] if use_cache else None
         self._root_io = root_io
         self.track_limit = track_limit
@@ -256,6 +347,34 @@ class IO(object):
         self._out_obj = None if self._root_io else stream
         self._cur_out_obj = self._out_obj
         self._before_critical = None
+
+    def init_trace_logger(self, log_path, log_name=None, trace_id=None):
+        if self._trace_logger is None:
+            self.log_path = log_path
+            if trace_id:
+                self.trace_id = trace_id
+            if log_name:
+                self.log_name = log_name
+
+    def __getstate__(self):
+        state = {}
+        for key in self.__dict__:
+            state[key] = self.__dict__[key]
+        for key in ['_trace_logger', 'sync_obj', '_out_obj', '_cur_out_obj', '_before_critical']:
+            state[key] = None
+        return state
+
+    @property
+    def trace_logger(self):
+        if self.log_path and self._trace_logger is None:
+            self._trace_logger = Logger(self.log_name)
+            handler = handlers.TimedRotatingFileHandler(self.log_path, when='midnight', interval=1, backupCount=30)
+            if self.trace_id:
+                handler.setFormatter(logging.Formatter("[%%(asctime)s.%%(msecs)03d] [%s] [%%(levelname)s] %%(message)s" % self.trace_id, "%Y-%m-%d %H:%M:%S"))
+            else:
+                handler.setFormatter(logging.Formatter("[%%(asctime)s.%%(msecs)03d] [%%(levelname)s] %%(message)s", "%Y-%m-%d %H:%M:%S"))
+            self._trace_logger.addHandler(handler)
+        return self._trace_logger
 
     @property
     def log_cache(self):
@@ -417,13 +536,17 @@ class IO(object):
             msg_lv = self.msg_lv
         key = "%s-%s" % (pid, msg_lv)
         if key not in self.sub_ios:
-            self.sub_ios[key] = self.__class__(
+            sub_io = self.__class__(
                 self.level + 1,
                 msg_lv=msg_lv,
-                trace_logger=self.trace_logger,
                 track_limit=self.track_limit,
                 root_io=self._root_io if self._root_io else self
             )
+            sub_io.log_name = self.log_name
+            sub_io.log_path = self.log_path
+            sub_io.trace_id = self.trace_id
+            sub_io._trace_logger = self.trace_logger
+            self.sub_ios[key] = sub_io
         return self.sub_ios[key]
 
     def print_list(self, ary, field_names=None, exp=lambda x: x if isinstance(x, (list, tuple)) else [x], show_index=False, start=0, **kwargs):
@@ -445,11 +568,18 @@ class IO(object):
             table.add_row(row)
         self.print(table)
 
+    def read(self, msg='', blocked=False):
+        if msg:
+            self._print(MsgLevel.INFO, msg)
+        return self.INPUT.read(blocked)
+
     def confirm(self, msg):
+        msg = '%s [y/n]: ' % msg
+        self.print(msg, end='')
         if self.IS_TTY:
             while True:
                 try:
-                    ans = raw_input('%s [y/n]: ' % msg)
+                    ans = raw_input()
                     if ans == 'y':
                         return True
                     if ans == 'n':
@@ -595,6 +725,8 @@ class StdIO(object):
         self._warn_func = getattr(self.io, "warn", print)
 
     def __getattr__(self, item):
+        if item.startswith('__'):
+            return super(StdIO, self).__getattribute__(item)
         if self.io is None:
             return FAKE_RETURN
         if item not in self._attrs:

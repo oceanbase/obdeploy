@@ -22,8 +22,10 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import re
+import sys
 import pickle
 import getpass
+import hashlib
 from copy import deepcopy
 from enum import Enum
 
@@ -33,12 +35,12 @@ from tool import ConfigUtil, FileUtil, YamlLoader, OrderedDict, COMMAND_ENV
 from _manager import Manager
 from _repository import Repository
 from _stdio import SafeStdio
+from _environ import ENV_BASE_DIR
 
 
 yaml = YamlLoader()
 DEFAULT_CONFIG_PARSER_MANAGER = None
 ENV = 'env'
-BASE_DIR_KEY = "OBD_DEPLOY_BASE_DIR"
 
 
 class ParserError(Exception):
@@ -383,6 +385,30 @@ class ClusterConfig(object):
         self._depends = {}
         self.parser = parser
         self._has_package_pattern = None
+        self._object_hash = None
+
+    if sys.version_info.major == 2:
+        def __hash__(self):
+            if self._object_hash is None:
+                m_sum = hashlib.md5()
+                m_sum.update(str(self.package_hash).encode('utf-8'))
+                m_sum.update(str(self.get_global_conf()).encode('utf-8'))
+                for server in self.servers:
+                    m_sum.update(str(self.get_server_conf(server)).encode('utf-8'))
+                m_sum.update(str(self.depends).encode('utf-8'))
+                self._object_hash = int(''.join(['%03d' % ord(v) for v in m_sum.digest()]))
+            return self._object_hash
+    else:
+        def __hash__(self):
+            if self._object_hash is None:
+                m_sum = hashlib.md5()
+                m_sum.update(str(self.package_hash).encode('utf-8'))
+                m_sum.update(str(self.get_global_conf()).encode('utf-8'))
+                for server in self.servers:
+                    m_sum.update(str(self.get_server_conf(server)).encode('utf-8'))
+                m_sum.update(str(self.depends).encode('utf-8'))
+                self._object_hash = (int(''.join(['%03d' % v for v in m_sum.digest()])))
+            return self._object_hash
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -446,6 +472,9 @@ class ClusterConfig(object):
             raise Exception('Circular Dependency: %s and %s' % (self.name, name))
         self._depends[name] = cluster_conf
 
+    def add_depend_component(self, depend_component_name):
+        return self._deploy_config.add_depend_for_component(self.name, depend_component_name, save=False)
+
     def del_depend(self, name, component_name):
         if component_name in self._depends:
             del self._depends[component_name]
@@ -468,6 +497,8 @@ class ClusterConfig(object):
             return False
         if server not in self._server_conf:
             return False
+        if self._temp_conf and key in self._temp_conf:
+            value = self._temp_conf[key].param_type(value).value
         if not self._deploy_config.update_component_server_conf(self.name, server, key, value, save):
             return False
         self._server_conf[server][key] = value
@@ -478,6 +509,8 @@ class ClusterConfig(object):
     def update_global_conf(self, key, value, save=True):
         if self._deploy_config is None:
             return False
+        if self._temp_conf and key in self._temp_conf:
+            value = self._temp_conf[key].param_type(value).value
         if not self._deploy_config.update_component_global_conf(self.name, key, value, save):
             return False
         self._update_global_conf(key, value)
@@ -488,7 +521,8 @@ class ClusterConfig(object):
 
     def _update_global_conf(self, key, value):
         self._original_global_conf[key] = value
-        self._global_conf[key] = value
+        if self._global_conf:
+            self._global_conf[key] = value
 
     def update_rsync_list(self, rsync_list, save=True):
         if self._deploy_config is None:
@@ -558,6 +592,13 @@ class ClusterConfig(object):
         self._global_conf = None
         self._clear_cache_server()
 
+    def _apply_temp_conf(self, conf):
+        if self._temp_conf:
+            for key in conf:
+                if key in self._temp_conf:
+                    conf[key] = self._temp_conf[key].param_type(conf[key]).value
+        return conf
+
     def get_temp_conf_item(self, key):
         if self._temp_conf:
             return self._temp_conf.get(key)
@@ -613,7 +654,9 @@ class ClusterConfig(object):
         if self._global_conf is None:
             self._global_conf = deepcopy(self._default_conf)
             self._global_conf.update(self._get_include_config('config', {}))
-            self._global_conf.update(self._original_global_conf)
+            if self._original_global_conf:
+                self._global_conf.update(self._original_global_conf)
+            self._global_conf = self._apply_temp_conf(self._global_conf)
         return self._global_conf
 
     def _add_base_dir(self, path):
@@ -622,7 +665,7 @@ class ClusterConfig(object):
                 path = os.path.join(self._base_dir, path)
             else:
                 raise Exception("`{}` need to use absolute paths. If you want to use relative paths, please enable developer mode "
-                "and set environment variables {}".format(RsyncConfig.RSYNC, BASE_DIR_KEY))
+                "and set environment variables {}".format(RsyncConfig.RSYNC, ENV_BASE_DIR))
         return path
 
     @property
@@ -717,9 +760,9 @@ class ClusterConfig(object):
         if server not in self._server_conf:
             return None
         if self._cache_server[server] is None:
-            conf = deepcopy(self._inner_config.get(server.name, {}))
+            conf = self._apply_temp_conf(deepcopy(self._inner_config.get(server.name, {})))
             conf.update(self.get_global_conf())
-            conf.update(self._server_conf[server])
+            conf.update(self._apply_temp_conf(self._server_conf[server]))
             self._cache_server[server] = conf
         return self._cache_server[server]
 
@@ -788,7 +831,7 @@ class DeployConfig(SafeStdio):
         self.stdio = stdio
         self._ignore_include_error = False
         if self.config_parser_manager is None:
-            raise ParserError('ConfigParaserManager Not Set')
+            raise ParserError('ConfigParserManager Not Set')
         self._load()
 
     @property
@@ -853,32 +896,35 @@ class DeployConfig(SafeStdio):
         return False
 
     def _load(self):
-        with open(self.yaml_path, 'rb') as f:
-            depends = {}
-            self._src_data = self.yaml_loader.load(f)
-            for key in self._src_data:
-                if key == 'user':
-                    self.set_user_conf(UserConfig(
-                        ConfigUtil.get_value_from_dict(self._src_data[key], 'username'),
-                        ConfigUtil.get_value_from_dict(self._src_data[key], 'password'),
-                        ConfigUtil.get_value_from_dict(self._src_data[key], 'key_file'),
-                        ConfigUtil.get_value_from_dict(self._src_data[key], 'port', 0, int),
-                        ConfigUtil.get_value_from_dict(self._src_data[key], 'timeout', 0, int),
-                    ))
-                elif key == 'unuse_lib_repository':
-                    self.unuse_lib_repository = self._src_data['unuse_lib_repository']
-                elif key == 'auto_create_tenant':
-                    self.auto_create_tenant = self._src_data['auto_create_tenant']
-                elif issubclass(type(self._src_data[key]), dict):
-                    self._add_component(key, self._src_data[key])
-                    depends[key] = self._src_data[key].get('depends', [])
-            for comp in depends:
-                conf = self.components[comp]
-                for name in depends[comp]:
-                    if name == comp:
-                        continue
-                    if name in self.components:
-                        conf.add_depend(name, self.components[name])
+        try:
+            with open(self.yaml_path, 'rb') as f:
+                depends = {}
+                self._src_data = self.yaml_loader.load(f)
+                for key in self._src_data:
+                    if key == 'user':
+                        self.set_user_conf(UserConfig(
+                            ConfigUtil.get_value_from_dict(self._src_data[key], 'username'),
+                            ConfigUtil.get_value_from_dict(self._src_data[key], 'password'),
+                            ConfigUtil.get_value_from_dict(self._src_data[key], 'key_file'),
+                            ConfigUtil.get_value_from_dict(self._src_data[key], 'port', 0, int),
+                            ConfigUtil.get_value_from_dict(self._src_data[key], 'timeout', 0, int),
+                        ))
+                    elif key == 'unuse_lib_repository':
+                        self.unuse_lib_repository = self._src_data['unuse_lib_repository']
+                    elif key == 'auto_create_tenant':
+                        self.auto_create_tenant = self._src_data['auto_create_tenant']
+                    elif issubclass(type(self._src_data[key]), dict):
+                        self._add_component(key, self._src_data[key])
+                        depends[key] = self._src_data[key].get('depends', [])
+                for comp in depends:
+                    conf = self.components[comp]
+                    for name in depends[comp]:
+                        if name == comp:
+                            continue
+                        if name in self.components:
+                            conf.add_depend(name, self.components[name])
+        except:
+            pass
         if not self.user:
             self.set_user_conf(UserConfig())
 
@@ -889,7 +935,7 @@ class DeployConfig(SafeStdio):
     def load_include_file(self, path):
         if not os.path.isabs(path):
             raise Exception("`{}` need to use absolute path. If you want to use relative paths, please enable developer mode "
-            "and set environment variables {}".format('include', BASE_DIR_KEY))
+            "and set environment variables {}".format('include', ENV_BASE_DIR))
         if os.path.isfile(path):
             with open(path, 'rb') as f:
                 return self.yaml_loader.load(f)
@@ -909,7 +955,7 @@ class DeployConfig(SafeStdio):
                 if parser:
                     inner_config = parser.extract_inner_config(cluster_config, src_data)
                     self.inner_config.update_component_config(component_name, inner_config)
-        
+
     def _dump_inner_config(self):
         if self.inner_config:
             self._separate_config()

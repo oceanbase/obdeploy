@@ -87,7 +87,9 @@ def check_opt(plugin_context, opt, *args, **kwargs):
         ob_component = intersection[0]
         global_config = cluster_config.get_depend_config(ob_component)
     else:
+        ob_component = opt["component"]
         global_config = cluster_config.get_global_conf()
+    opt['is_business'] = 1 if ob_component == 'oceanbase' else 0
     cursor = opt['cursor']
     opt['_enable_static_typing_engine'] = None
     if '_enable_static_typing_engine' in global_config:

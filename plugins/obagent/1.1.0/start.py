@@ -33,6 +33,7 @@ from copy import deepcopy
 from Crypto import Random
 from Crypto.Cipher import AES
 
+from ssh import SshClient, SshConfig
 from tool import YamlLoader
 from _errno import *
 
@@ -136,7 +137,7 @@ def generate_aes_b64_key():
     return base64.b64encode(key.encode('utf-8'))
 
 
-def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
+def start(plugin_context, local_home_path, repository_dir, deploy_name=None, *args, **kwargs):
     global stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -184,7 +185,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     if key and isinstance(key, dict):
                         key = list(key.keys())[0]
                         need_encrypted.append(key)
-
+    targets = []
     for server in cluster_config.servers:
         client = clients[server]
         server_config = deepcopy(cluster_config.get_server_conf(server))
@@ -193,7 +194,8 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         home_path = server_config['home_path']
         remote_pid_path = '%s/run/obagent-%s-%s.pid' % (home_path, server.ip, server_config["server_port"])
         pid_path[server] = remote_pid_path
-
+        server_port = int(server_config['server_port'])
+        targets.append('{}:{}'.format(server.ip, server_port))
         remote_pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
         if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
             continue
@@ -255,8 +257,8 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                 'compress': True if server_config.get('log_compress', True) else False
             },
             'server': {
-                'address': '0.0.0.0:%d' % int(server_config.get('server_port', 8088)),
-                'adminAddress': '0.0.0.0:%d' % int(server_config.get('pprof_port', 8089)),
+                'address': '0.0.0.0:%d' % server_port,
+                'adminAddress': '0.0.0.0:%d' % int(server_config['pprof_port']),
                 'runDir': 'run'
             },
             'cryptoMethod': server_config['crypto_method'] if server_config.get('crypto_method').lower() in ['aes', 'plain'] else 'plain',
@@ -300,5 +302,43 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             stdio.warn(msg)
         plugin_context.return_false()
     else:
+        global_config = cluster_config.get_global_conf()
+        target_sync_configs = global_config.get('target_sync_configs', [])
+        stdio.verbose('start to sync target config')
+        data = [{'targets': targets}]
+        default_ssh_config = None
+        for client in clients.values():
+            default_ssh_config = client.config
+            break
+        for target_sync_config in target_sync_configs:
+            host = None
+            target_dir = None
+            try:
+                host = target_sync_config.get('host')
+                target_dir = target_sync_config.get('target_dir')
+                if not host or not target_dir:
+                    continue
+                ssh_config_keys = ['username', 'password', 'port', 'key_file', 'timeout']
+                auth_keys = ['username', 'password', 'key_file']
+                for key in auth_keys:
+                    if key in target_sync_config:
+                        config = SshConfig(host)
+                        break
+                else:
+                    config = deepcopy(default_ssh_config)
+                for key in ssh_config_keys:
+                    if key in target_sync_config:
+                        setattr(config, key, target_sync_config[key])
+                with tempfile.NamedTemporaryFile(suffix='.yaml') as f:
+                    yaml.dump(data, f)
+                    f.flush()
+                    file_name = '{}.yaml'.format(deploy_name or hash(cluster_config))
+                    file_path = os.path.join(target_dir, file_name)
+                    remote_client = SshClient(config)
+                    remote_client.connect(stdio=stdio)
+                    remote_client.put_file(f.name, file_path, stdio=stdio)
+            except:
+                stdio.warn('failed to sync target to {}:{}'.format(host, target_dir))
+                stdio.exception('')
         stdio.stop_loading('succeed')
         plugin_context.return_true(need_bootstrap=False)

@@ -89,6 +89,33 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
         cluster_config.update_global_conf('appname', default_appname, False)
 
     MIN_MEMORY = 8 << 30
+    MIN_CPU_COUNT = 16
+    clog_disk_utilization_threshold_max = 95
+    clog_disk_usage_limit_percentage_max = 98
+    global_config = cluster_config.get_original_global_conf()
+    
+    if getattr(plugin_context.options, 'mini', False):
+        if not global_config.get('memory_limit_percentage') and not global_config.get('memory_limit'):
+            cluster_config.update_global_conf('memory_limit', format_size(MIN_MEMORY, 0), False)
+        if not global_config.get('datafile_size') and not global_config.get('datafile_disk_percentage'):
+            cluster_config.update_global_conf('datafile_size', '20G', False)
+        if not global_config.get('clog_disk_utilization_threshold'):
+            cluster_config.update_global_conf('clog_disk_utilization_threshold', clog_disk_utilization_threshold_max, False)
+        if not global_config.get('clog_disk_usage_limit_percentage'):
+            cluster_config.update_global_conf('clog_disk_usage_limit_percentage', clog_disk_usage_limit_percentage_max, False)
+
+    max_syslog_file_count_default = 4
+    if global_config.get('syslog_level') is None:
+        cluster_config.update_global_conf('syslog_level', 'INFO', False)
+    if global_config.get('enable_syslog_recycle') is None:
+        cluster_config.update_global_conf('enable_syslog_recycle', True, False)
+    if global_config.get('enable_syslog_wf') is None:
+        cluster_config.update_global_conf('enable_syslog_wf', True, False)
+    if global_config.get('max_syslog_file_count') is None:
+        cluster_config.update_global_conf('max_syslog_file_count', max_syslog_file_count_default, False)
+    if global_config.get('cluster_id') is None:
+        cluster_config.update_global_conf('cluster_id', 1, False)
+
     for server in cluster_config.servers:
         ip = server.ip
         client = clients[server]
@@ -111,18 +138,6 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     if client.execute_command('ping -W 1 -c 1 -I %s %s' % (interface, ip)):
                         cluster_config.update_server_conf(server, 'devname', interface)
                         break
-
-        max_syslog_file_count_default = 4
-        if user_server_config.get('syslog_level') is None:
-            cluster_config.update_server_conf(server, 'syslog_level', 'INFO', False)
-        if user_server_config.get('enable_syslog_recycle') is None:
-            cluster_config.update_server_conf(server, 'enable_syslog_recycle', True, False)
-        if user_server_config.get('enable_syslog_wf') is None:
-            cluster_config.update_server_conf(server, 'enable_syslog_wf', True, False)
-        if user_server_config.get('max_syslog_file_count') is None:
-            cluster_config.update_server_conf(server, 'max_syslog_file_count', max_syslog_file_count_default, False)
-        if server_config.get('cluster_id') is None:
-            cluster_config.update_server_conf(server, 'cluster_id', 1, False)
 
         dirs = {"home_path": server_config['home_path']}
         dirs["data_dir"] = server_config['data_dir'] if server_config.get('data_dir') else os.path.join(server_config['home_path'], 'store')
@@ -162,10 +177,10 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             else:
                 try:
                     memory_limit = parse_size(server_config.get('memory_limit'))
+                    auto_set_memory = True
                 except:
                     stdio.error('memory_limit must be an integer')
                     return
-            auto_set_memory = True
 
         auto_set_system_memory = False
         if not user_server_config.get('system_memory'):
@@ -177,12 +192,14 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
             if ret and ret.stdout.strip().isdigit():
                 cpu_num = int(ret.stdout)
-                server_config['cpu_count'] = max(16, int(cpu_num - 2))
+                server_config['cpu_count'] = max(MIN_CPU_COUNT, int(cpu_num - 2))
             else:
-                server_config['cpu_count'] = 16
+                server_config['cpu_count'] = MIN_CPU_COUNT
+            cluster_config.update_server_conf(server, 'cpu_count', server_config['cpu_count'], False)
+        elif server_config['cpu_count'] < MIN_CPU_COUNT:
+            cluster_config.update_server_conf(server, 'cpu_count', MIN_CPU_COUNT, False)
+            stdio.warn('(%s): automatically adjust the cpu_count %s' % (server, MIN_CPU_COUNT))
         
-        cluster_config.update_server_conf(server, 'cpu_count', max(16, server_config['cpu_count']), False)
-            
         # disk
         if not server_config.get('datafile_size') and not user_server_config.get('datafile_disk_percentage'):
             disk = {'/': 0}
@@ -224,7 +241,6 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             clog_dir_disk = disk[clog_dir_mount]
 
             if clog_dir_mount == data_dir_mount:
-                clog_disk_utilization_threshold_max = 95
                 disk_free = data_dir_disk['avail']
                 real_disk_total = data_dir_disk['total']
                 if mounts[dirs['home_path']] == data_dir_mount:
@@ -274,7 +290,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 datafile_size = parse_size(datafile_size_format)
                 clog_disk_utilization_threshold = max(80, int(100.0 * (disk_used + datafile_size + padding_size + clog_disk_size * 0.8) / real_disk_total))
                 clog_disk_utilization_threshold = min(clog_disk_utilization_threshold, clog_disk_utilization_threshold_max)
-                clog_disk_usage_limit_percentage = min(int(clog_disk_utilization_threshold / 80.0 * 95), 98)
+                clog_disk_usage_limit_percentage = min(int(clog_disk_utilization_threshold / 80.0 * 95), clog_disk_usage_limit_percentage_max)
 
                 cluster_config.update_server_conf(server, 'datafile_size', datafile_size_format, False)
                 cluster_config.update_server_conf(server, 'clog_disk_utilization_threshold', clog_disk_utilization_threshold, False)
