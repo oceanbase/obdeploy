@@ -29,7 +29,7 @@ psmall_test=[
 'static_engine.nested_loop_join_oracle',
 'static_engine.merge_join',
 'static_engine.merge_join_oracle',
-#'static_engine.plan_cache_check_right',bug: https://work.aone.alibaba-inc.com/issue/27146709
+
 'static_engine.explicit_cast',
 'static_engine.expr_abs',
 'static_engine.expr_add_months_oracle',
@@ -41,7 +41,7 @@ psmall_test=[
 'static_engine.expr_ascii',
 'static_engine.expr_bit_andor_oracle',
 'static_engine.expr_bool',
-# 'static_engine.expr_char', bug: https://work.aone.alibaba-inc.com/issue/27254079
+
 'static_engine.expr_chr_oracle',
 #'static_engine.expr_coalesce_oracle',
 #'static_engine.expr_coalesce',
@@ -65,7 +65,7 @@ psmall_test=[
 'static_engine.expr_initcap_oracle',
 'static_engine.expr_insert',
 'static_engine.expr_instr_oracle',
-# 'static_engine.expr_int2ip', bug: https://work.aone.alibaba-inc.com/issue/27254079
+
 'static_engine.expr_is_oracle',
 'static_engine.expr_is_serving_tenant',
 'static_engine.expr_is',
@@ -192,7 +192,7 @@ psmall_test=[
 #'rowscn_oracle',
 'execution_partition_pruning_mysql',
 'execution_partition_pruning_oracle',
-#'global_index.global_index_basic', bug:https://work.aone.alibaba-inc.com/issue/26845791
+
 'part_mg.basic_partition_mg1',
 'part_mg.basic_partition_mg_pg3',
 'bulk_insert',
@@ -202,7 +202,7 @@ psmall_test=[
 'global_index.global_index_lookup_3',
 'global_index.global_index_lookup_4',
 'global_index.global_index_lookup_5',
-# 'global_index.global_index_lookup_6', bug: https://work.aone.alibaba-inc.com/issue/27142897
+
 'empty_input',
 'selectotherdb',
 'special_hook',
@@ -210,7 +210,7 @@ psmall_test=[
 'special_stmt',
 'bug210026',
 ####'default_system_variable',
-# 'system_variable', bug: https://work.aone.alibaba-inc.com/issue/27146709
+
 ####'java',
 'escape',
 'largetimeout',
@@ -298,9 +298,9 @@ psmall_test=[
 'type_date.daylight_saving_time',
 'intersect',
 'join_null',
-# 'delete', https://work.aone.alibaba-inc.com/issue/27208185
+
 'identifier_name_length',
-#'delete_from_mysql', bug:    https://work.aone.alibaba-inc.com/issue/26823648
+
 'delete.delete',
 'delete.delete_from_mysql',
 'type_date.datetime_java',
@@ -335,7 +335,7 @@ psmall_test=[
 'fin',
 'func_group_7',
 'expr.expr_instr',
-# 'insert.insert_and_update_not_null', https://work.aone.alibaba-inc.com/issue/27146709
+
 'insert.insert_and_update_not_null_oracle',
 #'auto_increment',
 'autocommit',
@@ -348,8 +348,8 @@ psmall_test=[
 ####'join',
 #'plan_cache.plan_cache_check_right',
 #'plan_cache.plan_cache_basic',
-# 'plan_cache.plan_cache_memory', bug: https://work.aone.alibaba-inc.com/issue/26853353
-# 'plan_cache.work_area_mem', bug:https://work.aone.alibaba-inc.com/issue/26853353
+
+
 'plan_cache.plan_cache_basic_oracle',
 'plan_cache.plan_cache_select_list',
 'plan_cache.plan_cache_select_list_oracle',
@@ -368,13 +368,13 @@ psmall_test=[
 'add',
 'minus',
 'div',
-# 'expr.add_oracle', bug: https://work.aone.alibaba-inc.com/issue/27305532
+
 'expr.minus_oracle',
 'expr.mul',
 'expr.mul_oracle',
 'expr.div_oracle',
 'expr.expr_is_oracle',
-# 'expr.expr_in_oracle', bug: https://work.aone.alibaba-inc.com/issue/27304553
+
 'expr.expr_locate',
 ####'trx_basic',
 'trx_timeout_bug',
@@ -502,7 +502,7 @@ psmall_test=[
 'select.order_by_oracle',
 'create_using_type',
 'charset.underline_oracle',
-# 'sql_alloc_count', bug: https://work.aone.alibaba-inc.com/issue/27146709
+
 #'plan_base_line',
 'topk',
 'dist_nest_loop_simple',
@@ -531,11 +531,11 @@ psmall_test=[
 'transformer.transformer_outer_join_simplification',
 #'transformer.transformer_join_eliminate',
 #'transformer.transformer_or_expansion',
-#'transformer.transformer_other', bug:https://work.aone.alibaba-inc.com/issue/27051936
+
 'transformer.transformer_predicate_deduce',
 #'transformer.transformer_set_op',
 'transformer.transformer_simplify',
-#'transformer.transformer_subquery_pullup', bug:https://work.aone.alibaba-inc.com/issue/27132289
+
 #'transformer.transformer_view_merge',
 'transformer.transformer_add_limit_for_union_oracle',
 #'transformer.transformer_aggregate_oracle',
@@ -544,7 +544,7 @@ psmall_test=[
 #'transformer.transformer_join_eliminate_oracle',
 #'transformer.transformer_limit_push_down_oracle',
 #'transformer.transformer_or_expansion_oracle',
-# 'transformer.transformer_other_oracle', #bug:https://work.aone.alibaba-inc.com/issue/27067628
+
 'transformer.transformer_predicate_deduce_oracle',
 #'transformer.transformer_set_op_oracle',
 #'transformer.transformer_simplify_oracle',
@@ -552,7 +552,7 @@ psmall_test=[
 'transformer.transformer_view_merge_oracle',
 #'transformer.transformer_win_magic',
 #'partition.ob_partition_list',
-# 'partition.distributed_dml', # https://work.aone.alibaba-inc.com/issue/27734000
+
 'partition.distributed_dml_oracle',
 'global_index.global_index_select',
 #'groupby.groupby_check_expr_oracle',
@@ -638,7 +638,7 @@ psmall_test=[
 'px.join_nlj',
 'px.join_pwj',
 #'px.mj_early_termination',
-#'px.parallel_execution', bug:https://work.aone.alibaba-inc.com/issue/26984764  https://work.aone.alibaba-inc.com/issue/27000920
+
 'px.parallel_execution_oracle',
 #'px.px_hint',
 'px.sql_audit',
@@ -672,7 +672,7 @@ psmall_test=[
 #'part_mg.basic_partition_mg3',
 #'part_mg.basic_partition_mg4',
 'foreign_key.dml_147',
-#'foreign_key.dml_210', bug: https://work.aone.alibaba-inc.com/issue/27309297
+
 #'connect_oracle',
 'expr.func_without_param_oracle',
 'update_column_use_other_oracle',
@@ -682,8 +682,8 @@ psmall_test=[
 'negation_elimination_oracle',
 'order_by_sortkey_oracle',
 'update_for_oracle',
-# 'update', bug:   https://work.aone.alibaba-inc.com/issue/26845524
-# 'update_oracle', bug:  https://work.aone.alibaba-inc.com/issue/26849092
+
+
 'trx_for_update_oracle',
 'trans_ac_oracle',
 'sfu_oracle',
