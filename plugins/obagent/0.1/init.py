@@ -50,7 +50,17 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
 
         if need_clean:
             client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/monagent -c conf/monagent.yaml'" % home_path)
-            ret = client.execute_command('rm -fr %s' % home_path)
+            if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
+                owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
+                global_ret = False
+                err_msg = ' {} is not empty, and the owner is {}'.format(home_path, owner)
+                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err_msg))
+                continue
+            need_clean = True
+
+        if need_clean:
+            client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/monagent -c conf/monagent.yaml'" % home_path)
+            ret = client.execute_command('rm -fr %s' % home_path, timeout=-1)
             if not ret:
                 global_ret = False
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))

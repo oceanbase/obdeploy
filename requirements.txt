@@ -1,6 +1,6 @@
 requests==2.24.0
 rpmfile==1.0.8
-paramiko==2.7.2
+paramiko==2.10.1
 backports.lzma==0.0.14
 MySQL-python==1.2.5
 ruamel.yaml.clib==0.2.2
@@ -14,3 +14,4 @@ pycryptodome==3.10.1
 inspect2==0.1.2
 six==1.16.0
 pyinstaller==3.6
+bcrypt==3.1.7

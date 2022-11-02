@@ -50,7 +50,7 @@ class InitDirFailedErrorMessage(object):
 
 
 DOC_LINK = '<DOC_LINK>'
-DOC_LINK_MSG = 'See {}'.format(DOC_LINK if DOC_LINK else "https://open.oceanbase.com/docs/obd-cn/V1.4.0/10000000000436999 .")
+DOC_LINK_MSG = 'See {}'.format(DOC_LINK if DOC_LINK else "https://www.oceanbase.com/product/ob-deployer/error-codes .")
 
 EC_CONFIG_CONFLICT_PORT = OBDErrorCode(1000, 'Configuration conflict {server1}:{port} port is used for {server2}\'s {key}')
 EC_CONFLICT_PORT = OBDErrorCode(1001, '{server}:{port} port is already used')
@@ -76,4 +76,4 @@ EC_OBAGENT_RELOAD_FAILED = OBDErrorCode(4000, 'Fail to reload {server}')
 EC_OBAGENT_SEND_CONFIG_FAILED = OBDErrorCode(4001, 'Fail to send config file to {server}')
 
 # WARN CODE 
-WC_ULIMIT_CHECK = OBDErrorCode(1007, '({server}) The recommended number of {key} is {need} (Current value: %s)')
+WC_ULIMIT_CHECK = OBDErrorCode(1007, '({server}) The recommended number of {key} is {need} (Current value: {now})')

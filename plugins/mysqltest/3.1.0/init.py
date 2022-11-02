@@ -22,8 +22,11 @@ from __future__ import absolute_import, division, print_function
 
 import re
 import os
-from ssh import LocalClient
+import time
+import hashlib
 
+from ssh import LocalClient
+from tool import FileUtil
 from _errno import EC_MYSQLTEST_FAILE_NOT_FOUND, EC_MYSQLTEST_PARSE_CMD_FAILED
 
 
@@ -58,21 +61,23 @@ def get_memory_limit(cursor, client):
     return 0
 
 
-def get_root_server(cursor):
-    try:
-        cursor.execute('select * from oceanbase.__all_server where status = \'active\' and with_rootserver=1')
-        return cursor.fetchone()
-    except:
-        pass
-    return None
-
-
 def init(plugin_context, env, *args, **kwargs):
+    def get_root_server(cursor):
+        while True:
+            try:
+                cursor.execute('select * from oceanbase.__all_server where status = \'active\' and with_rootserver=1')
+                return cursor.fetchone()
+            except:
+                if load_snap:
+                    time.sleep(0.1)
+                    continue
+            return None
+
     def exec_sql(cmd):
         ret = re.match('(.*\.sql)(?:\|([^\|]*))?(?:\|([^\|]*))?', cmd)
         if not ret:
             stdio.error(EC_MYSQLTEST_PARSE_CMD_FAILED.format(path=cmd))
-            return False
+            return None
         cmd = ret.groups()
         sql_file_path1 = os.path.join(init_sql_dir, cmd[0])
         sql_file_path2 = os.path.join(plugin_init_sql_dir, cmd[0])
@@ -82,19 +87,27 @@ def init(plugin_context, env, *args, **kwargs):
             sql_file_path = sql_file_path2
         else:
             stdio.error(EC_MYSQLTEST_FAILE_NOT_FOUND.format(file=cmd[0], path='[%s, %s]' % (init_sql_dir, plugin_init_sql_dir)))
-            return False
-        exec_sql_cmd = exec_sql_temp % (cmd[1] if cmd[1] else 'root', cmd[2] if cmd[2] else 'oceanbase', sql_file_path)
-        ret = LocalClient.execute_command(exec_sql_cmd, stdio=stdio)
-        if ret:
-            return True
-        stdio.error('Failed to Excute %s: %s' % (sql_file_path, ret.stderr.strip()))
-        return False
+            return None
+        if load_snap:
+            exec_sql_cmd = exec_sql_connect % (cmd[1] if cmd[1] else 'root')
+        else:
+            exec_sql_cmd = exec_sql_execute % (cmd[1] if cmd[1] else 'root', cmd[2] if cmd[2] else 'oceanbase', sql_file_path)
+        
+        while True:
+            ret = LocalClient.execute_command(exec_sql_cmd, stdio=stdio)
+            if ret:
+                return sql_file_path
+            if load_snap:
+                time.sleep(0.1)
+                continue
+            stdio.error('Failed to Excute %s: %s' % (sql_file_path, ret.stderr.strip()))
+            return None
         
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
+    load_snap = env.get('load_snap', False)
     cursor = env['cursor']
     obclient_bin = env['obclient_bin']
-    mysqltest_bin = env['mysqltest_bin']
     server = env['test_server']
     root_server = get_root_server(cursor)
     if root_server:
@@ -105,7 +118,8 @@ def init(plugin_context, env, *args, **kwargs):
         return plugin_context.return_false()
     init_sql_dir = env['init_sql_dir']
     plugin_init_sql_dir = os.path.join(os.path.split(__file__)[0], 'init_sql')
-    exec_sql_temp = obclient_bin + ' --prompt "OceanBase(\\u@\d)>" -h ' + host + ' -P ' + str(port) + ' -u%s -D%s -c < %s'
+    exec_sql_execute = obclient_bin + ' --prompt "OceanBase(\\u@\d)>" -h ' + host + ' -P ' + str(port) + ' -u%s -D%s -c < %s'
+    exec_sql_connect = obclient_bin + ' --prompt "OceanBase(\\u@\d)>" -h ' + host + ' -P ' + str(port) + ' -u%s -e "select 1 from DUAL"'
 
     if 'init_sql_files' in env and env['init_sql_files']:
         init_sql = env['init_sql_files'].split(',')
@@ -116,15 +130,21 @@ def init(plugin_context, env, *args, **kwargs):
         client = plugin_context.clients[server]
         memory_limit = get_memory_limit(cursor, client)
         is_mini = memory_limit and parse_size(memory_limit) < (16<<30)
-        if is_mini:
-            init_sql = [exec_mini_init, exec_init_user]
+        if env['is_business']:
+            init_sql = [exec_mini_init if is_mini else exec_init, exec_init_user_for_oracle, exec_init_user]
         else:
-            init_sql = [exec_init, exec_init_user]
+            init_sql = [exec_mini_init if is_mini else exec_init, exec_init_user]
 
+    m_sum = hashlib.md5() if not load_snap else None
     stdio.start_loading('Execute initialize sql')
     for sql in init_sql:
-        if not exec_sql(sql):
+        sql_file_path = exec_sql(sql)
+        if not sql_file_path:
             stdio.stop_loading('fail')
             return plugin_context.return_false()
+        m_sum and m_sum.update(FileUtil.checksum(sql_file_path)) 
     stdio.stop_loading('succeed')
+
+    if m_sum:
+        env['init_file_md5'] = m_sum.hexdigest()
     return plugin_context.return_true()

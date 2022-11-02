@@ -30,7 +30,7 @@ from copy import deepcopy
 from _manager import Manager
 from _rpm import Version
 from ssh import ConcurrentExecutor
-from tool import ConfigUtil, DynamicLoading, YamlLoader
+from tool import ConfigUtil, DynamicLoading, YamlLoader, FileUtil
 
 
 yaml = YamlLoader()
@@ -38,9 +38,11 @@ yaml = YamlLoader()
 
 class PluginType(Enum):
 
+    # 插件类型 = 插件加载类
     START = 'StartPlugin'
     PARAM = 'ParamPlugin'
     INSTALL = 'InstallPlugin'
+    SNAP_CONFIG = 'SnapConfigPlugin'
     PY_SCRIPT = 'PyScriptPlugin'
 
 
@@ -125,7 +127,7 @@ class PluginContext(object):
         self.options = options
         self.dev_mode = dev_mode
         self.stdio = stdio
-        self.concurrent_exector = ConcurrentExecutor(32)
+        self.concurrent_executor = ConcurrentExecutor(32)
         self._return = PluginReturn()
 
     def get_return(self):
@@ -265,18 +267,28 @@ class PyScriptPlugin(ScriptPlugin):
 #     def init(self, components, ssh_clients, cluster_config, cmd, options, stdio, *arg, **kwargs):
 #         pass
 
+class Null(object):
+
+    def __init__(self):
+        pass
+
 
 class ParamPlugin(Plugin):
+
 
     class ConfigItemType(object):
 
         TYPE_STR = None
+        NULL = Null()
 
         def __init__(self, s):
             try:
                 self._origin = s
                 self._value = 0
+                self.value = self.NULL
                 self._format()
+                if self.value == self.NULL:
+                    self.value = self._origin
             except:
                 raise Exception("'%s' is not %s" % (self._origin, self._type_str))
 
@@ -401,10 +413,48 @@ class ParamPlugin(Plugin):
             else:
                 self._value = []
 
+    class Dict(ConfigItemType):
+
+        def _format(self):
+            if self._origin:
+                if not isinstance(self._origin, dict):
+                    raise Exception("Invalid Value")
+                self._value = self._origin
+            else:
+                self._value = self.value = {}
+
+    class List(ConfigItemType):
+
+        def _format(self):
+            if self._origin:
+                if not isinstance(self._origin, list):
+                    raise Exception("Invalid value: {} is not a list.".format(self._origin))
+                self._value = self._origin
+            else:
+                self._value = self.value = []
+
+    class StringOrKvList(ConfigItemType):
+
+        def _format(self):
+            if self._origin:
+                if not isinstance(self._origin, list):
+                    raise Exception("Invalid value: {} is not a list.".format(self._origin))
+                for item in self._origin:
+                    if not item:
+                        continue
+                    if not isinstance(item, (str, dict)):
+                        raise Exception("Invalid value: {} should be string or key-value format.".format(item))
+                    if isinstance(item, dict):
+                        if len(item.keys()) != 1:
+                            raise Exception("Invalid value: {} should be single key-value format".format(item))
+                self._value = self._origin
+            else:
+                self._value = self.value = []
+
     class Double(ConfigItemType):
 
         def _format(self):
-            self._value = float(self._origin) if self._origin else 0
+            self.value = self._value = float(self._origin) if self._origin else 0
 
     class Boolean(ConfigItemType):
 
@@ -413,10 +463,15 @@ class ParamPlugin(Plugin):
                 self._value = self._origin
             else:
                 _origin = str(self._origin).lower()
-                if _origin.isdigit() or _origin in ['true', 'false']:
+                if _origin == 'true':
+                    self._value = True
+                elif _origin == 'false':
+                    self._value = False
+                elif _origin.isdigit():
                     self._value = bool(self._origin)
                 else:
-                    raise Exception('%s is not Boolean')
+                    raise Exception('%s is not Boolean' % _origin)
+            self.value = self._value
 
     class Integer(ConfigItemType):
 
@@ -426,15 +481,15 @@ class ParamPlugin(Plugin):
                 self._origin = 0
             else:
                 _origin = str(self._origin)
-                if _origin.isdigit():
-                    self._value = int(_origin)
-                else:
-                    raise Exception('%s is not Integer')
+                try:
+                    self.value = self._value = int(_origin)
+                except:
+                    raise Exception('%s is not Integer' % _origin)
 
     class String(ConfigItemType):
 
         def _format(self):
-            self._value = str(self._origin) if self._origin else ''
+            self.value = self._value = str(self._origin) if self._origin else ''
 
     class ConfigItem(object):
 
@@ -519,29 +574,35 @@ class ParamPlugin(Plugin):
                     'MOMENT': ParamPlugin.Moment,
                     'TIME': ParamPlugin.Time,
                     'CAPACITY': ParamPlugin.Capacity,
-                    'STRING_LIST': ParamPlugin.StringList
+                    'STRING_LIST': ParamPlugin.StringList,
+                    'DICT': ParamPlugin.Dict,
+                    'LIST': ParamPlugin.List,
+                    'PARAM_LIST': ParamPlugin.StringOrKvList
                 }
                 self._src_data = {}
                 with open(self.def_param_yaml_path, 'rb') as f:
                     configs = yaml.load(f)
                     for conf in configs:
-                        param_type = ConfigUtil.get_value_from_dict(conf, 'type', 'STRING').upper()
-                        if param_type in TYPES:
-                            param_type = TYPES[param_type]
-                        else:
-                            param_type = ParamPlugin.String
+                        try:
+                            param_type = ConfigUtil.get_value_from_dict(conf, 'type', 'STRING').upper()
+                            if param_type in TYPES:
+                                param_type = TYPES[param_type]
+                            else:
+                                param_type = ParamPlugin.String
 
-                        self._src_data[conf['name']] = ParamPlugin.ConfigItem(
-                            name=conf['name'],
-                            param_type=param_type,
-                            default=ConfigUtil.get_value_from_dict(conf, 'default', None),
-                            min_value=ConfigUtil.get_value_from_dict(conf, 'min_value', None),
-                            max_value=ConfigUtil.get_value_from_dict(conf, 'max_value', None),
-                            modify_limit=ConfigUtil.get_value_from_dict(conf, 'modify_limit', None),
-                            require=ConfigUtil.get_value_from_dict(conf, 'require', False),
-                            need_restart=ConfigUtil.get_value_from_dict(conf, 'need_restart', False),
-                            need_redeploy=ConfigUtil.get_value_from_dict(conf, 'need_redeploy', False)
-                        )
+                            self._src_data[conf['name']] = ParamPlugin.ConfigItem(
+                                name=conf['name'],
+                                param_type=param_type,
+                                default=ConfigUtil.get_value_from_dict(conf, 'default', None),
+                                min_value=ConfigUtil.get_value_from_dict(conf, 'min_value', None),
+                                max_value=ConfigUtil.get_value_from_dict(conf, 'max_value', None),
+                                modify_limit=ConfigUtil.get_value_from_dict(conf, 'modify_limit', None),
+                                require=ConfigUtil.get_value_from_dict(conf, 'require', False),
+                                need_restart=ConfigUtil.get_value_from_dict(conf, 'need_restart', False),
+                                need_redeploy=ConfigUtil.get_value_from_dict(conf, 'need_redeploy', False)
+                            )
+                        except:
+                            pass
             except:
                 pass
         return self._src_data
@@ -590,6 +651,40 @@ class ParamPlugin(Plugin):
         return self._params_default
 
 
+class SnapConfigPlugin(Plugin):
+
+    PLUGIN_TYPE = PluginType.SNAP_CONFIG
+    CONFIG_YAML = 'snap_config.yaml'
+    FLAG_FILE = CONFIG_YAML
+    _KEYCRE = re.compile(r"\$(\w+)")
+
+    def __init__(self, component_name, plugin_path, version, dev_mode):
+        super(SnapConfigPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
+        self.config_path = os.path.join(self.plugin_path, self.CONFIG_YAML)
+        self._config = None
+        self._file_hash = None
+
+    def __hash__(self):
+        if self._file_hash is None:
+            self._file_hash = int(''.join(['%03d' % (ord(v) if isinstance(v, str) else v) for v in FileUtil.checksum(self.config_path)]))
+        return self._file_hash
+
+    @property
+    def config(self):
+        if self._config is None:
+            with open(self.config_path, 'rb') as f:
+                self._config = yaml.load(f)
+        return self._config
+
+    @property
+    def backup(self):
+        return self.config.get('backup', [])
+
+    @property
+    def clean(self):
+        return self.config.get('clean', [])
+
+
 class InstallPlugin(Plugin):
 
     class FileItemType(Enum):
@@ -621,6 +716,7 @@ class InstallPlugin(Plugin):
         self.file_map_path = os.path.join(self.plugin_path, self.FILES_MAP_YAML)
         self._file_map = {}
         self._file_map_data = None
+        self._check_value = None
 
     @classmethod
     def var_replace(cls, string, var):
@@ -643,6 +739,12 @@ class InstallPlugin(Plugin):
             string = string[end:]
 
         return ''.join(done)
+
+    @property
+    def check_value(self):
+        if self._check_value is None:
+            self._check_value = os.path.getmtime(self.file_map_path)
+        return self._check_value
 
     @property
     def file_map_data(self):

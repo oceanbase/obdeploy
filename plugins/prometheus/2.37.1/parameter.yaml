@@ -1,0 +1,62 @@
+- name: home_path
+  require: true
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the work data file
+  description_local: Prometheus工作目录
+- name: data_dir
+  require: false
+  type: STRING
+  need_redeploy: true
+  description_en: Base path for metrics storage.
+  description_local:
+- name: enable_lifecycle
+  require: true
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: Enable shutdown and reload via HTTP request.
+  description_local:
+- name: port
+  require: true
+  default: 9090
+  type: INT
+  need_restart: true
+  description_en: the listen port for prometheus
+  description_local: Prometheus监听端口
+- name: address
+  require: true
+  default: 0.0.0.0
+  type: STRING
+  need_restart: true
+  description_en: the listen address for prometheus
+  description_local: Prometheus监听地址
+- name: config
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: the configuration for prometheus
+  description_local: Prometheus配置文件
+- name: web_config
+  require: false
+  type: DICT
+  need_restart: true
+  description_en: The web configuration that can enable TLS.
+  description_local: Prometheus的web服务配置
+- name: basic_auth_users
+  require: false
+  type: DICT
+  need_restart: true
+  description_en: The authentication info for prometheus web server.
+  description_local: Prometheus web服务的认证信息，键名为用户名，值为密码
+- name: additional_parameters
+  require: false
+  type: PARAM_LIST
+  need_restart: ture
+  description_en: the boot parameters for prometheus
+  description_local: Prometheus启动参数
+
+
+

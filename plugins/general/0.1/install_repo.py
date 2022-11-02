@@ -110,20 +110,21 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
             stdio.verbose('%s %s need to be installed ' % (server, install_repository))
 
         stdio.verbose('%s %s installing' % (server, install_repository))
+        sub_io = stdio.sub_io()
         for file_item in install_file_items:
             file_path = os.path.join(install_repository.repository_dir, file_item.target_path)
             remote_file_path = os.path.join(install_path, file_item.target_path)
             if file_item.type == InstallPlugin.FileItemType.DIR:
-                if os.path.isdir(file_path) and not client.put_dir(file_path, remote_file_path):
+                if os.path.isdir(file_path) and not client.put_dir(file_path, remote_file_path, stdio=sub_io):
                     stdio.stop_loading('fail')
                     return False
             else:
-                if not client.put_file(file_path, remote_file_path):
+                if not client.put_file(file_path, remote_file_path, stdio=sub_io):
                     stdio.stop_loading('fail')
                     return False
         if is_ln_install_mode:
             # save data file for later comparing
-            client.put_file(install_repository.data_file_path, remote_repository_data_path)
+            client.put_file(install_repository.data_file_path, remote_repository_data_path, stdio=sub_io)
             # link files to home_path
             install_to_home_path()
         stdio.verbose('%s %s installed' % (server, install_repository.name))

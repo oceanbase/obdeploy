@@ -56,8 +56,6 @@ obagent:
     cluster_name: obcluster
     # Cluster ID for OceanBase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the cluster_id in oceanbase-ce.
     cluster_id: 1
-    # Zone name for your observer. The default value is zone1. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the zone name in oceanbase-ce.
-    zone_name: zone1
     # Monitor status for OceanBase Database.  Active is to enable. Inactive is to disable. The default value is active. When you deploy an cluster automatically, OBD decides whether to enable this parameter based on depends.
     ob_monitor_status: active
     # Monitor status for your host. Active is to enable. Inactive is to disable. The default value is active.
@@ -66,3 +64,23 @@ obagent:
     disable_http_basic_auth: false
     # Whether to disable the basic authentication for the debug interface. True is to disable. False is to enable. The default value is false.
     disable_pprof_basic_auth: false
+    # Synchronize the obagent-related information to the specified path of the remote host, as the targets specified by `file_sd_config` in the Prometheus configuration.
+    # For prometheus that depends on obagent, it can be specified to $home_path/targets of prometheus.
+    # For independently deployed prometheus, specify the files to be collected by setting `config` -> `scrape_configs` -> `file_sd_configs` -> `files`. For details, please refer to prometheus-only-example.yaml.
+    # target_sync_configs:
+    #   - host: 192.168.1.1
+    #     target_dir: /root/prometheus/targets
+    #     username: your username
+    #     password: your password if need
+    #     key_file: your ssh-key file path if need
+    #     port: your ssh port, default 22
+    #     timeout: ssh connection timeout (second), default 30
+  192.168.1.2:
+    # Zone name for your observer. The default value is zone1. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the zone name in oceanbase-ce.
+    zone_name: zone1
+  192.168.1.3:
+    # Zone name for your observer. The default value is zone1. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the zone name in oceanbase-ce.
+    zone_name: zone2
+  192.168.1.4:
+    # Zone name for your observer. The default value is zone1. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the zone name in oceanbase-ce.
+    zone_name: zone3

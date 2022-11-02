@@ -1,0 +1,11 @@
+set _force_parallel_query_dop = {cpu_total};
+analyze table bmsql_warehouse partition(bmsql_warehouse) compute statistics for all columns size auto;
+analyze table bmsql_district partition(bmsql_district) compute statistics for all columns size auto;
+analyze table bmsql_customer partition(bmsql_customer) compute statistics for all columns size auto;
+analyze table bmsql_new_order partition(bmsql_new_order) compute statistics for all columns size auto;
+analyze table bmsql_oorder partition(bmsql_oorder) compute statistics for all columns size auto;
+analyze table bmsql_order_line partition(bmsql_order_line) compute statistics for all columns size auto;
+analyze table bmsql_stock partition(bmsql_stock) compute statistics for all columns size auto;
+analyze table bmsql_history partition(bmsql_history) compute statistics for all columns size auto;
+analyze table bmsql_config compute statistics for all columns size auto;
+analyze table bmsql_item compute statistics for all columns size auto;

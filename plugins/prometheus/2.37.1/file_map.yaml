@@ -1,0 +1,14 @@
+- src_path: ./usr/prometheus/prometheus
+  target_path: prometheus
+  type: file
+- src_path: ./usr/prometheus/promtool
+  target_path: promtool
+  type: file
+- src_path: ./usr/prometheus/consoles
+  target_path: consoles
+  type: dir
+  install_method: cp
+- src_path: ./usr/prometheus/console_libraries
+  target_path: console_libraries
+  type: dir
+  install_method: cp

@@ -39,8 +39,8 @@ oceanbase-ce:
     # system_memory: 22G
     # The size of a data file. When ignored, autodeploy calculates this value based on the current server available resource.
     # datafile_size: 200G
-    # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.
-    # datafile_disk_percentage: 90
+    # The size of disk space used by the clog files. When ignored, autodeploy calculates this value based on the current server available resource.
+    # log_disk_size: 66G
     # System log level. The default value is INFO.
     # syslog_level: INFO
     # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true. The default value for autodeploy mode is false.
@@ -86,6 +86,8 @@ obproxy-ce:
     # Password for proxyro. proxyro_password must be the same with proxyro_password. The default value is empty.
     # observer_sys_password:
 obagent:
+  # Set dependent components for the component.
+  # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
   depends:
     - oceanbase-ce
   # The list of servers to be monitored. This list is consistent with the servers in oceanbase-ce. 
@@ -97,10 +99,6 @@ obagent:
       ip: 172.19.33.3
     - name: server3
       ip: 172.19.33.4
-  # Set dependent components for the component.
-  # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
-  depends:
-    - oceanbase-ce
   global:
     # The working directory for obagent. obagent is started under this directory. This is a required field.
     home_path: /root/obagent

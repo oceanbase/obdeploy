@@ -55,18 +55,17 @@ class Restart(object):
     #         self.cursors = None
     #         self.dbs = None
 
-    def connect(self):
-        if self.cursors is None:
-            self.stdio.verbose('Call %s for %s' % (self.connect_plugin, self.repository))
-            self.sub_io.start_loading('Connect to obproxy')
-            ret = self.connect_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io)
-            if not ret:
-                self.sub_io.stop_loading('fail')
-                return False
-            self.sub_io.stop_loading('succeed')
-            # self.close()
-            self.cursors = ret.get_return('cursor')
-            self.dbs = ret.get_return('connect')
+    def connect(self, cluster_config):
+        self.stdio.verbose('Call %s for %s' % (self.connect_plugin, self.repository))
+        self.sub_io.start_loading('Connect to obproxy')
+        ret = self.connect_plugin(self.components, self.clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io)
+        if not ret:
+            self.sub_io.stop_loading('fail')
+            return False
+        self.sub_io.stop_loading('succeed')
+        # self.close()
+        self.cursors = ret.get_return('cursor')
+        self.dbs = ret.get_return('connect')
         return True
 
     def dir_read_check(self, client, path):
@@ -77,6 +76,12 @@ class Restart(object):
 
     def restart(self):
         clients = self.clients
+        if self.new_cluster_config:
+            if not self.connect(self.cluster_config):
+                return False
+            self.stdio.verbose('Call %s for %s' % (self.reload_plugin, self.repository))
+            self.reload_plugin(self.components, self.clients, self.cluster_config, [], {}, self.sub_io, cursor=self.cursors, new_cluster_config=self.new_cluster_config, repository_dir=self.repository.repository_dir)
+
         self.stdio.verbose('Call %s for %s' % (self.stop_plugin, self.repository))
         if not self.stop_plugin(self.components, clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io):
             self.stdio.stop_loading('stop_loading', 'fail')
@@ -103,16 +108,12 @@ class Restart(object):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
         
-        if self.connect():
+        if self.connect(cluster_config):
             if self.bootstrap_plugin:
                 self.stdio.verbose('Call %s for %s' % (self.bootstrap_plugin, self.repository))
                 self.bootstrap_plugin(self.components, clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io, cursor=self.cursors)
             self.stdio.verbose('Call %s for %s' % (self.display_plugin, self.repository))
             ret = self.display_plugin(self.components, clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io, cursor=self.cursors)
-            if self.new_cluster_config:
-                self.stdio.verbose('Call %s for %s' % (self.reload_plugin, self.repository))
-                self.reload_plugin(self.components, self.clients, self.cluster_config, [], {}, self.sub_io, 
-                cursor=self.cursors, new_cluster_config=self.new_cluster_config, repository_dir=self.repository.repository_dir)
             return ret
         return False
 

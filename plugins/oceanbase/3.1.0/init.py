@@ -37,7 +37,7 @@ def critical(*arg, **kwargs):
 
 def init_dir(server, client, key, path, link_path=None):
     if force:
-        ret = client.execute_command('rm -fr %s' % path)
+        ret = client.execute_command('rm -fr %s' % path, timeout=-1)
         if not ret:
             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s path' % key, msg=ret.stderr))
             return False
@@ -118,7 +118,17 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         if need_clean:
             client.execute_command(
                 "pkill -9 -u `whoami` -f '^%s/bin/observer -p %s'" % (home_path, server_config['mysql_port']))
-            ret = client.execute_command('rm -fr %s/*' % home_path)
+            if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
+                owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
+                err_msg = ' {} is not empty, and the owner is {}'.format(home_path, owner)
+                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err_msg))
+                continue
+            need_clean = True
+
+        if need_clean:
+            client.execute_command(
+                "pkill -9 -u `whoami` -f '^%s/bin/observer -p %s'" % (home_path, server_config['mysql_port']))
+            ret = client.execute_command('rm -fr %s/*' % home_path, timeout=-1)
             if not ret:
                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))
                 continue
@@ -134,7 +144,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         if ret:
             data_path = server_config['data_dir']
             if need_clean:
-                ret = client.execute_command('rm -fr %s/*' % data_path)
+                ret = client.execute_command('rm -fr %s/*' % data_path, timeout=-1)
                 if not ret:
                     critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=data_path)))
                     continue
@@ -154,7 +164,7 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
                     # init_dir(server, client, key, server_config['%s_dir' % key], os.path.join(data_path, key))
                     log_dir = server_config['%s_dir' % key]
                     if force:
-                        ret = client.execute_command('rm -fr %s/*' % log_dir)
+                        ret = client.execute_command('rm -fr %s/*' % log_dir, timeout=-1)
                         if not ret:
                             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s dir' % key, msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=log_dir)))
                             continue

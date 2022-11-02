@@ -1,0 +1,93 @@
+test:
+  system_config:
+  - name: enable_sql_audit
+    value: false
+  - name: enable_sql_extension
+    value: true
+    optimizer: tenant
+  - name: syslog_level
+    value: PERF
+  - name: max_syslog_file_count
+    value: 100
+  - name: enable_syslog_recycle
+    value: true
+    value_type: BOOL
+  - name: trace_log_slow_query_watermark
+    value: 100s
+  - name: enable_sql_operator_dump
+    value: true
+    value_type: BOOL
+  - name: _hash_area_size
+    value: 3g
+    optimizer: tenant
+  - name: memstore_limit_percentage
+    value: 50
+  - name: enable_rebalance
+    value: false
+    value_type: BOOL
+  - name: memory_chunk_cache_size
+    value: 0
+  - name: cache_wash_threshold
+    value: 30g
+  - name: ob_enable_batched_multi_statement
+    value: true
+    optimizer: tenant
+    value_type: BOOL
+  - name: _bloom_filter_ratio
+    value: 10
+  - name: _pushdown_storage_level
+    value: 3
+    optimizer: tenant
+  - name: _rowsets_enabled
+    value: true
+    optimizer: tenant
+  - name: _parallel_server_sleep_time
+    value: 10
+  - name: cpu_quota_concurrency
+    value: 4
+  - name: syslog_io_bandwidth_limit
+    value: 30m
+  - name: enable_async_syslog
+    value: true
+  - name: large_query_worker_percentage
+    value: 10
+  - name: minor_compact_trigger
+    value: 2
+  - name: builtin_db_data_verify_cycle
+    value: 0
+  - name: micro_block_merge_verify_level
+    value: 0
+  - name: freeze_trigger_percentage
+    value: 50
+  - name: sleep
+    value: 5
+    optimizer: sleep
+  - name: enable_perf_event
+    value: false
+  - name: large_query_threshold
+    value: 1s
+  variables:
+  - name: ob_sql_work_area_percentage
+    value: 80
+  - name: optimizer_use_sql_plan_baselines
+    value: true
+  - name: optimizer_capture_sql_plan_baselines
+    value: true
+  - name: ob_query_timeout
+    value: 36000000000
+  - name: ob_trx_timeout
+    value: 36000000000
+  - name: max_allowed_packet
+    value: 67108864
+  - name: secure_file_priv
+    value: ''
+  - name: parallel_servers_target
+    value: int(max_cpu * server_num * 8)
+    expression: true
+  - name: _groupby_nopushdown_cut_ratio
+    value: 1
+  - name: _nlj_batching_enabled
+    value: true
+  exec_sql:
+  - name: clean_cache
+    optimizer: clean_cache

@@ -35,8 +35,7 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
     clients = plugin_context.clients
     servers = cluster_config.servers
     yaml = YamlLoader(stdio)
-
-    config_map =  {
+    config_map = {
         "monitor_password": "root_password",
         "sql_port": "mysql_port",
         "rpc_port": "rpc_port",
@@ -62,13 +61,13 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
         with open(path) as f:
             data = yaml.load(f)['configs']
             for config in data:
-                key = config.get('value')
-                if key and isinstance(key, dict):
-                    key = list(key.keys())[0]
-                    config_kv[key] = key
-
+                value = config.get('value')
+                key = config.get('key')
+                if key and value and isinstance(value, dict):
+                    value = list(value.keys())[0]
+                    config_kv[value] = key
     global_ret = True
-    stdio.start_load('Reload obagent')
+    stdio.start_loading('Reload obagent')
     for server in servers:
         change_conf = deepcopy(global_change_conf)
         client = clients[server]
@@ -111,8 +110,8 @@ def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
                 stdio.error(EC_OBAGENT_RELOAD_FAILED.format(server=server))
     
     if global_ret:
-        stdio.stop_load('succeed')
+        stdio.stop_loading('succeed')
         return plugin_context.return_true()
     else:
-        stdio.stop_load('fail')
+        stdio.stop_loading('fail')
         return

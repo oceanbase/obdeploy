@@ -1,0 +1,128 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+prometheus:
+  servers:
+    - 192.168.1.5
+  global:
+    # The working directory for prometheus. prometheus is started under this directory. This is a required field.
+    home_path: /root/prometheus
+    # address: 0.0.0.0  # The ip address to bind to. Along with port, corresponds to the `web.listen-address` parameter.
+    # port: 9090 # The http port to use. Along with address, corresponds to the `web.listen-address` parameter.
+    # enable_lifecycle: true # Enable shutdown and reload via HTTP request. Corresponds to the `web.enable-lifecycle` parameter.
+    # data_dir: /root/prometheus/data # Base path for metrics storage. Corresponds to the `storage.tsdb.path` parameter.
+    # basic_auth_users:  # Usernames and passwords that have full access to the web server via basic authentication. Corresponds to the `basic_auth_users` parameter.
+    #   <username>: <password>  # The format of `basic_auth_users` : the key is the user name and the value is the password.
+    # web_config: # Content of Prometheus web service config file. The format is consistent with the file. However, `basic_auth_users` cannot be set in it. Please set `basic_auth_users` above if needed. Corresponds to the `web.config.file` parameter.
+    #   tls_server_config:
+    #     # Certificate and key files for server to use to authenticate to client.
+    #     cert_file: <filename>
+    #     key_file: <filename>
+    # config: # Configuration of the Prometheus service. The format is consistent with the Prometheus config file. Corresponds to the `config.file` parameter.
+    #   rule_files:
+    #   - rules/*rules.yaml
+    #   scrape_configs:
+    #   - job_name: prometheus
+    #     metrics_path: /metrics
+    #     scheme: http
+    #     static_configs:
+    #       - targets:
+    #           - localhost:9090
+    #   - job_name: node
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/node/host
+    #     scheme: http
+    #     file_sd_configs:  # Set the targets to be collected by reading local files. The example is to collect targets corresponding to all yaml files in the 'targets' directory under $home_path.
+    #     - files:
+    #       - 'targets/*.yaml'
+    #   - job_name: ob_basic
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/ob/basic
+    #     scheme: http
+    #     file_sd_configs:
+    #     - files:
+    #       - 'targets/*.yaml'
+    #   - job_name: ob_extra
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/ob/extra
+    #     scheme: http
+    #     file_sd_configs:
+    #     - files:
+    #       - 'targets/*.yaml'
+    #   - job_name: agent
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/stat
+    #     scheme: http
+    #     file_sd_configs:
+    #     - files:
+    #       - 'targets/*.yaml'
+    # additional_parameters: # Additional parameters for Prometheus service, among which `web.listen-address`, `web.enable-lifecycle`, `storage.tsdb.path`, `config.file` and `web.config.file` cannot be set. Please set them in the corresponding configuration above if needed.
+    # - log.level: debug
+grafana:
+  servers:
+    - 192.168.1.5
+  depends:
+    - prometheus
+  global:
+    home_path: /root/grafana
+    login_password: oceanbase # Grafana login password. The default value is 'oceanbase'.
+    # data_dir: # Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used).$data_dir can be empty. The default value is $home_path/data.
+    # logs_dir: # Directory where grafana can store logs, can be empty. The default value is $data_dir/log.
+    # plugins_dir: # Directory where grafana will automatically scan and look for plugins, can be empty. The default value is $data_dir/plugins.
+    # provisioning_dir: # folder that contains provisioning config files that grafana will apply on startup and while running, can be empty. The default value is $home_path/conf/provisioning.
+    # temp_data_lifetime: # How long temporary images in data directory should be kept. Supported modifiers h (hours), m (minutes), Use 0 to never clean up temporary files, can be empty. The default value is 24h.
+    # log_max_days: # Expired days of log file(delete after max days), can be empty. The default value is 7.
+    # domian: # The public facing domain name used to access grafana from a browser, can be empty. The default value is $server.ip.
+    # port: # The http port to use, can be empty. The default value is 3000.
+
+    # # list of datasources to insert/update depending on what's available in the database, can be empty.
+    # # For more parameter settings, please refer to https://grafana.com/docs/grafana/latest/administration/provisioning/#datasources
+    # datasources:
+    #   name: # name of the datasource. Required and should not be 'OB-Prometheus'
+    #   type: # datasource type. Required
+    #   access: # access mode. direct or proxy. Required
+    #   url: # the url of datasource
+
+    # list of dashboards providers that load dashboards into Grafana from the local filesystem, can be empty.
+    # For more information, please refer to https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+    # providers:
+    #   name: # an unique provider name. Required and should not be 'OceanBase Metrics'
+    #   type: # provider type. Default to 'file'
+    #   options:
+    #     path: # path to dashboard files on disk. Required when using the 'file' type
+
+    # # customize your Grafana instance by adding/modifying the custom configuration as follows   
+    # # for more information, please refer to https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#configure-grafana
+    # # Here, setting parameters is required for format conversion.
+    # # For example, if the original grafana configuration format is
+    # #
+    # # [section1.section2]
+    # # key1 = value1
+    # # key2 = value2
+    # #
+    # # Then when writing the configuration below, you need to write it as
+    # #
+    # # section1:
+    # #   section2:
+    # #     key1: value1
+    # #     key2: value2
+    # #
+    # # Here we only list one item， because there are more than 500 items. Please add them according to your own needs.
+    # customize_config:
+    #   # original grafana configuration format is 
+    #   # [server] 
+    #   # protocol = http
+    #   server:
+    #     protocol: http  

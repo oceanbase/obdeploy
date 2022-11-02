@@ -44,4 +44,25 @@ def display(plugin_context, cursor, *args, **kwargs):
         result.append(data)
     stdio.print_list(result, ['ip', 'port', 'prometheus_port', 'status'], 
         lambda x: [x['ip'], x['listen_port'], x['prometheus_listen_port'], x['status']], title='obproxy')
+    
+    server = servers[0]
+    with_observer = False
+    server_config = cluster_config.get_server_conf(server)
+    cmd = ''
+    for comp in ['oceanbase', 'oceanbase-ce']:
+        if comp in cluster_config.depends:
+            ob_config = cluster_config.get_depend_config(comp)
+            if not ob_config:
+                continue
+            password = ob_config.get('root_password', '')
+            with_observer = True
+            cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase' % (server.ip, server_config['listen_port'], '-p%s ' % password if password else '')
+            break
+
+    if not with_observer:
+        password = server_config.get('obproxy_sys_password', '')
+        cmd = 'obclient -h%s -P%s -uroot@proxysys %s-Doceanbase' % (server.ip, server_config['listen_port'], '-p%s ' % password if password else '')
+
+    stdio.print(cmd)
+        
     plugin_context.return_true()

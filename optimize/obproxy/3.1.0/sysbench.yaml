@@ -1,0 +1,21 @@
+test:
+  system_config:
+  - name: proxy_mem_limited
+    value: format_size(min(max(threads * (8 << 10), 2 << 30), 4 << 30), 0)
+    expression: true
+    condition: "lambda n, o: parse_size(n) > parse_size(o)"
+  - name: enable_prometheus
+    value: false
+    value_type: BOOL
+  - name: enable_metadb_used
+    value: false
+    value_type: BOOL
+  - name: enable_standby
+    value: false
+    value_type: BOOL
+  - name: enable_strict_stat_time
+    value: false
+    value_type: BOOL
+  - name: use_local_dbconfig
+    value: true
+    value_type: BOOL

@@ -23,6 +23,7 @@ from __future__ import absolute_import, division, print_function
 import enum
 import getpass
 import os
+import tempfile
 import warnings
 from glob import glob
 
@@ -39,8 +40,9 @@ from multiprocessing.queues import Empty
 from multiprocessing import Queue, Process
 from multiprocessing.pool import ThreadPool
 
-from tool import COMMAND_ENV, DirectoryUtil
+from tool import COMMAND_ENV, DirectoryUtil, FileUtil
 from _stdio import SafeStdio
+from _environ import ENV_DISABLE_RSYNC
 
 
 __all__ = ("SshClient", "SshConfig", "LocalClient", "ConcurrentExecutor")
@@ -104,6 +106,9 @@ class ConcurrentExecutor(object):
         self.futures.append(ret)
         return ret
 
+    def size(self):
+        return len(self.futures)
+
     @staticmethod
     def execute(future):
         client = SshClient(future.client.config, future.stdio)
@@ -160,9 +165,22 @@ class LocalClient(SafeStdio):
         if os.path.exists(os.path.dirname(local_dir)) and not glob(local_dir):
             stdio.verbose("%s is empty" % local_dir)
             return True
-        if LocalClient.execute_command('mkdir -p %s && cp -fr %s %s' % (remote_dir, local_dir, remote_dir), stdio=stdio):
+        if LocalClient.execute_command('mkdir -p %s && cp -frL %s %s' % (remote_dir, local_dir, remote_dir), stdio=stdio):
             return True
         return False
+
+    @staticmethod
+    def write_file(content, file_path, mode='w', stdio=None):
+        stdio.verbose('write {} to {}'.format(content, file_path))
+        try:
+            with FileUtil.open(file_path, mode, stdio=stdio) as f:
+                f.write(content)
+                f.flush()
+            return True
+        except:
+            stdio.exception('')
+            return False
+
 
     @staticmethod
     def get_file(local_path, remote_path, stdio=None):
@@ -231,7 +249,7 @@ class SshClient(SafeStdio):
             stdio.verbose('%s@%s delete env %s' % (self.config.username, self.config.host, key))
             del self.env[key]
             self._update_env()
-    
+
     def __str__(self):
         return '%s@%s:%d' % (self.config.username, self.config.host, self.config.port)
 
@@ -336,12 +354,12 @@ class SshClient(SafeStdio):
 
         verbose_msg = '%s execute: %s ' % (self.config, command)
         stdio.verbose(verbose_msg, end='')
-        command = '%s %s;echo -e "\n$?\c"' % (self.env_str, command.strip(';'))
+        command = '%s %s;echo -e "\n$?\c"' % (self.env_str, command.strip(';').lstrip('\n'))
         return self._execute_command(command, retry=3, timeout=timeout, stdio=stdio)
 
     @property
     def disable_rsync(self):
-        return COMMAND_ENV.get("OBD_DISABLE_RSYNC") == "1"
+        return COMMAND_ENV.get(ENV_DISABLE_RSYNC) == "1"
 
     @property
     def remote_transporter(self):
@@ -366,6 +384,22 @@ class SshClient(SafeStdio):
         if not self._open_sftp(stdio=stdio):
             return False
         return self._put_file(local_path, remote_path, stdio=stdio)
+
+    def write_file(self, content, file_path, mode='w', stdio=None):
+        if self._is_local():
+            return LocalClient.write_file(content, file_path, mode, stdio)
+        return self._write_file(content, file_path, mode, stdio)
+
+    def _write_file(self, content, file_path, mode='w', stdio=None):
+        stdio.verbose('write {} to {}: {}'.format(content, self, file_path))
+        try:
+            with tempfile.NamedTemporaryFile(mode=mode) as f:
+                f.write(content)
+                f.flush()
+                return self.put_file(f.name, file_path, stdio=stdio)
+        except:
+            stdio.exception('')
+            return False
 
     @property
     def _put_file(self):

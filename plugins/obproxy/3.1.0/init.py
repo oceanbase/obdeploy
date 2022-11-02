@@ -51,14 +51,25 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         if need_clean:
             client.execute_command("pkill -9 -u `whoami` -f '^bash {home_path}/obproxyd.sh {home_path} {ip} {port} daemon$'".format(home_path=home_path, ip=server.ip, port=server_config.get('listen_port')))
             client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/obproxy --listen_port %s'" % (home_path, server_config.get('listen_port')))
-            ret = client.execute_command('rm -fr %s' % home_path)
+            if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
+                owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
+                global_ret = False
+                err_msg = ' {} is not empty, and the owner is {}'.format(home_path, owner)
+                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err_msg))
+                continue
+            need_clean = True
+
+        if need_clean:
+            client.execute_command("pkill -9 -u `whoami` -f '^bash {home_path}/obproxyd.sh {home_path} {ip} {port} daemon$'".format(home_path=home_path, ip=server.ip, port=server_config.get('listen_port')))
+            client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/obproxy --listen_port %s'" % (home_path, server_config.get('listen_port')))
+            ret = client.execute_command('rm -fr %s' % home_path, timeout=-1)
             if not ret:
                 global_ret = False
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))
                 continue
         if not client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib}'" % home_path):
             global_ret = False
-            stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
+            stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=home_path)))
             
     if global_ret:
         stdio.stop_loading('succeed')

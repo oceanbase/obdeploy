@@ -1,0 +1,4 @@
+system_config:
+  default:
+    query_sql: "show proxyconfig like {name}"
+    modify_sql: "alter proxyconfig set {name}={value}"

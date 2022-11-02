@@ -19,6 +19,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import socket
 
 def display(plugin_context, cursor, *args, **kwargs):
     stdio = plugin_context.stdio
@@ -34,9 +35,12 @@ def display(plugin_context, cursor, *args, **kwargs):
         else:
             auth = '--user %s:%s' % (config['http_basic_auth_user'], config['http_basic_auth_password'])
         cmd = '''curl %s -H "Content-Type:application/json" -L "http://%s:%s/metrics/stat"''' % (auth, server.ip, config['server_port'])
-        
+        ip = server.ip
+        if ip == '127.0.0.1':
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
         result.append({
-            'ip': server.ip,
+            'ip': ip,
             'status': 'active' if client.execute_command(cmd) else 'inactive',
             'server_port': config['server_port'],
             'pprof_port': config['pprof_port']

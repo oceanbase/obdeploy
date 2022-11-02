@@ -1,0 +1,61 @@
+test:
+  system_config:
+  - name: syslog_level
+    value: PERF
+  - name: max_syslog_file_count
+    value: 100
+  - name: enable_syslog_recycle
+    value: true
+    value_type: BOOL
+  - name: enable_merge_by_turn
+    value: false
+    value_type: BOOL
+  - name: trace_log_slow_query_watermark
+    value: 100s
+  - name: max_kept_major_version_number
+    value: 1
+  - name: enable_sql_operator_dump
+    value: true
+    value_type: BOOL
+  - name: _hash_area_size
+    value: 3g
+    optimizer: tenant
+  - name: memstore_limit_percentage
+    value: 50
+  - name: enable_rebalance
+    value: false
+    value_type: BOOL
+  - name: memory_chunk_cache_size
+    value: 1g
+  - name: minor_freeze_times
+    value: 5
+  - name: merge_thread_count
+    value: 20
+  - name: cache_wash_threshold
+    value: format_size(int(min_memory * 0.2), 0)
+    expression: true
+  - name: ob_enable_batched_multi_statement
+    value: true
+    optimizer: tenant
+    value_type: BOOL
+  variables:
+  - name: ob_sql_work_area_percentage
+    value: 80
+  - name: optimizer_use_sql_plan_baselines
+    value: true
+  - name: optimizer_capture_sql_plan_baselines
+    value: true
+  - name: ob_query_timeout
+    value: 36000000000
+  - name: ob_trx_timeout
+    value: 36000000000
+  - name: max_allowed_packet
+    value: 67108864
+  - name: secure_file_priv
+    value: ''
+  - name: parallel_max_servers
+    value: min(int(max_cpu * 10), 1800)
+    expression: true
+  - name: parallel_servers_target
+    value: int(max_cpu * server_num * 8)
+    expression: true

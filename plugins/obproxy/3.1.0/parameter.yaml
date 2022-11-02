@@ -372,22 +372,16 @@
 - name: local_bound_ip
   type: STRING
   default: 0.0.0.0
-  max_value: ''
-  min_value: ''
   need_restart: true
   description_en: local bound ip(any)
 - name: obproxy_config_server_url
   type: STRING
   default: ''
-  max_value: ''
-  min_value: ''
   need_restart: true
   description_en: url of config info(rs list and so on)
 - name: proxy_service_mode
   type: STRING
   default: ''
-  max_value: ''
-  min_value: ''
   need_restart: true
   description_en: "proxy deploy and service mode: 1.client(default); 2.server"
 - name: proxy_id
@@ -400,8 +394,6 @@
 - name: app_name
   type: STRING
   default: undefined
-  max_value: ''
-  min_value: ''
   need_restart: true
   description_en: current application name which proxy works for, need defined, only modified when restart
 - name: enable_metadb_used
@@ -414,8 +406,6 @@
 - name: rootservice_cluster_name
   type: STRING
   default: undefined
-  max_value: ''
-  min_value: ''
   need_restart: true
   description_en: default cluster name for rootservice_list
 - name: prometheus_cost_ms_unit
@@ -435,21 +425,15 @@
 - name: obproxy_sys_password
   type: STRING
   default: ''
-  max_value: ''
-  min_value: ''
   need_restart: false
   description_en: password pf obproxy sys user
 - name: observer_sys_password
   type: STRING
   default: ''
-  max_value: ''
-  min_value: ''
   need_restart: false
   description_en: password of observer proxyro user
 - name: observer_root_password
   type: STRING
   default: ''
-  max_value: ''
-  min_value: ''
   need_restart: false
   description_en: password of observer root user

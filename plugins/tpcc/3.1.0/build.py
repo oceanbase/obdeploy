@@ -175,34 +175,11 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     # load data
     stdio.verbose('Start to load data.')
     cmd = '{java_bin} -cp {cp} -Dprop={prop} LoadData'.format(java_bin=java_bin, cp=bmsql_classpath, prop=bmsql_prop_path)
-    stdio.start_progressbar('Load data ', warehouses, widget_type='simple_progress')
     try:
         stdio.verbose('local execute: %s' % cmd)
-        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        while p.poll() is None:
-            count = get_table_rows('bmsql_warehouse')
-            if count:
-                stdio.update_progressbar(min(count, warehouses - 1))
-            time.sleep(10)
-        code = p.returncode
-        output = p.stdout.read().decode()
-        verbose_msg = 'exited code %s' % code
-        verbose_msg += ', output:\n%s' % output
+        subprocess.call(cmd, shell=True, stderr=subprocess.STDOUT)
     except:
-        output = ''
-        code = 255
-        verbose_msg = 'unknown error'
-        stdio.exception('')
-    stdio.verbose(verbose_msg)
-    if code != 0:
-        stdio.interrupt_progressbar()
-        stdio.error(EC_TPCC_LOAD_DATA_FAILED)
-        return
-    if re.match(r'.*Worker \d+: ERROR: .*', output, re.S):
-        stdio.interrupt_progressbar()
-        stdio.error(EC_TPCC_LOAD_DATA_FAILED)
-        return
-    stdio.finish_progressbar()
+        stdio.exception('failed to load data')
 
     # create index
     stdio.start_loading('create index')
