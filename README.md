@@ -1,5 +1,29 @@
 # OceanBase Deployer
 
+<!--
+#
+# OceanBase Deploy.
+# Copyright (C) 2021 OceanBase
+#
+# This file is part of OceanBase Deploy.
+#
+# OceanBase Deploy is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# OceanBase Deploy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+#
+-->
+
+<!-- TODO: some badges here -->
+
 OceanBase Deployer (OBD) is an installation and deployment tool for open-source OceanBase software. It is also a package manager for managing all open-source OceanBase software. This topic describes how to install OBD, how to use OBD, and OBD commands.
 
 ## Install OBD
@@ -25,42 +49,12 @@ Before you install OBD by using the source code, make sure that you have install
 - openssl-devel
 - xz-devel
 - mysql-devel
-- pip
-- pyinstaller
 
-> Notes:
->
-> You can install pip for Python2.7 or Python3.8 refer below cmd:
->
-> ```shell
-> curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # for Python2.7 
-> curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # for Python3.8 
-> sudo python get-pip.py
-> ```
->
-> then install pyinstaller as below:
->
-> ```shell
-> sudo pip install pyinstaller==3.6
-> ```
-
-To install OBD on Python2.7, run these commands:
+To install OBD on Python3.8, run these commands:
 
 ```shell
-sh rpm/build.sh build
-source /etc/profile.d/obd.sh
-```
-
-To install OBD on Python3.8, run these commands on Python2.7 first:
-
-```shell
-sh rpm/build.sh executer
-```
-
-Then run these commands on Python3.8:
-
-```shell
-sh rpm/build.sh build_obd
+pip install -r requirements3.txt
+sh build.sh build_obd
 source /etc/profile.d/obd.sh
 ```
 
@@ -136,7 +130,3 @@ A：You can use the `obd update` command to update OBD. When you are done with t
 ## Protocol
 
 OBD complies with [GPL-3.0](/LICENSE).
-
-## TPC-C
-
-- [Run TPC-C benchmark test on OceanBase](https://github.com/oceanbase/oceanbase-doc/blob/V3.1.4/en-US/1.Get-Started/5.Experience-OceanBase-Advanced-Features/1.Experience-Scalable-OLTP/1.Run-the-TPC-C-benchmark-test-in-OceanBase-Database.md)
