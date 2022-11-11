@@ -368,7 +368,7 @@ class SshClient(SafeStdio):
         _transporter = RemoteTransporter.CLIENT
         if not self._is_local() and self._remote_transporter is None:
             if not self.config.password and not self.disable_rsync:
-                ret = LocalClient.execute_command('rsync -h', stdio=self.stdio)
+                ret = LocalClient.execute_command('rsync -h', stdio=self.stdio) and self.execute_command('rsync -h', stdio=self.stdio)
                 if ret:
                     _transporter = RemoteTransporter.RSYNC
         self._remote_transporter = _transporter

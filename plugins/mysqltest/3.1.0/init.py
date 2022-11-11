@@ -127,6 +127,7 @@ def init(plugin_context, env, *args, **kwargs):
         exec_init = 'init.sql'
         exec_mini_init = 'init_mini.sql'
         exec_init_user = 'init_user.sql|root@mysql|test'
+        exec_init_user_for_oracle = 'init_user_oracle.sql|SYS@oracle|SYS'
         client = plugin_context.clients[server]
         memory_limit = get_memory_limit(cursor, client)
         is_mini = memory_limit and parse_size(memory_limit) < (16<<30)

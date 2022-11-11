@@ -173,6 +173,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     memory_limit = max(min_memory, memory_limit * 0.9)
                     server_config['memory_limit'] = format_size(memory_limit, 0)
                     cluster_config.update_server_conf(server, 'memory_limit', server_config['memory_limit'], False)
+                    auto_set_memory = True
                 else:
                     stdio.error("%s: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
                     success = False
@@ -180,7 +181,6 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             else:
                 try:
                     memory_limit = parse_size(server_config.get('memory_limit'))
-                    auto_set_memory = True
                 except:
                     stdio.error('memory_limit must be an integer')
                     return
@@ -300,14 +300,14 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                         continue
                     
                     disk_free = disk_free - log_size - SLOG_SIZE
-                    memory_factor = 0
+                    memory_factor = 6
                     if auto_set_datafile_size is False:
                         disk_free -= min_datafile_size
-                        memory_factor += 3
+                        memory_factor -= 3
                     if auto_set_log_disk_size is False:
                         disk_free -= min_log_disk_size
-                        memory_factor += 3
-                    memory_limit = format_size(disk_free / memory_factor, 0)
+                        memory_factor -= 3
+                    memory_limit = format_size(disk_free / max(1, memory_factor), 0)
                     cluster_config.update_server_conf(server, 'memory_limit', memory_limit, False)
                     memory_limit = parse_size(memory_limit)
                     if auto_set_system_memory:
