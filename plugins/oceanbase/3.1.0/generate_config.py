@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function
 
 import re, os
 
-from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY
+from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED
 
 
 def parse_size(size):
@@ -32,7 +32,7 @@ def parse_size(size):
         _bytes = int(size)
     else:
         units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'([1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
+        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
         _bytes = int(match.group(1)) * units[match.group(2)]
     return _bytes
 
@@ -90,6 +90,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
 
     MIN_MEMORY = 8 << 30
     MIN_CPU_COUNT = 16
+    START_NEED_MEMORY = 3 << 30
     clog_disk_utilization_threshold_max = 95
     clog_disk_usage_limit_percentage_max = 98
     global_config = cluster_config.get_original_global_conf()
@@ -158,16 +159,32 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             if not server_config.get('memory_limit'):
                 ret = client.execute_command('cat /proc/meminfo')
                 if ret:
-                    free_memory = 0
+                    server_memory_stats = {}
+                    memory_key_map = {
+                        'MemTotal': 'total',
+                        'MemFree': 'free',
+                        'MemAvailable': 'available',
+                        'Buffers': 'buffers',
+                        'Cached': 'cached'
+                    }
+                    for key in memory_key_map:
+                        server_memory_stats[memory_key_map[key]] = 0
                     for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
-                        if k == 'MemAvailable':
-                            free_memory = parse_size(str(v))
-                    memory_limit = free_memory
-                    if memory_limit < MIN_MEMORY:
-                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(free_memory), need=format_size(MIN_MEMORY)))
+                        if k in memory_key_map:
+                            key = memory_key_map[k]
+                            server_memory_stats[key] = parse_size(str(v))
+
+                    if server_memory_stats['available'] < START_NEED_MEMORY:
+                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(START_NEED_MEMORY)))
                         success = False
                         continue
-                    memory_limit = max(MIN_MEMORY, memory_limit * 0.9)
+                    
+                    if server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached'] < MIN_MEMORY:
+                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(MIN_MEMORY)))
+                        success = False
+                        continue
+
+                    memory_limit = max(MIN_MEMORY, server_memory_stats['available'] * 0.9)
                     server_config['memory_limit'] = format_size(memory_limit, 0)
                     cluster_config.update_server_conf(server, 'memory_limit', server_config['memory_limit'], False)
                 else:

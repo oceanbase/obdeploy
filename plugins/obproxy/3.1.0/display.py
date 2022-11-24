@@ -56,12 +56,12 @@ def display(plugin_context, cursor, *args, **kwargs):
                 continue
             password = ob_config.get('root_password', '')
             with_observer = True
-            cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase' % (server.ip, server_config['listen_port'], '-p%s ' % password if password else '')
+            cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase -A' % (server.ip, server_config['listen_port'], '-p%s ' % password if password else '')
             break
 
     if not with_observer:
         password = server_config.get('obproxy_sys_password', '')
-        cmd = 'obclient -h%s -P%s -uroot@proxysys %s-Doceanbase' % (server.ip, server_config['listen_port'], '-p%s ' % password if password else '')
+        cmd = 'obclient -h%s -P%s -uroot@proxysys %s-Doceanbase -A' % (server.ip, server_config['listen_port'], '-p%s ' % password if password else '')
 
     stdio.print(cmd)
         

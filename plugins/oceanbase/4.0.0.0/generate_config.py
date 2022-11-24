@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function
 
 import re, os
 
-from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY
+from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED
 
 
 def parse_size(size):
@@ -32,7 +32,7 @@ def parse_size(size):
         _bytes = int(size)
     else:
         units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'([1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
+        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
         _bytes = int(match.group(1)) * units[match.group(2)]
     return _bytes
 
@@ -106,6 +106,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
     PRO_MEMORY_MIN = 16 << 30
     SLOG_SIZE = 10 << 30
     MIN_CPU_COUNT = 16
+    START_NEED_MEMORY = 3 << 30
     if getattr(plugin_context.options, 'mini', False):
         if not global_config.get('memory_limit_percentage') and not global_config.get('memory_limit'):
             cluster_config.update_global_conf('memory_limit', format_size(MIN_MEMORY, 0), False)
@@ -161,18 +162,35 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             if not server_config.get('memory_limit'):
                 ret = client.execute_command('cat /proc/meminfo')
                 if ret:
-                    free_memory = 0
+                    server_memory_stats = {}
+                    memory_key_map = {
+                        'MemTotal': 'total',
+                        'MemFree': 'free',
+                        'MemAvailable': 'available',
+                        'Buffers': 'buffers',
+                        'Cached': 'cached'
+                    }
+                    for key in memory_key_map:
+                        server_memory_stats[memory_key_map[key]] = 0
                     for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
-                        if k == 'MemAvailable':
-                            free_memory = parse_size(str(v))
-                    memory_limit = free_memory
-                    if memory_limit < min_memory:
-                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(free_memory), need=format_size(min_memory)))
+                        if k in memory_key_map:
+                            key = memory_key_map[k]
+                            server_memory_stats[key] = parse_size(str(v))
+
+                    if server_memory_stats['available'] < START_NEED_MEMORY:
+                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(START_NEED_MEMORY)))
                         success = False
                         continue
-                    memory_limit = max(min_memory, memory_limit * 0.9)
+                    
+                    if server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached'] < MIN_MEMORY:
+                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(MIN_MEMORY)))
+                        success = False
+                        continue
+
+                    memory_limit = max(MIN_MEMORY, server_memory_stats['available'] * 0.9)
                     server_config['memory_limit'] = format_size(memory_limit, 0)
                     cluster_config.update_server_conf(server, 'memory_limit', server_config['memory_limit'], False)
+                    auto_set_memory = True
                 else:
                     stdio.error("%s: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
                     success = False
@@ -180,7 +198,6 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             else:
                 try:
                     memory_limit = parse_size(server_config.get('memory_limit'))
-                    auto_set_memory = True
                 except:
                     stdio.error('memory_limit must be an integer')
                     return
@@ -300,14 +317,14 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                         continue
                     
                     disk_free = disk_free - log_size - SLOG_SIZE
-                    memory_factor = 0
+                    memory_factor = 6
                     if auto_set_datafile_size is False:
                         disk_free -= min_datafile_size
-                        memory_factor += 3
+                        memory_factor -= 3
                     if auto_set_log_disk_size is False:
                         disk_free -= min_log_disk_size
-                        memory_factor += 3
-                    memory_limit = format_size(disk_free / memory_factor, 0)
+                        memory_factor -= 3
+                    memory_limit = format_size(disk_free / max(1, memory_factor), 0)
                     cluster_config.update_server_conf(server, 'memory_limit', memory_limit, False)
                     memory_limit = parse_size(memory_limit)
                     if auto_set_system_memory:

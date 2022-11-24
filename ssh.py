@@ -368,7 +368,7 @@ class SshClient(SafeStdio):
         _transporter = RemoteTransporter.CLIENT
         if not self._is_local() and self._remote_transporter is None:
             if not self.config.password and not self.disable_rsync:
-                ret = LocalClient.execute_command('rsync -h', stdio=self.stdio)
+                ret = LocalClient.execute_command('rsync -h', stdio=self.stdio) and self.execute_command('rsync -h', stdio=self.stdio)
                 if ret:
                     _transporter = RemoteTransporter.RSYNC
         self._remote_transporter = _transporter
@@ -418,8 +418,10 @@ class SshClient(SafeStdio):
     def _rsync(self, source, target, stdio=None):
         identity_option = ""
         if self.config.key_filename:
-            identity_option += '-e "ssh -i {key_filename} "'.format(key_filename=self.config.key_filename)
-        cmd = 'rsync -a -W {identity_option} {source} {target}'.format(
+            identity_option += '-i {key_filename} '.format(key_filename=self.config.key_filename)
+        if self.config.port:
+            identity_option += '-p {}'.format(self.config.port)
+        cmd = 'rsync -a -W -e "ssh {identity_option}" {source} {target}'.format(
             identity_option=identity_option,
             source=source,
             target=target

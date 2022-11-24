@@ -172,7 +172,9 @@ class ParallerExtractWorker(object):
 
 class ParallerExtractor(object):
 
-    MAX_PARALLER = cpu_count() if cpu_count() else 8
+    MAX_PARALLER = cpu_count() * 2 if cpu_count() else 8
+    MAX_SIZE = 100
+    MIN_SIZE = 20
 
     def __init__(self, pkg, files, stdio=None):
         self.pkg = pkg
@@ -180,11 +182,13 @@ class ParallerExtractor(object):
         self.stdio = stdio
 
     def extract(self):
+        if not self.files:
+            return
         workers = []
         file_num = len(self.files)
-        paraler = int(min(self.MAX_PARALLER, file_num))
-        size = min(100, int(file_num / paraler))
-        size = int(max(10, size))
+        paraller = int(min(self.MAX_PARALLER, file_num))
+        size = min(self.MAX_SIZE, int(file_num / paraller)) # 
+        size = int(max(self.MIN_SIZE, size))
         index = 0
         while index < file_num:
             p_index = index + size
@@ -195,7 +199,7 @@ class ParallerExtractor(object):
             ))
             index = p_index
         
-        pool = Pool(processes=paraler)
+        pool = Pool(processes=paraller)
         try:
             results = pool.map(ParallerExtractWorker.extract, workers)
             for r in results:

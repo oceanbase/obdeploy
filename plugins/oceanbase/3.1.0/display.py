@@ -36,7 +36,7 @@ def display(plugin_context, cursor, *args, **kwargs):
                     stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'], 
                         lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title='observer')
                     password = cluster_config.get_global_conf().get('root_password', '')
-                    cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase' % (servers[0]['svr_ip'], servers[0]['inner_port'], '-p%s ' % password if password else '') 
+                    cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase -A' % (servers[0]['svr_ip'], servers[0]['inner_port'], '-p%s ' % password if password else '') 
                     stdio.print(cmd)
                     stdio.stop_loading('succeed')
                     return plugin_context.return_true()

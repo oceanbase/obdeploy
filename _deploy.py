@@ -625,6 +625,8 @@ class ClusterConfig(object):
         return error
 
     def set_global_conf(self, conf):
+        if not isinstance(conf, dict):
+            raise Exception('%s global config is not a dictionary. Please check the syntax of your configuration file.\n See https://github.com/oceanbase/obdeploy/blob/master/docs/zh-CN/4.configuration-file-description.md' % self.name)
         self._original_global_conf = deepcopy(conf)
         self._global_conf = None
         self._clear_cache_server()
