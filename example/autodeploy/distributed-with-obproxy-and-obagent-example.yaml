@@ -69,6 +69,7 @@ obproxy-ce:
   global:
     # The working directory for obproxy. Obproxy is started under this directory. This is a required field.
     home_path: /root/obproxy
+    enable_cluster_checkout: false
     skip_proxy_sys_private_check: true
     enable_strict_kernel_release: false
     # External port. The default value is 2883.
