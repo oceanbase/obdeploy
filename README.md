@@ -1,5 +1,29 @@
 # OceanBase Deployer
 
+<!--
+#
+# OceanBase Deploy.
+# Copyright (C) 2021 OceanBase
+#
+# This file is part of OceanBase Deploy.
+#
+# OceanBase Deploy is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# OceanBase Deploy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+#
+-->
+
+<!-- TODO: some badges here -->
+
 OceanBase Deployer (OBD) is an installation and deployment tool for open-source OceanBase software. It is also a package manager for managing all open-source OceanBase software. This topic describes how to install OBD, how to use OBD, and OBD commands.
 
 ## Install OBD
@@ -25,64 +49,36 @@ Before you install OBD by using the source code, make sure that you have install
 - openssl-devel
 - xz-devel
 - mysql-devel
-- pip
-- pyinstaller
 
-> Notes:
->
-> You can install pip for Python2.7 or Python3.8 refer below cmd:
->
-> ```shell
-> curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # for Python2.7 
-> curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # for Python3.8 
-> sudo python get-pip.py
-> ```
->
-> then install pyinstaller as below:
->
-> ```shell
-> sudo pip install pyinstaller==3.6
-> ```
-
-To install OBD on Python2.7, run these commands:
+To install OBD on Python3.8, run these commands:
 
 ```shell
-sh rpm/build.sh build
-source /etc/profile.d/obd.sh
-```
-
-To install OBD on Python3.8, run these commands on Python2.7 first:
-
-```shell
-sh rpm/build.sh executer
-```
-
-Then run these commands on Python3.8:
-
-```shell
-sh rpm/build.sh build_obd
+pip install -r requirements3.txt
+sh build.sh build_obd
 source /etc/profile.d/obd.sh
 ```
 
 ## Start an OceanBase cluster
 
-After you install OBD, you can run these commands as the root user to start a local single-node OceanBase cluster.
-Before you run the commands, make sure that these conditions are met:
+After you deploy OceanBase Deployer (OBD), you can run the `obd demo` command to deploy and start OceanBase Database on a single local server. Make sure the following prerequisites are met:
 
-- You have logged on as the root user.
-- Ports `2882` and `2883` are available.
-- Your server has at least 8 GB of memory.
-- Your server has at least 2 CPU cores.
+- Ports `2881` and `2882` are not occupied.
 
-> **NOTE:** If the preceding conditions are not met, see [Use OBD to start an OceanBase cluster](./docs/en-US/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md).
+- At least 6 GB of memory is available on the server.
 
-> **NOTE:** For the convenience of using root here, OBD and OceanBase database do not have any restrictions on running users. We do not recommend that you use root in production.
+- At least two CPU cores are available on the server.
+
+- At least 54 GB of disk space is available on the server.
+
+> **Note**
+>
+> If the foregoing prerequisites are not met, see [Use OBD to start an OceanBase cluster](../3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md).
 
 ```shell
-obd cluster deploy c1 -c ./example/mini-local-example.yaml
-obd cluster start c1
-# Connect to the OceanBase Database by using a MySQL client.
-mysql -h127.1 -uroot -P2883
+# Deploy and start OceanBase Database.
+obd demo
+# Run the following command to connect to OceanBase Database by using the OBClient:
+obclient -h127.0.0.1 -uroot -P2881
 ```
 
 ## Use OBD to start an OceanBase cluster
@@ -136,7 +132,3 @@ A：You can use the `obd update` command to update OBD. When you are done with t
 ## Protocol
 
 OBD complies with [GPL-3.0](/LICENSE).
-
-## TPC-C
-
-- [Run TPC-C benchmark test on OceanBase](https://github.com/oceanbase/oceanbase-doc/blob/V3.1.4/en-US/1.Get-Started/5.Experience-OceanBase-Advanced-Features/1.Experience-Scalable-OLTP/1.Run-the-TPC-C-benchmark-test-in-OceanBase-Database.md)

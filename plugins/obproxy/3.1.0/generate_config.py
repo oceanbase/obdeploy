@@ -47,7 +47,7 @@ def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **k
     
     if getattr(plugin_context.options, 'mini', False):
         if 'proxy_mem_limited' not in global_config:
-            cluster_config.update_global_conf('proxy_mem_limited', '200M', False)
+            cluster_config.update_global_conf('proxy_mem_limited', '500M', False)
 
     ob_comps = ['oceanbase', 'oceanbase-ce']
     ob_cluster_config = None

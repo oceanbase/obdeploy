@@ -1,5 +1,29 @@
 # OceanBase Deployer
 
+<!--
+#
+# OceanBase Deploy.
+# Copyright (C) 2021 OceanBase
+#
+# This file is part of OceanBase Deploy.
+#
+# OceanBase Deploy is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# OceanBase Deploy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+#
+-->
+
+<!-- TODO: some badges here -->
+
 OceanBase Deployer（简称 OBD）是 OceanBase 开源软件的安装部署工具。OBD 同时也是包管理器，可以用来管理 OceanBase 所有的开源软件。本文介绍如何安装 OBD、使用 OBD 和 OBD 的命令。
 
 ## 安装 OBD
@@ -25,66 +49,44 @@ source /etc/profile.d/obd.sh
 - openssl-devel
 - xz-devel
 - mysql-devel
-- pip
-- pyinstaller
-
-> **说明**
->
-> 您可以参考如下命令在拥有 Python2.7 或 Python3.8 的环境中安装 pip:
->
-> ```shell
-> curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py # 针对 Python2.7 环境
-> curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py # 针对 Python3.8 环境
-> sudo python get-pip.py
-> ```
->
-> 然后使用如下 pip 命令安装 pyinstaller:
->
-> ```shell
-> sudo pip install pyinstaller==3.6
-> ```
-  
-Python2.7 使用以下命令安装：
-
-```shell
-sh rpm/build.sh build
-source /etc/profile.d/obd.sh
-```
 
 Python3.8 使用以下命令安装：
 
-首先在 Python 2.7 环境下执行以下命令：
+首先请先使用Python 2.7 环境下执行以下命令：
 
 ```shell
+# 这一步是为了编译observer升级所需的解释器。如果不使用升级功能可以不执行该步骤
 sh rpm/build.sh executer
 ```
 
-然后在 Python3.8 环境执行以下命令：
+然后再在Python3.8 环境执行以下命令：
 
 ```shell
-rpm/build.sh build_obd
+sh rpm/build.sh build_obd
 source /etc/profile.d/obd.sh
 ```
 
 ## 快速启动 OceanBase 数据库
 
-安装 OBD 后，您可以使用 root 用户执行这组命令快速启动本地单节点 OceanBase 数据库。
-在此之前您需要确认以下信息：
+安装 OBD 后，您可执行 `obd demo` 命令快速启动本地单节点 OceanBase 数据库。在此之前您需要确认以下信息：
 
-- 当前用户为 root。
-- `2882` 和 `2883` 端口没有被占用。
-- 您的机器内存应该不低于 8 G。
-- 您的机器 CPU 数目应该不低于 2。
+* `2881` 和 `2882` 端口没有被占用。
 
-> **说明：** 如果以上条件不满足，请参考[使用 OBD 启动 OceanBase 数据库集群](./docs/zh-CN/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md)。
+* 机器可用内存不低于 `6 G`。
 
-> **注意：** 此处为了方便使用 root，OBD 和 OceanBase 数据库没有对运行用户做出任何限制，我们不建议生产中直接使用 root。
+* 机器 CPU 数目不低于 `2`。
+
+* 机器可用磁盘空间不小于 `54 G`。
+
+> **说明**
+>
+> 如果以上条件不满足，您可参考文档 [使用 OBD 启动 OceanBase 数据库集群](../3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md)。
 
 ```shell
-obd cluster deploy c1 -c ./example/mini-local-example.yaml
-obd cluster start c1
-# 使用 mysql 客户端链接到到 OceanBase 数据库。
-mysql -h127.1 -uroot -P2883
+# 部署并启动 OceanBase 数据库
+obd demo
+# 使用 OBClient 客户端连接到 OceanBase 数据库。
+obclient -h127.0.0.1 -uroot -P2881
 ```
 
 ## 使用 OBD 启动 OceanBase 数据库集群

@@ -115,10 +115,11 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
             for server in servers:
                 if key not in change_conf[server]:
                     continue
+                value = change_conf[server][key]
                 msg = sql = 'alter system set %s = %%s server=%%s' % key
                 stdio.verbose('execute sql: %s' % msg)
-                cursor.execute(sql, [change_conf[server][key], cluster_server[server]])
-                cluster_config.update_server_conf(server,key, value, False)
+                cursor.execute(sql, [value, cluster_server[server]])
+                cluster_config.update_server_conf(server, key, value, False)
         except:
             global_ret = False
             stdio.exception('execute sql exception: %s' % msg)

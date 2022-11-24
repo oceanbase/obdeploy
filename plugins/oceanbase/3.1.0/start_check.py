@@ -24,7 +24,11 @@ import os
 import re
 import time
 
-from _errno import EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG, EC_CONFIG_CONFLICT_PORT, EC_OBSERVER_NOT_ENOUGH_MEMORY, EC_ULIMIT_CHECK, WC_ULIMIT_CHECK
+from _errno import (
+    EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG, EC_CONFIG_CONFLICT_PORT, 
+    EC_OBSERVER_NOT_ENOUGH_MEMORY, EC_ULIMIT_CHECK, WC_ULIMIT_CHECK,
+    EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED
+)
 
 
 stdio = None
@@ -46,8 +50,9 @@ def parse_size(size):
     if not isinstance(size, str) or size.isdigit():
         _bytes = int(size)
     else:
+        print (size)
         units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'([1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
+        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
         _bytes = int(match.group(1)) * units[match.group(2)]
     return _bytes
 
@@ -90,6 +95,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
         global success
         success = False
         stdio.error(*arg, **kwargs)
+
     global stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -101,6 +107,8 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
     servers_clog_mount = {}
     servers_net_inferface = {}
     server_num = len(cluster_config.servers)
+    START_NEED_MEMORY = 3 << 30
+
     stdio.start_loading('Check before start observer')
     for server in cluster_config.servers:
         ip = server.ip
@@ -119,7 +127,7 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             servers_port[ip] = {}
             servers_clog_mount[ip] = {}
             servers_net_inferface[ip] = {}
-            servers_memory[ip] = {'num': 0, 'percentage': 0}
+            servers_memory[ip] = {'num': 0, 'percentage': 0, 'server_num': 0}
         memory = servers_memory[ip]
         ports = servers_port[ip]
         disk = servers_disk[ip]
@@ -137,6 +145,8 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             }
             if get_port_socket_inode(client, port):
                 critical('%s:%s port is already used' % (ip, port))
+
+        memory['server_num'] += 1
         if 'memory_limit' in server_config:
             try:
                 memory['num'] += parse_size(server_config['memory_limit'])
@@ -234,16 +244,29 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
         # memory
         ret = client.execute_command('cat /proc/meminfo')
         if ret:
-            total_memory = 0
-            free_memory = 0
+            server_memory_stats = {}
+            memory_key_map = {
+                'MemTotal': 'total',
+                'MemFree': 'free',
+                'MemAvailable': 'available',
+                'Buffers': 'buffers',
+                'Cached': 'cached'
+            }
+            for key in memory_key_map:
+                server_memory_stats[memory_key_map[key]] = 0
             for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
-                if k == 'MemTotal':
-                    total_memory = parse_size(str(v))
-                elif k == 'MemAvailable':
-                    free_memory = parse_size(str(v))
-            total_use = servers_memory[ip]['percentage'] * total_memory / 100 + servers_memory[ip]['num']
-            if total_use > free_memory:
-                error(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(free_memory), need=format_size(total_use)))
+                if k in memory_key_map:
+                    key = memory_key_map[k]
+                    server_memory_stats[key] = parse_size(str(v))
+                    
+            min_start_need = servers_memory[ip]['server_num'] * START_NEED_MEMORY
+            total_use = servers_memory[ip]['percentage'] * server_memory_stats['total'] / 100 + servers_memory[ip]['num']
+            if min_start_need > server_memory_stats['available']:
+                error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(min_start_need)))
+            elif total_use > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
+                error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(min_start_need)))
+            elif total_use > server_memory_stats['free']:
+                alert(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(server_memory_stats['free']), need=format_size(min_start_need)))
         # disk
         disk = {'/': 0}
         ret = client.execute_command('df --block-size=1024')

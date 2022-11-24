@@ -854,6 +854,7 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
         self.parser.add_option('--max-session-num', type='int', help="Max session unit number. Not supported after version 4.0")
         self.parser.add_option('--unit-num', type='int', help="Pool unit number.")
         self.parser.add_option('-z', '--zone-list', type='string', help="Tenant zone list.")
+        self.parser.add_option('--mode', type='string', help='Tenant compatibility mode. {mysql,oracle} [mysql]', default='mysql')
         self.parser.add_option('--charset', type='string', help="Tenant charset.")
         self.parser.add_option('--collate', type='string', help="Tenant COLLATE.")
         self.parser.add_option('--replica-num', type='int', help="Tenant replica number.")
@@ -925,6 +926,8 @@ class MySQLTestCommand(TestMirrorCommand):
 
     def __init__(self):
         super(MySQLTestCommand, self).__init__('mysqltest', 'Run a mysqltest for a deployment.')
+        self.parser.add_option('--mode', type='string', help='Test mode. Available values are mysql, oracle, and both.', default='both')
+        # self.parser.add_option('--case-mode', type='string', help='case run mode [mysql,oracle]', default='mysql')
         self.parser.add_option('--component', type='string', help='Components for mysqltest.')
         self.parser.add_option('--test-server', type='string', help='The server for mysqltest. By default, the first root server in the component is the mysqltest server.')
         self.parser.add_option('--user', type='string', help='Username for a test. [admin]', default='admin')
@@ -1042,7 +1045,7 @@ class TPCHCommand(TestMirrorCommand):
         self.parser.add_option('--remote-tbl-dir', type='string', help='Directory for the tbl on target observers. Make sure that you have read and write access to the directory when you start observer.')
         self.parser.add_option('--disable-transfer', '--dt', action='store_true', help='Disable the transfer. When enabled, OBD will use the tbl files under remote-tbl-dir instead of transferring local tbl files to remote remote-tbl-dir.')
         self.parser.add_option('--dss-config', type='string', help='Directory for dists.dss. [/usr/tpc-h-tools/tpc-h-tools]', default='/usr/tpc-h-tools/tpc-h-tools/')
-        self.parser.add_option('-O', '--optimization', type='int', help='Optimization level {0/1}. [1]', default=1)
+        self.parser.add_option('-O', '--optimization', type='int', help='Optimization level {0/1/2}. [1] 0 - No optimization. 1 - Optimize some of the parameters which do not need to restart servers. 2 - Optimize all the parameters and maybe RESTART SERVERS for better performance.', default=1)
         self.parser.add_option('--test-only', action='store_true', help='Only testing SQLs are executed. No initialization is executed.')
         self.parser.add_option('-S', '--skip-cluster-status-check', action='store_true', help='Skip cluster status check', default=False)
 

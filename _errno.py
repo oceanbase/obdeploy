@@ -62,6 +62,8 @@ EC_FAIL_TO_CONNECT = OBDErrorCode(1006, 'Failed to connect to {component}')
 EC_ULIMIT_CHECK = OBDErrorCode(1007, '({server}) {key} must not be less than {need} (Current value: {now})')
 
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCode(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
+EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE = OBDErrorCode(2000, '({ip}) not enough memory. (Available: {available}, Need: {need})')
+EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED = OBDErrorCode(2000, '({ip}) not enough memory. (Free: {free}, Buff/Cache: {cached}, Need: {need})')
 EC_OBSERVER_CAN_NOT_MIGRATE_IN = OBDErrorCode(2001, 'server can not migrate in')
 EC_OBSERVER_FAIL_TO_START = OBDErrorCode(2002, 'Failed to start {server} observer')
 EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG = OBDErrorCode(2003, '({ip}) {path} not enough disk space for clog. Use redo_dir to set other disk for clog, or reduce the value of datafile_size')

@@ -218,11 +218,11 @@
           "exemplar": true,
           "expr": "(sum(rate(ob_sysstat{stat_id=\"40003\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40005\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40009\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40009\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40001\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group))\n/\n(sum(rate(ob_sysstat{stat_id=\"40002\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40004\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40006\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40008\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"40000\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group))",
           "interval": "",
-          "legendFormat": "qps rt {{$group}}",
+          "legendFormat": "sql latency {{$group}}",
           "refId": "A"
         }
       ],
-      "title": "QPS rt",
+      "title": "Sql Latency",
       "type": "timeseries"
     },
     {
@@ -2129,7 +2129,7 @@
           "exemplar": true,
           "expr": "(sum(rate(ob_sysstat{stat_id=\"10005\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"10006\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group)) / sum(rate(ob_sysstat{stat_id=\"10000\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group)",
           "interval": "",
-          "legendFormat": "roc in rt {{$group}}",
+          "legendFormat": "rpc in Latency {{$group}}",
           "refId": "A"
         },
         {
@@ -2137,11 +2137,11 @@
           "expr": "(sum(rate(ob_sysstat{stat_id=\"10005\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group) + sum(rate(ob_sysstat{stat_id=\"10006\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group)) / sum(rate(ob_sysstat{stat_id=\"10002\",ob_cluster_name=~\"$obcluster\",obzone=~\"$obzone\",svr_ip=~\"$observer\",tenant_name=~\"$tenant_name\"}[$__rate_interval])) by ($group)",
           "hide": false,
           "interval": "",
-          "legendFormat": "rpc out rt {{$group}}",
+          "legendFormat": "rpc out latency {{$group}}",
           "refId": "B"
         }
       ],
-      "title": "Rpc rt",
+      "title": "Rpc Latency",
       "type": "timeseries"
     },
     {

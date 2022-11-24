@@ -36,7 +36,7 @@ def parse_size(size):
         _bytes = int(size)
     else:
         units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'([1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
+        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
         _bytes = int(match.group(1)) * units[match.group(2)]
     return _bytes
 
@@ -127,6 +127,7 @@ def init(plugin_context, env, *args, **kwargs):
         exec_init = 'init.sql'
         exec_mini_init = 'init_mini.sql'
         exec_init_user = 'init_user.sql|root@mysql|test'
+        exec_init_user_for_oracle = 'init_user_oracle.sql|SYS@oracle|SYS'
         client = plugin_context.clients[server]
         memory_limit = get_memory_limit(cursor, client)
         is_mini = memory_limit and parse_size(memory_limit) < (16<<30)
