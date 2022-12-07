@@ -50,7 +50,6 @@ def parse_size(size):
     if not isinstance(size, str) or size.isdigit():
         _bytes = int(size)
     else:
-        print (size)
         units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
         match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
         _bytes = int(match.group(1)) * units[match.group(2)]
@@ -264,9 +263,9 @@ def _start_check(plugin_context, strict_check=False, *args, **kwargs):
             if min_start_need > server_memory_stats['available']:
                 error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(min_start_need)))
             elif total_use > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
-                error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(min_start_need)))
+                error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(total_use)))
             elif total_use > server_memory_stats['free']:
-                alert(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(server_memory_stats['free']), need=format_size(min_start_need)))
+                alert(EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(server_memory_stats['free']), need=format_size(total_use)))
         # disk
         disk = {'/': 0}
         ret = client.execute_command('df --block-size=1024')
