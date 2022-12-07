@@ -52,7 +52,7 @@ function _obd_complete_func
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  all_cmds["obd"]="mirror cluster test update repo"
+  all_cmds["obd"]="mirror cluster test update repo demo"
   all_cmds["obd cluster"]="autodeploy tenant start deploy redeploy restart reload destroy stop edit-config list display upgrade chst check4ocp reinstall"
   all_cmds["obd cluster *"]="_obd_reply_deploy_names"
   all_cmds["obd cluster tenant"]="create drop"
@@ -66,8 +66,9 @@ function _obd_complete_func
   if [ -f "$env_file" ] && [ "$(grep '"OBD_DEV_MODE": "1"' "$env_file")" != "" ]; then
       all_cmds["obd"]="${all_cmds[obd]} devmode env tool"
       all_cmds["obd devmode"]="enable disable"
-      all_cmds["obd tool"]="command db_connect"
+      all_cmds["obd tool"]="command db_connect dooba"
       all_cmds["obd tool db_connect"]="_obd_reply_deploy_names"
+      all_cmds["obd tool dooba"]="_obd_reply_deploy_names"
       all_cmds["obd tool command"]="_obd_reply_deploy_names"
       all_cmds["obd tool command *"]="_obd_reply_tool_commands"
       all_cmds["obd env"]="set unset show clear"

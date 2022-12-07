@@ -115,8 +115,9 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
 
         dashboard_template_path = os.path.join(home_path, 'conf/provisioning/dashboards/templates')
         if client.execute_command('bash -c "mkdir -p %s"' % dashboard_template_path):
-            ob_dashboard = os.path.join(os.path.split(__file__)[0], 'oceanbase-metrics_rev1.json')
-            client.put_file(ob_dashboard, dashboard_template_path)
+            file_name = 'oceanbase-metrics_rev1.json'
+            ob_dashboard = os.path.join(os.path.split(__file__)[0], file_name)
+            client.put_file(ob_dashboard, os.path.join(dashboard_template_path, file_name))
         else:
             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='conf/provisioning/dashboards/templates', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=dashboard_template_path)))
             continue

@@ -1013,7 +1013,7 @@
   require: true
   type: INT
   default: 2147483648
-  min_value: 268435456
+  min_value: 1073741824
   max_value: NULL
   need_restart: false
   description_en: the minimum memory limit of the resource pool

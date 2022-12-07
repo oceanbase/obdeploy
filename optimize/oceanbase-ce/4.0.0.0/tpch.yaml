@@ -69,10 +69,6 @@ test:
   variables:
   - name: ob_sql_work_area_percentage
     value: 80
-  - name: optimizer_use_sql_plan_baselines
-    value: true
-  - name: optimizer_capture_sql_plan_baselines
-    value: true
   - name: ob_query_timeout
     value: 36000000000
   - name: ob_trx_timeout
