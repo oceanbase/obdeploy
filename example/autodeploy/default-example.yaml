@@ -269,7 +269,7 @@ grafana:
     # #     key1: value1
     # #     key2: value2
     # #
-    # # Here we only list one item， because there are more than 500 items. Please add them according to your own needs.
+    # # Here we only list one item, because there are more than 500 items. Please add them according to your own needs.
     # customize_config:
     #   # original grafana configuration format is 
     #   # [server] 
