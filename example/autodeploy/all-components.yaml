@@ -178,6 +178,8 @@ obagent:
 prometheus:
   servers:
     - 192.168.1.5
+  depends:
+    - obagent
   global:
     # The working directory for prometheus. prometheus is started under this directory. This is a required field.
     home_path: /root/prometheus
