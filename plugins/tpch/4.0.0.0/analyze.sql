@@ -1,9 +1,8 @@
-set _force_parallel_query_dop = {cpu_total};
-analyze table lineitem partition(lineitem) compute statistics for all columns size auto;
-analyze table orders partition(orders) compute statistics for all columns size auto;
-analyze table partsupp partition(partsupp) compute statistics for all columns size auto;
-analyze table part partition(part) compute statistics for all columns size auto;
-analyze table customer partition(customer) compute statistics for all columns size auto;
-analyze table supplier partition(supplier) compute statistics for all columns size auto;
-analyze table nation compute statistics for all columns size auto;
-analyze table region compute statistics for all columns size auto;
+call dbms_stats.gather_table_stats('test', 'lineitem', degree=>{cpu_total}, granularity=>'GLOBAL', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
+call dbms_stats.gather_table_stats('test', 'orders', degree=>{cpu_total}, granularity=>'GLOBAL', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
+call dbms_stats.gather_table_stats('test', 'partsupp', degree=>{cpu_total}, granularity=>'GLOBAL', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
+call dbms_stats.gather_table_stats('test', 'part', degree=>{cpu_total}, granularity=>'GLOBAL', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
+call dbms_stats.gather_table_stats('test', 'customer', degree=>{cpu_total}, granularity=>'GLOBAL', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
+call dbms_stats.gather_table_stats('test', 'supplier', degree=>{cpu_total}, granularity=>'GLOBAL', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
+call dbms_stats.gather_table_stats('test', 'nation', degree=>{cpu_total},  granularity=>'AUTO', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
+call dbms_stats.gather_table_stats('test', 'region', degree=>{cpu_total},  granularity=>'AUTO', method_opt=>'FOR ALL COLUMNS SIZE AUTO');
