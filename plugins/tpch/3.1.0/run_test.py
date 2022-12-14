@@ -227,10 +227,10 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
             end_time = time.time()
             cost = end_time - start_time
             total_cost += cost
-            stdio.print('[%s]: end %s, cost %.1fs' % (time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_time)), path, cost))
+            stdio.print('[%s]: end %s, cost %.2fs' % (time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_time)), path, cost))
             if not ret:
                 raise Exception(ret.stderr)
-        stdio.print('Total Cost: %.1fs' % total_cost)
+        stdio.print('Total Cost: %.2fs' % total_cost)
         return plugin_context.return_true()
     except KeyboardInterrupt:
         stdio.stop_loading('fail')
