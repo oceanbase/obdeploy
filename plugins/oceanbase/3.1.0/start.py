@@ -20,13 +20,12 @@
 
 from __future__ import absolute_import, division, print_function
 
-import os
 import json
 import time
 import requests
 from copy import deepcopy
 
-from _errno import EC_OBSERVER_FAIL_TO_START
+from _errno import EC_OBSERVER_FAIL_TO_START, EC_OBSERVER_FAIL_TO_START_WITH_ERR, EC_OBSERVER_FAILED_TO_REGISTER, EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS
 
 from collections import OrderedDict
 
@@ -81,7 +80,7 @@ class EnvVariables(object):
                 self.client.del_env(env_key)
 
 
-def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
+def start(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     options = plugin_context.options
     clients = plugin_context.clients
@@ -101,10 +100,10 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         try:
             cfg_url = init_config_server(obconfig_url, appname, cluster_id, getattr(options, 'force_delete', False), stdio)
             if not cfg_url:
-                stdio.error('failed to register cluster. %s may have been registered in %s.' % (appname, obconfig_url))
+                stdio.error(EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS.format(appname, obconfig_url))
                 return
         except:
-            stdio.exception('failed to register cluster')
+            stdio.exception(EC_OBSERVER_FAILED_TO_REGISTER.format())
             return
 
     stdio.start_loading('Start observer')
@@ -156,7 +155,8 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             })
             not_cmd_opt = [
                 'home_path', 'obconfig_url', 'root_password', 'proxyro_password',
-                'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc'
+                'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc',
+                'ocp_meta_tenant', 'ocp_meta_username', 'ocp_meta_password', 'ocp_meta_db', 'ocp_agent_monitor_password'
             ]
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
             opt_str = []
@@ -189,7 +189,7 @@ def start(plugin_context, local_home_path, repository_dir, *args, **kwargs):
             ret = client.execute_command(clusters_cmd[server])
         if not ret:
             stdio.stop_loading('fail')
-            stdio.error(EC_OBSERVER_FAIL_TO_START.format(server=server) + ': ' + ret.stderr)
+            stdio.error(EC_OBSERVER_FAIL_TO_START_WITH_ERR.format(server=server, stderr=ret.stderr))
             return
     stdio.stop_loading('succeed')
 

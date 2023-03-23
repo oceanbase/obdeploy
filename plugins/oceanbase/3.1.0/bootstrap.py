@@ -20,7 +20,6 @@
 
 from __future__ import absolute_import, division, print_function
 
-import time
 from _deploy import InnerConfigItem
 
 
@@ -38,7 +37,6 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
         if componet_name in plugin_context.components:
             has_obproxy = True
             break
-    inner_keys = inner_config.keys()
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         zone = server_config['zone']
@@ -59,49 +57,39 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
                 continue
             zone_config[key] = server_config[key]
     try:
+        raise_cursor = cursor.raise_cursor
         sql = 'set session ob_query_timeout=1000000000'
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
+        raise_cursor.execute(sql)
         sql = 'alter system bootstrap %s' % (','.join(bootstrap))
         stdio.start_loading('Cluster bootstrap')
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
+        raise_cursor.execute(sql, exc_level='verbose')
         for zone in floor_servers:
             for addr in floor_servers[zone]:
                 sql = 'alter system add server "%s" zone "%s"' % (addr, zone)
-                stdio.verbose('execute sql: %s' % sql)
-                cursor.execute(sql)
+                raise_cursor.execute(sql)
         global_conf = cluster_config.get_global_conf()
         if has_obproxy or 'proxyro_password' in global_conf:
             value = global_conf['proxyro_password'] if global_conf.get('proxyro_password') is not None else ''
             sql = 'create user "proxyro" IDENTIFIED BY %s'
-            stdio.verbose(sql)
-            cursor.execute(sql, [value])
+            raise_cursor.execute(sql, [value])
             sql = 'grant select on oceanbase.* to proxyro IDENTIFIED BY %s'
-            stdio.verbose(sql)
-            cursor.execute(sql, [value])
+            raise_cursor.execute(sql, [value])
+
         if global_conf.get('root_password') is not None:
-            sql = 'alter user "root" IDENTIFIED BY "%s"' % global_conf.get('root_password')
-            stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql)
+            sql = 'alter user "root" IDENTIFIED BY %s'
+            raise_cursor.execute(sql, [global_conf.get('root_password')])
         for zone in zones_config:
             zone_config = zones_config[zone]
             for key in zone_config:
                 sql = 'alter system modify zone %s set %s = %%s' % (zone, inner_config[key])
-                stdio.verbose('execute sql: %s' % sql)
-                cursor.execute(sql, [zone_config[key]])
+                raise_cursor.execute(sql, [zone_config[key]])
         stdio.stop_loading('succeed')
-        plugin_context.return_true()
     except:
-        stdio.exception('')
-        try:
-            cursor.execute('select * from oceanbase.__all_rootservice_event_history where module = "bootstrap" and event = "bootstrap_succeed"')
-            event = cursor.fetchall()
-            if not event:
-                raise Exception('Not found bootstrap_succeed event')
-            stdio.stop_loading('succeed')
-            plugin_context.return_true()
-        except:
+        event = cursor.fetchall('select * from oceanbase.__all_rootservice_event_history where module = "bootstrap" and event = "bootstrap_succeed"')
+        if not event:
             stdio.stop_loading('fail')
-            stdio.exception('')
-            plugin_context.return_false()
+            return plugin_context.return_false()
+        stdio.stop_loading('succeed')
+        return plugin_context.return_true()
+
+    return plugin_context.return_true()

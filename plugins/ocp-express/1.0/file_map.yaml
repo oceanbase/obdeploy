@@ -1,0 +1,6 @@
+- src_path: ./home/admin/ocp-express/lib/ocp-express-server.jar
+  target_path: lib/ocp-express-server.jar
+  type: file
+- src_path: ./home/admin/ocp-express/conf
+  target_path: conf
+  type: dir

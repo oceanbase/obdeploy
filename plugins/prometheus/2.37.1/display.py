@@ -20,8 +20,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-import socket
-from tool import YamlLoader
+from tool import YamlLoader, NetUtil
 
 yaml = YamlLoader()
 
@@ -39,8 +38,7 @@ def display(plugin_context, cursor, *args, **kwargs):
         password = api_cursor.password
         ip = server.ip
         if ip == '127.0.0.1':
-            hostname = socket.gethostname()
-            ip = socket.gethostbyname(hostname)
+            ip = NetUtil.get_host_ip()
         url = '%s://%s:%s' % (protocol, ip, server_config['port'])
         results.append({
             'ip': ip,
@@ -51,4 +49,8 @@ def display(plugin_context, cursor, *args, **kwargs):
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })
     stdio.print_list(results, ['url', 'user', 'password', 'status'], lambda x: [x['url'], x['user'], x['password'], x['status']], title='prometheus')
-    return plugin_context.return_true()
+    active_result = [r for r in results if r['status'] == 'active']
+    info_dict = active_result[0] if len(active_result) > 0 else None
+    if info_dict is not None:
+        info_dict['type'] = 'web'
+    return plugin_context.return_true(info=info_dict)

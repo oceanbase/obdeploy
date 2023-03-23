@@ -1,5 +1,7 @@
 - name: home_path
+  name_local: 工作目录
   require: true
+  essential: true
   type: STRING
   min_value: NULL
   max_value: NULL
@@ -7,16 +9,20 @@
   description_en: the directory for the work data file
   description_local: OceanBase工作目录
 - name: cluster_id
+  name_local: 集群ID
   require: true
+  essential: true
   type: INT
   default: 1
   min_value: 1
   max_value: 4294901759
   modify_limit: modify
-  need_restart: true
+  need_redeploy: true
   description_en: ID of the cluster
   description_local: 本OceanBase集群ID
 - name: data_dir
+  name_local: 数据目录
+  essential: true
   type: STRING
   min_value: NULL
   max_value: NULL
@@ -24,6 +30,8 @@
   description_en: the directory for the data file
   description_local: 存储sstable等数据的目录
 - name: redo_dir
+  name_local: 日志目录
+  essential: true
   type: STRING
   min_value: NULL
   max_value: NULL
@@ -52,6 +60,8 @@
   description_en: the directory for the ilog file
   description_local: 存储ilog数据的目录
 - name: devname
+  name_local: 网卡名
+  essential: true
   type: STRING
   min_value: NULL
   max_value: NULL
@@ -59,7 +69,9 @@
   description_en: name of network adapter
   description_local: 服务进程绑定的网卡设备名
 - name: rpc_port
+  name_local: 内部通信端口
   require: true
+  essential: true
   type: INT
   default: 2882
   min_value: 1025
@@ -69,7 +81,9 @@
   description_en: the port number for RPC protocol.
   description_local: 集群内部通信的端口号
 - name: mysql_port
+  name_local: 服务端口
   require: true
+  essential: true
   type: INT
   default: 2881
   min_value: 1025
@@ -239,7 +253,9 @@
   description_en: enable server supports SSL connection, takes effect only after server restart with all ca/cert/key file.
   description_local: 是否开启SSL连接功能
 - name: datafile_size
+  name_local: 数据文件大小
   require: false
+  essential: true
   type: CAPACITY
   default: 0
   min_value: 0M
@@ -247,8 +263,26 @@
   modify_limit: decrease
   section: SSTABLE
   need_restart: false
-  description_en: size of the data file.
-  description_local: 数据文件大小。一般不要设置。
+  description_en: size of the data file. Please enter an capacity, such as 20G
+  description_local: 数据文件大小。请输入带容量带单位的整数，如20G
+- name: log_disk_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 99
+  description_en: the percentage of disk space used by the clog files.
+  description_local: Redo 日志占用其所在磁盘总空间的百分比。
+- name: log_disk_size
+  name_local: Redo 日志大小
+  require: false
+  essential: true
+  type: CAPACITY
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  description_en: the size of disk space used by the clog files. Please enter an capacity, such as 20G
+  description_local: Redo 日志磁盘的大小。请输入带容量带单位的整数，如24G
 - name: merge_stat_sampling_ratio
   require: false
   type: INT
@@ -600,6 +634,7 @@
   description_local: 本地存储配置文件的多个目录，为了冗余存储多份配置文件
 - name: enable_syslog_recycle
   require: false
+  essential: true
   type: BOOL
   default: false
   min_value: NULL
@@ -608,6 +643,17 @@
   need_restart: false
   description_en: specifies whether log file recycling is turned on
   description_local: 是否自动回收系统日志
+- name: max_syslog_file_count
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in. Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
+  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
 - name: px_task_size
   require: false
   type: CAPACITY
@@ -919,15 +965,6 @@
   need_restart: false
   description_en: URL for OBConfig service
   description_local: OBConfig服务的URL地址
-- name: system_memory
-  type: CAPACITY
-  default: 30G
-  min_value: 0M
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: the memory reserved for internal use which cannot be allocated to any outer-tenant, and should be determined to guarantee every server functions normally.
-  description_local: 系统预留内存大小，不能分配给普通租户使用
 - name: cpu_quota_concurrency
   require: false
   type: DOUBLE
@@ -999,7 +1036,9 @@
   description_en: the time interval between the schedules of the partition load-balancing task.
   description_local: 负载均衡等后台任务线程空闲时的唤醒间隔时间
 - name: memory_limit
+  name_local: 最大运行内存
   require: false
+  essential: true
   type: CAPACITY
   default: 0
   min_value: NULL
@@ -1007,8 +1046,19 @@
   modify_limit: decrease
   section: OBSERVER
   need_restart: false
-  description_en: the size of the memory reserved for internal use(for testing purpose)
-  description_local: 可用总内存大小。用于调试，不要设置。
+  description_en: the size of the memory reserved for internal use(for testing purpose). Please enter an capacity, such as 8G
+  description_local: 可用总内存大小。请输入带容量带单位的整数，如8G
+- name: system_memory
+  name_local: 集群系统内存
+  essential: true
+  type: CAPACITY
+  default: 30G
+  min_value: 0M
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the memory reserved for internal use which cannot be allocated to any outer-tenant, and should be determined to guarantee every server functions normally. Please enter an capacity, such as 2G
+  description_local: 系统预留内存大小，不能分配给普通租户使用。请输入带容量带单位的整数，如2G
 - name: __min_full_resource_pool_memory
   require: true
   type: INT
@@ -1169,7 +1219,9 @@
   description_en: disable write to memstore when observer memstore free memory(plus memory hold by blockcache) lower than this limit,
   description_local: 当全局剩余内存小于这个百分比时，暂停普通租户写入（sys租户不受影响）
 - name: cpu_count
+  name_local: 系统CPU总数
   require: false
+  essential: true
   type: INT
   default: 0
   min_value: 0
@@ -1178,16 +1230,6 @@
   need_restart: true
   description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be set according to sysconf; otherwise, this parameter is used.
   description_local: 系统CPU总数，如果设置为0，将自动检测
-- name: max_syslog_file_count
-  require: false
-  type: INT
-  default: 0
-  min_value: 0
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in. Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
-  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
 - name: appname
   require: false
   type: STRING
@@ -1566,22 +1608,6 @@
   need_restart: false
   description_en: password of observer root user
   description_local: sys租户root用户的密码
-- name: log_disk_percentage
-  require: false
-  type: INT
-  default: 0
-  min_value: 0
-  max_value: 99
-  description_en: the percentage of disk space used by the clog files.
-  description_local: Redo 日志占用其所在磁盘总空间的百分比。
-- name: log_disk_size
-  require: false
-  type: CAPACITY
-  default: 0
-  min_value: 0M
-  max_value: NULL
-  description_en: the size of disk space used by the clog files.
-  description_local: Redo 日志磁盘的大小。
 # todo： 等文档更新
 - name: sql_login_thread_count
   require: false
@@ -1814,3 +1840,68 @@
   need_redeploy: false
   description_en: Production mode switch, default True. Adjust the memory_limit and __min_full_resource_pool_memory The lower bound of memory is adjusted to 16G and 2147483648
   description_local: 生产模式开关, 默认开启。开启后调整memory limit 和 __min_full_resource_pool_memory 下界调整为 16G 和 2147483648
+- name: ocp_meta_tenant
+  require: false
+  type: DICT
+  default:
+    tenant_name: ocp
+    max_cpu: 1
+    memory_size: 2147483648
+  need_redeploy: true
+  description_en: The tenant specifications for ocp meta db
+  description_local: ocp express的元数据库使用的租户规格
+- name: ocp_meta_tenant_max_cpu
+  name_local: OCP express元数据库租户的CPU数
+  essential: true
+  require: false
+  type: INT
+  default: 1
+  need_redeploy: true
+  description_en: The tenant cpu count for ocp meta db
+  description_local: ocp express的元数据库使用的CPU数量
+- name: ocp_meta_tenant_memory_size
+  name_local: OCP express元数据库租户内存
+  essential: true
+  require: false
+  type: CAPACITY
+  default: 2G
+  need_redeploy: true
+  description_en: The tenant memory size for ocp meta db
+  description_local: ocp express的元数据库使用的租户内存大小
+- name: ocp_meta_tenant_log_disk_size
+  name_local: OCP express元数据库租户日志磁盘大小
+  essential: true
+  require: false
+  type: CAPACITY
+  default: 6656M
+  need_redeploy: true
+  description_en: The tenant log disk size for ocp meta db
+  description_local: ocp express的元数据库使用的租户日志磁盘大小
+- name: ocp_meta_db
+  require: false
+  type: STRING
+  default: ocp_express
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp express的元数据库使用的数据库名
+- name: ocp_meta_username
+  require: false
+  type: STRING
+  default: meta
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp express的元数据库使用的数据库名
+- name: ocp_meta_password
+  require: false
+  type: STRING
+  default: oceanbase
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp express的元数据库使用的数据库名
+- name: ocp_agent_monitor_password
+  require: false
+  type: STRING
+  default: ''
+  need_redeploy: true
+  description_en: The password for obagent monitor user
+  description_local: obagent 监控用户的密码

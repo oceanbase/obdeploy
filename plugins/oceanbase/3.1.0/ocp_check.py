@@ -58,8 +58,7 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
             stdio.error('%s Multiple OBservers exist.' % server)
 
     try:
-        cursor.execute("select * from oceanbase.__all_user where user_name = 'root' and passwd = ''")
-        if cursor.fetchone() and not cluster_config.get_global_conf().get("root_password"):
+        if cursor.fetchone("select * from oceanbase.__all_user where user_name = 'root' and passwd = ''", raise_exception=True) and not cluster_config.get_global_conf().get("root_password"):
             pwd_not_empty = False
             stdio.error('The password of root@sys is empty. Run the edit-config command to modify the root_password value of %s.' % cluster_config.name)
     except:
@@ -68,8 +67,7 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
 
     zones = {}
     try:
-        cursor.execute("select zone from oceanbase.__all_zone where name = 'idc' and info = ''")
-        ret = cursor.fetchall()
+        ret = cursor.fetchall("select zone from oceanbase.__all_zone where name = 'idc' and info = ''", raise_exception=True)
         if ret:
             for row in ret:
                 zones[str(row['zone'])] = 1

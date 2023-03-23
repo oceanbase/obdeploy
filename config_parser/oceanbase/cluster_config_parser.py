@@ -57,6 +57,12 @@ class ClusterConfigParser(ConfigParser):
         return zone_config[server.name]
 
     @classmethod
+    def get_global_src_conf(cls, cluster_config, component_config):
+        if 'config' not in component_config:
+            component_config['config'] = {}
+        return component_config['config']
+
+    @classmethod
     def _to_cluster_config(cls, component_name, conf):
         servers = OrderedDict()
         zones = conf.get('zones', {})
@@ -242,8 +248,8 @@ class ClusterConfigParser(ConfigParser):
             conf['name'] = global_config['appname']
             del global_config['appname']
 
+        conf['zones'] = zones
         if global_config:
             conf['config'] = global_config
-        conf['zones'] = zones
 
         return conf

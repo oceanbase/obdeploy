@@ -20,14 +20,26 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
+
+def call_plugin(plugin, plugin_context, repositories, *args, **kwargs):
+    namespace = plugin_context.namespace
+    namespaces = plugin_context.namespaces
+    deploy_name = plugin_context.deploy_name
     components = plugin_context.components
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-    cmd = plugin_context.cmd
+    cmds = plugin_context.cmds
     options = plugin_context.options
     stdio = plugin_context.stdio
+    return plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options,
+        stdio, *args, **kwargs)
+
+
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
+    cluster_config = plugin_context.cluster_config
+    clients = plugin_context.clients
 
     upgrade_ctx = kwargs.get('upgrade_ctx')
     local_home_path = kwargs.get('local_home_path')
@@ -44,14 +56,14 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     display_plugin = search_py_script_plugin([dest_repository], 'display')[dest_repository]
 
     apply_param_plugin(cur_repository)
-    if not stop_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
+    if not call_plugin(stop_plugin, plugin_context, [cur_repository], *args, **kwargs):
         return 
 
     apply_param_plugin(dest_repository)
-    if not start_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
-        return 
-    
-    ret = connect_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs)
-    if ret and display_plugin(components, clients, cluster_config, cmd, options, stdio, ret.get_return('cursor'), *args, **kwargs):
+    if not call_plugin(start_plugin, plugin_context, [dest_repository], *args, **kwargs):
+        return
+
+    ret = call_plugin(connect_plugin, plugin_context, [dest_repository], *args, **kwargs)
+    if ret and call_plugin(display_plugin, plugin_context, [dest_repository], ret.get_return('cursor'), *args, **kwargs):
         upgrade_ctx['index'] = len(upgrade_repositories)
         return plugin_context.return_true()

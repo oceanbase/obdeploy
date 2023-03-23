@@ -79,18 +79,13 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
     for zone in zones_config:
         zone_config = zones_config[zone]
         for key in zone_config:
-            msg = ''
-            try:
-                msg = sql = 'alter system modify zone %s set %s = %%s' % (zone, inner_config[key])
-                stdio.verbose('execute sql: %s' % sql)
-                cursor.execute(sql, [zone_config[key]])
-                stdio.verbose('%s ok' % sql)
-            except:
-                global_ret = False
-                stdio.exception('execute sql exception: %s' % msg)
+            sql = 'alter system modify zone %s set %s = %%s' % (zone, inner_config[key])
+            if cursor.execute(sql, [zone_config[key]]) is False:
+                return
+            stdio.verbose('%s ok' % sql)
 
+    raise_cursor = cursor.raise_cursor
     for key in global_change_conf:
-        msg = ''
         try:
             if key in ['proxyro_password', 'root_password']:
                 if global_change_conf[key]['count'] != servers_num:
@@ -99,17 +94,14 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
                 value = change_conf[server][key] if change_conf[server].get(key) is not None else ''
                 user = key.split('_')[0]
                 msg = sql = 'CREATE USER IF NOT EXISTS %s IDENTIFIED BY %%s' % (user)
-                stdio.verbose('execute sql: %s' % sql)
-                cursor.execute(sql, [value])
+                raise_cursor.execute(sql, [value])
                 msg = sql = 'alter user "%s" IDENTIFIED BY %%s' % (user)
-                stdio.verbose('execute sql: %s' % sql)
-                cursor.execute(sql, [value])
+                raise_cursor.execute(sql, [value])
                 continue
             if global_change_conf[key]['count'] == servers_num:
-                sql = 'alter system set %s = %%s' % key
+                msg = sql = 'alter system set %s = %%s' % key
                 value = change_conf[server][key]
-                stdio.verbose('execute sql: %s' % msg)
-                cursor.execute(sql, [value])
+                raise_cursor.execute(sql, [value])
                 cluster_config.update_global_conf(key, value, False)
                 continue
             for server in servers:
@@ -117,16 +109,17 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
                     continue
                 value = change_conf[server][key]
                 msg = sql = 'alter system set %s = %%s server=%%s' % key
-                stdio.verbose('execute sql: %s' % msg)
-                cursor.execute(sql, [value, cluster_server[server]])
+                raise_cursor.execute(sql, [value, cluster_server[server]])
                 cluster_config.update_server_conf(server, key, value, False)
         except:
             global_ret = False
-            stdio.exception('execute sql exception: %s' % msg)
 
-    cursor.execute('alter system reload server')
-    cursor.execute('alter system reload zone')
-    cursor.execute('alter system reload unit')
+    try:
+        raise_cursor.execute('alter system reload server')
+        raise_cursor.execute('alter system reload zone')
+        raise_cursor.execute('alter system reload unit')
+    except:
+        global_ret = False
     
     if global_ret:
         stdio.stop_load('succeed')

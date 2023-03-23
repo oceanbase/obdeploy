@@ -43,16 +43,14 @@ def parse_size(size):
 
 def get_memory_limit(cursor, client):
     try:
-        cursor.execute('show parameters where name = \'memory_limit\'')
-        memory_limit = cursor.fetchone()
+        memory_limit = cursor.fetchone('show parameters where name = \'memory_limit\'')
         if memory_limit and 'value' in memory_limit and memory_limit['value']:
             return parse_size(memory_limit['value'])
         ret = client.execute_command('free -b')
         if ret:
             ret = client.execute_command("cat /proc/meminfo | grep 'MemTotal:' | awk -F' ' '{print $2}'")
             total_memory = int(ret.stdout) * 1024
-            cursor.execute('show parameters where name = \'memory_limit_percentage\'')
-            memory_limit_percentage = cursor.fetchone()
+            memory_limit_percentage = cursor.fetchone('show parameters where name = \'memory_limit_percentage\'')
             if memory_limit_percentage and 'value' in memory_limit_percentage and memory_limit_percentage['value']:
                 total_memory = total_memory * memory_limit_percentage['value'] / 100
             return total_memory
@@ -65,8 +63,7 @@ def init(plugin_context, env, *args, **kwargs):
     def get_root_server(cursor):
         while True:
             try:
-                cursor.execute('select * from oceanbase.__all_server where status = \'active\' and with_rootserver=1')
-                return cursor.fetchone()
+                return cursor.fetchone('select * from oceanbase.__all_server where status = \'active\' and with_rootserver=1', raise_exception=True)
             except:
                 if load_snap:
                     time.sleep(0.1)

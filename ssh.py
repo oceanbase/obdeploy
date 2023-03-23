@@ -42,6 +42,7 @@ from multiprocessing.pool import ThreadPool
 
 from tool import COMMAND_ENV, DirectoryUtil, FileUtil
 from _stdio import SafeStdio
+from _errno import EC_SSH_CONNECT
 from _environ import ENV_DISABLE_RSYNC
 
 
@@ -53,10 +54,10 @@ class SshConfig(object):
     def __init__(self, host, username='root', password=None, key_filename=None, port=22, timeout=30):
         self.host = host
         self.username = username
-        self.password = password
+        self.password = password if password is None else str(password)
         self.key_filename = key_filename
-        self.port = port
-        self.timeout = timeout
+        self.port = int(port)
+        self.timeout = int(timeout)
 
     def __str__(self):
         return '%s@%s' % (self.username ,self.host)
@@ -262,6 +263,7 @@ class SshClient(SafeStdio):
     def _login(self, stdio=None):
         if self.is_connected:
             return True
+        err = None
         try:
             self.ssh_client.set_missing_host_key_policy(AutoAddPolicy())
             self.ssh_client.connect(
@@ -275,13 +277,16 @@ class SshClient(SafeStdio):
             self.is_connected = True
         except AuthenticationException:
             stdio.exception('')
-            stdio.critical('%s@%s username or password error' % (self.config.username, self.config.host))
+            err = EC_SSH_CONNECT.format(user=self.config.username, ip=self.config.host, message='username or password error')
         except NoValidConnectionsError:
             stdio.exception('')
-            stdio.critical('%s@%s connect failed: time out' % (self.config.username, self.config.host))
-        except Exception as e:
+            err = EC_SSH_CONNECT.format(user=self.config.username, ip=self.config.host, message='time out')
+        except BaseException as e:
             stdio.exception('')
-            stdio.critical('%s@%s connect failed: %s' % (self.config.username, self.config.host, e))
+            err = EC_SSH_CONNECT.format(user=self.config.username, ip=self.config.host, message=e)
+        if err:
+            stdio.critical(err)
+            return err
         return self.is_connected
 
     def _open_sftp(self, stdio=None):
@@ -330,7 +335,6 @@ class SshClient(SafeStdio):
             if code:
                 verbose_msg = 'exited code %s, error output:\n%s' % (code, error)
             stdio.verbose(verbose_msg)
-            return SshReturn(code, stdout, error)
         except SSHException as e:
             if retry:
                 self.close()
@@ -341,8 +345,10 @@ class SshClient(SafeStdio):
                 raise e
         except Exception as e:
             stdio.exception('')
-            stdio.critical('%s@%s connect failed: %s' % (self.config.username, self.config.host, e))
-            raise e
+            code = 255
+            stdout = ''
+            error = str(e)
+        return SshReturn(code, stdout, error)
 
     def execute_command(self, command, timeout=None, stdio=None):
         if timeout is None:

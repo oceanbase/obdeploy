@@ -29,11 +29,17 @@ from tool import YamlLoader
 from _errno import *
 
 
-def reload(plugin_context, repository_dir, new_cluster_config, *args, **kwargs):
+def reload(plugin_context, new_cluster_config, *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     servers = cluster_config.servers
+
+    for repository in plugin_context.repositories:
+        if repository.name == cluster_config.name:
+            break
+    repository_dir = repository.repository_dir
+
     yaml = YamlLoader(stdio)
     config_map = {
         "monitor_password": "root_password",

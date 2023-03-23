@@ -21,22 +21,17 @@
 from __future__ import absolute_import, division, print_function
 
 
-def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **kwargs):
+def generate_config(plugin_context, auto_depend=False,  return_generate_keys=False, *args, **kwargs):
+    if return_generate_keys:
+        return plugin_context.return_true(generate_keys=[])
+
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-    success = True
     have_depend = False
     depends = ['obagent']
+    generate_configs = {'global': {}}
+    plugin_context.set_variable('generate_configs', generate_configs)
     stdio.start_loading('Generate prometheus configuration')
-
-    for server in cluster_config.servers:
-        server_config = cluster_config.get_server_conf(server)
-        if not server_config.get('home_path'):
-            stdio.error("prometheus %s: missing configuration 'home_path' in configuration file" % server)
-            success = False
-    if not success:
-        stdio.stop_loading('fail')
-        return
 
     for comp in cluster_config.depends:
         if comp in depends:
@@ -46,5 +41,6 @@ def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **k
         for depend in depends:
             if cluster_config.add_depend_component(depend):
                 break
+
     stdio.stop_loading('succeed')
     plugin_context.return_true()

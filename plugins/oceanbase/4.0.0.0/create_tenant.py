@@ -26,6 +26,8 @@ import time
 
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 
+tenant_cursor = None
+
 
 def parse_size(size):
     _bytes = 0
@@ -55,7 +57,19 @@ def format_size(size, precision=1):
     return format % (size, units[idx])
 
 
-def create_tenant(plugin_context, cursor, *args, **kwargs):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, retries=10):
+    global tenant_cursor
+    if not tenant_cursor:
+        user = 'SYS' if mode == 'oracle' else 'root'
+        tenant_cursor = cursor.new_cursor(tenant=tenant, user=user)
+        if not tenant_cursor and retries:
+            retries -= 1
+            time.sleep(2)
+            return exec_sql_in_tenant(sql, cursor, tenant, mode, retries)
+    return tenant_cursor.execute(sql)
+
+
+def create_tenant(plugin_context, cursor, create_tenant_options=None, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -76,14 +90,12 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     def error(*arg, **kwargs):
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
-    def exception(*arg, **kwargs):
-        stdio.exception(*arg, **kwargs)
-        stdio.stop_loading('fail')
         
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-    options = plugin_context.options
-    
+    options = create_tenant_options if create_tenant_options else plugin_context.options
+    create_if_not_exists = get_option('create_if_not_exists', False)
+
     mode = get_option('mode', 'mysql').lower()
     if not mode in ['mysql', 'oracle']:
         error('No such tenant mode: %s.\n--mode must be `mysql` or `oracle`' % mode)
@@ -98,64 +110,60 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
     name = get_option('tenant_name', 'test')
     unit_name = '%s_unit' % name
     sql = 'select * from oceanbase.DBA_OB_UNIT_CONFIGS order by name'
-    try:
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-    except:
-        exception('execute sql exception: %s' % sql)
+    res = cursor.fetchall(sql)
+    if res is False:
         return
-
-    res = cursor.fetchall()
     for row in res:
         if str(row['NAME']) == unit_name:
             unit_name += '1'
 
     pool_name = '%s_pool' % name
-    
-    stdio.start_loading('Create tenant %s' % name)
+
     sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
-    try:
-        stdio.verbose('execute sql: %s' % (sql % name))
-        cursor.execute(sql, [name])
-        if cursor.fetchone():
+    tenant_exists = False
+    res = cursor.fetchone(sql, [name])
+    if res:
+        if create_if_not_exists:
+            tenant_exists = True
+        else:
             error('Tenant %s already exists' % name)
             return
-    except:
-        exception('execute sql exception: %s' % (sql % name))
+    elif res is False:
         return
+    if not tenant_exists:
+        stdio.start_loading('Create tenant %s' % name)
+        zone_list = get_option('zone_list', set())
+        zone_obs_num = {}
+        sql = "select zone, count(*) num from oceanbase.__all_server where status = 'active' group by zone"
+        res = cursor.fetchall(sql)
+        if res is False:
+            error()
+            return
 
-    zone_list = get_option('zone_list', set())
-    zone_obs_num = {}
-    sql = "select zone, count(*) num from oceanbase.__all_server where status = 'active' group by zone"
-    try:
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-        res = cursor.fetchall()
         for row in res:
             zone_obs_num[str(row['zone'])] = row['num']
-    except:
-        exception('execute sql exception: %s' % sql)
-        return
-    if not zone_list:
-        zone_list = zone_obs_num.keys()
-    if isinstance(zone_list, str):
-        zones = zone_list.replace(';', ',').split(',')
-    else:
-        zones = zone_list
-    zone_list = "('%s')" % "','".join(zones)
 
-    min_unit_num = min(zone_obs_num.items(),key=lambda x: x[1])[1]
-    unit_num = get_option('unit_num', min_unit_num)
-    if unit_num > min_unit_num:
-        return error('resource pool unit num is bigger than zone server count')
-    
-    sql = "select count(*) num from oceanbase.__all_server where status = 'active' and start_service_time > 0"
-    try:
+        if not zone_list:
+            zone_list = zone_obs_num.keys()
+        if isinstance(zone_list, str):
+            zones = zone_list.replace(';', ',').split(',')
+        else:
+            zones = zone_list
+        zone_list = "('%s')" % "','".join(zones)
+
+        min_unit_num = min(zone_obs_num.items(), key=lambda x: x[1])[1]
+        unit_num = get_option('unit_num', min_unit_num)
+        if unit_num > min_unit_num:
+            return error('resource pool unit num is bigger than zone server count')
+
+        sql = "select count(*) num from oceanbase.__all_server where status = 'active' and start_service_time > 0"
         count = 30
         while count:
-            stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql)
-            num = cursor.fetchone()['num']
+            num = cursor.fetchone(sql)
+            if num is False:
+                error()
+                return
+            num = num['num']
             if num >= unit_num:
                 break
             count -= 1
@@ -163,146 +171,156 @@ def create_tenant(plugin_context, cursor, *args, **kwargs):
         if count == 0:
             stdio.error(EC_OBSERVER_CAN_NOT_MIGRATE_IN)
             return
-    except:
-        exception('execute sql exception: %s' % sql)
-        return
 
-    sql = "SELECT * FROM oceanbase.GV$OB_SERVERS where zone in %s"
-    try:
-        sql = sql % zone_list
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-    except:
-        exception('execute sql exception: %s' % sql)
-        return
-    servers_stats = cursor.fetchall()
-    cpu_available = servers_stats[0]['CPU_CAPACITY_MAX'] - servers_stats[0]['CPU_ASSIGNED_MAX']
-    mem_available = servers_stats[0]['MEM_CAPACITY'] - servers_stats[0]['MEM_ASSIGNED']
-    disk_available = servers_stats[0]['DATA_DISK_CAPACITY'] - servers_stats[0]['DATA_DISK_IN_USE']
-    log_disk_available = servers_stats[0]['LOG_DISK_CAPACITY'] - servers_stats[0]['LOG_DISK_ASSIGNED']
-    for servers_stat in servers_stats[1:]:
-        cpu_available = min(servers_stat['CPU_CAPACITY_MAX'] - servers_stat['CPU_ASSIGNED_MAX'], cpu_available)
-        mem_available = min(servers_stat['MEM_CAPACITY'] - servers_stat['MEM_ASSIGNED'], mem_available)
-        disk_available = min(servers_stat['DATA_DISK_CAPACITY'] - servers_stat['DATA_DISK_IN_USE'], disk_available)
-        log_disk_available = min(servers_stat['LOG_DISK_CAPACITY'] - servers_stat['LOG_DISK_ASSIGNED'], log_disk_available)
+        sql = "SELECT * FROM oceanbase.GV$OB_SERVERS where zone in %s" % zone_list
+        servers_stats = cursor.fetchall(sql)
+        if servers_stats is False:
+            error()
+            return
+        cpu_available = servers_stats[0]['CPU_CAPACITY_MAX'] - servers_stats[0]['CPU_ASSIGNED_MAX']
+        mem_available = servers_stats[0]['MEM_CAPACITY'] - servers_stats[0]['MEM_ASSIGNED']
+        disk_available = servers_stats[0]['DATA_DISK_CAPACITY'] - servers_stats[0]['DATA_DISK_IN_USE']
+        log_disk_available = servers_stats[0]['LOG_DISK_CAPACITY'] - servers_stats[0]['LOG_DISK_ASSIGNED']
+        for servers_stat in servers_stats[1:]:
+            cpu_available = min(servers_stat['CPU_CAPACITY_MAX'] - servers_stat['CPU_ASSIGNED_MAX'], cpu_available)
+            mem_available = min(servers_stat['MEM_CAPACITY'] - servers_stat['MEM_ASSIGNED'], mem_available)
+            disk_available = min(servers_stat['DATA_DISK_CAPACITY'] - servers_stat['DATA_DISK_IN_USE'], disk_available)
+            log_disk_available = min(servers_stat['LOG_DISK_CAPACITY'] - servers_stat['LOG_DISK_ASSIGNED'], log_disk_available)
 
-    MIN_CPU = 1
-    MIN_MEMORY = 1073741824
-    MIN_LOG_DISK_SIZE = 2147483648
-    MIN_IOPS = 1024
+        MIN_CPU = 1
+        MIN_MEMORY = 1073741824
+        MIN_LOG_DISK_SIZE = 2147483648
+        MIN_IOPS = 1024
 
-    if cpu_available < MIN_CPU:
-        return error('%s: resource not enough: cpu count less than %s' % (zone_list, MIN_CPU))
-    if mem_available < MIN_MEMORY:
-        return error('%s: resource not enough: memory less than %s' % (zone_list, format_size(MIN_MEMORY)))
-    if log_disk_available < MIN_LOG_DISK_SIZE:
-        return error('%s: resource not enough: log disk size less than %s' % (zone_list, format_size(MIN_MEMORY)))
+        if cpu_available < MIN_CPU:
+            return error('%s: resource not enough: cpu count less than %s' % (zone_list, MIN_CPU))
+        if mem_available < MIN_MEMORY:
+            return error('%s: resource not enough: memory less than %s' % (zone_list, format_size(MIN_MEMORY)))
+        if log_disk_available < MIN_LOG_DISK_SIZE:
+            return error('%s: resource not enough: log disk size less than %s' % (zone_list, format_size(MIN_MEMORY)))
 
-    # cpu options
-    max_cpu = get_option('max_cpu', cpu_available)
-    min_cpu = get_option('min_cpu', max_cpu)
-    if cpu_available < max_cpu:
-        return error('resource not enough: cpu (Avail: %s, Need: %s)' % (cpu_available, max_cpu))
-    if max_cpu < min_cpu:
-        return error('min_cpu must less then max_cpu')
+        # cpu options
+        max_cpu = get_option('max_cpu', cpu_available)
+        min_cpu = get_option('min_cpu', max_cpu)
+        if cpu_available < max_cpu:
+            return error('resource not enough: cpu (Avail: %s, Need: %s)' % (cpu_available, max_cpu))
+        if max_cpu < min_cpu:
+            return error('min_cpu must less then max_cpu')
 
-    # memory options
-    memory_size = get_parsed_option('memory_size', None)
-    log_disk_size = get_parsed_option('log_disk_size', None)
+        # memory options
+        memory_size = get_parsed_option('memory_size', None)
+        log_disk_size = get_parsed_option('log_disk_size', None)
 
-    if memory_size is None:
-        memory_size = mem_available
-        if log_disk_size is None:
-            log_disk_size = log_disk_available
+        if memory_size is None:
+            memory_size = mem_available
+            if log_disk_size is None:
+                log_disk_size = log_disk_available
 
-    if mem_available < memory_size:
-        return error('resource not enough: memory (Avail: %s, Need: %s)' % (format_size(mem_available), format_size(memory_size)))
+        if mem_available < memory_size:
+            return error('resource not enough: memory (Avail: %s, Need: %s)' % (format_size(mem_available), format_size(memory_size)))
 
-    # log disk size options
-    if log_disk_size is not None and log_disk_available < log_disk_size:
-        return error('resource not enough: log disk space (Avail: %s, Need: %s)' % (format_size(disk_available), format_size(log_disk_size)))
+        # log disk size options
+        if log_disk_size is not None and log_disk_available < log_disk_size:
+            return error('resource not enough: log disk space (Avail: %s, Need: %s)' % (format_size(disk_available), format_size(log_disk_size)))
 
-    # iops options
-    max_iops = get_option('max_iops', None)
-    min_iops = get_option('min_iops', None)
-    iops_weight = get_option('iops_weight', None)
-    if max_iops is not None and max_iops < MIN_IOPS:
-        return error('max_iops must greater than %d' % MIN_IOPS)
-    if max_iops is not None and min_iops is not None and max_iops < min_iops:
-        return error('min_iops must less then max_iops')
+        # iops options
+        max_iops = get_option('max_iops', None)
+        min_iops = get_option('min_iops', None)
+        iops_weight = get_option('iops_weight', None)
+        if max_iops is not None and max_iops < MIN_IOPS:
+            return error('max_iops must greater than %d' % MIN_IOPS)
+        if max_iops is not None and min_iops is not None and max_iops < min_iops:
+            return error('min_iops must less then max_iops')
 
-    zone_num = len(zones)
-    charset = get_option('charset', '')
-    collate = get_option('collate', '')
-    replica_num = get_option('replica_num', zone_num)
-    logonly_replica_num = get_option('logonly_replica_num', 0)
-    tablegroup = get_option('tablegroup', '')
-    primary_zone = get_option('primary_zone', 'RANDOM')
-    locality = get_option('locality', '')
-    variables = get_option('variables', '')
+        zone_num = len(zones)
+        charset = get_option('charset', '')
+        collate = get_option('collate', '')
+        replica_num = get_option('replica_num', zone_num)
+        logonly_replica_num = get_option('logonly_replica_num', 0)
+        tablegroup = get_option('tablegroup', '')
+        primary_zone = get_option('primary_zone', 'RANDOM')
+        locality = get_option('locality', '')
+        variables = get_option('variables', '')
 
-    if replica_num == 0:
-        replica_num = zone_num
-    elif replica_num > zone_num:
-        return error('replica_num cannot be greater than zone num (%s)' % zone_num)
-    if not primary_zone:
-        primary_zone = 'RANDOM'
-    if logonly_replica_num > replica_num:
-        return error('logonly_replica_num cannot be greater than replica_num (%s)' % replica_num)
-    
-    # create resource unit
-    sql = "create resource unit %s max_cpu %.1f, memory_size %d" % (unit_name, max_cpu, memory_size)
-    if min_cpu is not None:
-        sql += ', min_cpu %.1f' % min_cpu
-    if max_iops is not None:
-        sql += ', max_iops %d' % max_iops
-    if min_iops is not None:
-        sql += ', min_iops %d' % min_iops
-    if iops_weight is not None:
-        sql += ', iops_weight %d' % iops_weight
-    if log_disk_size is not None:
-        sql += ', log_disk_size %d' % log_disk_size
-    try:
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-    except:
-        exception('faild to crate unit, execute sql exception: %s' % sql)
-        return
+        if replica_num == 0:
+            replica_num = zone_num
+        elif replica_num > zone_num:
+            return error('replica_num cannot be greater than zone num (%s)' % zone_num)
+        if not primary_zone:
+            primary_zone = 'RANDOM'
+        if logonly_replica_num > replica_num:
+            return error('logonly_replica_num cannot be greater than replica_num (%s)' % replica_num)
 
-    # create resource pool
-    sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
-    try:
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-    except:
-        exception('failed to create pool, execute sql exception: %s' % sql)
-        return
+        # create resource unit
+        sql = "create resource unit %s max_cpu %.1f, memory_size %d" % (unit_name, max_cpu, memory_size)
+        if min_cpu is not None:
+            sql += ', min_cpu %.1f' % min_cpu
+        if max_iops is not None:
+            sql += ', max_iops %d' % max_iops
+        if min_iops is not None:
+            sql += ', min_iops %d' % min_iops
+        if iops_weight is not None:
+            sql += ', iops_weight %d' % iops_weight
+        if log_disk_size is not None:
+            sql += ', log_disk_size %d' % log_disk_size
 
-    # create tenant
-    sql = "create tenant %s replica_num=%d,zone_list=%s,primary_zone='%s',resource_pool_list=('%s')"
-    sql = sql % (name, replica_num, zone_list, primary_zone, pool_name)
-    if charset:
-        sql += ", charset = '%s'" % charset
-    if collate:
-        sql += ", collate = '%s'" % collate
-    if logonly_replica_num:
-        sql += ", logonly_replica_num = %d" % logonly_replica_num
-    if tablegroup:
-        sql += ", default tablegroup ='%s'" % tablegroup
-    if locality:
-        sql += ", locality = '%s'" % locality
+        res = cursor.execute(sql)
+        if res is False:
+            error()
+            return
 
-    set_mode = "ob_compatibility_mode = '%s'" % mode
-    if variables:
-        sql += "set %s, %s" % (variables, set_mode)
-    else:
-        sql += "set %s" % set_mode
-    try:
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-    except:
-        exception('faild to crate tenant, execute sql exception: %s' % sql)
-        return
-        
+        # create resource pool
+        sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
+        res = cursor.execute(sql)
+        if res is False:
+            error()
+            return
+
+        # create tenant
+        sql = "create tenant %s replica_num=%d,zone_list=%s,primary_zone='%s',resource_pool_list=('%s')"
+        sql = sql % (name, replica_num, zone_list, primary_zone, pool_name)
+        if charset:
+            sql += ", charset = '%s'" % charset
+        if collate:
+            sql += ", collate = '%s'" % collate
+        if logonly_replica_num:
+            sql += ", logonly_replica_num = %d" % logonly_replica_num
+        if tablegroup:
+            sql += ", default tablegroup ='%s'" % tablegroup
+        if locality:
+            sql += ", locality = '%s'" % locality
+
+        set_mode = "ob_compatibility_mode = '%s'" % mode
+        if variables:
+            sql += "set %s, %s" % (variables, set_mode)
+        else:
+            sql += "set %s" % set_mode
+        res = cursor.execute(sql)
+        if res is False:
+            error()
+            return
     stdio.stop_loading('succeed')
+    database = get_option('database')
+    if database:
+        sql = 'create database {}'.format(database)
+        if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode) and not create_if_not_exists:
+            stdio.error('failed to create database {}'.format(database))
+            return
+
+    db_username = get_option('db_username')
+    db_password = get_option('db_password', '')
+    if db_username:
+        if mode == "mysql":
+            sql = """create user if not exists '{username}' IDENTIFIED BY '{password}';
+    grant all on *.* to '{username}' WITH GRANT OPTION;""".format(
+                username=db_username, password=db_password)
+        else:
+            # todo: fix oracle user create
+            sql = """create {username} IDENTIFIED BY {password};
+grant all on *.* to {username} WITH GRANT OPTION;
+grant dba to {username};
+grant all privileges to {username};"""
+        if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode):
+            stdio.error('failed to create user {}'.format(db_username))
+            return
     return plugin_context.return_true()

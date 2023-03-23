@@ -1,0 +1,300 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+oceanbase-ce:
+  servers:
+    - name: server1
+      # Please don't use hostname, only IP can be supported
+      ip: 172.19.33.2
+    - name: server2
+      ip: 172.19.33.3
+    - name: server3
+      ip: 172.19.33.4
+  global:
+    # The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
+    home_path: /root/observer
+    # The directory for data storage. The default value is $home_path/store.
+    # data_dir: /data
+    # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
+    # redo_dir: /redo
+    # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
+    # if set severs as "127.0.0.1", please set devname as "lo"
+    # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
+    # devname: eth0
+    # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
+    # mysql_port: 2881
+    # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    # rpc_port: 2882
+    # Defines the zone for an observer. The default value is zone1.
+    # zone: zone1
+    # The maximum running memory for an observer. When ignored, autodeploy calculates this value based on the current server available resource.
+    # memory_limit: 58G
+    # The percentage of the maximum available memory to the total memory. This value takes effect only when memory_limit is 0. The default value is 80.
+    # memory_limit_percentage: 80
+    # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G. Autodeploy calculates this value based on the current server available resource.
+    # system_memory: 22G
+    # The size of a data file. When ignored, autodeploy calculates this value based on the current server available resource.
+    # datafile_size: 200G
+    # The size of disk space used by the clog files. When ignored, autodeploy calculates this value based on the current server available resource.
+    # log_disk_size: 66G
+    # System log level. The default value is WDIAG.
+    # syslog_level: WDIAG
+    # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true. The default value for autodeploy mode is false.
+    # enable_syslog_wf: false
+    # Enable auto system log recycling or not. The default value is false. The default value for autodeploy mode is on.
+    # enable_syslog_recycle: true
+    # The maximum number of reserved log files before enabling auto recycling. When set to 0, no logs are deleted. The default value for autodeploy mode is 4.
+    # max_syslog_file_count: 4
+    # Cluster name for OceanBase Database. The default value is obcluster. When you deploy OceanBase Database and obproxy, this value must be the same as the cluster_name for obproxy.
+    # appname: obcluster
+    # Password for root. The default value is empty.
+    # root_password:
+    # Password for proxyro. proxyro_password must be the same as observer_sys_password. The default value is empty.
+    # proxyro_password:
+  server1:
+    zone: zone1
+  server2:
+    zone: zone2
+  server3:
+    zone: zone3
+obproxy-ce:
+  # Set dependent components for the component.
+  # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
+  depends:
+    - oceanbase-ce
+  servers:
+    - 192.168.1.5
+  global:
+    listen_port: 2883 # External port. The default value is 2883.
+    prometheus_listen_port: 2884 # The Prometheus port. The default value is 2884.
+    home_path: /root/obproxy
+    # oceanbase root server list
+    # format: ip:mysql_port;ip:mysql_port. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
+    # rs_list: 192.168.1.2:2881;192.168.1.3:2881;192.168.1.4:2881
+    enable_cluster_checkout: false
+    # observer cluster name, consistent with oceanbase-ce's appname. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
+    # cluster_name: obcluster
+    skip_proxy_sys_private_check: true
+    enable_strict_kernel_release: false
+    # obproxy_sys_password: # obproxy sys user password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
+    # observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
+obproxy-ce:
+  depends:
+    - oceanbase-ce
+  servers:
+    - 192.168.1.5
+  global:
+    # The working directory for obproxy. Obproxy is started under this directory. This is a required field.
+    home_path: /root/obproxy
+    skip_proxy_sys_private_check: true
+    enable_strict_kernel_release: false
+    # External port. The default value is 2883.
+    # listen_port: 2883
+    # The Prometheus port. The default value is 2884.
+    # prometheus_listen_port: 2884
+    # rs_list is the root server list for observers. The default root server is the first server in the zone.
+    # The format for rs_list is observer_ip:observer_mysql_port;observer_ip:observer_mysql_port.
+    # Ignore this value in autodeploy mode.
+    # rs_list: 127.0.0.1:2881
+    # Cluster name for the proxy OceanBase Database. The default value is obcluster. This value must be set to the same with the appname for OceanBase Database.
+    # cluster_name: obcluster
+    # Password for obproxy system tenant. The default value is empty.
+    # obproxy_sys_password:
+    # Password for proxyro. proxyro_password must be the same with proxyro_password. The default value is empty.
+    # observer_sys_password:
+obagent:
+  # Set dependent components for the component.
+  # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
+  depends:
+    - oceanbase-ce
+  # The list of servers to be monitored. This list is consistent with the servers in oceanbase-ce.
+  servers:
+    - name: server1
+      # Please don't use hostname, only IP is supported.
+      ip: 172.19.33.2
+    - name: server2
+      ip: 172.19.33.3
+    - name: server3
+      ip: 172.19.33.4
+  global:
+    # The working directory for obagent. obagent is started under this directory. This is a required field.
+    home_path: /root/obagent
+    # The port that pulls and manages the metrics. The default port number is 8088.
+    # server_port: 8088
+    # Debug port for pprof. The default port number is 8089.
+    # pprof_port: 8089
+    # Log level. The default value is INFO.
+    # log_level: INFO
+    # Log path. The default value is log/monagent.log.
+    # log_path: log/monagent.log
+    # Encryption method. OBD supports aes and plain. The default value is plain.
+    # crypto_method: plain
+    # Path to store the crypto key. The default value is conf/.config_secret.key.
+    # crypto_path: conf/.config_secret.key
+    # Size for a single log file. Log size is measured in Megabytes. The default value is 30M.
+    # log_size: 30
+    # Expiration time for logs. The default value is 7 days.
+    # log_expire_day: 7
+    # The maximum number for log files. The default value is 10.
+    # log_file_count: 10
+    # Whether to use local time for log files. The default value is true.
+    # log_use_localtime: true
+    # Whether to enable log compression. The default value is true.
+    # log_compress: true
+    # Username for HTTP authentication. The default value is admin.
+    # http_basic_auth_user: admin
+    # Password for HTTP authentication. The default value is root.
+    # http_basic_auth_password: root
+    # Username for debug service. The default value is admin.
+    # pprof_basic_auth_user: admin
+    # Password for debug service. The default value is root.
+    # pprof_basic_auth_password: root
+    # Monitor username for OceanBase Database. The user must have read access to OceanBase Database as a system tenant. The default value is root.
+    # monitor_user: root
+    # Monitor password for OceanBase Database. The default value is empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the root_password in oceanbase-ce.
+    # monitor_password:
+    # The SQL port for observer. The default value is 2881. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the mysql_port in oceanbase-ce.
+    # sql_port: 2881
+    # The RPC port for observer. The default value is 2882. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the rpc_port in oceanbase-ce.
+    # rpc_port: 2882
+    # Cluster name for OceanBase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the appname in oceanbase-ce.
+    # cluster_name: obcluster
+    # Cluster ID for OceanBase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the cluster_id in oceanbase-ce.
+    # cluster_id: 1
+    # Zone name for your observer. The default value is zone1. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the zone name in oceanbase-ce.
+    # zone_name: zone1
+    # Monitor status for OceanBase Database.  Active is to enable. Inactive is to disable. The default value is active. When you deploy an cluster automatically, OBD decides whether to enable this parameter based on depends.
+    # ob_monitor_status: active
+    # Monitor status for your host. Active is to enable. Inactive is to disable. The default value is active.
+    # host_monitor_status: active
+    # Whether to disable the basic authentication for HTTP service. True is to disable. False is to enable. The default value is false.
+    # disable_http_basic_auth: false
+    # Whether to disable the basic authentication for the debug interface. True is to disable. False is to enable. The default value is false.
+    # disable_pprof_basic_auth: false
+prometheus:
+  servers:
+    - 192.168.1.5
+  depends:
+    - obagent
+  global:
+    # The working directory for prometheus. prometheus is started under this directory. This is a required field.
+    home_path: /root/prometheus
+    # address: 0.0.0.0  # The ip address to bind to. Along with port, corresponds to the `web.listen-address` parameter.
+    # port: 9090 # The http port to use. Along with address, corresponds to the `web.listen-address` parameter.
+    # enable_lifecycle: true # Enable shutdown and reload via HTTP request. Corresponds to the `web.enable-lifecycle` parameter.
+    # data_dir: /root/prometheus/data # Base path for metrics storage. Corresponds to the `storage.tsdb.path` parameter.
+    # basic_auth_users:  # Usernames and passwords that have full access to the web server via basic authentication. Corresponds to the `basic_auth_users` parameter.
+    #   <username>: <password>  # The format of `basic_auth_users` : the key is the user name and the value is the password.
+    # web_config: # Content of Prometheus web service config file. The format is consistent with the file. However, `basic_auth_users` cannot be set in it. Please set `basic_auth_users` above if needed. Corresponds to the `web.config.file` parameter.
+    #   tls_server_config:
+    #     # Certificate and key files for server to use to authenticate to client.
+    #     cert_file: <filename>
+    #     key_file: <filename>
+    # config: # Configuration of the Prometheus service. The format is consistent with the Prometheus config file. Corresponds to the `config.file` parameter.
+    #   rule_files:
+    #   - rules/*rules.yaml
+    #   scrape_configs:
+    #   - job_name: prometheus
+    #     metrics_path: /metrics
+    #     scheme: http
+    #     static_configs:
+    #       - targets:
+    #           - localhost:9090
+    #   - job_name: node
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/node/host
+    #     scheme: http
+    #     file_sd_configs:  # Set the targets to be collected by reading local files. The example is to collect targets corresponding to all yaml files in the 'targets' directory under $home_path.
+    #     - files:
+    #       - 'targets/*.yaml'
+    #   - job_name: ob_basic
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/ob/basic
+    #     scheme: http
+    #     file_sd_configs:
+    #     - files:
+    #       - 'targets/*.yaml'
+    #   - job_name: ob_extra
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/ob/extra
+    #     scheme: http
+    #     file_sd_configs:
+    #     - files:
+    #       - 'targets/*.yaml'
+    #   - job_name: agent
+    #     basic_auth:
+    #       username: admin
+    #       password: root
+    #     metrics_path: /metrics/stat
+    #     scheme: http
+    #     file_sd_configs:
+    #     - files:
+    #       - 'targets/*.yaml'
+    # additional_parameters: # Additional parameters for Prometheus service, among which `web.listen-address`, `web.enable-lifecycle`, `storage.tsdb.path`, `config.file` and `web.config.file` cannot be set. Please set them in the corresponding configuration above if needed.
+    # - log.level: debug
+grafana:
+  servers:
+    - 192.168.1.5
+  depends:
+    - prometheus
+  global:
+    home_path: /root/grafana
+    login_password: oceanbase # Grafana login password. The default value is 'oceanbase'.
+    # data_dir: # Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used).$data_dir can be empty. The default value is $home_path/data.
+    # logs_dir: # Directory where grafana can store logs, can be empty. The default value is $data_dir/log.
+    # plugins_dir: # Directory where grafana will automatically scan and look for plugins, can be empty. The default value is $data_dir/plugins.
+    # provisioning_dir: # folder that contains provisioning config files that grafana will apply on startup and while running, can be empty. The default value is $home_path/conf/provisioning.
+    # temp_data_lifetime: # How long temporary images in data directory should be kept. Supported modifiers h (hours), m (minutes), Use 0 to never clean up temporary files, can be empty. The default value is 24h.
+    # log_max_days: # Expired days of log file(delete after max days), can be empty. The default value is 7.
+    # domian: # The public facing domain name used to access grafana from a browser, can be empty. The default value is $server.ip.
+    # port: # The http port to use, can be empty. The default value is 3000.
+
+    # # list of datasources to insert/update depending on what's available in the database, can be empty.
+    # # For more parameter settings, please refer to https://grafana.com/docs/grafana/latest/administration/provisioning/#datasources
+    # datasources:
+    #   name: # name of the datasource. Required and should not be 'OB-Prometheus'
+    #   type: # datasource type. Required
+    #   access: # access mode. direct or proxy. Required
+    #   url: # the url of datasource
+
+    # list of dashboards providers that load dashboards into Grafana from the local filesystem, can be empty.
+    # For more information, please refer to https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+    # providers:
+    #   name: # an unique provider name. Required and should not be 'OceanBase Metrics'
+    #   type: # provider type. Default to 'file'
+    #   options:
+    #     path: # path to dashboard files on disk. Required when using the 'file' type
+
+    # # customize your Grafana instance by adding/modifying the custom configuration as follows
+    # # for more information, please refer to https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#configure-grafana
+    # # Here, setting parameters is required for format conversion.
+    # # For example, if the original grafana configuration format is
+    # #
+    # # [section1.section2]
+    # # key1 = value1
+    # # key2 = value2
+    # #
+    # # Then when writing the configuration below, you need to write it as
+    # #
+    # # section1:
+    # #   section2:
+    # #     key1: value1
+    # #     key2: value2
+    # #
+    # # Here we only list one item, because there are more than 500 items. Please add them according to your own needs.
+    # customize_config:
+    #   # original grafana configuration format is
+    #   # [server]
+    #   # protocol = http
+    #   server:
+    #     protocol: http

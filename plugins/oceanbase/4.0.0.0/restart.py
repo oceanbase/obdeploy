@@ -28,11 +28,22 @@ class Restart(object):
 
     def __init__(self, plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, repository, new_cluster_config=None, new_clients=None):
         self.local_home_path = local_home_path
-        self.plugin_context = plugin_context
+
+        self.namespace = plugin_context.namespace
+        self.namespaces = plugin_context.namespaces
+        self.deploy_name = plugin_context.deploy_name
+        self.repositories = plugin_context.repositories
+        self.plugin_name = plugin_context.plugin_name
+
         self.components = plugin_context.components
         self.clients = plugin_context.clients
         self.cluster_config = plugin_context.cluster_config
+        self.cmds = plugin_context.cmds
+        self.options = plugin_context.options
+        self.dev_mode = plugin_context.dev_mode
         self.stdio = plugin_context.stdio
+
+        self.plugin_context = plugin_context
         self.repository = repository
         self.start_plugin = start_plugin
         self.reload_plugin = reload_plugin
@@ -47,24 +58,42 @@ class Restart(object):
         self.cursor = None
         for server in self.cluster_config.servers:
             self.now_clients[server] = self.clients[server]
+    
+    def call_plugin(self, plugin, **kwargs):
+        args = {
+            'namespace': self.namespace,
+            'namespaces': self.namespaces,
+            'deploy_name': self.deploy_name,
+            'cluster_config': self.cluster_config,
+            'repositories': self.repositories,
+            'repository': self.repository,
+            'components': self.components,
+            'clients': self.clients,
+            'cmd': self.cmds,
+            'options': self.options,
+            'stdio': self.sub_io
+        }
+        args.update(kwargs)
+        
+        self.stdio.verbose('Call %s for %s' % (plugin, self.repository))
+        return plugin(**args)
 
     def close(self):
         if self.db:
             self.cursor.close()
-            self.db.close()
             self.cursor = None
             self.db = None
 
     def connect(self):
         if self.cursor is None or self.execute_sql('select version()', error=False) is False:
-            self.stdio.verbose('Call %s for %s' % (self.connect_plugin, self.repository))
             self.sub_io.start_loading('Connect to observer')
-            ret = self.connect_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io)
+            ret = self.call_plugin(self.connect_plugin)
             if not ret:
                 self.sub_io.stop_loading('fail')
                 return False
             self.sub_io.stop_loading('succeed')
-            self.close()
+            if self.cursor:
+                self.close()
             self.cursor = ret.get_return('cursor')
             self.db = ret.get_return('connect')
             while self.execute_sql('use oceanbase', error=False) is False:
@@ -73,18 +102,13 @@ class Restart(object):
         return True
 
     def execute_sql(self, query, args=None, one=True, error=True):
-        msg = query % tuple(args) if args is not None else query
-        self.stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            self.stdio.verbose('execute sql: %s' % msg)
-            self.cursor.execute(query, args)
-            result = self.cursor.fetchone() if one else self.cursor.fetchall()
-            result and self.stdio.verbose(result)
-            return result
-        except:
-            msg = 'execute sql exception: %s' % msg if error else ''
-            self.stdio.exception(msg)
-        return False
+        exc_level = 'error' if error else 'verbose'
+        if one:
+            result = self.cursor.fetchone(query, args, exc_level=exc_level)
+        else:
+            result = self.cursor.fetchall(query, args, exc_level=exc_level)
+        result and self.stdio.verbose(result)
+        return result
 
     def broken_sql(self, sql, sleep_time=3):
         while True:
@@ -135,12 +159,12 @@ class Restart(object):
     def rollback(self):
         if self.new_clients:
             self.stdio.start_loading('Rollback')
-            self.stop_plugin(self.components, self.now_clients, self.new_cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io)
+            cluster_config = self.new_cluster_config if self.new_cluster_config else self.cluster_config
+            self.call_plugin(self.stop_plugin, clients=self.now_clients, cluster_config=cluster_config)
             for server in self.cluster_config.servers:
                 client = self.clients[server]
                 new_client = self.now_clients[server]
                 server_config = self.cluster_config.get_server_conf(server)
-                home_path = server_config['home_path']
                 chown_cmd = 'sudo chown -R %s:' % client.config.username
                 for key in ['home_path', 'data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir']:
                     if key in server_config:
@@ -156,11 +180,10 @@ class Restart(object):
 
     def _restart(self):
         clients = self.clients
-        self.stdio.verbose('Call %s for %s' % (self.stop_plugin, self.repository))
-        if not self.stop_plugin(self.components, clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io):
+        if not self.call_plugin(self.stop_plugin, clients=clients):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
-        
+
         if self.new_clients:
             self.stdio.verbose('use new clients')
             for server in self.cluster_config.servers:
@@ -178,10 +201,10 @@ class Restart(object):
             clients = self.new_clients
 
         cluster_config = self.new_cluster_config if self.new_cluster_config else self.cluster_config
-        self.stdio.verbose('Call %s for %s' % (self.start_plugin, self.repository))
-        if not self.start_plugin(self.components, clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io, local_home_path=self.local_home_path, repository_dir=self.repository.repository_dir):
+        if not self.call_plugin(self.start_plugin, clients=clients, cluster_config=cluster_config, local_home_path=self.local_home_path, repository=self.repository):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
+        self.close()
         return True
 
     def rolling(self, zones_servers):
@@ -205,13 +228,13 @@ class Restart(object):
                         where svr_ip = %s and svr_port = %s and refreshed_schema_version > 1
                         ) as b on a.tenant_id = b.tenant_id 
                     where b.tenant_id is null'''
-                    if self.execute_sql(sql, args=(server.ip, config['rpc_port'])).get('cnt'):
+                    if self.execute_sql(sql, args=(server.ip, config['rpc_port']), error=False).get('cnt'):
                         break
                 else:
                     break
                 time.sleep(3)
 
-            while self.execute_sql("select * from oceanbase.__all_virtual_clog_stat where table_id = 1099511627777 and status != 'ACTIVE'"):
+            while self.execute_sql("select * from oceanbase.__all_virtual_clog_stat where table_id = 1099511627777 and status != 'ACTIVE'", error=False):
                 time.sleep(3)
             
             self.stop_zone(zone)
@@ -245,7 +268,7 @@ class Restart(object):
         if self.connect():
             self.stdio.start_loading('Server check')
             servers = self.execute_sql("select * from oceanbase.__all_server", one=False, error=False)
-            if len(self.cluster_config.servers) == len(servers):
+            if isinstance(servers, list) and len(self.cluster_config.servers) == len(servers):
                 for server in servers:
                     if server['status'] != 'active' or server['stop_time'] > 0 or server['start_service_time'] == 0:
                         break
@@ -256,7 +279,6 @@ class Restart(object):
                         if zone not in zones_servers:
                             zones_servers[zone] = []
                         zones_servers[zone].append(server)
-                    servers = self.cluster_config.servers
             self.stdio.stop_loading('succeed')
         ret = False
         try:
@@ -266,11 +288,9 @@ class Restart(object):
                 ret = self.un_rolling()
         
             if ret and self.connect():
-                self.display_plugin(self.components, self.new_clients if self.new_clients else self.clients, self.new_cluster_config if self.new_cluster_config else self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io, cursor=self.cursor)
+                self.call_plugin(self.display_plugin, clients=self.now_clients, cluster_config=self.new_cluster_config if self.new_cluster_config else self.cluster_config, cursor=self.cursor)
                 if self.new_cluster_config:
-                    self.stdio.verbose('Call %s for %s' % (self.reload_plugin, self.repository))
-                    self.reload_plugin(self.components, self.clients, self.cluster_config, [], {}, self.sub_io, 
-                    cursor=self.cursor, new_cluster_config=self.new_cluster_config, repository_dir=self.repository.repository_dir)
+                    self.call_plugin(self.reload_plugin, clients=self.now_clients, cursor=self.cursor, new_cluster_config=self.new_cluster_config, repository_dir=self.repository.repository_dir)
         except Exception as e:
             self.stdio.exception('Run Exception: %s' % e)
         finally:
@@ -282,7 +302,8 @@ class Restart(object):
         return ret
 
 
-def restart(plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, repository, new_cluster_config=None, new_clients=None, rollback=False, *args, **kwargs):
+def restart(plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, new_cluster_config=None, new_clients=None, rollback=False, *args, **kwargs):
+    repository = kwargs.get('repository')
     task = Restart(plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, repository, new_cluster_config, new_clients)
     call = task.rollback if rollback else task.restart
     if call():

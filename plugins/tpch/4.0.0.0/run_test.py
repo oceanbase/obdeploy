@@ -63,17 +63,6 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
         if value is None:
             value = default
         return value
-    def execute(cursor, query, args=None):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose('execute sql: %s' % msg)
-        stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            cursor.execute(query, args)
-            return cursor.fetchone()
-        except:
-            msg = 'execute sql exception: %s' % msg
-            stdio.exception(msg)
-            raise Exception(msg)
 
     def local_execute_command(command, env=None, timeout=None):
         return LocalClient.execute_command(command, env, timeout, stdio)
@@ -132,7 +121,10 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
 
     try:
         sql = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = 'secure_file_priv'" % tenant_id
-        ret = execute(cursor, sql)['value']
+        ret = cursor.fetchone(sql)
+        if ret is False:
+            return
+        ret = ret['value']
         if ret is None:
             stdio.error('Access denied. Please set `secure_file_priv` to "".')
             return
@@ -179,15 +171,24 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
             # Major freeze
             stdio.start_loading('Merge')
             sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION where tenant_id = %s" % tenant_id
-            merge_version = execute(cursor, sql_frozen_scn)['FROZEN_SCN']
-            execute(cursor, "alter system major freeze tenant = %s" % tenant_name)
+            merge_version = cursor.fetchone(sql_frozen_scn)
+            if merge_version is False:
+                return
+            merge_version = merge_version['FROZEN_SCN']
+            if cursor.fetchone("alter system major freeze tenant = %s" % tenant_name) is False:
+                return
             while True:
-                current_version = execute(cursor, sql_frozen_scn).get("FROZEN_SCN")
+                current_version = cursor.fetchone(sql_frozen_scn)
+                if current_version is False:
+                    return
+                current_version = current_version['FROZEN_SCN']
                 if int(current_version) > int(merge_version):
                     break
                 time.sleep(5)
             while True:
-                ret = execute(cursor, sql_frozen_scn)
+                ret = cursor.fetchone(sql_frozen_scn)
+                if ret is False:
+                    return
                 if int(ret.get("FROZEN_SCN", 0)) / 1000 == int(ret.get("LAST_SCN", 0)) / 1000:
                     break
                 time.sleep(5)
@@ -203,7 +204,7 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
                         analyze_path = os.path.join(local_dir, 'analyze.sql')
                         with FileUtil.open(analyze_path, stdio=stdio) as f:
                             content = f.read()
-                        analyze_content = content.format(cpu_total=cpu_total)
+                        analyze_content = content.format(cpu_total=cpu_total, database=mysql_db)
                         ret = LocalClient.execute_command('%s -e """%s"""' % (sql_cmd_prefix, analyze_content), stdio=stdio)
                         if not ret:
                             raise Exception(ret.stderr)

@@ -32,7 +32,8 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
 
     config_map = {
         'observer_sys_password': 'proxyro_password',
-        'cluster_name': 'appname'
+        'cluster_name': 'appname',
+        'observer_root_password': 'root_password'
     }
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
@@ -54,7 +55,10 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
         stdio.verbose('get %s cluster address' % (server))
         cluster_server[server] = '%s:%s' % (server.ip, config['listen_port'])
         stdio.verbose('compare configuration of %s' % (server))
+        reload_unused = ['observer_root_password']
         for key in new_config:
+            if key in reload_unused:
+                continue
             if key not in config or config[key] != new_config[key]:
                 item = cluster_config.get_temp_conf_item(key)
                 if item:
@@ -85,15 +89,12 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
         for server in servers:
             if key not in change_conf[server]:
                 continue
-            try:
-                sql = 'alter proxyconfig set %s = %%s' % key
-                value = change_conf[server][key] if change_conf[server].get(key) is not None else ''
-                stdio.verbose('execute sql: %s' % (sql % value))
-                cursor[server].execute(sql, [value])
-                success_conf[key].append(server)
-            except:
+            sql = 'alter proxyconfig set %s = %%s' % key
+            value = change_conf[server][key] if change_conf[server].get(key) is not None else ''
+            if cursor[server].execute(sql, [value]) is False:
                 global_ret = False
-                stdio.exception('execute sql exception: %s' % (sql % value))
+                continue
+            success_conf[key].append(server)
     for key in success_conf:
         if global_change_conf[key] == servers_num == len(success_conf):
             cluster_config.update_global_conf(key, value, False)

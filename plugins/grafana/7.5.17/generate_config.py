@@ -21,35 +21,34 @@
 from __future__ import absolute_import, division, print_function
 
 
-def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **kwargs):
+def generate_config(plugin_context, auto_depend=False, generate_check=True, return_generate_keys=False, *args, **kwargs):
+    if return_generate_keys:
+        return plugin_context.return_true(generate_keys=['login_password'])
+
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     success = True
     have_depend = False
     depend = 'prometheus'
-    server_depends = {}
+    generate_configs = {'global': {}}
+    plugin_context.set_variable('generate_configs', generate_configs)
     stdio.start_loading('Generate grafana configuration')
 
     global_config = cluster_config.get_original_global_conf()
     login_password = global_config.get('login_password')
     if login_password:
-        login_password = str(login_password)
-        if len(login_password) < 5:
-            stdio.error("Grafana : the length of configuration 'login_password' cannot be less than 5")
-            success = False
-        elif login_password == "admin":
-            stdio.error("Grafana : configuration 'login_password' in configuration file should not be 'admin'")
-            success = False
+        if generate_check:
+            login_password = str(login_password)
+            if len(login_password) < 5:
+                stdio.error("Grafana : the length of configuration 'login_password' cannot be less than 5")
+                success = False
+            elif login_password == "admin":
+                stdio.error("Grafana : configuration 'login_password' in configuration file should not be 'admin'")
+                success = False
     else:
+        generate_configs['global']['login_password'] = 'oceanbase'
         cluster_config.update_global_conf('login_password', 'oceanbase', False)
 
-    for server in cluster_config.servers:
-        server_depends[server] = []
-        server_config = cluster_config.get_server_conf(server)
-        if not server_config.get('home_path'):
-            stdio.error("%s grafana : missing configuration 'home_path' in configuration file" % server)
-            success = False
-        
     if not success:
         stdio.stop_loading('fail')
         return 

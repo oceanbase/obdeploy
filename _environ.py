@@ -23,6 +23,9 @@ from __future__ import absolute_import, division, print_function
 # obd dev mode. {0/1}
 ENV_DEV_MODE = "OBD_DEV_MODE"
 
+# obd lock mode. 0 - No lock mode, 1 - The deploy lock wiil be downgraded to shared lock, 2 - Default lock mode.
+ENV_LOCK_MODE = "OBD_LOCK_MODE"
+
 # base path which will be used by runtime dependencies sync and include config. {absolute path style}
 ENV_BASE_DIR = "OBD_DEPLOY_BASE_DIR"
 
@@ -31,3 +34,5 @@ ENV_REPO_INSTALL_MODE = "OBD_REPO_INSTALL_MODE"
 
 # disable rsync mode even if the rsync exists. {0/1}
 ENV_DISABLE_RSYNC = "OBD_DISABLE_RSYNC"
+
+ENV_DISABLE_PARALLER_EXTRACT = "OBD_DISALBE_PARALLER_EXTRACT"

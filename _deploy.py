@@ -23,7 +23,6 @@ from __future__ import absolute_import, division, print_function
 import os
 import re
 import sys
-import pickle
 import getpass
 import hashlib
 from copy import deepcopy
@@ -31,9 +30,9 @@ from enum import Enum
 
 from ruamel.yaml.comments import CommentedMap
 
+import _errno as err
 from tool import ConfigUtil, FileUtil, YamlLoader, OrderedDict, COMMAND_ENV
 from _manager import Manager
-from _repository import Repository
 from _stdio import SafeStdio
 from _environ import ENV_BASE_DIR
 
@@ -360,6 +359,7 @@ class ClusterConfig(object):
         self.origin_package_hash = package_hash
         self._package_hash = package_hash
         self._temp_conf = {}
+        self._all_default_conf = {}
         self._default_conf = {}
         self._global_conf = None
         self._server_conf = {}
@@ -371,6 +371,8 @@ class ClusterConfig(object):
         self._include_file = None
         self._origin_include_file = None
         self._origin_include_config = None
+        self._unprocessed_global_conf = None
+        self._unprocessed_server_conf = {}
         self._environments = None
         self._origin_environments = {}
         self._inner_config = {}
@@ -414,7 +416,14 @@ class ClusterConfig(object):
         if not isinstance(other, self.__class__):
             return False
         # todo 检查 rsync include等
-        return self._global_conf == other._global_conf and self._server_conf == other._server_conf
+        if self.servers != other.servers:
+            return False
+        if self.get_global_conf() != other.get_global_conf():
+            return False
+        for server in self.servers:
+            if self.get_server_conf(server) != other.get_server_conf(server):
+                return False
+        return True
 
     def __deepcopy__(self, memo):
         cluster_config = self.__class__(deepcopy(self.servers), self.name, self.version, self.tag, self.package_hash, self.parser)
@@ -451,6 +460,8 @@ class ClusterConfig(object):
     def _clear_cache_server(self):
         for server in self._cache_server:
             self._cache_server[server] = None
+            if server in self._unprocessed_server_conf:
+                del self._unprocessed_server_conf[server]
 
     def get_inner_config(self):
         return self._inner_config
@@ -485,11 +496,14 @@ class ClusterConfig(object):
         cluster_config = self._depends[name]
         return deepcopy(cluster_config.original_servers)
         
-    def get_depend_config(self, name, server=None):
+    def get_depend_config(self, name, server=None, with_default=True):
         if name not in self._depends:
             return None
         cluster_config = self._depends[name]
-        config = cluster_config.get_server_conf_with_default(server) if server else cluster_config.get_global_conf()
+        if with_default:
+            config = cluster_config.get_server_conf_with_default(server) if server else cluster_config.get_global_conf_with_default()
+        else:
+            config = cluster_config.get_server_conf(server) if server else cluster_config.get_global_conf()
         return deepcopy(config)
 
     def update_server_conf(self, server, key, value, save=True):
@@ -514,15 +528,13 @@ class ClusterConfig(object):
         if not self._deploy_config.update_component_global_conf(self.name, key, value, save):
             return False
         self._update_global_conf(key, value)
-        for server in self._cache_server:
-            if self._cache_server[server] is not None:
-                self._cache_server[server][key] = value
         return True
 
     def _update_global_conf(self, key, value):
         self._original_global_conf[key] = value
-        if self._global_conf:
-            self._global_conf[key] = value
+        self._global_conf = None
+        self._unprocessed_global_conf = None
+        self._clear_cache_server()
 
     def update_rsync_list(self, rsync_list, save=True):
         if self._deploy_config is None:
@@ -541,11 +553,13 @@ class ClusterConfig(object):
         self._environments = None
         return True
 
-    def get_unconfigured_require_item(self, server):
+    def get_unconfigured_require_item(self, server, skip_keys=[]):
         items = []
-        config = self.get_server_conf(server)
+        config = self._get_unprocessed_server_conf(server)
         if config is not None:
             for key in self._temp_conf:
+                if key in skip_keys:
+                    continue
                 if not self._temp_conf[key].require:
                     continue
                 if key in config:
@@ -556,11 +570,10 @@ class ClusterConfig(object):
     def get_server_conf_with_default(self, server):
         if server not in self._server_conf:
             return None
-        config = {}
-        for key in self._temp_conf:
-            if self._temp_conf[key].default is not None:
-                config[key] = self._temp_conf[key].default
-        config.update(self.get_server_conf(server))
+        config = deepcopy(self._all_default_conf)
+        server_config = self.get_server_conf(server)
+        if server_config:
+            config.update(server_config)
         return config
 
     def get_need_redeploy_items(self, server):
@@ -585,11 +598,15 @@ class ClusterConfig(object):
         
     def update_temp_conf(self, temp_conf):
         self._default_conf = {}
+        self._all_default_conf = {}
         self._temp_conf = temp_conf
         for key in self._temp_conf:
             if self._temp_conf[key].require and self._temp_conf[key].default is not None:
                 self._default_conf[key] = self._temp_conf[key].default
+            if self._temp_conf[key].default is not None:
+                self._all_default_conf[key] = self._temp_conf[key].default
         self._global_conf = None
+        self._unprocessed_global_conf = None
         self._clear_cache_server()
 
     def _apply_temp_conf(self, conf):
@@ -606,23 +623,44 @@ class ClusterConfig(object):
             return None
 
     def check_param(self):
-        error = []
+        errors = []
         if self._temp_conf:
-            error += self._check_param(self.get_global_conf())
+            _, g_errs = self.global_check_param()
+            errors += g_errs
             for server in self._server_conf:
-                error += self._check_param(self._server_conf[server])
-        return not error, set(error)
+                s_errs, _ = self._check_param(self._server_conf[server])
+                errors += s_errs
+        return not errors, set(errors)
+
+    def global_check_param(self):
+        errors = []
+        if self._temp_conf:
+            errors, _ = self._check_param(self._get_unprocessed_global_conf())
+        return not errors, errors
+
+    def servers_check_param(self):
+        check_res = {}
+        if self._temp_conf:
+            global_config = self._get_unprocessed_global_conf()
+            for server in self._server_conf:
+                config = deepcopy(self._server_conf[server])
+                config.update(global_config)
+                errors, items = self._check_param(config)
+                check_res[server] = {'errors': errors, 'items': items}
+        return check_res
 
     def _check_param(self, config):
-        error = []
+        errors = []
+        items = []
         for key in config:
             item = self._temp_conf.get(key)
             if item:
                 try:
                     item.check_value(config[key])
                 except Exception as e:
-                    error.append(str(e))
-        return error
+                    errors.append(str(e))
+                    items.append(item)
+        return errors, items
 
     def set_global_conf(self, conf):
         if not isinstance(conf, dict):
@@ -652,14 +690,23 @@ class ClusterConfig(object):
         self._server_conf[server] = conf
         self._cache_server[server] = None
 
+    def _get_unprocessed_global_conf(self):
+        if self._unprocessed_global_conf is None:
+            self._unprocessed_global_conf = deepcopy(self._default_conf)
+            self._unprocessed_global_conf.update(self._get_include_config('config', {}))
+            if self._original_global_conf:
+                self._unprocessed_global_conf.update(self._original_global_conf)
+        return self._unprocessed_global_conf
+
     def get_global_conf(self):
         if self._global_conf is None:
-            self._global_conf = deepcopy(self._default_conf)
-            self._global_conf.update(self._get_include_config('config', {}))
-            if self._original_global_conf:
-                self._global_conf.update(self._original_global_conf)
-            self._global_conf = self._apply_temp_conf(self._global_conf)
+            self._global_conf = self._apply_temp_conf(self._get_unprocessed_global_conf())
         return self._global_conf
+
+    def get_global_conf_with_default(self):
+        config = deepcopy(self._all_default_conf)
+        config.update(self.get_global_conf())
+        return config
 
     def _add_base_dir(self, path):
         if not os.path.isabs(path):
@@ -758,21 +805,31 @@ class ClusterConfig(object):
             self._environments.update(self._origin_environments)
         return self._environments
 
+    def _get_unprocessed_server_conf(self, server):
+        if server not in self._unprocessed_server_conf:
+            conf = deepcopy(self._inner_config.get(server.name, {}))
+            conf.update(self._get_unprocessed_global_conf())
+            conf.update(self._server_conf[server])
+            self._unprocessed_server_conf[server] = conf
+        return self._unprocessed_server_conf[server]
+
     def get_server_conf(self, server):
         if server not in self._server_conf:
             return None
         if self._cache_server[server] is None:
-            conf = self._apply_temp_conf(deepcopy(self._inner_config.get(server.name, {})))
-            conf.update(self.get_global_conf())
-            conf.update(self._apply_temp_conf(self._server_conf[server]))
-            self._cache_server[server] = conf
+            self._cache_server[server] = self._apply_temp_conf(self._get_unprocessed_server_conf(server))
         return self._cache_server[server]
 
     def get_original_global_conf(self):
-        return self._original_global_conf
+        return deepcopy(self._original_global_conf)
 
     def get_original_server_conf(self, server):
         return self._server_conf.get(server)
+
+    def get_original_server_conf_with_global(self, server):
+        config = self.get_original_global_conf()
+        config.update(self._server_conf.get(server, {}))
+        return config
 
 
 class DeployStatus(Enum):

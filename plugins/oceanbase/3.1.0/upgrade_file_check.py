@@ -23,7 +23,9 @@ from __future__ import absolute_import, division, print_function
 import os
 
 
-def upgrade_file_check(plugin_context, current_repository, repositories, route, *args, **kwargs):
+def upgrade_file_check(plugin_context, route, *args, **kwargs):
+    current_repository = kwargs.get('repository')
+    repositories = plugin_context.repositories
     options = plugin_context.options
     stdio = plugin_context.stdio
 

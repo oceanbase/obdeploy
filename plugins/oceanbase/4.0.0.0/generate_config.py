@@ -22,8 +22,10 @@ from __future__ import absolute_import, division, print_function
 
 
 import re, os
+from math import sqrt
 
-from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED
+from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED, EC_OBSERVER_GET_MEMINFO_FAIL
+import _errno as err
 
 
 def parse_size(size):
@@ -55,79 +57,90 @@ def format_size(size, precision=1):
     return format % (size, units[idx])
 
 
-def get_system_memory(memory_limit):
-    if memory_limit < (8 << 30):
+def get_system_memory(memory_limit, min_pool_memory, generate_config_mini):
+    if generate_config_mini and memory_limit <= 6 << 30:
         system_memory = 1 << 30
-    elif memory_limit <= (64 << 30):
-        system_memory = memory_limit * 0.5
-    elif memory_limit <= (150 << 30):
-        system_memory = memory_limit * 0.4
+    elif memory_limit <= 8 << 30:
+        system_memory = 2 << 30
+    elif memory_limit <= 16 << 30:
+        system_memory = 3 << 30
+    elif memory_limit <= 32 << 30:
+        system_memory = 5 << 30
+    elif memory_limit <= 48 << 30:
+        system_memory = 7 << 30
+    elif memory_limit <= 64 << 30:
+        system_memory = 10 << 30
     else:
-        system_memory = memory_limit * 0.3
-    return max(1 << 30, system_memory)
+        memory_limit_gb = memory_limit >> 30
+        system_memory = int(3 * (sqrt(memory_limit_gb) - 3)) << 30
+    return max(system_memory, min_pool_memory)
 
 
-def generate_config(plugin_context, deploy_config, *args, **kwargs):
+def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, *args, **kwargs):
+    if return_generate_keys:
+        return plugin_context.return_true(generate_keys=[
+            'memory_limit', 'datafile_size', 'log_disk_size', 'devname', 'system_memory', 'cpu_count', 'production_mode',
+            'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size'
+        ])
+
+    def update_server_conf(server, key, value):
+        if server not in generate_configs:
+            generate_configs[server] = {}
+        generate_configs[server][key] = value
+    def update_global_conf(key, value):
+        generate_configs['global'][key] = value
+    def summit_config():
+        generate_global_config = generate_configs['global']
+        for key in generate_global_config:
+            cluster_config.update_global_conf(key, generate_global_config[key], False)
+        for server in cluster_config.servers:
+            if server not in generate_configs:
+                continue
+            generate_server_config = generate_configs[server]
+            for key in generate_server_config:
+                cluster_config.update_server_conf(server, key, generate_server_config[key], False)
+
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     success = True
+    generate_configs = {'global': {}}
+    plugin_context.set_variable('generate_configs', generate_configs)
     stdio.start_loading('Generate observer configuration')
 
     global_config = cluster_config.get_global_conf()
-    if not global_config.get('appname'):
-        default_appname = 'obcluster'
-        for componet_name in ['obproxy', 'obproxy-ce']:
-            if componet_name in deploy_config.components:
-                obproxy_cluster_config = deploy_config.components[componet_name]
-                cluster_name = obproxy_cluster_config.get_global_conf().get('cluster_name')
-                if not cluster_name:
-                    for server in obproxy_cluster_config.servers:
-                        server_config = obproxy_cluster_config.get_server_conf(server)
-                        if server_config.get('cluster_name'):
-                            default_appname = server_config['cluster_name']
-                            break
-                break
-        cluster_config.update_global_conf('appname', default_appname, False)
-
     max_syslog_file_count_default = 4
-    if global_config.get('syslog_level') is None:
-        cluster_config.update_global_conf('syslog_level', 'INFO', False)
     if global_config.get('enable_syslog_recycle') is None:
-        cluster_config.update_global_conf('enable_syslog_recycle', True, False)
+        update_global_conf('enable_syslog_recycle', True)
     if global_config.get('enable_syslog_wf') is None:
-        cluster_config.update_global_conf('enable_syslog_wf', True, False)
+        update_global_conf('enable_syslog_wf', False)
     if global_config.get('max_syslog_file_count') is None:
-        cluster_config.update_global_conf('max_syslog_file_count', max_syslog_file_count_default, False)
+        update_global_conf('max_syslog_file_count', max_syslog_file_count_default)
     if global_config.get('cluster_id') is None:
-        cluster_config.update_global_conf('cluster_id', 1, False)
+        update_global_conf('cluster_id', 1)
 
     MIN_MEMORY = 6 << 30
     PRO_MEMORY_MIN = 16 << 30
     SLOG_SIZE = 10 << 30
     MIN_CPU_COUNT = 16
     START_NEED_MEMORY = 3 << 30
-    if getattr(plugin_context.options, 'mini', False):
-        if not global_config.get('memory_limit_percentage') and not global_config.get('memory_limit'):
-            cluster_config.update_global_conf('memory_limit', format_size(MIN_MEMORY, 0), False)
-        if not global_config.get('datafile_size') and not global_config.get('datafile_disk_percentage'):
-            cluster_config.update_global_conf('datafile_size', '20G', False)
-        if not global_config.get('log_disk_size') and not global_config.get('log_disk_percentage'):
-            cluster_config.update_global_conf('log_disk_size', '24G', False)
 
+    MINI_MEMORY_SIZE = MIN_MEMORY
+    MINI_DATA_FILE_SIZE = 20 << 30
+    MINI_LOG_DISK_SIZE = 15 << 30
+
+    has_ocp = 'ocp-express' in [repo.name for repo in plugin_context.repositories]
+    ip_server_memory_info = {}
+    servers_info = {}
     for server in cluster_config.servers:
         ip = server.ip
         client = clients[server]
         server_config = cluster_config.get_server_conf_with_default(server)
-        user_server_config = cluster_config.get_original_server_conf(server)
-        if not server_config.get('home_path'):
-            stdio.error("observer %s: missing configuration 'home_path' in configuration file" % server)
-            success = False
-            continue
+        user_server_config = cluster_config.get_original_server_conf_with_global(server)
 
         if user_server_config.get('devname') is None:
             if client.is_localhost():
-                cluster_config.update_server_conf(server, 'devname', 'lo')
+                update_server_conf(server, 'devname', 'lo')
             else:
                 devinfo = client.execute_command('cat /proc/net/dev').stdout
                 interfaces = re.findall('\n\s+(\w+):', devinfo)
@@ -135,7 +148,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     if interface == 'lo':
                         continue
                     if client.execute_command('ping -W 1 -c 1 -I %s %s' % (interface, ip)):
-                        cluster_config.update_server_conf(server, 'devname', interface)
+                        update_server_conf(server, 'devname', interface)
                         break
 
         dirs = {"home_path": server_config['home_path']}
@@ -146,67 +159,80 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
         # memory
         auto_set_memory = False
         auto_set_system_memory = False
+        auto_set_min_pool_memory = False
         system_memory = 0
         if user_server_config.get('system_memory'):
             system_memory = parse_size(user_server_config.get('system_memory'))
+        if generate_config_mini and '__min_full_resource_pool_memory' not in user_server_config:
+            auto_set_min_pool_memory = True
+        min_pool_memory = server_config['__min_full_resource_pool_memory']
         min_memory = max(system_memory, MIN_MEMORY)
-        if user_server_config.get('memory_limit_percentage'):
+        if ip not in ip_server_memory_info:
             ret = client.execute_command('cat /proc/meminfo')
             if ret:
-                total_memory = 0
+                ip_server_memory_info[ip] = server_memory_stats = {}
+                memory_key_map = {
+                    'MemTotal': 'total',
+                    'MemFree': 'free',
+                    'MemAvailable': 'available',
+                    'Buffers': 'buffers',
+                    'Cached': 'cached'
+                }
+                for key in memory_key_map:
+                    server_memory_stats[memory_key_map[key]] = 0
                 for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
-                    if k == 'MemTotal':
-                        total_memory = parse_size(str(v))
-            memory_limit = int(total_memory * user_server_config.get('memory_limit_percentage') / 100)
-        else:
-            if not server_config.get('memory_limit'):
-                ret = client.execute_command('cat /proc/meminfo')
-                if ret:
-                    server_memory_stats = {}
-                    memory_key_map = {
-                        'MemTotal': 'total',
-                        'MemFree': 'free',
-                        'MemAvailable': 'available',
-                        'Buffers': 'buffers',
-                        'Cached': 'cached'
-                    }
-                    for key in memory_key_map:
-                        server_memory_stats[memory_key_map[key]] = 0
-                    for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
-                        if k in memory_key_map:
-                            key = memory_key_map[k]
-                            server_memory_stats[key] = parse_size(str(v))
+                    if k in memory_key_map:
+                        key = memory_key_map[k]
+                        server_memory_stats[key] = parse_size(str(v))
 
-                    if server_memory_stats['available'] < START_NEED_MEMORY:
-                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(START_NEED_MEMORY)))
-                        success = False
-                        continue
-                    
-                    if server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached'] < MIN_MEMORY:
-                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(MIN_MEMORY)))
-                        success = False
-                        continue
+        if user_server_config.get('memory_limit_percentage'):
+            if ip in ip_server_memory_info:
+                total_memory = parse_size(ip_server_memory_info[ip]['total'])
+                memory_limit = int(total_memory * user_server_config.get('memory_limit_percentage') / 100)
+            elif generate_check:
+                stdio.error(EC_OBSERVER_GET_MEMINFO_FAIL.format(server=server))
+                success = False
+                continue
+            else:
+                memory_limit = MIN_MEMORY
+        elif not server_config.get('memory_limit'):
+            if generate_config_mini:
+                memory_limit = MINI_MEMORY_SIZE
+                update_server_conf(server, 'memory_limit', format_size(memory_limit, 0))
+                update_server_conf(server, 'production_mode', False)
+                if auto_set_min_pool_memory:
+                    min_pool_memory = 1073741824
+                    update_server_conf(server, '__min_full_resource_pool_memory', min_pool_memory)
+            else:
+                if ip in ip_server_memory_info:
+                    server_memory_stats = ip_server_memory_info[ip]
+                    if generate_check:
+                        if server_memory_stats['available'] < START_NEED_MEMORY:
+                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(START_NEED_MEMORY)))
+                            success = False
+                            continue
 
-                    memory_limit = max(MIN_MEMORY, server_memory_stats['available'] * 0.9)
-                    server_config['memory_limit'] = format_size(memory_limit, 0)
-                    cluster_config.update_server_conf(server, 'memory_limit', server_config['memory_limit'], False)
+                        if server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached'] < MIN_MEMORY:
+                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(MIN_MEMORY)))
+                            success = False
+                            continue
+                    memory_limit = max(MIN_MEMORY, int(server_memory_stats['available'] * 0.9))
+                    update_server_conf(server, 'memory_limit', format_size(memory_limit, 0))
                     auto_set_memory = True
-                else:
-                    stdio.error("%s: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
+                elif generate_check:
+                    stdio.error(EC_OBSERVER_GET_MEMINFO_FAIL.format(server=server))
                     success = False
                     continue
-            else:
-                try:
-                    memory_limit = parse_size(server_config.get('memory_limit'))
-                except:
-                    stdio.error('memory_limit must be an integer')
-                    return
+                else:
+                    memory_limit = MIN_MEMORY
+        else:
+            memory_limit = parse_size(server_config.get('memory_limit'))
 
         if system_memory == 0:
             auto_set_system_memory = True
-            system_memory = get_system_memory(memory_limit)
-            cluster_config.update_server_conf(server, 'system_memory', format_size(system_memory, 0), False)
-            
+            system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+            update_server_conf(server, 'system_memory', format_size(system_memory, 0))
+
         # cpu
         if not server_config.get('cpu_count'):
             ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
@@ -215,14 +241,15 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 server_config['cpu_count'] = max(MIN_CPU_COUNT, int(cpu_num - 2))
             else:
                 server_config['cpu_count'] = MIN_CPU_COUNT
-            cluster_config.update_server_conf(server, 'cpu_count', server_config['cpu_count'], False)
+            update_server_conf(server, 'cpu_count', server_config['cpu_count'])
         elif server_config['cpu_count'] < MIN_CPU_COUNT:
-            cluster_config.update_server_conf(server, 'cpu_count', MIN_CPU_COUNT, False)
+            update_server_conf(server, 'cpu_count', MIN_CPU_COUNT)
             stdio.warn('(%s): automatically adjust the cpu_count %s' % (server, MIN_CPU_COUNT))
-            
+
         # disk
-        if (not server_config.get('datafile_size') and not user_server_config.get('datafile_disk_percentage')) or \
-             (not server_config.get('log_disk_size') and not user_server_config.get('log_disk_percentage')):
+        datafile_size = parse_size(server_config.get('datafile_size', 0))
+        log_disk_size = parse_size(server_config.get('log_disk_size', 0))
+        if not server_config.get('datafile_size') or not server_config.get('log_disk_size'):
             disk = {'/': 0}
             ret = client.execute_command('df --block-size=1024')
             if ret:
@@ -257,22 +284,23 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
 
             home_path_mount = mounts[dirs['home_path']]
             home_path_disk = disk[home_path_mount]
-            
+
             data_dir_mount = mounts[dirs['data_dir']]
             data_dir_disk = disk[data_dir_mount]
-            
+
             clog_dir_mount = mounts[dirs['clog_dir']]
             clog_dir_disk = disk[clog_dir_mount]
 
             auto_set_datafile_size = False
             auto_set_log_disk_size = False
-            datafile_size = parse_size(server_config.get('datafile_size', 0))
-            log_disk_size = parse_size(server_config.get('log_disk_size', 0))
 
             if not datafile_size:
                 datafile_disk_percentage = int(user_server_config.get('datafile_disk_percentage', 0))
                 if datafile_disk_percentage:
                     datafile_size = data_dir_mount['total'] * datafile_disk_percentage / 100
+                elif generate_config_mini:
+                    datafile_size = MINI_DATA_FILE_SIZE
+                    update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
                 else:
                     auto_set_datafile_size = True
 
@@ -280,13 +308,16 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 log_disk_percentage = int(user_server_config.get('log_disk_percentage', 0))
                 if log_disk_percentage:
                     log_disk_size = clog_dir_disk['total'] * log_disk_percentage / 100
+                elif generate_config_mini:
+                    log_disk_size = MINI_LOG_DISK_SIZE
+                    update_server_conf(server, 'log_disk_size', format_size(log_disk_size, 0))
                 else:
                     auto_set_log_disk_size = True
 
             if user_server_config.get('enable_syslog_recycle') is False:
                 log_size = 1 << 30 # 默认先给1G普通日志空间
             else:
-                log_size = (256 << 20) * user_server_config.get('max_syslog_file_count', max_syslog_file_count_default) * 4
+                log_size = (256 << 20) * int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) * 4
 
             if clog_dir_mount == data_dir_mount:
                 min_log_size = log_size if clog_dir_mount == home_path_mount else 0
@@ -304,18 +335,30 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     min_log_disk_size = log_disk_size
                     MIN_NEED += log_disk_size
                 min_need = min_log_size + min_datafile_size + min_log_disk_size
-                
+
                 disk_free = data_dir_disk['avail']
                 if MIN_NEED > disk_free:
-                    stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s).' % (ip, data_dir_mount, format_size(disk_free), format_size(MIN_NEED)))
-                    success = False
-                    continue
-                if min_need > disk_free:
-                    if not auto_set_memory:
-                        stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s).' % (ip, data_dir_mount, format_size(disk_free), format_size(min_need)))
+                    if generate_check:
+                        stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(MIN_NEED)))
                         success = False
                         continue
-                    
+                    else:
+                        if auto_set_datafile_size:
+                            datafile_size = MIN_MEMORY * 3
+                        if auto_set_log_disk_size:
+                            log_disk_size = MIN_MEMORY * 3
+                        if auto_set_memory:
+                            memory_limit = MIN_MEMORY
+                            update_server_conf(server, 'memory_limit', format_size(memory_limit, 0))
+                        if auto_set_system_memory:
+                            system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+                            update_server_conf(server, 'system_memory', format_size(system_memory, 0))
+                elif min_need > disk_free:
+                    if generate_check and not auto_set_memory:
+                        stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
+                        success = False
+                        continue
+
                     disk_free = disk_free - log_size - SLOG_SIZE
                     memory_factor = 6
                     if auto_set_datafile_size is False:
@@ -325,21 +368,21 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                         disk_free -= min_log_disk_size
                         memory_factor -= 3
                     memory_limit = format_size(disk_free / max(1, memory_factor), 0)
-                    cluster_config.update_server_conf(server, 'memory_limit', memory_limit, False)
+                    update_server_conf(server, 'memory_limit', memory_limit)
                     memory_limit = parse_size(memory_limit)
                     if auto_set_system_memory:
-                        system_memory = get_system_memory(memory_limit)
-                        cluster_config.update_server_conf(server, 'system_memory', format_size(system_memory, 0), False)
+                        system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+                        update_server_conf(server, 'system_memory', format_size(system_memory, 0))
                     log_disk_size = memory_limit * 3
-                    datafile_size = disk_free - log_disk_size
+                    datafile_size = max(disk_free - log_disk_size, log_disk_size)
                 else:
                     log_disk_size = memory_limit * 3
-                    datafile_size = disk_free - log_size - SLOG_SIZE - log_disk_size
+                    datafile_size = max(disk_free - log_size - SLOG_SIZE - log_disk_size, log_disk_size)
 
                 if auto_set_datafile_size:
-                    cluster_config.update_server_conf(server, 'datafile_size', format_size(datafile_size, 0), False)
+                    update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
                 if auto_set_log_disk_size:
-                    cluster_config.update_server_conf(server, 'log_disk_size', format_size(log_disk_size, 0), False)
+                    update_server_conf(server, 'log_disk_size', format_size(log_disk_size, 0))
             else:
                 datafile_min_memory_limit = memory_limit
                 if auto_set_datafile_size:
@@ -347,18 +390,18 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     min_log_size = log_size if data_dir_mount == home_path_mount else 0
                     disk_free = data_dir_disk['avail']
                     min_need = min_log_size + datafile_size + SLOG_SIZE
-                    if min_need > disk_free:
+                    if generate_check and min_need > disk_free:
                         if not auto_set_memory:
-                            stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s).' % (ip, data_dir_mount, format_size(disk_free), format_size(min_need)))
+                            stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
                             success = False
                             continue
                         datafile_min_memory_limit = (disk_free - log_size - SLOG_SIZE) / 3
                         if datafile_min_memory_limit < min_memory:
-                            stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s).' % (ip, data_dir_mount, format_size(disk_free), format_size(min_need)))
+                            stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
                             success = False
                             continue
                         datafile_min_memory_limit = parse_size(format_size(datafile_min_memory_limit, 0))
-                        disk_log_size = datafile_min_memory_limit * 3
+                        datafile_size = datafile_min_memory_limit * 3
 
                 log_disk_min_memory_limit = memory_limit
                 if auto_set_log_disk_size:
@@ -366,33 +409,144 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     min_log_size = log_size if clog_dir_mount == home_path_mount else 0
                     disk_free = clog_dir_disk['avail']
                     min_need = min_log_size + log_disk_size
-                    if min_need > disk_free:
+                    if generate_check and min_need > disk_free:
                         if not auto_set_memory:
-                            stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s).' % (ip, clog_dir_mount, format_size(disk_free), format_size(min_need)))
+                            stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
                             success = False
                             continue
                         log_disk_min_memory_limit = (disk_free - log_size) / 3
                         if log_disk_min_memory_limit < min_memory:
-                            stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s).' % (ip, clog_dir_mount, format_size(disk_free), format_size(min_need)))
+                            stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
                             success = False
                             continue
                         log_disk_min_memory_limit = parse_size(format_size(log_disk_min_memory_limit, 0))
                         log_disk_size = log_disk_min_memory_limit * 3
-                
+
                 if auto_set_memory:
-                    cluster_config.update_server_conf(server, 'memory_limit', format_size(memory_limit, 0), False)
+                    update_server_conf(server, 'memory_limit', format_size(memory_limit, 0))
                     if auto_set_system_memory:
-                        system_memory = get_system_memory(memory_limit)
-                        cluster_config.update_server_conf(server, 'system_memory', format_size(system_memory, 0), False)
-                
+                        system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+                        update_server_conf(server, 'system_memory', system_memory)
+
                 if auto_set_datafile_size:
-                    cluster_config.update_server_conf(server, 'datafile_size', format_size(datafile_size, 0), False)
+                    update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
                 if auto_set_log_disk_size:
-                    cluster_config.update_server_conf(server, 'log_disk_size', format_size(log_disk_size, 0), False)
+                    update_server_conf(server, 'log_disk_size', format_size(log_disk_size, 0))
 
         if memory_limit < PRO_MEMORY_MIN:
-            cluster_config.update_server_conf(server, 'production_mode', False, False)
-                        
+            update_server_conf(server, 'production_mode', False)
+        servers_info[server] = {
+            "memory_limit": memory_limit,
+            "system_memory": system_memory,
+            "min_pool_memory": min_pool_memory,
+            "log_disk_size": log_disk_size
+        }
+
+    # ocp meta db
+    SYS_TENANT_LOG_DISK_SCALE = 1
+    if has_ocp:
+        if 'ocp_meta_tenant_log_disk_size' not in global_config and 'log_disk_size' not in global_config.get('ocp_meta_tenant', {}):
+            if generate_config_mini:
+                update_global_conf('ocp_meta_tenant_log_disk_size', '6656M')
+            else:
+                meta_min_log_disk_size = 6 << 30
+                expect_log_disk_size = (9 * 512 + 512 * len(cluster_config.servers) + 512 * 3) << 20
+                max_available = 0
+                sys_memory_size = None
+                sys_log_disk_size = None
+                if 'sys_tenant' in global_config:
+                    if 'memory_size' in global_config['sys_tenant']:
+                        sys_memory_size = global_config['sys_tenant']['memory_size']
+                    if 'log_disk_size' in global_config['sys_tenant']:
+                        sys_log_disk_size = global_config['sys_tenant']['log_disk_size']
+                for server in cluster_config.servers:
+                    # server_config = cluster_config.get_server_conf_with_default(server)
+                    server_info = servers_info.get(server)
+                    if not server_info:
+                        continue
+                    memory_limit = server_info['memory_limit']
+                    system_memory = server_info['system_memory']
+                    log_disk_size = server_info['log_disk_size']
+                    min_pool_memory = server_info['min_pool_memory']
+                    if not sys_log_disk_size:
+                        if not sys_memory_size:
+                            sys_memory_size = max(min_pool_memory, min(int((memory_limit - system_memory) * 0.25), 16 << 30))
+                        sys_log_disk_size = sys_memory_size * SYS_TENANT_LOG_DISK_SCALE
+                    max_available = max(max_available, log_disk_size - sys_log_disk_size)
+                if expect_log_disk_size > max_available:
+                    expect_log_disk_size = meta_min_log_disk_size
+                if expect_log_disk_size > max_available and generate_check:
+                    stdio.error(err.EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE.format(avail=max_available, need=expect_log_disk_size))
+                    success = False
+                cluster_config.update_global_conf('ocp_meta_tenant_log_disk_size', format_size(expect_log_disk_size, 0))
+        if generate_config_mini and 'ocp_meta_tenant_memory_size' not in global_config and 'memory_size' not in global_config.get('ocp_meta_tenant', {}):
+            update_global_conf('ocp_meta_tenant_memory_size', '1536M')
+
+    if generate_consistent_config:
+        generate_global_config = generate_configs['global']
+        server_num = len(cluster_config.servers)
+        keys = ['memory_limit', 'datafile_size', 'system_memory', 'log_disk_size', 'cpu_count', 'production_mode']
+        for key in keys:
+            servers = []
+            values = []
+            is_capacity_key = (key != 'cpu_count' and key != 'production_mode')
+            for server in cluster_config.servers:
+                if key in generate_configs.get(server, {}):
+                    value = generate_configs[server][key]
+                    servers.append(server)
+                    values.append(parse_size(value) if is_capacity_key else value)
+            if values:
+                if len(values) != server_num and key in generate_global_config:
+                    continue
+                value = min(values)
+                generate_global_config[key] = format_size(value, 0) if is_capacity_key else value
+                for server in servers:
+                    del generate_configs[server][key]
+
+    # merge_generate_config
+    merge_config = {}
+    generate_global_config = generate_configs['global']
+    count_base = len(cluster_config.servers) - 1
+    if count_base < 1:
+        for server in cluster_config.servers:
+            if server not in generate_configs:
+                continue
+            generate_global_config.update(generate_configs[server])
+            generate_configs[server] = {}
+    else:
+        for server in cluster_config.servers:
+            if server not in generate_configs:
+                continue
+            generate_server_config = generate_configs[server]
+            merged_server_config = {}
+            for key in generate_server_config:
+                if key in generate_global_config:
+                    if generate_global_config[key] != generate_server_config[key]:
+                        merged_server_config[key] = generate_server_config[key]
+                elif key in merge_config:
+                    if merge_config[key]['value'] != generate_server_config[key]:
+                        merged_server_config[key] = generate_server_config[key]
+                    elif count_base == merge_config[key]['count']:
+                        generate_global_config[key] = generate_server_config[key]
+                        del merge_config[key]
+                    else:
+                        merge_config[key]['severs'].append(server)
+                        merge_config[key]['count'] += 1
+                else:
+                    merge_config[key] = {'value': generate_server_config[key], 'severs': [server], 'count': 1}
+            generate_configs[server] = merged_server_config
+
+        for key in merge_config:
+            config_st = merge_config[key]
+            for server in config_st['severs']:
+                if server not in generate_configs:
+                    continue
+                generate_server_config = generate_configs[server]
+                generate_server_config[key] = config_st['value']
+
+    # summit_config
+    summit_config()
+
     if success:
         stdio.stop_loading('succeed')
         return plugin_context.return_true()

@@ -20,13 +20,9 @@
 
 from __future__ import absolute_import, division, print_function
 
-import sys
 import time
-
-if sys.version_info.major == 2:
-    from MySQLdb import DatabaseError
-else:
-    from pymysql.err import DatabaseError
+from copy import deepcopy
+from optparse import Values
 
 from _deploy import InnerConfigItem
 
@@ -43,24 +39,16 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
 
     def is_bootstrap():
         sql = "select column_value from oceanbase.__all_core_table where table_name = '__all_global_stat' and column_name = 'baseline_schema_version'"
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-        return int(cursor.fetchone().get("column_value")) > 0
-
-    try:
-        if is_bootstrap():
-            return plugin_context.return_true()
-    except DatabaseError as e:
-        stdio.verbose('%s:%s' % e.args)
-    except:
-        stdio.exception("")
+        ret = cursor.fetchone(sql, raise_exception=False, exc_level='verbose')
+        if ret is False:
+            return False
+        return int(ret.get("column_value")) > 0
 
     has_obproxy = False
     for componet_name in ['obproxy', 'obproxy-ce']:
         if componet_name in plugin_context.components:
             has_obproxy = True
             break
-    inner_keys = inner_config.keys()
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         zone = server_config['zone']
@@ -81,46 +69,75 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
                 continue
             zone_config[key] = server_config[key]
     try:
+        raise_cursor = cursor.raise_cursor
+        sql = 'set session ob_query_timeout=1000000000'
+        stdio.verbose('execute sql: %s' % sql)
+        raise_cursor.execute(sql)
         sql = 'alter system bootstrap %s' % (','.join(bootstrap))
         stdio.start_loading('Cluster bootstrap')
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
+        raise_cursor.execute(sql, exc_level='verbose')
         for zone in floor_servers:
             for addr in floor_servers[zone]:
                 sql = 'alter system add server "%s" zone "%s"' % (addr, zone)
-                stdio.verbose('execute sql: %s' % sql)
-                cursor.execute(sql)
+                raise_cursor.execute(sql)
         global_conf = cluster_config.get_global_conf()
         if has_obproxy or 'proxyro_password' in global_conf:
             value = global_conf['proxyro_password'] if global_conf.get('proxyro_password') is not None else ''
             sql = 'create user "proxyro" IDENTIFIED BY %s'
-            stdio.verbose(sql)
-            cursor.execute(sql, [value])
+            raise_cursor.execute(sql, [value])
             sql = 'grant select on oceanbase.* to proxyro IDENTIFIED BY %s'
+            raise_cursor.execute(sql, [value])
+
+        has_obagent = "obagent" in plugin_context.components
+        if has_obagent or 'ocp_agent_monitor_password' in global_conf:
+            value = global_conf['ocp_agent_monitor_password'] if global_conf.get('ocp_agent_monitor_password') is not None else ''
+            sql = 'create user "ocp_monitor" IDENTIFIED BY %s'
             stdio.verbose(sql)
-            cursor.execute(sql, [value])
+            raise_cursor.execute(sql, [value])
+            sql = 'grant select on oceanbase.* to ocp_monitor IDENTIFIED BY %s'
+            stdio.verbose(sql)
+            raise_cursor.execute(sql, [value])
+
         if global_conf.get('root_password') is not None:
-            sql = 'alter user "root" IDENTIFIED BY "%s"' % global_conf.get('root_password')
-            stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql)
+            sql = 'alter user "root" IDENTIFIED BY %s'
+            raise_cursor.execute(sql, [global_conf.get('root_password')])
         for zone in zones_config:
             zone_config = zones_config[zone]
             for key in zone_config:
                 sql = 'alter system modify zone %s set %s = %%s' % (zone, inner_config[key])
-                stdio.verbose('execute sql: %s' % sql)
-                cursor.execute(sql, [zone_config[key]])
+                raise_cursor.execute(sql, [zone_config[key]])
         stdio.stop_loading('succeed')
-        plugin_context.return_true()
     except:
-        stdio.exception('')
-        try:
-            sql = 'set session ob_query_timeout=1000000000'
-            stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql)
-            if is_bootstrap():
-                stdio.stop_loading('succeed')
-                return plugin_context.return_true()
-        except:
-            stdio.exception('')
-        stdio.stop_loading('fail')
-        return plugin_context.return_false()
+        if not is_bootstrap():
+            stdio.stop_loading('fail')
+            return plugin_context.return_false()
+        stdio.stop_loading('succeed')
+        return plugin_context.return_true()
+
+    has_ocp = 'ocp-express' in plugin_context.components
+    if any([key in global_conf for key in ["ocp_meta_tenant", "ocp_meta_db", "ocp_meta_username", "ocp_meta_password"]]):
+        has_ocp = True
+    if has_ocp:
+        global_conf_with_default = deepcopy(cluster_config.get_global_conf_with_default())
+        ocp_meta_tenant_prefix = 'ocp_meta_tenant_'
+        for key in global_conf_with_default:
+            if key.startswith(ocp_meta_tenant_prefix):
+                global_conf_with_default['ocp_meta_tenant'][key.replace(ocp_meta_tenant_prefix, '', 1)] = global_conf_with_default[key]
+        tenant_info = global_conf_with_default["ocp_meta_tenant"]
+        tenant_info["variables"] = "ob_tcp_invited_nodes='%'"
+        tenant_info["create_if_not_exists"] = True
+        tenant_info["database"] = global_conf_with_default["ocp_meta_db"]
+        tenant_info["db_username"] = global_conf_with_default["ocp_meta_username"]
+        tenant_info["db_password"] = global_conf_with_default.get("ocp_meta_password", "")
+        tenant_options = Values(tenant_info)
+        plugin_context.set_variable("create_tenant_options", tenant_options)
+    # wait for server online
+    all_server_online = False
+    while not all_server_online:
+        servers = cursor.fetchall('select * from oceanbase.__all_server', raise_exception=False, exc_level='verbose')
+        if servers and all([s.get('status') for s in servers]):
+            all_server_online = True
+        else:
+            time.sleep(1)
+
+    return plugin_context.return_true()

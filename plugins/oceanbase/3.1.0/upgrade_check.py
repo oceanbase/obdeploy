@@ -23,21 +23,9 @@ from __future__ import absolute_import, division, print_function
 import os
 
 
-def upgrade_check(plugin_context, current_repository, repositories, route, cursor, *args, **kwargs):
-    def execute_sql(query, args=None, one=True, error=True):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            stdio.verbose('execute sql: %s' % msg)
-            cursor.execute(query, args)
-            result = cursor.fetchone() if one else cursor.fetchall()
-            result and stdio.verbose(result)
-            return result
-        except:
-            msg = 'execute sql exception: %s' % msg if error else ''
-            stdio.exception(msg)
-        return False
+def upgrade_check(plugin_context, current_repository, route, cursor, *args, **kwargs):
 
+    repositories = plugin_context.repositories
     options = plugin_context.options
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
@@ -53,7 +41,10 @@ def upgrade_check(plugin_context, current_repository, repositories, route, curso
         zones.add(zone)
     
     if len(zones) > 2:
-        tenants = execute_sql('select * from oceanbase.gv$tenant', one=False)
+        tenants = cursor.fetchall('select * from oceanbase.gv$tenant')
+        if tenants is False:
+            return
+        tenants and stdio.verbose(tenants)
         for tenant in tenants:
             zone_list = tenant.get('zone_list', '').split(';')
             if len(zone_list) < 3:

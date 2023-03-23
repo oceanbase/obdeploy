@@ -25,7 +25,8 @@ import os
 from ssh import LocalClient
 
 
-def check_opt(plugin_context, opt, *args, **kwargs):
+def check_opt(plugin_context, env, *args, **kwargs):
+    opt = env
     stdio = plugin_context.stdio
     server = opt['test_server']
     obclient_bin = opt['obclient_bin']
@@ -96,15 +97,12 @@ def check_opt(plugin_context, opt, *args, **kwargs):
         stdio.verbose('load engine from config')
         opt['_enable_static_typing_engine'] = global_config['_enable_static_typing_engine']
     else:
-        try:
-            sql = "select value from oceanbase.__all_virtual_sys_parameter_stat where name like '_enable_static_typing_engine';"
-            stdio.verbose('execute sql: {}'.format(sql))
-            cursor.execute(sql)
-            ret = cursor.fetchone()
-            stdio.verbose('query engine ret: {}'.format(ret))
-            if ret:
-                opt['_enable_static_typing_engine'] = ret.get('value')
-        except:
-            stdio.exception('')
+        sql = "select value from oceanbase.__all_virtual_sys_parameter_stat where name like '_enable_static_typing_engine';"
+        ret = cursor.fetchone(sql)
+        if ret is False:
+            return
+        stdio.verbose('query engine ret: {}'.format(ret))
+        if ret:
+            opt['_enable_static_typing_engine'] = ret.get('value')
     stdio.verbose('_enable_static_typing_engine: {}'.format(opt['_enable_static_typing_engine']))
     return plugin_context.return_true()

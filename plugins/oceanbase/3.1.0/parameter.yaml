@@ -1,5 +1,7 @@
 - name: home_path
+  name_local: 工作目录
   require: true
+  essential: true
   type: STRING
   min_value: NULL
   max_value: NULL
@@ -7,7 +9,9 @@
   description_en: the directory for the work data file
   description_local: OceanBase工作目录
 - name: cluster_id
+  name_local: 集群ID
   require: true
+  essential: true
   type: INT
   default: 1
   min_value: 1
@@ -17,14 +21,18 @@
   description_en: ID of the cluster
   description_local: 本OceanBase集群ID
 - name: data_dir
+  name_local: 数据目录
   type: STRING
+  essential: true
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: the directory for the data file
   description_local: 存储sstable等数据的目录
 - name: redo_dir
+  name_local: 日志目录
   type: STRING
+  essential: true
   min_value: NULL
   max_value: NULL
   need_redeploy: true
@@ -52,14 +60,18 @@
   description_en: the directory for the ilog file
   description_local: 存储ilog数据的目录 
 - name: devname
+  name_local: 网卡名
   type: STRING
+  essential: true
   min_value: NULL
   max_value: NULL
   need_restart: true
   description_en: name of network adapter
   description_local: 服务进程绑定的网卡设备名
 - name: rpc_port
+  name_local: 内部通信端口
   require: true
+  essential: true
   type: INT
   default: 2882
   min_value: 1025
@@ -69,7 +81,9 @@
   description_en: the port number for RPC protocol.
   description_local: 集群内部通信的端口号
 - name: mysql_port
+  name_local: 服务端口
   require: true
+  essential: true
   type: INT
   default: 2881
   min_value: 1025
@@ -289,7 +303,9 @@
   description_en: the time interval between the schedules of the task that checks whether the partition load balancing task has timed-out.
   description_local: 检查负载均衡等后台任务是否超时的时间间隔
 - name: datafile_size
+  name_local: 数据文件大小
   require: false
+  essential: true
   type: CAPACITY
   default: 0
   min_value: 0M
@@ -297,8 +313,8 @@
   modify_limit: decrease
   section: SSTABLE
   need_restart: false
-  description_en: size of the data file.
-  description_local: 数据文件大小。一般不要设置。
+  description_en: size of the data file. Please enter an capacity, such as 20G
+  description_local: 数据文件大小。请输入带容量带单位的整数，如20G
 - name: clog_cache_priority
   require: false
   type: INT
@@ -780,6 +796,7 @@
   description_local: 本地存储配置文件的多个目录，为了冗余存储多份配置文件
 - name: enable_syslog_recycle
   require: false
+  essential: true
   type: BOOL
   default: false
   min_value: NULL
@@ -788,6 +805,17 @@
   need_restart: false
   description_en: specifies whether log file recycling is turned on
   description_local: 是否自动回收系统日志
+- name: max_syslog_file_count
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in. Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
+  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
 - name: meta_table_read_write_mode
   require: false
   type: INT
@@ -1007,7 +1035,6 @@
   section: OBSERVER
   need_restart: false
   description_en: specify what kind of verification should be done when merging micro block. 0, no verification will be done; 1, verify encoding algorithm, encoded micro block will be read to ensure data is correct; 2, verify encoding and compression algorithm, besides encoding verification, compressed block will be decompressed to ensure data is correct; 3, verify encoding, compression algorithm and lost write protect
-
   description_local: 控制合并时宏块的校验级别
 - name: backup_net_limit
   require: false
@@ -1279,15 +1306,6 @@
   need_restart: false
   description_en: size of clog files that a replica lag behind leader to trigger rebuild
   description_local: 备副本的事务日志和主副本差距超过该阈值时，触发副本重建
-- name: system_memory
-  type: CAPACITY
-  default: 30G
-  min_value: 0M
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: the memory reserved for internal use which cannot be allocated to any outer-tenant, and should be determined to guarantee every server functions normally.
-  description_local: 系统预留内存大小，不能分配给普通租户使用
 - name: cpu_quota_concurrency
   require: false
   type: DOUBLE
@@ -1389,7 +1407,9 @@
   description_en: the time interval between the schedules of the partition load-balancing task.
   description_local: 负载均衡等后台任务线程空闲时的唤醒间隔时间
 - name: memory_limit
+  name_local: 最大运行内存
   require: false
+  essential: true
   type: CAPACITY
   default: 0
   min_value: NULL
@@ -1397,8 +1417,19 @@
   modify_limit: decrease
   section: OBSERVER
   need_restart: false
-  description_en: the size of the memory reserved for internal use(for testing purpose)
-  description_local: 可用总内存大小。用于调试，不要设置。
+  description_en: the size of the memory reserved for internal use(for testing purpose). Please enter an capacity, such as 8G
+  description_local: 可用总内存大小。请输入带容量带单位的整数，如8G
+- name: system_memory
+  name_local: 集群系统内存
+  essential: true
+  type: CAPACITY
+  default: 30G
+  min_value: 0M
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the memory reserved for internal use which cannot be allocated to any outer-tenant, and should be determined to guarantee every server functions normally. Please enter an capacity, such as 2G
+  description_local: 系统预留内存大小，不能分配给普通租户使用。请输入带容量带单位的整数，如2G
 - name: __min_full_resource_pool_memory
   require: true
   type: INT
@@ -1639,7 +1670,9 @@
   description_en: disable write to memstore when observer memstore free memory(plus memory hold by blockcache) lower than this limit,
   description_local: 当全局剩余内存小于这个百分比时，暂停普通租户写入（sys租户不受影响）
 - name: cpu_count
+  name_local: 系统CPU总数
   require: false
+  essential: true
   type: INT
   default: 0
   min_value: 0
@@ -1658,16 +1691,6 @@
   need_restart: false
   description_en: control if auto delete expired backup
   description_local: 自动删除过期的备份
-- name: max_syslog_file_count
-  require: false
-  type: INT
-  default: 0
-  min_value: 0
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in. Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
-  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
 - name: appname
   require: false
   type: STRING

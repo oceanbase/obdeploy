@@ -26,7 +26,7 @@ import time
 
 def get_port_socket_inode(client, port, stdio):
     port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{tcp,udp}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
     inode = res.stdout.strip()
     if not res or not inode:
@@ -72,7 +72,7 @@ def stop(plugin_context, *args, **kwargs):
                 }
             else:
                 stdio.verbose('failed to stop prometheus[pid:{}] in {}, permission deny'.format(prometheus_pid, server))
-                success = True
+                success = False
         else:
             stdio.verbose('{} prometheus is not running'.format(server))
     if not success:

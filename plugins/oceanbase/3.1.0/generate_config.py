@@ -66,27 +66,39 @@ def get_system_memory(memory_limit):
     return format_size(system_memory, 0)
 
 
-def generate_config(plugin_context, deploy_config, *args, **kwargs):
+def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, *args, **kwargs):
+    if return_generate_keys:
+        return plugin_context.return_true(generate_keys=[
+            'memory_limit', 'datafile_size', 'clog_disk_utilization_threshold', 'clog_disk_usage_limit_percentage',
+            'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id',
+            'devname', 'system_memory', 'cpu_count', 
+        ])
+
+    def update_server_conf(server, key, value):
+        if server not in generate_configs:
+            generate_configs[server] = {}
+        generate_configs[server][key] = value
+    def update_global_conf(key, value):
+        generate_configs['global'][key] = value
+
+    def summit_config():
+        generate_global_config = generate_configs['global']
+        for key in generate_global_config:
+            cluster_config.update_global_conf(key, generate_global_config[key], False)
+        for server in cluster_config.servers:
+            if server not in generate_configs:
+                continue
+            generate_server_config = generate_configs[server]
+            for key in generate_server_config:
+                cluster_config.update_server_conf(server, key, generate_server_config[key], False)
+
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     success = True
+    generate_configs = {'global': {}}
+    plugin_context.set_variable('generate_configs', generate_configs)
     stdio.start_loading('Generate observer configuration')
-
-    if not cluster_config.get_global_conf().get('appname'):
-        default_appname = 'obcluster'
-        for componet_name in ['obproxy', 'obproxy-ce']:
-            if componet_name in deploy_config.components:
-                obproxy_cluster_config = deploy_config.components[componet_name]
-                cluster_name = obproxy_cluster_config.get_global_conf().get('cluster_name')
-                if not cluster_name:
-                    for server in obproxy_cluster_config.servers:
-                        server_config = obproxy_cluster_config.get_server_conf(server)
-                        if server_config.get('cluster_name'):
-                            default_appname = server_config['cluster_name']
-                            break
-                break
-        cluster_config.update_global_conf('appname', default_appname, False)
 
     MIN_MEMORY = 8 << 30
     MIN_CPU_COUNT = 16
@@ -94,42 +106,39 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
     clog_disk_utilization_threshold_max = 95
     clog_disk_usage_limit_percentage_max = 98
     global_config = cluster_config.get_original_global_conf()
-    
-    if getattr(plugin_context.options, 'mini', False):
-        if not global_config.get('memory_limit_percentage') and not global_config.get('memory_limit'):
-            cluster_config.update_global_conf('memory_limit', format_size(MIN_MEMORY, 0), False)
-        if not global_config.get('datafile_size') and not global_config.get('datafile_disk_percentage'):
-            cluster_config.update_global_conf('datafile_size', '20G', False)
-        if not global_config.get('clog_disk_utilization_threshold'):
-            cluster_config.update_global_conf('clog_disk_utilization_threshold', clog_disk_utilization_threshold_max, False)
-        if not global_config.get('clog_disk_usage_limit_percentage'):
-            cluster_config.update_global_conf('clog_disk_usage_limit_percentage', clog_disk_usage_limit_percentage_max, False)
 
     max_syslog_file_count_default = 4
     if global_config.get('syslog_level') is None:
-        cluster_config.update_global_conf('syslog_level', 'INFO', False)
+        update_global_conf('syslog_level', 'INFO')
     if global_config.get('enable_syslog_recycle') is None:
-        cluster_config.update_global_conf('enable_syslog_recycle', True, False)
+        update_global_conf('enable_syslog_recycle', True)
     if global_config.get('enable_syslog_wf') is None:
-        cluster_config.update_global_conf('enable_syslog_wf', True, False)
+        update_global_conf('enable_syslog_wf', False)
     if global_config.get('max_syslog_file_count') is None:
-        cluster_config.update_global_conf('max_syslog_file_count', max_syslog_file_count_default, False)
+        update_global_conf('max_syslog_file_count', max_syslog_file_count_default)
     if global_config.get('cluster_id') is None:
-        cluster_config.update_global_conf('cluster_id', 1, False)
-
+        update_global_conf('cluster_id', 1)
+    
+    if generate_config_mini:
+        if not global_config.get('memory_limit_percentage') and not global_config.get('memory_limit'):
+            update_global_conf('memory_limit', format_size(MIN_MEMORY, 0))
+        if not global_config.get('datafile_size') and not global_config.get('datafile_disk_percentage'):
+            update_global_conf('datafile_size', '20G')
+        if not global_config.get('clog_disk_utilization_threshold'):
+            update_global_conf('clog_disk_utilization_threshold', clog_disk_utilization_threshold_max)
+        if not global_config.get('clog_disk_usage_limit_percentage'):
+            update_global_conf('clog_disk_usage_limit_percentage', clog_disk_usage_limit_percentage_max)
+        summit_config()
+        
     for server in cluster_config.servers:
         ip = server.ip
         client = clients[server]
         server_config = cluster_config.get_server_conf_with_default(server)
-        user_server_config = cluster_config.get_original_server_conf(server)
-        if not server_config.get('home_path'):
-            stdio.error("observer %s: missing configuration 'home_path' in configuration file" % server)
-            success = False
-            continue
+        user_server_config = cluster_config.get_original_server_conf_with_global(server)
 
         if user_server_config.get('devname') is None:
             if client.is_localhost():
-                cluster_config.update_server_conf(server, 'devname', 'lo')
+                update_server_conf(server, 'devname', 'lo')
             else:
                 devinfo = client.execute_command('cat /proc/net/dev').stdout
                 interfaces = re.findall('\n\s+(\w+):', devinfo)
@@ -137,7 +146,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     if interface == 'lo':
                         continue
                     if client.execute_command('ping -W 1 -c 1 -I %s %s' % (interface, ip)):
-                        cluster_config.update_server_conf(server, 'devname', interface)
+                        update_server_conf(server, 'devname', interface)
                         break
 
         dirs = {"home_path": server_config['home_path']}
@@ -174,35 +183,32 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                             key = memory_key_map[k]
                             server_memory_stats[key] = parse_size(str(v))
 
-                    if server_memory_stats['available'] < START_NEED_MEMORY:
-                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(START_NEED_MEMORY)))
-                        success = False
-                        continue
-                    
-                    if server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached'] < MIN_MEMORY:
-                        stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(MIN_MEMORY)))
-                        success = False
-                        continue
+                    if generate_check:
+                        if server_memory_stats['available'] < START_NEED_MEMORY:
+                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(START_NEED_MEMORY)))
+                            success = False
+                            continue
+                        
+                        if server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached'] < MIN_MEMORY:
+                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(MIN_MEMORY)))
+                            success = False
+                            continue
 
                     memory_limit = max(MIN_MEMORY, server_memory_stats['available'] * 0.9)
                     server_config['memory_limit'] = format_size(memory_limit, 0)
-                    cluster_config.update_server_conf(server, 'memory_limit', server_config['memory_limit'], False)
+                    update_server_conf(server, 'memory_limit', server_config['memory_limit'])
+                    auto_set_memory = True
                 else:
                     stdio.error("%s: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
                     success = False
                     continue
             else:
-                try:
-                    memory_limit = parse_size(server_config.get('memory_limit'))
-                    auto_set_memory = True
-                except:
-                    stdio.error('memory_limit must be an integer')
-                    return
+                memory_limit = parse_size(server_config.get('memory_limit'))
 
         auto_set_system_memory = False
         if not user_server_config.get('system_memory'):
             auto_set_system_memory = True
-            cluster_config.update_server_conf(server, 'system_memory', get_system_memory(memory_limit), False)
+            update_server_conf(server, 'system_memory', get_system_memory(memory_limit))
             
         # cpu
         if not server_config.get('cpu_count'):
@@ -212,9 +218,9 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 server_config['cpu_count'] = max(MIN_CPU_COUNT, int(cpu_num - 2))
             else:
                 server_config['cpu_count'] = MIN_CPU_COUNT
-            cluster_config.update_server_conf(server, 'cpu_count', server_config['cpu_count'], False)
+            update_server_conf(server, 'cpu_count', server_config['cpu_count'])
         elif server_config['cpu_count'] < MIN_CPU_COUNT:
-            cluster_config.update_server_conf(server, 'cpu_count', MIN_CPU_COUNT, False)
+            update_server_conf(server, 'cpu_count', MIN_CPU_COUNT)
             stdio.warn('(%s): automatically adjust the cpu_count %s' % (server, MIN_CPU_COUNT))
         
         # disk
@@ -264,7 +270,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                     if user_server_config.get('enable_syslog_recycle') is False:
                         log_size = real_disk_total * 0.1
                     else:
-                        log_size = (256 << 20) * user_server_config.get('max_syslog_file_count', max_syslog_file_count_default) * 4
+                        log_size = (256 << 20) * int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) * 4
                 else:
                     log_size = 0
                 clog_padding_size = int(real_disk_total * (1 - clog_disk_utilization_threshold_max / 100.0 * 0.8))
@@ -288,17 +294,17 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                         if min_need <= disk_free:
                             memory_limit = (disk_free - padding_size) / 7
                             server_config['memory_limit'] = format_size(memory_limit, 0)
-                            cluster_config.update_server_conf(server, 'memory_limit', server_config['memory_limit'], False)
+                            update_server_conf(server, 'memory_limit', server_config['memory_limit'])
                             memory_limit = parse_size(server_config['memory_limit'])
                             clog_disk_size = memory_limit * 4
                             clog_size = int(round(clog_disk_size * 0.64))
                             if auto_set_system_memory:
-                                cluster_config.update_server_conf(server, 'system_memory', get_system_memory(memory_limit), False)
+                                update_server_conf(server, 'system_memory', get_system_memory(memory_limit))
                             disk_flag = True
                 else:
                     disk_flag = True
 
-                if not disk_flag:
+                if generate_check and not disk_flag:
                     stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s). Use `redo_dir` to set other disk for clog' % (ip, kp, format_size(disk_free), format_size(min_need)))
                     success = False
                     continue
@@ -309,12 +315,81 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 clog_disk_utilization_threshold = min(clog_disk_utilization_threshold, clog_disk_utilization_threshold_max)
                 clog_disk_usage_limit_percentage = min(int(clog_disk_utilization_threshold / 80.0 * 95), clog_disk_usage_limit_percentage_max)
 
-                cluster_config.update_server_conf(server, 'datafile_size', datafile_size_format, False)
-                cluster_config.update_server_conf(server, 'clog_disk_utilization_threshold', clog_disk_utilization_threshold, False)
-                cluster_config.update_server_conf(server, 'clog_disk_usage_limit_percentage', clog_disk_usage_limit_percentage, False)
+                update_server_conf(server, 'datafile_size', datafile_size_format)
+                update_server_conf(server, 'clog_disk_utilization_threshold', clog_disk_utilization_threshold)
+                update_server_conf(server, 'clog_disk_usage_limit_percentage', clog_disk_usage_limit_percentage)
             else:
                 datafile_size = max(5 << 30, data_dir_disk['avail'] * 0.8, 0)
-                cluster_config.update_server_conf(server, 'datafile_size', format_size(datafile_size, 0), False)
+                update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
+
+    if generate_consistent_config:
+        generate_global_config = generate_configs['global']
+        server_num = len(cluster_config.servers)
+        MIN_KEY = ['memory_limit', 'datafile_size', 'system_memory', 'cpu_count']
+        MAX_KEY = ['clog_disk_utilization_threshold', 'clog_disk_usage_limit_percentage']
+        CAPACITY_KEY = ['memory_limit', 'datafile_size', 'system_memory']
+        keys = MIN_KEY + MAX_KEY
+        for key in keys:
+            servers = []
+            values = []
+            is_capacity_key = key in CAPACITY_KEY
+            for server in cluster_config.servers:
+                if key in generate_configs.get(server, {}):
+                    value = generate_configs[server][key]
+                    servers.append(server)
+                    values.append(parse_size(value) if is_capacity_key else value)
+            if values:
+                if len(values) != server_num and key in generate_global_config:
+                    continue
+                comp = min if key in MIN_KEY else max
+                value = comp(values)
+                generate_global_config[key] = format_size(value, 0) if is_capacity_key else value
+                for server in servers:
+                    del generate_configs[server][key]
+
+    # merge_generate_config
+    merge_config = {}
+    generate_global_config = generate_configs['global']
+    count_base = len(cluster_config.servers) - 1
+    if count_base < 1:
+        for server in cluster_config.servers:
+            if server not in generate_configs:
+                continue
+            generate_global_config.update(generate_configs[server])
+            generate_configs[server] = {}
+    else:
+        for server in cluster_config.servers:
+            if server not in generate_configs:
+                continue
+            generate_server_config = generate_configs[server]
+            merged_server_config = {}
+            for key in generate_server_config:
+                if key in generate_global_config:
+                    if generate_global_config[key] != generate_server_config[key]:
+                        merged_server_config[key] = generate_server_config[key]
+                elif key in merge_config:
+                    if merge_config[key]['value'] != generate_server_config[key]:
+                        merged_server_config[key] = generate_server_config[key]
+                    elif count_base == merge_config[key]['count']:
+                        generate_global_config[key] = generate_server_config[key]
+                        del merge_config[key]
+                    else:
+                        merge_config[key]['severs'].append(server)
+                        merge_config[key]['count'] += 1
+                else:
+                    merge_config[key] = {'value': generate_server_config[key], 'severs': [server], 'count': 1}
+            generate_configs[server] = merged_server_config
+
+        for key in merge_config:
+            config_st = merge_config[key]
+            for server in config_st['severs']:
+                if server not in generate_configs:
+                    continue
+                generate_server_config = generate_configs[server]
+                generate_server_config[key] = config_st['value']
+
+    # summit_config
+    summit_config()
 
     if success:
         stdio.stop_loading('succeed')

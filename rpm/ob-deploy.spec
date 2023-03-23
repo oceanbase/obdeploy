@@ -54,16 +54,24 @@ VERSION="$RPM_PACKAGE_VERSION"
 if  [ "$OBD_DUBUG" ]; then
     VERSION=$VERSION".`date +%s`"
 fi
+cd $SRC_DIR/web
+yarn
+yarn build
+cd $SRC_DIR
 cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" | sed "s/<VERSION>/$VERSION/" > obd.py
 sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
 mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
 mkdir -p $BUILD_DIR/SOURCES/{site-packages}
 mkdir -p ${RPM_BUILD_ROOT}/usr/bin
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd
-pip install -r plugins-requirements3.txt --target=$BUILD_DIR/SOURCES/site-packages
-pyinstaller --hidden-import=decimal --hidden-import=configparser -F obd.py
+pip install -r plugins-requirements3.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+pip install -r service/service-requirements.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+# pyinstaller -y --clean -n obd-web -p $BUILD_DIR/SOURCES/site-packages -F service/app.py
+pyinstaller --hidden-import=decimal -p $BUILD_DIR/SOURCES/site-packages --hidden-import service/app.py --hidden-import=configparser -F obd.py
 rm -f obd.py obd.spec
+\mkdir -p $BUILD_DIR/SOURCES/web
 \cp -rf $SRC_DIR/dist/obd ${RPM_BUILD_ROOT}/usr/bin/obd
+\cp -rf $SRC_DIR/web/dist $BUILD_DIR/SOURCES/web
 \cp -rf $SRC_DIR/plugins $BUILD_DIR/SOURCES/plugins
 \cp -rf $SRC_DIR/optimize $BUILD_DIR/SOURCES/optimize
 \cp -rf $SRC_DIR/example $BUILD_DIR/SOURCES/example
@@ -72,6 +80,7 @@ rm -f obd.py obd.spec
 \rm -fr $BUILD_DIR/SOURCES/config_parser/oceanbase-ce
 \cp -rf $SRC_DIR/profile/ $BUILD_DIR/SOURCES/
 \cp -rf $SRC_DIR/mirror/ $BUILD_DIR/SOURCES/
+\cp -rf $BUILD_DIR/SOURCES/web ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/plugins ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/optimize ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/config_parser ${RPM_BUILD_ROOT}/usr/obd/
@@ -120,6 +129,15 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Wed Dec 14 2022 obd 1.6.2
+ - new features: support OceanBaseCE BP upgrade
+ - fix bug: grafana init failed when remote deploy
+* Thu Nov 24 2022 obd 1.6.1
+ - new features: minimum startup resource check
+ - fix bug: grafana dashboard title
+ - fix bug: autodeploy maybe failed in the case of large memory and small disk
+ - fix bug: obproxy frequent core dump in demo
+ - fix bug: remote install rsync transmission does not use the user.port
 * Mon Oct 31 2022 obd 1.6.0
  - new features: support oceanbase 4.0
  - new features: support Prometheus

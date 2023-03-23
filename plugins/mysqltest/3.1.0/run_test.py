@@ -205,7 +205,6 @@ def run_test(plugin_context, env, *args, **kwargs):
     need_reboot = env.get('need_reboot', False)
     collect_all = env.get('collect_all', False)
     collect_log = False
-
     total_test_count = len(test_set)
     while index < total_test_count:
         test = test_set[index]
@@ -369,13 +368,8 @@ def run_test(plugin_context, env, *args, **kwargs):
             opt['connector'] = 'ob'
 
         if opt['_enable_static_typing_engine'] is not None:
-            ret = None
-            try:
-                sql = "select value from oceanbase.__all_virtual_sys_parameter_stat where name like '_enable_static_typing_engine';"
-                cursor.execute(sql)
-                ret = cursor.fetchone()
-            except:
-                pass
+            sql = "select value from oceanbase.__all_virtual_sys_parameter_stat where name like '_enable_static_typing_engine';"
+            ret = cursor.fetchone(sql)
             if ret and str(ret.get('value')).lower() != str(opt['_enable_static_typing_engine']).lower():
                 LocalClient.execute_command('%s "alter system set _enable_static_typing_engine = %s;select sleep(2);"' % (exec_sql_cmd, opt['_enable_static_typing_engine']), stdio=stdio)
 

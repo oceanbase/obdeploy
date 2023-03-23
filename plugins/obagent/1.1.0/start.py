@@ -108,7 +108,7 @@ def encrypt(key, data):
 
 def get_port_socket_inode(client, port):
     port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{tcp,udp}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
         return False
@@ -137,10 +137,11 @@ def generate_aes_b64_key():
     return base64.b64encode(key.encode('utf-8'))
 
 
-def start(plugin_context, local_home_path, repository_dir, deploy_name=None, *args, **kwargs):
+def start(plugin_context, local_home_path, *args, **kwargs):
     global stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
+    deploy_name = plugin_context.deploy_name
     stdio = plugin_context.stdio
     options = plugin_context.options
     config_files = {}
@@ -157,6 +158,11 @@ def start(plugin_context, local_home_path, repository_dir, deploy_name=None, *ar
         "zone_name": "zone",
         "ob_install_path": "home_path"
     }
+
+    for repository in plugin_context.repositories:
+        if repository.name == cluster_config.name:
+            break
+    repository_dir = repository.repository_dir
 
     stdio.start_loading('Start obagent')
     for server in cluster_config.servers:
@@ -281,21 +287,28 @@ def start(plugin_context, local_home_path, repository_dir, deploy_name=None, *ar
     stdio.start_loading('obagent program health check')
     time.sleep(1)
     failed = []
-    fail_time = 0
-    for server in cluster_config.servers:
-        client = clients[server]
-        server_config = cluster_config.get_server_conf(server)
-        stdio.verbose('%s program health check' % server)
-        pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
-        if pid:
-            if confirm_port(client, pid, int(server_config["server_port"])):
-                stdio.verbose('%s obagent[pid: %s] started', server, pid)
-                client.execute_command('echo %s > %s' % (pid, pid_path[server]))
+    servers = cluster_config.servers
+    count = 20
+    while servers and count:
+        count -= 1
+        tmp_servers = []
+        for server in servers:
+            client = clients[server]
+            server_config = cluster_config.get_server_conf(server)
+            stdio.verbose('%s program health check' % server)
+            pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
+            if pid:
+                if confirm_port(client, pid, int(server_config["server_port"])):
+                    stdio.verbose('%s obagent[pid: %s] started', server, pid)
+                elif count:
+                    tmp_servers.append(server)
+                else:
+                    failed.append('failed to start %s obagent' % server)
             else:
-                fail_time += 1
-        else:
-            failed.append('failed to start %s obagent' % server)
-
+                failed.append('failed to start %s obagent' % server)
+        servers = tmp_servers
+        if servers and count:
+            time.sleep(1)
     if failed:
         stdio.stop_loading('fail')
         for msg in failed:

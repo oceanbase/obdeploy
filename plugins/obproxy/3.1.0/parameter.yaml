@@ -1,11 +1,15 @@
 - name: home_path
+  name_local: 工作目录
   require: true
+  essential: true
   type: STRING
-  need_restart: true
+  need_redeploy: true
   description_en: the directory for the work data file
   description_local: ObProxy工作目录
 - name: listen_port
+  name_local: 服务端口
   require: true
+  essential: true
   type: INT
   default: 2883
   min_value: 1025
@@ -14,7 +18,9 @@
   description_en: port number for mysql connection
   description_local: SQL服务协议端口号
 - name: prometheus_listen_port
+  name_local: Exporter 端口
   require: true
+  essential: true
   type: INT
   default: 2884
   min_value: 1025
@@ -39,6 +45,15 @@
   need_restart: true
   description_en: root server list(format ip:sql_port)
   description_local: observer列表（格式 ip:sql_port)
+- name: proxy_mem_limited
+  name_local: 最大运行内存
+  essential: true
+  type: CAPACITY
+  default: 2G
+  min_value: 100MB
+  max_value: 100GB
+  description_en: The upper limit of ODP runtime memory. If the ODP exceeds the upper limit, it will exit automatically. Please enter an capacity, such as 2G
+  description_local: ODP 运行时内存上限。超过上限 ODP 即自动退出。请输入带容量带单位的整数，如2G
 - name: refresh_json_config
   type: BOOL
   default: false
@@ -423,6 +438,8 @@
   need_restart: true
   description_en: beyond trust sdk retry times
 - name: obproxy_sys_password
+  name_local: 密码
+  essential: true
   type: STRING
   default: ''
   need_restart: false

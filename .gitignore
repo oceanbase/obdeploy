@@ -6,4 +6,33 @@ dist
 .vscode
 .git
 __pycache__
-.idea/workspace.xml
+.idea
+.obd
+plugins/oceanbase-ce
+config_parser/oceanbase-ce
+tags
+ .DS_store
+
+
+
+# dependencies
+/web/node_modules
+/web/npm-debug.log*
+/web/yarn-error.log
+/web/yarn.lock
+/web/package-lock.json
+/web/.mfsu-dev
+/web/.mfsu-prod
+
+# production
+/web/dist
+
+# misc
+/web/**/.DS_Store
+/web/.DS_Store
+
+# umi
+/web/src/.umi
+/web/src/.umi-production
+/web/src/.umi-test
+/web/.env.local

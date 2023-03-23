@@ -59,18 +59,6 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
         stdio.verbose('get option: {} value {}'.format(key, value))
         return value
 
-    def execute(cursor, query, args=None):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose('execute sql: %s' % msg)
-        stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            cursor.execute(query, args)
-            return cursor.fetchone()
-        except:
-            msg = 'execute sql exception: %s' % msg
-            stdio.exception(msg)
-            raise Exception(msg)
-
     def local_execute_command(command, env=None, timeout=None):
         return LocalClient.execute_command(command, env, timeout, stdio)
 
@@ -162,9 +150,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     min_cpu = None
     try:
         sql = "select b.CPU_CAPACITY from oceanbase.DBA_OB_SERVERS a join oceanbase.GV$OB_SERVERS b on a.SVR_IP=b.SVR_IP and a.SVR_PORT = b.SVR_PORT where a.STATUS = 'ACTIVE' and a.STOP_TIME is NULL  and a.START_SERVICE_TIME > 0"
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-        all_services = cursor.fetchall()
+        all_services = cursor.fetchall(sql)
         if not all_services:
             stdio.error('No active server available.')
             return
@@ -187,23 +173,20 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
         local_execute_command("sed -i 's/{{partition_num}}/%d/g' %s" % (cpu_total, create_table_sql))
 
     sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
-    try:
-        stdio.verbose('execute sql: %s' % (sql % tenant_name))
-        cursor.execute(sql, [tenant_name])
-        tenant_meta = cursor.fetchone()
-        if not tenant_meta:
-            stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
-            return
-        sql = "select * from oceanbase.DBA_OB_RESOURCE_POOLS where TENANT_ID = %d" % tenant_meta['TENANT_ID']
-        pool = execute(cursor, sql)
-        sql = "select * from oceanbase.DBA_OB_UNIT_CONFIGS where UNIT_CONFIG_ID = %d" % pool['UNIT_CONFIG_ID']
-        tenant_unit = execute(cursor, sql)
-        max_memory = tenant_unit['MEMORY_SIZE']
-        max_cpu = int(tenant_unit['MAX_CPU'])
-    except Exception as e:
-        stdio.verbose(e)
-        stdio.error('fail to get tenant info')
+    tenant_meta = cursor.fetchone(sql, [tenant_name])
+    if not tenant_meta:
+        stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
         return
+    sql = "select * from oceanbase.DBA_OB_RESOURCE_POOLS where TENANT_ID = %d" % tenant_meta['TENANT_ID']
+    pool = cursor.fetchone(sql)
+    if pool is False:
+        return
+    sql = "select * from oceanbase.DBA_OB_UNIT_CONFIGS where UNIT_CONFIG_ID = %d" % pool['UNIT_CONFIG_ID']
+    tenant_unit = cursor.fetchone(sql)
+    if tenant_unit is False:
+        return
+    max_memory = tenant_unit['MEMORY_SIZE']
+    max_cpu = int(tenant_unit['MAX_CPU'])
 
     host = get_option('host', '127.0.0.1')
     port = get_option('port', 2881)
@@ -217,9 +200,14 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     test_only = get_option('test_only')
 
     stdio.verbose('Check connect ready')
-    exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A %s -e" % (
-        obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '', db_name)
-    ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'))
+    if not test_only:
+        exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A -e" % (
+            obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
+        ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'create database if not exists %s' % db_name))
+    else:
+        exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A %s -e" % (
+            obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '', db_name)
+        ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'))
     if not ret:
         stdio.error('Connect to tenant %s failed' % tenant_name)
         return

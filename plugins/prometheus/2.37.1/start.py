@@ -28,6 +28,7 @@ from copy import deepcopy
 import bcrypt
 
 from tool import YamlLoader, FileUtil
+from _rpm import Version
 
 
 prometheusd_path = os.path.join(os.path.split(__file__)[0], 'prometheusd.sh')
@@ -73,14 +74,13 @@ def prometheusd(home_path, client, server, args, start_only=False, stdio=None):
     return True
 
 
-def load_config_from_obagent(cluster_config, repository_dir_map, stdio, client, server, server_config, yaml):
+def load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server, server_config, yaml):
     stdio.verbose('load config from obagent')
     server_home_path = server_config['home_path']
     port = server_config['port']
-    address  = server_config['address']
+    address = server_config['address']
     obagent_servers = cluster_config.get_depend_servers('obagent')
-    obagent_repo_dir = repository_dir_map['obagent']
-    prometheus_conf_dir = os.path.join(obagent_repo_dir, 'conf/prometheus_config')
+    prometheus_conf_dir = os.path.join(obagent_repo.repository_dir, 'conf/prometheus_config')
     prometheus_conf_path = os.path.join(prometheus_conf_dir, 'prometheus.yaml')
     rules_dir = os.path.join(prometheus_conf_dir, 'rules')
     remote_rules_dir = os.path.join(server_home_path, 'rules')
@@ -88,9 +88,13 @@ def load_config_from_obagent(cluster_config, repository_dir_map, stdio, client, 
     obagent_targets = []
     http_basic_auth_user = None
     http_basic_auth_password = None
+    watershed = Version('1.3.0')
     for obagent_server in obagent_servers:
         obagent_server_config = cluster_config.get_depend_config('obagent', obagent_server)
-        server_port = obagent_server_config['server_port']
+        if obagent_repo.version < watershed:
+            server_port = obagent_server_config['server_port']
+        else:
+            server_port = obagent_server_config['monagent_http_port']
         obagent_targets.append('{}:{}'.format(obagent_server.ip, server_port))
         if http_basic_auth_user is None:
             http_basic_auth_user = obagent_server_config['http_basic_auth_user']
@@ -134,7 +138,7 @@ def load_config_from_obagent(cluster_config, repository_dir_map, stdio, client, 
         raise e
 
 
-def start(plugin_context, local_home_path, repository_dir, repository_dir_map=None, *args, **kwargs):
+def start(plugin_context, *args, **kwargs):
 
     def generate_or_update_config():
         prometheus_conf_content = None
@@ -148,9 +152,9 @@ def start(plugin_context, local_home_path, repository_dir, repository_dir_map=No
                 stdio.exception('')
                 stdio.warn('{}: invalid prometheus config {}, regenerate a new config.'.format(server, runtime_prometheus_conf))
         if prometheus_conf_content is None:
-            if 'obagent' in cluster_config.depends and repository_dir_map:
+            if obagent_repo:
                 try:
-                    prometheus_conf_content = load_config_from_obagent(cluster_config, repository_dir_map, stdio, client, server, server_config, yaml=yaml)
+                    prometheus_conf_content = load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server, server_config, yaml=yaml)
                 except Exception as e:
                     stdio.exception(e)
                     return False
@@ -188,6 +192,13 @@ def start(plugin_context, local_home_path, repository_dir, repository_dir_map=No
     yaml = YamlLoader(stdio=stdio)
     pid_path = {}
     cmd_args_map = {}
+    obagent_repo = None
+    if 'obagent' in cluster_config.depends:
+        for repository in plugin_context.repositories:
+            if repository.name == 'obagent':
+                stdio.verbose('obagent version: {}'.format(repository.version))
+                obagent_repo = repository
+                break
     stdio.start_loading('Start promethues')
 
     if not os.path.exists(prometheusd_path):

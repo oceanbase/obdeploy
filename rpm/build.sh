@@ -72,6 +72,15 @@ function pacakge_obd()
     rm -fr rpmbuild
 }
 
+function package_web()
+{
+    cd2workdir
+    DIR=`pwd`/../web
+    cd $DIR
+    yarn
+    yarn build
+}
+
 function get_python()
 {
     if [ `id -u` != 0 ] ; then
@@ -166,5 +175,8 @@ case "x$1" in
         $2
         get_python
         build
+    ;;
+    xweb)
+        package_web
     ;;
 esac

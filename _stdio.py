@@ -48,17 +48,47 @@ if sys.version_info.major == 3:
 
 
 class BufferIO(object):
-
-    def __init__(self):
+    
+    def __init__(self, auto_clear=True):
         self._buffer = []
+        self.auto_clear = auto_clear
+        self.closed = False
+
+    def isatty(self):
+        return False
+
+    def writable(self):
+        return not self.closed
+
+    def close(self):
+        self.closed = True
+        return self
+
+    def open(self):
+        self.closed = False
+        self._buffer = []
+        return self
+
+    def __enter__(self):
+        return self.open()
+
+    def __exit__(self, *args, **kwargs):
+        return self.close()
 
     def write(self, s):
         self._buffer.append(s)
 
-    def read(self):
+    def read(self, *args, **kwargs):
         s = ''.join(self._buffer)
-        self._buffer = []
+        self.auto_clear and self.clear()
         return s
+
+    def clear(self):
+        self._buffer = []
+
+    def flush(self):
+        self.auto_clear and self.clear()
+        return True
 
 
 class SysStdin(object):
@@ -66,6 +96,13 @@ class SysStdin(object):
     NONBLOCK = False
     STATS = None
     FD = None
+    IS_TTY = None
+
+    @classmethod
+    def isatty(cls):
+        if cls.IS_TTY is None:
+            cls.IS_TTY = sys.stdin.isatty()
+        return cls.IS_TTY
 
     @classmethod
     def fileno(cls):
@@ -140,29 +177,33 @@ class SysStdin(object):
             return sys.stdin.readlines()
 
 
-
-
 class FormtatText(object):
 
-    @staticmethod
-    def format(text, color):
-        return color + text + Fore.RESET
+    def __init__(self, text, color):
+        self.text = text
+        self.color_text = color + text + Fore.RESET
+
+    def format(self, istty=True):
+        return self.color_text if istty else self.text
+
+    def __str__(self):
+        return self.format()
 
     @staticmethod
     def info(text):
-        return FormtatText.format(text, Fore.BLUE)
+        return FormtatText(text, Fore.BLUE)
 
     @staticmethod
     def success(text):
-        return FormtatText.format(text, Fore.GREEN)
+        return FormtatText(text, Fore.GREEN)
 
     @staticmethod
     def warning(text):
-        return FormtatText.format(text, Fore.YELLOW)
+        return FormtatText(text, Fore.YELLOW)
 
     @staticmethod
     def error(text):
-        return FormtatText.format(text, Fore.RED)
+        return FormtatText(text, Fore.RED)
 
 
 class LogSymbols(Enum):
@@ -220,7 +261,7 @@ class IOHalo(Halo):
         if getattr(self._stream, 'isatty', lambda : False)():
             return super(IOHalo, self).stop_and_persist(symbol=symbol, text=text)
         else:
-            self._stream.write(' %s\n' % symbol)
+            self._stream.write(' %s\n' % symbol.format(istty=False))
 
     def succeed(self, text=None):
         return self.stop_and_persist(symbol=LogSymbols.SUCCESS.value, text=text)
@@ -238,9 +279,11 @@ class IOHalo(Halo):
 class IOProgressBar(ProgressBar):
 
     @staticmethod
-    def _get_widgets(widget_type, text):
-        if widget_type == 'download':
-            return ['%s: ' % text, Percentage(), ' ', Bar(marker='#', left='[', right=']'), ' ', ETA(), ' ', FileTransferSpeed()]
+    def _get_widgets(widget_type, text, istty=True):
+        if istty is False:
+            return [text]
+        elif widget_type == 'download':
+                return ['%s: ' % text, Percentage(), ' ', Bar(marker='#', left='[', right=']'), ' ', ETA(), ' ', FileTransferSpeed()]
         elif widget_type == 'timer':
             return ['%s: ' % text, Percentage(), ' ', Bar(marker='#', left='[', right=']'), ' ', AdaptiveETA()]
         elif widget_type == 'simple_progress':
@@ -249,7 +292,8 @@ class IOProgressBar(ProgressBar):
             return ['%s: ' % text, Percentage(), ' ', Bar(marker='#', left='[', right=']')]
 
     def __init__(self, maxval=None, text='', term_width=None, poll=1, left_justify=True, stream=None, widget_type='download'):
-        super(IOProgressBar, self).__init__(maxval=maxval, widgets=self._get_widgets(widget_type, text), term_width=term_width, poll=poll, left_justify=left_justify, fd=stream)
+        self.stream_isatty = getattr(stream, 'isatty', lambda : False)()
+        super(IOProgressBar, self).__init__(maxval=maxval, widgets=self._get_widgets(widget_type, text, self.stream_isatty), term_width=term_width, poll=poll, left_justify=left_justify, fd=stream)
 
     def start(self):
         self._hide_cursor()
@@ -261,21 +305,23 @@ class IOProgressBar(ProgressBar):
     def finish(self):
         if self.finished:
             return
-        self._show_cursor()
-        return super(IOProgressBar, self).finish()
+        self.update(self.maxval)
+        self._finish()
 
     def interrupt(self):
         if self.finished:
             return
-        self._show_cursor()
+        self._finish()
+
+    def _finish(self):
         self.finished = True
         self.fd.write('\n')
+        self._show_cursor()
         if self.signal_set:
             signal.signal(signal.SIGWINCH, signal.SIG_DFL)
 
     def _need_update(self):
-        return (self.currval == self.maxval or self.currval == 0 or getattr(self.fd, 'isatty', lambda : False)()) \
-             and super(IOProgressBar, self)._need_update()
+        return (self.currval == self.maxval or self.currval == 0 or self.stream_isatty) and super(IOProgressBar, self)._need_update()
 
     def _check_stream(self):
         if self.fd.closed:
@@ -291,13 +337,13 @@ class IOProgressBar(ProgressBar):
     def _hide_cursor(self):
         """Disable the user's blinking cursor
         """
-        if self._check_stream() and self.fd.isatty():
+        if self._check_stream() and self.stream_isatty:
             cursor.hide(stream=self.fd)
 
     def _show_cursor(self):
         """Re-enable the user's blinking cursor
         """
-        if self._check_stream() and self.fd.isatty():
+        if self._check_stream() and self.stream_isatty:
             cursor.show(stream=self.fd)
 
 
@@ -320,8 +366,6 @@ class IO(object):
     VERBOSE_LEVEL = 0
     WARNING_PREV = FormtatText.warning('[WARN]')
     ERROR_PREV = FormtatText.error('[ERROR]')
-    IS_TTY = sys.stdin.isatty()
-    INPUT = SysStdin
 
     def __init__(self,
         level,
@@ -329,7 +373,8 @@ class IO(object):
         use_cache=False,
         track_limit=0,
         root_io=None,
-        stream=sys.stdout
+        input_stream=SysStdin,
+        output_stream=sys.stdout
     ):
         self.level = level
         self.msg_lv = msg_lv
@@ -344,9 +389,34 @@ class IO(object):
         self._verbose_prefix = '-' * self.level
         self.sub_ios = {}
         self.sync_obj = None
-        self._out_obj = None if self._root_io else stream
-        self._cur_out_obj = self._out_obj
+        self.input_stream = None
+        self._out_obj = None
+        self._cur_out_obj = None
         self._before_critical = None
+        self._output_is_tty = False
+        self._input_is_tty = False
+        self.set_input_stream(input_stream)
+        self.set_output_stream(output_stream)
+
+    def isatty(self):
+        if self._root_io:
+            return self._root_io.isatty()
+        return self._output_is_tty and self._input_is_tty
+
+    def set_input_stream(self, input_stream):
+        if self._root_io:
+            return False
+        self.input_stream = input_stream
+        self._input_is_tty = input_stream.isatty()
+
+    def set_output_stream(self, output_stream):
+        if self._root_io:
+            return False
+        if self._cur_out_obj == self._out_obj:
+            self._cur_out_obj = output_stream
+        self._out_obj = output_stream
+        self._output_is_tty = output_stream.isatty()
+        return True
 
     def init_trace_logger(self, log_path, log_name=None, trace_id=None):
         if self._trace_logger is None:
@@ -360,7 +430,7 @@ class IO(object):
         state = {}
         for key in self.__dict__:
             state[key] = self.__dict__[key]
-        for key in ['_trace_logger', 'sync_obj', '_out_obj', '_cur_out_obj', '_before_critical']:
+        for key in ['_trace_logger', 'input_stream', 'sync_obj', '_out_obj', '_cur_out_obj', '_before_critical']:
             state[key] = None
         return state
 
@@ -418,6 +488,11 @@ class IO(object):
             self._flush_log()
             self._log_cache = None
         return True
+    
+    def get_input_stream(self):
+        if self._root_io:
+            return self._root_io.get_input_stream()
+        return self.input_stream
 
     def get_cur_out_obj(self):
         if self._root_io:
@@ -571,15 +646,15 @@ class IO(object):
     def read(self, msg='', blocked=False):
         if msg:
             self._print(MsgLevel.INFO, msg)
-        return self.INPUT.read(blocked)
+        return self.get_input_stream().read(blocked)
 
     def confirm(self, msg):
         msg = '%s [y/n]: ' % msg
         self.print(msg, end='')
-        if self.IS_TTY:
+        if self._input_is_tty:
             while True:
                 try:
-                    ans = raw_input()
+                    ans = self.get_input_stream().readline(blocked=True).strip().lower()
                     if ans == 'y':
                         return True
                     if ans == 'n':
@@ -598,8 +673,13 @@ class IO(object):
     def _print(self, msg_lv, msg, *args, **kwargs):
         if msg_lv < self.msg_lv:
             return
+        if 'prev_msg' in kwargs:
+            print_msg = '%s %s' % (kwargs['prev_msg'], msg)
+            del kwargs['prev_msg']
+        else:
+            print_msg = msg
         kwargs['file'] = self.get_cur_out_obj()
-        kwargs['file'] and print(self._format(msg, *args), **kwargs)
+        kwargs['file'] and print(self._format(print_msg, *args), **kwargs)
         del kwargs['file']
         self.log(msg_lv, msg, *args, **kwargs)
 
@@ -621,6 +701,7 @@ class IO(object):
             for levelno, line, args, kwargs in self._log_cache:
                 self.trace_logger.log(levelno, line, *args, **kwargs)
             self._log_cache = []
+
     def _log(self, levelno, msg, *args, **kwargs):
         if self.trace_logger:
             self.trace_logger.log(levelno, msg, *args, **kwargs)
@@ -629,16 +710,15 @@ class IO(object):
         self._print(MsgLevel.INFO, msg, *args, **kwargs)
 
     def warn(self, msg, *args, **kwargs):
-        self._print(MsgLevel.WARN, '%s %s' % (self.WARNING_PREV, msg), *args, **kwargs)
+        self._print(MsgLevel.WARN, msg, prev_msg=self.WARNING_PREV.format(self.isatty()), *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
-        self._print(MsgLevel.ERROR, '%s %s' % (self.ERROR_PREV, msg), *args, **kwargs)
+        self._print(MsgLevel.ERROR, msg, prev_msg=self.ERROR_PREV.format(self.isatty()), *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
-        if self._root_io:
-            return self._root_io.critical(msg, *args, **kwargs)
         self._print(MsgLevel.CRITICAL, '%s %s' % (self.ERROR_PREV, msg), *args, **kwargs)
-        self.exit(kwargs['code'] if 'code' in kwargs else 255)
+        if not self._root_io:
+            self.exit(kwargs['code'] if 'code' in kwargs else 255)
 
     def verbose(self, msg, *args, **kwargs):
         if self.level > self.VERBOSE_LEVEL:
@@ -728,13 +808,17 @@ class StdIO(object):
         if item.startswith('__'):
             return super(StdIO, self).__getattribute__(item)
         if self.io is None:
-            return FAKE_RETURN
+            if item == 'sub_io':
+                return self
+            else:
+                return FAKE_RETURN
         if item not in self._attrs:
             attr = getattr(self.io, item, EMPTY)
             if attr is not EMPTY:
                 self._attrs[item] = attr
             else:
-                self._warn_func(FormtatText.warning("WARNING: {} has no attribute '{}'".format(self.io, item)))
+                is_tty = getattr(self._stream, 'isatty', lambda : False)()
+                self._warn_func(FormtatText.warning("WARNING: {} has no attribute '{}'".format(self.io, item)).format(is_tty))
                 self._attrs[item] = FAKE_RETURN
         return self._attrs[item]
 

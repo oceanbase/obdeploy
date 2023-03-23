@@ -24,6 +24,7 @@ from __future__ import absolute_import, division, print_function
 import re
 import os
 import sys
+import tempfile
 import time
 import pickle
 import string
@@ -33,6 +34,7 @@ from glob import glob
 from enum import Enum
 from copy import deepcopy
 from xml.etree import cElementTree
+from ssh import LocalClient
 try:
     from ConfigParser import ConfigParser
 except:
@@ -257,6 +259,7 @@ class RemoteMirrorRepository(MirrorRepository):
         self.gpgcheck = False
         self._db = None
         self._repomds = None
+        self._available = None
         super(RemoteMirrorRepository, self).__init__(mirror_path, stdio=stdio)
         self.section_name = meta_data['section_name']
         self.baseurl = meta_data['baseurl']
@@ -270,6 +273,17 @@ class RemoteMirrorRepository(MirrorRepository):
             if repo_age > self.repo_age or int(time.time()) - 86400 > self.repo_age:
                 self.repo_age = repo_age
                 self.update_mirror()
+        
+    @property
+    def available(self):
+        if self._available is None:
+            try:
+                req = requests.request('get', self.baseurl)
+                self._available = req.status_code < 400
+            except Exception:
+                self.stdio and getattr(self.stdio, 'exception', print)('')
+                self._available = False
+        return self._available
 
     @property
     def db(self):
@@ -384,16 +398,19 @@ class RemoteMirrorRepository(MirrorRepository):
         self.get_repomds(True)
         primary_repomd = self._get_repomd_by_type(self.PRIMARY_REPOMD_TYPE)
         if not primary_repomd:
+            self._available = False
             self.stdio and getattr(self.stdio, 'stop_loading')('fail')
             return False
         file_path = self._get_repomd_data_file(primary_repomd)
         if not file_path:
+            self._available = False
             self.stdio and getattr(self.stdio, 'stop_loading')('fail')
             return False
         self._db = None
         self.repo_age = int(time.time())
         self._dump_repo_age_data()
         self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
+        self._available = True
         return True
 
     def get_repomds(self, update=False):
@@ -573,7 +590,8 @@ class RemoteMirrorRepository(MirrorRepository):
             return True
         except:
             FileUtil.rm(save_path)
-            stdio and getattr(stdio, 'exception', print)('Failed to download %s to %s' % (url, save_path))
+            stdio and getattr(stdio, 'warn', print)('Failed to download %s to %s' % (url, save_path))
+            stdio and getattr(stdio, 'exception', print)('')
         return False
 
 class LocalMirrorRepository(MirrorRepository):
@@ -586,6 +604,7 @@ class LocalMirrorRepository(MirrorRepository):
         self.db = {}
         self.db_path = os.path.join(mirror_path, self._DB_FILE)
         self.enabled = '-'
+        self.available = True
         self._load_db()
 
     @property
@@ -1050,3 +1069,46 @@ class MirrorRepositoryManager(Manager):
             mirror_section.meta_data['repo_age'] = repo_age
             self.stdio and getattr(self.stdio, 'stop_loading')('succeed')
         return True
+
+    def add_repo(self, url):
+        self._lock()
+        download_file_save_name = url.split('/')[-1]
+        if not download_file_save_name.endswith(".repo"):
+            self.stdio.error("Can't download. Please use a file in .repo format.")
+            return False
+
+        download_file_save_path = os.path.join(self.remote_path, download_file_save_name)
+        
+        if os.path.exists(download_file_save_path):
+            if not self.stdio.confirm("the repo file you want to add already exists, overwrite it?"):
+                self.stdio.print("exit without any changes")
+                return True
+
+        try:
+            download_file_res = requests.get(url, timeout=(5, 5))
+        except Exception as e:
+            self.stdio.exception("Failed to download repository file")
+            return False
+
+        download_status_code = download_file_res.status_code
+        
+        if download_status_code != 200:
+            self.stdio.verbose("http code: {}, http body: {}".format(download_status_code, download_file_res.text))
+            self.stdio.error("Failed to download repository file")
+            return False
+
+        try:
+            with tempfile.NamedTemporaryFile(mode='w+', suffix='.repo') as tf:
+                tf.write(download_file_res.content.decode(encoding='utf8'))
+                tf.seek(0)
+                ConfigParser().readfp(tf)
+                tf.seek(0)
+                if LocalClient.put_file(tf.name, download_file_save_path, stdio=self.stdio):
+                    self.stdio.print("repo file saved to {}".format(download_file_save_path))
+                    return True
+                else:
+                    self.stdio.error("Failed to save repository file")
+                    return False
+        except Exception as e:
+            self.stdio.exception("Failed to save repository file")
+            return False
