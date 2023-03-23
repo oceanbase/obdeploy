@@ -148,7 +148,7 @@ class OptimizeItem(object):
                 else:
                     r = re.match('^(\d+)(\w)B?$', self._origin.upper())
                     n, u = r.groups()
-                unit = self.UNITS.get(u.upper())
+                    unit = self.UNITS.get(u.upper())
                 if unit:
                     self._value = int(n) * unit
                 else:
@@ -540,14 +540,8 @@ class CursorOptimizer(SafeStdio):
         if not self.query_sql:
             stdio.verbose('no query sql')
             return
-        try:
-            sql = self.query_sql.format(**kwargs)
-            stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql)
-            ret = cursor.fetchone()
-            return ret
-        except:
-            stdio.exception("")
+        sql = self.query_sql.format(**kwargs)
+        return cursor.fetchone(sql)
 
     @property
     def modify_sql(self):
@@ -559,20 +553,13 @@ class CursorOptimizer(SafeStdio):
         if not self.modify_sql:
             stdio.verbose('no modify sql')
             return
-        try:
-            sql = self.modify_sql.format(**kwargs)
-            cursor_args = None
-            if value is not None:
-                cursor_args = (value, )
-                stdio.verbose('execute sql: %s' % (sql % cursor_args))
-            else:
-                stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql, cursor_args)
-            cursor.fetchone()
-            return True
-        except:
-            stdio.exception("")
+        sql = self.modify_sql.format(**kwargs)
+        cursor_args = None
+        if value is not None:
+            cursor_args = (value, )
+        if cursor.fetchone(sql, cursor_args) is False:
             return False
+        return True
 
 
 class OptimizeParser(SafeStdio):

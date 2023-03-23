@@ -1,0 +1,9 @@
+argparse==1.4.0
+pyyaml==6.0
+pymongo==4.2.0
+fastapi==0.87.0
+uvicorn==0.20.0
+asgi-correlation-id==3.2.1
+starlette_prometheus==0.9.0
+singleton-decorator==1.0.0
+fastapi_utils==0.2.1

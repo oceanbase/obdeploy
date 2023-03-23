@@ -62,17 +62,6 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
         if value is None:
             value = default
         return value
-    def execute(cursor, query, args=None):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose('execute sql: %s' % msg)
-        stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            cursor.execute(query, args)
-            return cursor.fetchone()
-        except:
-            msg = 'execute sql exception: %s' % msg
-            stdio.exception(msg)
-            raise Exception(msg)
 
     def local_execute_command(command, env=None, timeout=None):
         return LocalClient.execute_command(command, env, timeout, stdio)
@@ -129,7 +118,10 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
             cpu_total += int(server_config.get('cpu_count', 0))
     try:
         sql = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = 'secure_file_priv'" % tenant_id
-        ret = execute(cursor, sql)['value']
+        ret = cursor.fetchone(sql)
+        if ret is False:
+            return
+        ret = ret['value']
         if ret is None:
             stdio.error('Access denied. Please set `secure_file_priv` to "".')
             return
@@ -173,21 +165,30 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
                     raise Exception(ret.stderr)
             stdio.stop_loading('succeed')
 
-            merge_version = execute(cursor, "select value from oceanbase.__all_zone where name='frozen_version'")['value']
+            merge_version = cursor.fetchone("select value from oceanbase.__all_zone where name='frozen_version'")
+            if merge_version is False:
+                return
+            merge_version = merge_version['value']
             stdio.start_loading('Merge')
-            execute(cursor, 'alter system major freeze')
+            if cursor.fetchone('alter system major freeze') is False:
+                return
             sql = "select value from oceanbase.__all_zone where name='frozen_version' and value != %s" % merge_version
             while True:
-                if execute(cursor, sql):
+                res = cursor.fetchone(sql)
+                if res is False:
+                    return
+                if res:
                     break
-                time.sleep(1)
                 
             while True:
-                if not execute(cursor, """select * from  oceanbase.__all_zone 
-                where name='last_merged_version'
-                and value != (select value from oceanbase.__all_zone where name='frozen_version' limit 1)
-                and zone in (select zone from  oceanbase.__all_zone where name='status' and info = 'ACTIVE')
-                """):
+                res = cursor.fetchone("""select * from  oceanbase.__all_zone 
+                                         where name='last_merged_version'
+                                         and value != (select value from oceanbase.__all_zone where name='frozen_version' limit 1)
+                                         and zone in (select zone from  oceanbase.__all_zone where name='status' and info = 'ACTIVE')
+                                         """)
+                if res is False:
+                    return
+                if not res:
                     break
                 time.sleep(5)
             stdio.stop_loading('succeed')

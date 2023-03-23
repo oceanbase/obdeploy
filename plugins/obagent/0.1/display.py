@@ -19,7 +19,8 @@
 
 from __future__ import absolute_import, division, print_function
 
-import socket
+from tool import NetUtil
+
 
 def display(plugin_context, cursor, *args, **kwargs):
     stdio = plugin_context.stdio
@@ -37,8 +38,7 @@ def display(plugin_context, cursor, *args, **kwargs):
         cmd = '''curl %s -H "Content-Type:application/json" -L "http://%s:%s/metrics/stat"''' % (auth, server.ip, config['server_port'])
         ip = server.ip
         if ip == '127.0.0.1':
-            hostname = socket.gethostname()
-            ip = socket.gethostbyname(hostname)
+            ip = NetUtil.get_host_ip()
         result.append({
             'ip': ip,
             'status': 'active' if client.execute_command(cmd) else 'inactive',

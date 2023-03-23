@@ -205,11 +205,18 @@ class Upgrader(object):
         self._stop_plugin = None
         self._display_plugin = None
 
+    def call_plugin(self, plugin, *args, **kwargs):
+        return plugin(self.plugin_context.namespace, self.plugin_context.namespaces, self.plugin_context.deploy_name,
+                      self.plugin_context.repositories, self.plugin_context.components, self.plugin_context.clients,
+                      self.plugin_context.cluster_config, self.plugin_context.cmds, self.plugin_context.options,
+                      self.plugin_context.stdio, *args, **kwargs)
+
     def run(self):
         total = len(self.route)
         self.apply_param_plugin(self.repositories[self.route_index - 1])
         while self.route_index < total:
-            self.start_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.stdio, local_home_path=None, repository_dir=None)
+            self.call_plugin(self.start_plugin, local_home_path=None, repository_dir=None)
+            self.close()
             if not self.connect():
                 return False
             self.stdio.verbose('upgrade %s to %s' % (self.repositories[self.route_index], self.repositories[self.next_stage]))
@@ -241,17 +248,17 @@ class Upgrader(object):
     def close(self):
         if self.db:
             self.cursor.close()
-            self.db.close()
             self.cursor = None
             self.db = None
             self.exector = None
 
     def connect(self):
         if self.cursor is None or self.execute_sql('select version()', error=False) is False:
-            ret = self.connect_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.stdio)
+            ret = self.call_plugin(self.connect_plugin)
             if not ret:
                 return False
-            self.close()
+            if self.cursor:
+                self.close()
             self.cursor = ret.get_return('cursor')
             self.db = ret.get_return('connect')
             while self.execute_sql('use oceanbase', error=False) is False:
@@ -266,18 +273,13 @@ class Upgrader(object):
         return True
 
     def execute_sql(self, query, args=None, one=True, error=True):
-        msg = query % tuple(args) if args is not None else query
-        self.stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            self.stdio.verbose('execute sql: %s' % msg)
-            self.cursor.execute(query, args)
-            result = self.cursor.fetchone() if one else self.cursor.fetchall()
-            result and self.stdio.verbose(result)
-            return result
-        except:
-            msg = 'execute sql exception: %s' % msg if error else ''
-            self.stdio.exception(msg)
-        return False
+        exc_level = 'error' if error else 'verbose'
+        if one:
+            result = self.cursor.fetchone(query, args, exc_level=exc_level)
+        else:
+            result = self.cursor.fetchall(query, args, exc_level=exc_level)
+        result and self.stdio.verbose(result)
+        return result
 
     @property
     def next_stage(self):
@@ -418,15 +420,15 @@ class Upgrader(object):
         repository_dir = repository.repository_dir
         self.install_repository_to_servers(self.components, self.cluster_config, repository, self.clients,
                                            self.unuse_lib_repository)
-
-        if not self.stop_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.stdio):
+        if not self.call_plugin(self.stop_plugin):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
 
         self.apply_param_plugin(repository)
-        if not self.start_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.stdio, local_home_path=self.local_home_path, repository_dir=repository_dir):
+        if not self.call_plugin(self.start_plugin, local_home_path=self.local_home_path, repository_dir=repository_dir):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
+        self.close()
         self.wait()
         self.stdio.stop_loading('succeed')
         return True
@@ -469,14 +471,15 @@ class Upgrader(object):
 
             if pre_zone:
                 self.apply_param_plugin(self.repositories[self.route_index - 1])
-            if not self.stop_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.stdio):
+            if not self.call_plugin(self.stop_plugin):
                 self.stdio.stop_loading('stop_loading', 'fail')
                 return False
 
             self.apply_param_plugin(repository)
-            if not self.start_plugin(self.components, self.clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.stdio, local_home_path=self.local_home_path, repository_dir=repository_dir):
+            if not self.call_plugin(self.start_plugin, local_home_path=self.local_home_path, repository_dir=repository_dir):
                 self.stdio.stop_loading('stop_loading', 'fail')
                 return False
+            self.close()
             pre_zone = zone
             
         if not self.start_zone(pre_zone):
@@ -517,17 +520,11 @@ class Upgrader(object):
 
 
 def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, unuse_lib_repository, *args, **kwargs):
-    components = plugin_context.components
-    clients = plugin_context.clients
-    cluster_config = plugin_context.cluster_config
-    cmd = plugin_context.cmd
-    options = plugin_context.options
-    stdio = plugin_context.stdio
 
     upgrade_ctx = kwargs.get('upgrade_ctx')
     local_home_path = kwargs.get('local_home_path')
     upgrade_repositories = kwargs.get('upgrade_repositories')
-    exector_path = getattr(options, 'executer_path', '/usr/obd/lib/executer')
+    exector_path = getattr(plugin_context.options, 'executer_path', '/usr/obd/lib/executer')
 
     upgrader = Upgrader(
         plugin_context=plugin_context,
@@ -541,5 +538,6 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
         unuse_lib_repository=unuse_lib_repository)
     if upgrader.run():
         if upgrader.route_index >= len(upgrader.route):
-            upgrader.display_plugin(components, clients, cluster_config, cmd, options, stdio, upgrader.cursor, *args, **kwargs)
+            upgrader.call_plugin(upgrader.display_plugin, upgrader.cursor, *args, **kwargs)
         plugin_context.return_true()
+

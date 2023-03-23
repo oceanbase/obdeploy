@@ -30,7 +30,8 @@ from multiprocessing.pool import Pool
 
 from _rpm import Package, PackageInfo, Version
 from _arch import getBaseArch
-from tool import DirectoryUtil, FileUtil, YamlLoader
+from _environ import ENV_DISABLE_PARALLER_EXTRACT
+from tool import DirectoryUtil, FileUtil, YamlLoader, COMMAND_ENV
 from _manager import Manager
 from _plugin import InstallPlugin
 
@@ -150,24 +151,24 @@ class ExtractFileInfo(object):
         self.mode = mode
 
 
-class ParallerExtractWorker(object):
+class Extractor(object):
 
     def __init__(self, pkg, files, stdio=None):
         self.pkg = pkg
         self.files = files
         self.stdio = stdio
     
-    @staticmethod
-    def extract(worker):
-        with worker.pkg.open() as rpm:
-            for info in worker.files:
+    def extract(self):
+        with self.pkg.open() as rpm:
+            for info in self.files:
                 if os.path.exists(info.target_path):
                     continue
                 fd = rpm.extractfile(info.src_path)
-                with FileUtil.open(info.target_path, 'wb', stdio=worker.stdio) as f:
+                with FileUtil.open(info.target_path, 'wb', stdio=self.stdio) as f:
                     FileUtil.copy_fileobj(fd, f)
                 if info.mode != 0o744:
                     os.chmod(info.target_path, info.mode)
+        return True
 
 
 class ParallerExtractor(object):
@@ -180,10 +181,30 @@ class ParallerExtractor(object):
         self.pkg = pkg
         self.files = files
         self.stdio = stdio
+    
+    @staticmethod
+    def _extract(worker):
+        return worker.extract()
 
     def extract(self):
         if not self.files:
             return
+        
+        if sys.version_info.major == 2 or COMMAND_ENV.get(ENV_DISABLE_PARALLER_EXTRACT, False):
+            return self._single()
+        else:
+            return self._paraller()
+
+    def _single(self):
+        self.stdio and getattr(self.stdio, 'verbose', print)('extract mode: single')
+        return Extractor(
+            self.pkg,
+            self.files,
+            stdio=self.stdio
+        ).extract()
+        
+    def _paraller(self):
+        self.stdio and getattr(self.stdio, 'verbose', print)('extract mode: paraller')
         workers = []
         file_num = len(self.files)
         paraller = int(min(self.MAX_PARALLER, file_num))
@@ -192,7 +213,7 @@ class ParallerExtractor(object):
         index = 0
         while index < file_num:
             p_index = index + size
-            workers.append(ParallerExtractWorker(
+            workers.append(Extractor(
                 self.pkg,
                 self.files[index:p_index],
                 stdio=self.stdio
@@ -201,16 +222,20 @@ class ParallerExtractor(object):
         
         pool = Pool(processes=paraller)
         try:
-            results = pool.map(ParallerExtractWorker.extract, workers)
+            results = pool.map(ParallerExtractor._extract, workers)
             for r in results:
                 if not r:
                     return False
+            return True
         except KeyboardInterrupt:
             if pool:
                 pool.close()
                 pool = None
+        except:
+            self.stdio and getattr(self.stdio, 'exception', print)()
         finally:
             pool and pool.close()
+        return False
 
 
 class Repository(PackageInfo):
@@ -309,14 +334,14 @@ class Repository(PackageInfo):
         except:
             self.stdio and getattr(self.stdio, 'exception', print)('dump %s to %s failed' % (data, self.data_file_path))
         return False
+    
+    def need_load(self, pkg, plugin):
+        return self.hash != pkg.md5 or not self.install_time > plugin.check_value or not self.file_check(plugin)
 
     def load_pkg(self, pkg, plugin):
         if self.is_shadow_repository():
             self.stdio and getattr(self.stdio, 'print', '%s is a shadow repository' % self)
             return False
-        hash_path = os.path.join(self.repository_dir, '.hash')
-        if self.hash == pkg.md5 and self.file_check(plugin) and self.install_time > plugin.check_value:
-            return True
         self.clear()
         try:
             with pkg.open() as rpm:
@@ -385,7 +410,7 @@ class Repository(PackageInfo):
                     if not os.path.exists(path) and n_dir[:-1] in dirnames:
                         DirectoryUtil.mkdir(path)
                     if not os.path.isdir(path):
-                        raise Exception('%s in %s is not dir.' % (pkg.path, n_dir))
+                        raise Exception('%s in %s is not dir.' % (n_dir, pkg.path))
             self.set_version(pkg.version)
             self.set_release(pkg.release)
             self.md5 = pkg.md5

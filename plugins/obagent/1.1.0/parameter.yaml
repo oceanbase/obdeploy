@@ -1,11 +1,15 @@
 - name: home_path
+  name_local: 工作目录
   require: true
+  essential: true
   type: STRING
-  need_restart: true
+  need_redeploy: true
   description_en: working directory for obagent
   description_local: Obagent工作目录
 - name: server_port
+  name_local: 服务端口
   require: true
+  essential: true
   type: INT
   default: 8088
   min_value: 1025
@@ -14,7 +18,9 @@
   description_en: port number for pulling metrics and management
   description_local: 提供拉取 metrics 和管理的端口
 - name: pprof_port
+  name_local: 调试端口
   require: true
+  essential: true
   type: INT
   default: 8089
   min_value: 1025
@@ -41,7 +47,9 @@
   description_en: log path
   description_local: 日志路径
 - name: crypto_method
+  name_local: 加密方式
   require: true
+  essential: true
   type: STRING
   default: plain
   min_value: NULL
@@ -51,6 +59,8 @@
   description_local: 加密方式，仅支持 aes 和 plain
 - name: crypto_path
   require: true
+  name_local: 秘钥路径
+  essential: true
   type: STRING
   default: conf/.config_secret.key
   min_value: NULL
@@ -104,7 +114,9 @@
   description_en: whether to enable log compression
   description_local: 是否开启日志压缩
 - name: http_basic_auth_user
+  name_local: 用户名
   require: true
+  essential: true
   type: STRING
   default: admin
   min_value: NULL
@@ -113,7 +125,9 @@
   description_en: username for HTTP authentication
   description_local: HTTP 服务认证用户名
 - name: http_basic_auth_password
+  name_local: 密码
   require: false
+  essential: true
   type: STRING
   default: root
   min_value: NULL
@@ -122,7 +136,9 @@
   description_en: password for HTTP authentication
   description_local: HTTP 服务认证密码
 - name: pprof_basic_auth_user
+  name_local: 调试用户名
   require: true
+  essential: true
   type: STRING
   default: admin
   min_value: NULL
@@ -131,7 +147,9 @@
   description_en: username for debug service
   description_local: debug 接口认证用户名
 - name: pprof_basic_auth_password
+  name_local: 调试密码
   require: false
+  essential: true
   type: STRING
   default: root
   min_value: NULL
@@ -203,7 +221,9 @@
   description_en: zone name for your observer
   description_local: observer 所在的 zone 名字
 - name: ob_monitor_status
+  name_local: OceanBase 指标监控采集
   require: true
+  essential: true
   type: STRING
   default: active
   min_value: NULL
@@ -212,7 +232,9 @@
   description_en: monitor status for OceanBase Database. Active is to enable. Inactive is to disable.
   description_local: OceanBase 监控指标采集状态，active 表示开启，inactive 表示关闭
 - name: host_monitor_status
+  name_local: 主机指标监控采集
   require: true
+  essential: true
   type: STRING
   default: active
   min_value: NULL
@@ -221,7 +243,9 @@
   description_en: monitor status for your host. Active is to enable. Inactive is to disable.
   description_local: 主机监控指标采集状态， active 表示开启， inactive 表示关闭
 - name: disable_http_basic_auth
+  name_local: 禁用 HTTP 服务的basic auth 认证
   require: true
+  essential: true
   type: BOOL
   default: false
   min_value: NULL
@@ -230,7 +254,9 @@
   description_en: whether to disable the basic authentication for HTTP service. True is to disable. False is to enable.
   description_local: 是否禁用 HTTP 服务的basic auth 认证，true 表示禁用，false 表示不禁用
 - name: disable_pprof_basic_auth
+  name_local: 禁用 debug 接口的basic auth 认证
   require: true
+  essential: true
   type: BOOL
   default: false
   min_value: NULL
@@ -248,7 +274,9 @@
   description_en: status for OceanBase Database log alarm. Active is to enable. Inactive is to disable.
   description_local: OceanBase 日志报警状态，active 表示开启，inactive 表示关闭
 - name: alertmanager_address
+  name_local: Alertmanager 地址
   require: false
+  essential: true
   type: STRING
   default: ''
   min_value: NULL

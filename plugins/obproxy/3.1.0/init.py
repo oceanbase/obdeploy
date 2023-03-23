@@ -22,7 +22,7 @@ from __future__ import absolute_import, division, print_function
 from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage
 
 
-def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
+def init(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -35,8 +35,6 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
         home_path = server_config['home_path']
-        remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
-        remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
         stdio.verbose('%s init cluster work home', server)
         need_clean = force
         if clean and not force:

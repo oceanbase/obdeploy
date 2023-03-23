@@ -1,5 +1,7 @@
 - name: home_path
+  name_local: 工作目录
   require: true
+  essential: true
   type: STRING
   min_value: NULL
   max_value: NULL
@@ -7,7 +9,9 @@
   description_en: the directory for the work data file
   description_local: Prometheus工作目录
 - name: data_dir
+  name_local: 数据目录
   require: false
+  essential: true
   type: STRING
   need_redeploy: true
   description_en: Base path for metrics storage.
@@ -21,6 +25,8 @@
   description_local:
 - name: port
   require: true
+  name_local: 服务端口
+  essential: true
   default: 9090
   type: INT
   need_restart: true

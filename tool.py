@@ -21,7 +21,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-import os    
+import os
 import bz2
 import sys
 import stat
@@ -32,6 +32,7 @@ import shutil
 import re
 import json
 import hashlib
+import socket
 from io import BytesIO
 
 from ruamel.yaml import YAML, YAMLContextManager, representer
@@ -132,7 +133,7 @@ class DynamicLoading(object):
     def add_lib_path(lib):
         if lib not in DynamicLoading.LIBS_PATH:
             DynamicLoading.LIBS_PATH[lib] = 0
-        if DynamicLoading.LIBS_PATH[lib] == 0: 
+        if DynamicLoading.LIBS_PATH[lib] == 0:
             sys.path.insert(0, lib)
         DynamicLoading.LIBS_PATH[lib] += 1
 
@@ -140,7 +141,7 @@ class DynamicLoading(object):
     def add_libs_path(libs):
         for lib in libs:
             DynamicLoading.add_lib_path(lib)
-            
+
     @staticmethod
     def remove_lib_path(lib):
         if lib not in DynamicLoading.LIBS_PATH:
@@ -216,6 +217,10 @@ class ConfigUtil(object):
 
 
 class DirectoryUtil(object):
+
+    @staticmethod
+    def get_owner(path):
+        return os.stat(path)[stat.ST_UID]
 
     @staticmethod
     def list_dir(path, stdio=None):
@@ -352,7 +357,7 @@ class FileUtil(object):
                         return False
                     else:
                         raise IOError(info)
-        
+
         try:
             if os.path.islink(src):
                 FileUtil.symlink(os.readlink(src), dst)
@@ -438,7 +443,7 @@ class FileUtil(object):
         except:
             stdio and getattr(stdio, 'exception', print)('failed to remove %s' % path)
         return False
-        
+
     @staticmethod
     def move(src, dst, stdio=None):
         return shutil.move(src, dst)
@@ -477,7 +482,7 @@ class YamlLoader(YAML):
         self.stdio = stdio
         if not self.Representer.yaml_multi_representers and self.Representer.yaml_representers:
             self.Representer.yaml_multi_representers = self.Representer.yaml_representers
-    
+
     def load(self, stream):
         try:
             return super(YamlLoader, self).load(stream)
@@ -631,4 +636,11 @@ class CommandEnv(SafeStdio):
         return self._cmd_env
 
 
-COMMAND_ENV = CommandEnv()
+class NetUtil(object):
+    @staticmethod
+    def get_host_ip():
+        hostname = socket.gethostname()
+        ip = socket.gethostbyname(hostname)
+        return ip
+
+COMMAND_ENV=CommandEnv()

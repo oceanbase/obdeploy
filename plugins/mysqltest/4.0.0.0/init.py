@@ -45,8 +45,7 @@ def init(plugin_context, env, *args, **kwargs):
     def get_root_server(cursor):
         while True:
             try:
-                cursor.execute('select * from oceanbase.__all_server where status = \'active\' and with_rootserver=1')
-                return cursor.fetchone()
+                return cursor.fetchone('select * from oceanbase.__all_server where status = \'active\' and with_rootserver=1', raise_exception=True)
             except:
                 if load_snap:
                     time.sleep(0.1)

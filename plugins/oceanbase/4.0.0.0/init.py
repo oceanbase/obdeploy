@@ -60,7 +60,7 @@ def init_dir(server, client, key, path, link_path=None):
         return False
 
 
-def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
+def init(plugin_context, *args, **kwargs):
     global stdio, force
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -78,8 +78,6 @@ def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
         home_path = server_config['home_path']
-        remote_home_path = client.execute_command('echo ${OBD_HOME:-"$HOME"}/.obd').stdout.strip()
-        remote_repository_dir = repository_dir.replace(local_home_path, remote_home_path)
 
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path

@@ -25,9 +25,6 @@ def drop_tenant(plugin_context, cursor, *args, **kwargs):
     def error(*arg, **kwargs):
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
-    def exception(*arg, **kwargs):
-        stdio.exception(*arg, **kwargs)
-        stdio.stop_loading('fail')
         
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
@@ -45,47 +42,40 @@ def drop_tenant(plugin_context, cursor, *args, **kwargs):
 
     tenant = None
     sql = "select * from oceanbase.DBA_OB_TENANTS where tenant_name = %s"
-    try:
-        stdio.verbose('execute sql: %s' % (sql % tenant_name))
-        cursor.execute(sql, [tenant_name])
-        tenant = cursor.fetchone()
-        if not tenant:
-            error('No such Tenant %s' % tenant_name)
-            return
-    except:
-        exception('execute sql exception: %s' % (sql % tenant_name))
+    tenant = cursor.fetchone(sql, [tenant_name])
+    if tenant is False:
+        return
+    if not tenant:
+        error('No such Tenant %s' % tenant_name)
         return
 
     pool = None
     sql = "select * from oceanbase.DBA_OB_RESOURCE_POOLS where tenant_id = %d" % tenant['TENANT_ID']
-    try:
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-        pool = cursor.fetchone()
-        sql = "drop tenant %s FORCE" % tenant_name
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-        if not pool:
-            return
-        sql = "drop resource pool %s" % pool['NAME']
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-    except:
-        exception('execute sql exception: %s' % sql)
+    pool = cursor.fetchone(sql)
+    if pool is False:
+        return
+    sql = "drop tenant %s FORCE" % tenant_name
+    res = cursor.execute(sql)
+    if res is False:
+        error()
+        return
+    if not pool:
+        error()
+        return
+    sql = "drop resource pool %s" % pool['NAME']
+    res = cursor.execute(sql)
+    if res is False:
+        error()
         return
 
     sql = "select * from oceanbase.DBA_OB_UNIT_CONFIGS where unit_config_id = %d" % pool['UNIT_CONFIG_ID']
-    try:
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-        unit = cursor.fetchone()
-        if not unit:
-            return
-        sql = "drop resource unit %s" % unit['NAME']
-        stdio.verbose('execute sql: %s' % sql)
-        cursor.execute(sql)
-    except:
-        exception('execute sql exception: %s' % sql)
+    unit = cursor.fetchone(sql)
+    if not unit:
+        return
+    sql = "drop resource unit %s" % unit['NAME']
+    res = cursor.execute(sql)
+    if res is False:
+        error()
         return
 
     stdio.stop_loading('succeed')

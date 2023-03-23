@@ -93,7 +93,7 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
         stdio.verbose('%s %s install check' % (server, install_repository))
         try:
             yaml_loader = YamlLoader(stdio=stdio)
-            data = yaml_loader.load(remote_repository_data)
+            data = yaml_loader.loads(remote_repository_data)
             if not data:
                 stdio.verbose('%s %s need to be installed ' % (server, install_repository))
             elif data == install_repository:

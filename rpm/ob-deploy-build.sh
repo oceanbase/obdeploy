@@ -7,8 +7,8 @@ RELEASE=$4
 PYTHON3_SWITCH=$5
 
 if [[ x"$PYTHON3_SWITCH" == x"" ]]; then
-    echo "No switch command is provided, so use the default switch command: 'source /environments/python3_env/bin/activate'"
-    PYTHON3_SWITCH="source /environments/python3_env/bin/activate"
+    echo "No switch command is provided, so use the default switch command: 'source py-env-activate py38'"
+    PYTHON3_SWITCH="source py-env-activate py38"
 fi
 
 CURDIR=$PWD

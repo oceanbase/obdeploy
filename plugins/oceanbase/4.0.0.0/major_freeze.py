@@ -25,33 +25,33 @@ import time
 
 def major_freeze(plugin_context, cursor, *args, **kwargs):
 
-    def execute(cursor, query, args=None):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose('execute sql: %s' % msg)
-        stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            cursor.execute(query, args)
-            return cursor.fetchone()
-        except:
-            msg = 'execute sql exception: %s' % msg
-            stdio.exception(msg)
-            raise Exception(msg)
-
     stdio = plugin_context.stdio
     tenant_name = kwargs.get('tenant')
-    tenant_id = execute(cursor, "select TENANT_ID from oceanbase.DBA_OB_TENANTS where tenant_name = '%s'" % tenant_name)["TENANT_ID"]
+    tenant_id = cursor.fetchone("select TENANT_ID from oceanbase.DBA_OB_TENANTS where tenant_name = '%s'" % tenant_name)
+    if tenant_id is False:
+        return
+    tenant_id = tenant_id["TENANT_ID"]
     # Major freeze
     stdio.start_loading('Merge')
     sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION where tenant_id = '%s'" % tenant_id
-    merge_version = execute(cursor, sql_frozen_scn)['FROZEN_SCN']
-    execute(cursor, "alter system major freeze tenant = %s" % tenant_name)
+    merge_version = cursor.fetchone(sql_frozen_scn)
+    if merge_version is False:
+        return
+    merge_version = merge_version['FROZEN_SCN']
+    if cursor.execute("alter system major freeze tenant = %s" % tenant_name) is False:
+        return
     while True:
-        current_version = execute(cursor, sql_frozen_scn).get("FROZEN_SCN")
+        current_version = cursor.fetchone(sql_frozen_scn)
+        if current_version is False:
+            return
+        current_version = current_version.get("FROZEN_SCN")
         if int(current_version) > int(merge_version):
             break
         time.sleep(5)
     while True:
-        ret = execute(cursor, sql_frozen_scn)
+        ret = cursor.fetchone(sql_frozen_scn)
+        if ret is False:
+            return
         if int(ret.get("FROZEN_SCN", 0)) / 1000 == int(ret.get("LAST_SCN", 0)) / 1000:
             break
         time.sleep(5)

@@ -21,42 +21,33 @@
 from __future__ import absolute_import, division, print_function
 
 
-def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
-    clients = plugin_context.clients
-    stdio = plugin_context.stdio
-    success = True
-    stdio.start_loading('Generate obproxy configuration')
+def generate_config(plugin_context, generate_config_mini=False, auto_depend=False, return_generate_keys=False, *args, **kwargs):
+    if return_generate_keys:
+        return plugin_context.return_true(generate_keys=['skip_proxy_sys_private_check', 'enable_strict_kernel_release', 'enable_cluster_checkout', 'proxy_mem_limited'])
 
-    for server in cluster_config.servers:
-        server_config = cluster_config.get_server_conf(server)
-        if not server_config.get('home_path'):
-            stdio.error("obproxy %s: missing configuration 'home_path' in configuration file" % server)
-            success = False
-            continue
-        cluster_config.update_server_conf(server, 'enable_cluster_checkout', False)
-    if not success:
-        stdio.stop_loading('fail')
-        return
+    cluster_config = plugin_context.cluster_config
+    stdio = plugin_context.stdio
+    generate_configs = {'global': {}}
+    plugin_context.set_variable('generate_configs', generate_configs)
+    stdio.start_loading('Generate obproxy configuration')
 
     global_config = cluster_config.get_original_global_conf()
     if 'skip_proxy_sys_private_check' not in global_config:
+        generate_configs['global']['skip_proxy_sys_private_check'] = True
         cluster_config.update_global_conf('skip_proxy_sys_private_check', True, False)
-    if 'enable_strict_kernel_release' not in global_config:
-        cluster_config.update_global_conf('enable_strict_kernel_release', False, False)
-    
-    if getattr(plugin_context.options, 'mini', False):
-        if 'proxy_mem_limited' not in global_config:
-            cluster_config.update_global_conf('proxy_mem_limited', '500M', False)
 
-    ob_comps = ['oceanbase', 'oceanbase-ce']
-    ob_cluster_config = None
-    for comp in ob_comps:
-        if comp in cluster_config.depends:
-            stdio.stop_loading('succeed')
-            return plugin_context.return_true()
-        if comp in deploy_config.components:
-            ob_cluster_config = deploy_config.components[comp]
+    if 'enable_strict_kernel_release' not in global_config:
+        generate_configs['global']['enable_strict_kernel_release'] = False
+        cluster_config.update_global_conf('enable_strict_kernel_release', False, False)
+
+    if 'enable_cluster_checkout' not in global_config:
+        generate_configs['global']['enable_cluster_checkout'] = False
+        cluster_config.update_global_conf('enable_cluster_checkout', False, False)
+    
+    if generate_config_mini:
+        if 'proxy_mem_limited' not in global_config:
+            generate_configs['global']['proxy_mem_limited'] = '500M'
+            cluster_config.update_global_conf('proxy_mem_limited', '500M', False)
 
     if auto_depend:
         for depend in ['oceanbase', 'oceanbase-ce']:
@@ -64,22 +55,5 @@ def generate_config(plugin_context, deploy_config, auto_depend=False, *args, **k
                 stdio.stop_loading('succeed')
                 return plugin_context.return_true()
 
-    if ob_cluster_config:
-        root_servers = {}
-        cluster_name = ob_cluster_config.get_global_conf().get('appname')
-        for server in ob_cluster_config.servers:
-            config = ob_cluster_config.get_server_conf_with_default(server)
-            zone = config['zone']
-            cluster_name = cluster_name if cluster_name else config.get('appname')
-            if zone not in root_servers:
-                root_servers[zone] = '%s:%s' % (server.ip, config['mysql_port'])
-        rs_list = ';'.join([root_servers[zone] for zone in root_servers])
-
-        cluster_name = cluster_name if cluster_name else 'obcluster'
-        if not global_config.get('rs_list'):
-            cluster_config.update_global_conf('rs_list', rs_list, False)
-        if not global_config.get('cluster_name'):
-            cluster_config.update_global_conf('cluster_name', cluster_name, False)
-    
     stdio.stop_loading('succeed')
     return plugin_context.return_true()

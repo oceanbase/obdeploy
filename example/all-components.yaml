@@ -25,13 +25,21 @@ oceanbase-ce:
     system_memory: 30G
     datafile_size: 192G # Size of the data file. 
     log_disk_size: 192G # The size of disk space used by the clog files.
-    syslog_level: INFO # System log level. The default value is INFO.
     enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
     enable_syslog_recycle: true # Enable auto system log recycling or not. The default value is false.
     max_syslog_file_count: 4 # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
     skip_proxy_sys_private_check: true
     enable_strict_kernel_release: false
     # root_password: # root user password
+    # ocp_meta_db: ocp_express # The database name of ocp express meta
+    # ocp_meta_username: meta # The username of ocp express meta
+    # ocp_meta_password: '' # The password of ocp express meta
+    # ocp_agent_monitor_password: '' # The password for obagent monitor user
+    ocp_meta_tenant: # The config for ocp express meta tenant
+      tenant_name: ocp
+      max_cpu: 1
+      memory_size: 2G
+      log_disk_size: 7680M # The recommend value is (4608 + (expect node num + expect tenant num) * 512) M.
   # In this example , support multiple ob process in single node, so different process use different ports.
   # If deploy ob cluster in multiple nodes, the port and path setting can be same. 
   server1:
@@ -70,7 +78,7 @@ obproxy-ce:
   depends:
     - oceanbase-ce
   servers:
-    - 192.168.1.5
+    - 172.19.33.6
   global:
     listen_port: 2883 # External port. The default value is 2883.
     prometheus_listen_port: 2884 # The Prometheus port. The default value is 2884.
@@ -98,19 +106,17 @@ obagent:
       ip: 172.19.33.4
   global:
     home_path: /root/obagent
-    ob_monitor_status: active
-prometheus:
-  depends:
+ocp-express:
+  depeneds:
+    - oceanbase-ce
+    - obproxy-ce
     - obagent
   servers:
-    - 192.168.1.5
+    - 172.19.33.5
   global:
-    home_path: /root/prometheus
-grafana:
-  depends:
-    - prometheus
-  servers:
-    - 192.168.1.5
-  global:
-    home_path: /root/grafana
-    login_password: oceanbase
+    # The working directory for prometheus. prometheus is started under this directory. This is a required field.
+    home_path: /root/ocp-server
+    # log_dir: /home/oceanbase/ocp-server/log # The log directory of ocp express server. The default value is {home_path}/log.
+    memory_size: 1G # The memory size of ocp-express server.  The recommend value is 512MB * (expect node num + expect tenant num) * 60MB.
+    # logging_file_total_size_cap: 10G # The total log file size of ocp-express server
+    # logging_file_max_history: 1 # The maximum of retention days the log archive log files to keep. The default value is unlimited

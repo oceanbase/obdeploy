@@ -25,7 +25,7 @@ import re
 import sys
 from enum import Enum
 from glob import glob
-from copy import deepcopy
+from copy import deepcopy, copy
 
 from _manager import Manager
 from _rpm import Version
@@ -47,7 +47,7 @@ class PluginType(Enum):
 
 
 class Plugin(object):
-    
+
     PLUGIN_TYPE = None
     FLAG_FILE = None
 
@@ -67,6 +67,33 @@ class Plugin(object):
         return self.PLUGIN_TYPE
 
 
+class PluginContextNamespace:
+
+    def __init__(self, spacename):
+        self.spacename = spacename
+        self._variables = {}
+        self._return = {}
+
+    @property
+    def variables(self):
+        return self._variables
+
+    def get_variable(self, name):
+        return self._variables.get(name)
+
+    def set_variable(self, name, value):
+        self._variables[name] = value
+
+    def get_return(self, plugin_name):
+        ret = self._return.get(plugin_name)
+        if isinstance(ret, PluginReturn):
+            return ret
+        return None
+
+    def set_return(self, plugin_name, plugin_return):
+        self._return[plugin_name] = plugin_return
+
+
 class PluginReturn(object):
 
     def __init__(self, value=False, *arg, **kwargs):
@@ -83,7 +110,7 @@ class PluginReturn(object):
     @property
     def value(self):
         return self._return_value
-    
+
     @property
     def args(self):
         return self._return_args
@@ -91,11 +118,9 @@ class PluginReturn(object):
     @property
     def kwargs(self):
         return self._return_kwargs
-    
-    def get_return(self, key):
-        if key in self.kwargs:
-            return self.kwargs[key]
-        return None
+
+    def get_return(self, key, default=None):
+        return self.kwargs.get(key, default)
 
     def set_args(self, *args):
         self._return_args = args
@@ -105,12 +130,12 @@ class PluginReturn(object):
 
     def set_return(self, value):
         self._return_value = value
-    
+
     def return_true(self, *args, **kwargs):
         self.set_return(True)
         self.set_args(*args)
         self.set_kwargs(**kwargs)
-    
+
     def return_false(self, *args, **kwargs):
         self.set_return(False)
         self.set_args(*args)
@@ -119,25 +144,48 @@ class PluginReturn(object):
 
 class PluginContext(object):
 
-    def __init__(self, components, clients, cluster_config, cmd, options, dev_mode, stdio):
+    def __init__(self, plugin_name, namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmd, options, dev_mode, stdio):
+        self.namespace = namespace
+        self.namespaces = namespaces
+        self.deploy_name  = deploy_name
+        self.repositories =repositories
+        self.plugin_name = plugin_name
         self.components = components
         self.clients = clients
         self.cluster_config = cluster_config
-        self.cmd = cmd
+        self.cmds = cmd
         self.options = options
         self.dev_mode = dev_mode
         self.stdio = stdio
         self.concurrent_executor = ConcurrentExecutor(32)
         self._return = PluginReturn()
 
-    def get_return(self):
-        return self._return
+    def get_return(self, plugin_name=None, spacename=None):
+        if spacename:
+            namespace = self.namespaces.get(spacename)
+        else:
+            namespace = self.namespace
+        if plugin_name is None:
+            plugin_name = self.plugin_name
+        return namespace.get_return(plugin_name) if namespace else None
 
     def return_true(self, *args, **kwargs):
         self._return.return_true(*args, **kwargs)
-    
+        self.namespace.set_return(self.plugin_name, self._return)
+
     def return_false(self, *args, **kwargs):
         self._return.return_false(*args, **kwargs)
+        self.namespace.set_return(self.plugin_name, self._return)
+
+    def get_variable(self, name, spacename=None):
+        if spacename:
+            namespace = self.namespaces.get(spacename)
+        else:
+            namespace = self.namespace
+        return namespace.get_variable(name) if namespace else None
+
+    def set_variable(self, name, value):
+        self.namespace.set_variable(name, value)
 
 
 class SubIO(object):
@@ -148,7 +196,7 @@ class SubIO(object):
 
     def __del__(self):
         self.before_close()
-    
+
     def _temp_function(self, *arg, **kwargs):
         pass
 
@@ -192,13 +240,21 @@ class ScriptPlugin(Plugin):
     def __del__(self):
         self._export()
 
-    def before_do(self, components, clients, cluster_config, cmd, options, stdio, *arg, **kwargs):
+    def before_do(
+        self, plugin_name, namespace, namespaces, deploy_name,
+        repositories, components, clients, cluster_config, cmd,
+        options, stdio, *arg, **kwargs
+        ):
         self._import(stdio)
         sub_stdio = SubIO(stdio)
         sub_clients = {}
         for server in clients:
             sub_clients[server] = ScriptPlugin.ClientForScriptPlugin(clients[server], sub_stdio)
-        self.context = PluginContext(components, sub_clients, cluster_config, cmd, options, self.dev_mode, sub_stdio)
+        self.context = PluginContext(
+            plugin_name, namespace, namespaces, deploy_name, repositories, components,
+            sub_clients, cluster_config, cmd, options, self.dev_mode, sub_stdio
+        )
+        namespace.set_return(plugin_name, None)
 
     def after_do(self, stdio, *arg, **kwargs):
         self._export(stdio)
@@ -206,17 +262,28 @@ class ScriptPlugin(Plugin):
 
 
 def pyScriptPluginExec(func):
-    def _new_func(self, components, clients, cluster_config, cmd, options, stdio, *arg, **kwargs):
-        self.before_do(components, clients, cluster_config, cmd, options, stdio, *arg, **kwargs)
+    def _new_func(
+        self, namespace, namespaces, deploy_name,
+        repositories, components, clients, cluster_config, cmd,
+        options, stdio, *arg, **kwargs
+        ):
+        self.before_do(self.name, namespace, namespaces, deploy_name,
+        repositories, components, clients, cluster_config, cmd,
+        options, stdio, *arg, **kwargs)
         if self.module:
             method_name = func.__name__
             method = getattr(self.module, method_name, False)
+            namespace_vars = copy(self.context.namespace.variables)
+            namespace_vars.update(kwargs)
+            kwargs = namespace_vars
             if method:
                 try:
-                    method(self.context, *arg, **kwargs)
+                    ret = method(self.context, *arg, **kwargs)
+                    if ret is None and self.context and self.context.get_return() is None:
+                        self.context.return_false()
                 except Exception as e:
+                    self.context.return_false(exception=e)
                     stdio and getattr(stdio, 'exception', print)('%s RuntimeError: %s' % (self, e))
-                    pass
         ret = self.context.get_return() if self.context else PluginReturn()
         self.after_do(stdio, *arg, **kwargs)
         return ret
@@ -226,45 +293,57 @@ def pyScriptPluginExec(func):
 class PyScriptPlugin(ScriptPlugin):
 
     LIBS_PATH = []
-    PLUGIN_COMPONENT_NAME = None
+    PLUGIN_NAME = None
 
     def __init__(self, component_name, plugin_path, version, dev_mode):
-        if not self.PLUGIN_COMPONENT_NAME:
+        if not self.PLUGIN_NAME:
             raise NotImplementedError
         super(PyScriptPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
         self.module = None
+        self.name = self.PLUGIN_NAME
         self.libs_path = deepcopy(self.LIBS_PATH)
         self.libs_path.append(self.plugin_path)
 
-    def __call__(self, clients, cluster_config, cmd, options, stdio, *arg, **kwargs):
-        method = getattr(self, self.PLUGIN_COMPONENT_NAME, False)
+    def __call__(
+        self, namespace, namespaces, deploy_name,
+        repositories, components, clients, cluster_config, cmd,
+        options, stdio, *arg, **kwargs
+        ):
+        method = getattr(self, self.PLUGIN_NAME, False)
         if method:
-            return method(clients, cluster_config, cmd, options, stdio, *arg, **kwargs)
+            return method(
+                namespace, namespaces, deploy_name,
+                repositories, components, clients, cluster_config, cmd,
+                options, stdio, *arg, **kwargs
+            )
         else:
             raise NotImplementedError
 
     def _import(self, stdio=None):
         if self.module is None:
             DynamicLoading.add_libs_path(self.libs_path)
-            self.module = DynamicLoading.import_module(self.PLUGIN_COMPONENT_NAME, stdio)
+            self.module = DynamicLoading.import_module(self.PLUGIN_NAME, stdio)
 
     def _export(self, stdio=None):
         if self.module:
             DynamicLoading.remove_libs_path(self.libs_path)
-            DynamicLoading.export_module(self.PLUGIN_COMPONENT_NAME, stdio)
+            DynamicLoading.export_module(self.PLUGIN_NAME, stdio)
 
 # this is PyScriptPlugin demo
 # class InitPlugin(PyScriptPlugin):
 
 #     FLAG_FILE = 'init.py'
-#     PLUGIN_COMPONENT_NAME = 'init'
+#     PLUGIN_NAME = 'init'
 #     PLUGIN_TYPE = PluginType.INIT
 
 #     def __init__(self, component_name, plugin_path, version):
 #         super(InitPlugin, self).__init__(component_name, plugin_path, version)
 
 #     @pyScriptPluginExec
-#     def init(self, components, ssh_clients, cluster_config, cmd, options, stdio, *arg, **kwargs):
+#     def init(
+#         self, namespace, namespaces, deploy_name,
+#         repositories, components, clients, cluster_config, cmd,
+#         options, stdio, *arg, **kwargs):
 #         pass
 
 class Null(object):
@@ -353,7 +432,7 @@ class ParamPlugin(Plugin):
                         raise Exception('Invalid Value')
             else:
                 self._value = 0
-        
+
     class Time(ConfigItemType):
 
         UNITS = {
@@ -384,7 +463,7 @@ class ParamPlugin(Plugin):
                 self._value = 0
 
     class Capacity(ConfigItemType):
-        
+
         UNITS = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40, 'P': 1 << 50}
 
         def _format(self):
@@ -396,7 +475,7 @@ class ParamPlugin(Plugin):
                 else:
                     r = re.match('^(\d+)(\w)B?$', self._origin.upper())
                     n, u = r.groups()
-                unit = self.UNITS.get(u.upper())
+                    unit = self.UNITS.get(u.upper())
                 if unit:
                     self._value = int(n) * unit
                 else:
@@ -496,18 +575,27 @@ class ParamPlugin(Plugin):
         def __init__(
             self,
             name,
-            param_type=str, 
-            default=None, 
-            min_value=None, 
-            max_value=None, 
-            require=False, 
-            need_restart=False, 
+            param_type=str,
+            default=None,
+            min_value=None,
+            max_value=None,
+            require=False,
+            essential=False,
+            section="",
+            need_reload=False,
+            need_restart=False,
             need_redeploy=False,
-            modify_limit=None
+            modify_limit=None,
+            name_local=None,
+            description_en=None,
+            description_local=None
         ):
             self.name = name
             self.default = default
             self.require = require
+            self.essential = essential
+            self.section = section
+            self.need_reload = need_reload
             self.need_restart = need_restart
             self.need_redeploy = need_redeploy
             self._param_type = param_type
@@ -515,6 +603,9 @@ class ParamPlugin(Plugin):
             self.max_value = param_type(max_value) if max_value is not None else None
             self.modify_limit = getattr(self, ('_%s_limit' % modify_limit).lower(), self._none_limit)
             self.had_modify_limit = self.modify_limit != self._none_limit
+            self.name_local = name_local if name_local is not None else self.name
+            self.description_en = description_en
+            self.description_local = description_local if description_local is not None else self.description_en
 
         def param_type(self, value):
             try:
@@ -535,12 +626,12 @@ class ParamPlugin(Plugin):
             if old_value == new_value:
                 return True
             raise Exception('DO NOT modify %s after startup' % self.name)
-    
+
         def _increase_limit(self, old_value, new_value):
             if self.param_type(new_value) > self.param_type(old_value):
                 raise Exception('DO NOT increase %s after startup' % self.name)
             return True
-        
+
         def _decrease_limit(self, old_value, new_value):
             if self.param_type(new_value) < self.param_type(old_value):
                 raise Exception('DO NOT decrease %s after startup' % self.name)
@@ -548,7 +639,7 @@ class ParamPlugin(Plugin):
 
         def _none_limit(self, old_value, new_value):
             return True
-        
+
     PLUGIN_TYPE = PluginType.PARAM
     DEF_PARAM_YAML = 'parameter.yaml'
     FLAG_FILE = DEF_PARAM_YAML
@@ -598,8 +689,13 @@ class ParamPlugin(Plugin):
                                 max_value=ConfigUtil.get_value_from_dict(conf, 'max_value', None),
                                 modify_limit=ConfigUtil.get_value_from_dict(conf, 'modify_limit', None),
                                 require=ConfigUtil.get_value_from_dict(conf, 'require', False),
+                                section=ConfigUtil.get_value_from_dict(conf, 'section', ""),
+                                essential=ConfigUtil.get_value_from_dict(conf, 'essential', False),
+                                need_reload=ConfigUtil.get_value_from_dict(conf, 'need_reload', False),
                                 need_restart=ConfigUtil.get_value_from_dict(conf, 'need_restart', False),
-                                need_redeploy=ConfigUtil.get_value_from_dict(conf, 'need_redeploy', False)
+                                need_redeploy=ConfigUtil.get_value_from_dict(conf, 'need_redeploy', False),
+                                description_en=ConfigUtil.get_value_from_dict(conf, 'description_en', None),
+                                description_local=ConfigUtil.get_value_from_dict(conf, 'description_local', None),
                             )
                         except:
                             pass
@@ -647,7 +743,7 @@ class ParamPlugin(Plugin):
             params = self.params
             for name in params:
                 conf = params[name]
-                temp[conf.name] = conf.default
+                self._params_default[conf.name] = conf.default
         return self._params_default
 
 
@@ -722,7 +818,7 @@ class InstallPlugin(Plugin):
     def var_replace(cls, string, var):
         if not var:
             return string
-        done = []                      
+        done = []
 
         while string:
             m = cls._KEYCRE.search(string)
@@ -830,7 +926,7 @@ class ComponentPluginLoader(object):
         if plugins:
             plugin = max(plugins, key=lambda x: x.version)
             # self.stdio and getattr(self.stdio, 'warn', print)(
-            #     '%s %s plugin version %s not found, use the best suitable version %s.\n Use `obd update` to update local plugin repository' % 
+            #     '%s %s plugin version %s not found, use the best suitable version %s.\n Use `obd update` to update local plugin repository' %
             #     (self.component_name, self.PLUGIN_TYPE.name.lower(), version, plugin.version)
             #     )
             return plugin
@@ -862,7 +958,7 @@ class PyScriptPluginLoader(ComponentPluginLoader):
 class %s(PyScriptPlugin):
 
     FLAG_FILE = '%s.py'
-    PLUGIN_COMPONENT_NAME = '%s'
+    PLUGIN_NAME = '%s'
 
     def __init__(self, component_name, plugin_path, version, dev_mode):
         super(%s, self).__init__(component_name, plugin_path, version, dev_mode)
@@ -872,7 +968,10 @@ class %s(PyScriptPlugin):
         %s.PLUGIN_TYPE = plugin_type
 
     @pyScriptPluginExec
-    def %s(self, components, ssh_clients, cluster_config, cmd, options, stdio, *arg, **kwargs):
+    def %s(
+        self, namespace, namespaces, deploy_name,
+        repositories, components, clients, cluster_config, cmd,
+        options, stdio, *arg, **kwargs):
         pass
         ''' % (self.PLUGIN_TYPE.value, script_name, script_name, self.PLUGIN_TYPE.value, self.PLUGIN_TYPE.value, script_name))
         clz = locals()[self.PLUGIN_TYPE.value]

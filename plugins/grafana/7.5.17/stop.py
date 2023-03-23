@@ -69,7 +69,7 @@ def stop(plugin_context, *args, **kwargs):
                 }
             else:
                 stdio.verbose('failed to stop grafana[pid:{}] in {}, permission deny'.format(grafana_pid, server))
-                success = True
+                success = False
         else:
             stdio.verbose('{} grafana is not running'.format(server))
     if not success:

@@ -29,14 +29,10 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         for key in ['observer_sys_password', 'obproxy_sys_password']:
             sql = 'alter proxyconfig set %s = %%s' % key
-            value = None
-            try:
-                value = server_config.get(key, '')
-                value = '' if value is None else str(value)
-                stdio.verbose('execute sql: %s' % (sql % value))
-                cursor[server].execute(sql, [value])
-            except:
-                stdio.exception('execute sql exception: %s' % (sql % (value)))
+            value = server_config.get(key, '')
+            value = '' if value is None else str(value)
+            ret = cursor[server].execute(sql, [value], exc_level="verbose")
+            if ret is False:
                 stdio.error('failed to set %s for obproxy(%s)' % (key, server))
                 global_ret = False
     if global_ret:

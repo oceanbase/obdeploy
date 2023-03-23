@@ -1,0 +1,61 @@
+test:
+  variables:
+    - name: binlog_row_image
+      value: MINIMAL
+    - name: auto_increment_cache_size
+      value: 10000000
+  system_config:
+    - name: enable_sql_audit
+      value: 'false'
+    - name: sleep
+      value: 3
+      optimizer: sleep
+    - name: enable_early_lock_release
+      value: 'false'
+      optimizer: tenant
+    - name: syslog_level
+      value: 'ERROR'
+    - name: enable_perf_event
+      value: false
+      value_type: BOOL
+    - name: _enable_defensive_check
+      value: false
+    - name: _rowsets_enabled
+      value: 'false'
+      optimizer: tenant
+    - name: _enable_newsort
+      value: 'false'
+    - name: _trace_control_info
+      value: ''
+      optimizer: tenant
+    - name: _lcl_op_interval
+      value: 0ms
+    - name: writing_throttling_trigger_percentage
+      value: 100
+      optimizer: tenant
+    - name: default_auto_increment_mode
+      value: 'NOORDER'
+      optimizer: tenant
+    - name: enable_monotonic_weak_read
+      value: 'false'
+      optimizer: tenant
+    - name: _enable_adaptive_compaction
+      value: 'false'
+      optimizer: tenant
+    - name: enable_record_trace_log
+      value: 'false'
+    - name: cpu_quota_concurrency
+      value: 2
+      optimizer: tenant
+    - name: _ob_enable_prepared_statement
+      value: 'true'
+    - name: _pushdown_storage_level
+      value: 0
+      optimizer: tenant
+    - name: ignore_replay_checksum_error
+      value: 'true'
+    - name: weak_read_version_refresh_interval
+      value: 2s
+    - name: freeze_trigger_percentage
+      value: 40
+      optimizer: tenant

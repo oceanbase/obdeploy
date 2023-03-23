@@ -24,12 +24,14 @@ import os
 import time
 from copy import deepcopy
 
+from _errno import EC_CONFLICT_PORT
+
 stdio = None
 
 
 def get_port_socket_inode(client, port):
     port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{tcp,udp}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
         return False
@@ -106,7 +108,7 @@ class EnvVariables(object):
                 self.client.del_env(env_key)
 
 
-def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False, *args, **kwargs):
+def start(plugin_context, need_bootstrap=False, *args, **kwargs):
     global stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -214,7 +216,7 @@ def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False,
                 if confirm_port(client, remote_pid, port):
                     continue
                 stdio.stop_loading('fail')
-                stdio.error('%s:%s port is already used' % (server.ip, port))
+                stdio.error(EC_CONFLICT_PORT.format(server=server.ip, port=port))
                 return plugin_context.return_false()
 
         stdio.verbose('starting %s obproxy', server)

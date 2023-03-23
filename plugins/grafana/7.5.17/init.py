@@ -32,7 +32,7 @@ def critical(*arg, **kwargs):
     stdio.error(*arg, **kwargs)
 
 
-def init(plugin_context, local_home_path, repository_dir, *args, **kwargs):
+def init(plugin_context, *args, **kwargs):
     global stdio, force
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients

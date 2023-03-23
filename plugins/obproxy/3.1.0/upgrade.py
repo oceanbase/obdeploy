@@ -22,11 +22,18 @@ from __future__ import absolute_import, division, print_function
 
 
 def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
+    namespace = plugin_context.namespace
+    namespaces = plugin_context.namespaces
+    deploy_name = plugin_context.deploy_name
+    repositories = plugin_context.repositories
+    plugin_name = plugin_context.plugin_name
+
     components = plugin_context.components
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-    cmd = plugin_context.cmd
+    cmds = plugin_context.cmds
     options = plugin_context.options
+    dev_mode = plugin_context.dev_mode
     stdio = plugin_context.stdio
 
     upgrade_ctx = kwargs.get('upgrade_ctx')
@@ -45,15 +52,15 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     bootstrap_plugin = search_py_script_plugin([dest_repository], 'bootstrap')[dest_repository]
 
     apply_param_plugin(cur_repository)
-    if not stop_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs):
+    if not stop_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs):
         return 
 
     apply_param_plugin(dest_repository)
-    if not start_plugin(components, clients, cluster_config, cmd, options, stdio, need_bootstrap=True, *args, **kwargs):
+    if not start_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, need_bootstrap=True, *args, **kwargs):
         return 
     
-    ret = connect_plugin(components, clients, cluster_config, cmd, options, stdio, *args, **kwargs)
+    ret = connect_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)
     if ret:
-        if bootstrap_plugin(components, clients, cluster_config, cmd, options, stdio, ret.get_return('cursor'), *args, **kwargs) and display_plugin(components, clients, cluster_config, cmd, options, stdio, ret.get_return('cursor'), *args, **kwargs):
+        if bootstrap_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, ret.get_return('cursor'), *args, **kwargs) and display_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, ret.get_return('cursor'), *args, **kwargs):
             upgrade_ctx['index'] = len(upgrade_repositories)
             return plugin_context.return_true()

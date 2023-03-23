@@ -1,16 +1,22 @@
 - name: home_path
+  name_local: 工作目录
   require: true
+  essential: true
   type: STRING
   need_redeploy: true
   description_en: working directory for grafana
   description_local: grafana工作目录
 - name: login_password
+  name_local: 登录密码
   require: true
+  essential: true
   type: STRING
   need_reload: true
   description_en: password for Grafana
   description_local: Grafana 登录密码
 - name: data_dir
+  name_local: 数据目录
+  essential: true
   type: STRING
   min_value: NULL
   max_value: NULL
@@ -59,8 +65,10 @@
   description_en: The ip address to bind to
   description_local: 要绑定的ip地址
 - name: port
-  type: INT
+  name_local: HTTP 端口
   require: true
+  essential: true
+  type: INT
   default: 3000
   min_value: 1
   max_value: 65535

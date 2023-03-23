@@ -1,0 +1,29 @@
+# 运维 agent 二进制
+- src_path: ./home/admin/obagent/bin/ob_mgragent
+  target_path: bin/ob_mgragent
+  type: bin
+  mode: 755
+# 监控 agent 二进制
+- src_path: ./home/admin/obagent/bin/ob_monagent
+  target_path: bin/ob_monagent
+  type: bin
+  mode: 755
+# 守护进程二进制
+- src_path: ./home/admin/obagent/bin/ob_agentd
+  target_path: bin/ob_agentd
+  type: bin
+  mode: 755
+# 命令行工具二进制
+- src_path: ./home/admin/obagent/bin/ob_agentctl
+  target_path: bin/ob_agentctl
+  type: bin
+  mode: 755
+# agent 二进制目录
+- src_path: ./home/admin/obagent/bin
+  target_path: bin
+  type: dir
+# 配置定义目录
+- src_path: ./home/admin/obagent/conf
+  target_path: conf
+  type: dir
+  install_method: cp

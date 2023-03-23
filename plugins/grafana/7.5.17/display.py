@@ -19,7 +19,8 @@
 
 from __future__ import absolute_import, division, print_function
 
-import socket
+from tool import NetUtil
+
 
 stdio = None
 
@@ -36,16 +37,16 @@ def display(plugin_context, cursor, *args, **kwargs):
 
         ip = server.ip
         if ip == '127.0.0.1':
-            hostname = socket.gethostname()
-            ip = socket.gethostbyname(hostname)
+            ip = NetUtil.get_host_ip()
         user = api_cursor.user
         protocol = api_cursor.protocol
         if 'prometheus' in cluster_config.depends:
             url = '%s://%s:%s/d/oceanbase' % (protocol, ip, server_config['port'])
         else:
             url = '%s://%s:%s' % (protocol, ip, server_config['port'])
-        stdio.verbose('type: %s'% type(server.ip))
         results.append({
+            'ip': ip,
+            'port': server_config['port'],
             'user': user,
             'password': api_cursor.password,
             'url': url,
@@ -53,4 +54,8 @@ def display(plugin_context, cursor, *args, **kwargs):
         })
 
     stdio.print_list(results, [ 'url', 'user', 'password', 'status'], lambda x: [x['url'], x['user'], x['password'], x['status']], title='grafana')
-    return plugin_context.return_true()
+    active_result = [r for r in results if r['status'] == 'active']
+    info_dict = active_result[0] if len(active_result) > 0 else None
+    if info_dict is not None:
+        info_dict['type'] = 'web'
+    return plugin_context.return_true(info=info_dict)

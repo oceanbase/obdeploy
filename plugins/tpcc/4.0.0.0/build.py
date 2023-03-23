@@ -42,18 +42,6 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     def local_execute_command(command, env=None, timeout=None):
         return LocalClient.execute_command(command, env, timeout, stdio)
 
-    def execute(cursor, query, args=None):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose('execute sql: %s' % msg)
-        stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            cursor.execute(query, args)
-            return cursor.fetchone()
-        except:
-            msg = 'execute sql exception: %s' % msg
-            stdio.exception(msg)
-            raise Exception(msg)
-
     def run_sql(sql_file, force=False):
         sql_cmd = "{obclient} -h{host} -P{port} -u{user}@{tenant} {password_arg} -A {db} {force_flag} < {sql_file}".format(
             obclient=obclient_bin, host=host, port=port, user=user, tenant=tenant_name,
@@ -111,36 +99,33 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
         stdio.exception('')
         return
     stdio.start_loading('Server check')
-    try:
-        # check for observer
+    # check for observer
+    while True:
+        sql = "select * from oceanbase.DBA_OB_SERVERS where STATUS != 'ACTIVE' or STOP_TIME is not NULL or START_SERVICE_TIME is NULL"
+        ret = cursor.fetchone(sql)
+        if ret is False:
+            stdio.stop_loading('fail')
+            return
+        if ret is None:
+            break
+        time.sleep(3)
+    # check for obproxy
+    if odp_cursor:
         while True:
-            sql = "select * from oceanbase.DBA_OB_SERVERS where STATUS != 'ACTIVE' or STOP_TIME is not NULL or START_SERVICE_TIME is NULL"
-            stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql)
-            ret = cursor.fetchone()
-            if ret is None:
-                break
-            time.sleep(3)
-        # check for obproxy
-        if odp_cursor:
-            while True:
-                sql = "show proxycongestion all"
-                stdio.verbose('execute obproxy sql: %s' % sql)
-                odp_cursor.execute(sql)
-                proxy_congestions = odp_cursor.fetchall()
-                passed = True
-                for proxy_congestion in proxy_congestions:
-                    if proxy_congestion.get('dead_congested') != 0 or proxy_congestion.get('server_state') != 'ACTIVE':
-                        passed = False
-                        break
-                if passed:
+            sql = "show proxycongestion all"
+            proxy_congestions = odp_cursor.fetchall(sql)
+            if proxy_congestions is False:
+                stdio.stop_loading('fail')
+                return
+            passed = True
+            for proxy_congestion in proxy_congestions:
+                if proxy_congestion.get('dead_congested') != 0 or proxy_congestion.get('server_state') not in ['DETECT_ALIVE', 'ACTIVE']:
+                    passed = False
                     break
-                else:
-                    time.sleep(3)
-    except:
-        stdio.stop_loading('fail')
-        stdio.exception('')
-        return
+            if passed:
+                break
+            else:
+                time.sleep(3)
     stdio.stop_loading('succeed')
 
     # drop old tables
@@ -152,24 +137,31 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     # Major freeze
     stdio.start_loading('Merge')
     sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION where tenant_id = %s" % tenant_id
-    merge_version = execute(cursor, sql_frozen_scn)['FROZEN_SCN']
-    stdio.verbose('merge version is: %s' % merge_version)
-    execute(cursor, "alter system major freeze tenant = %s" % tenant_name)
+    merge_version = cursor.fetchone(sql_frozen_scn)
+    if merge_version is False:
+        return
+    merge_version = merge_version['FROZEN_SCN']
+    if cursor.fetchone("alter system major freeze tenant = %s" % tenant_name) is False:
+        return
     # merge version changed
     while True:
-        current_version = execute(cursor, sql_frozen_scn).get("FROZEN_SCN")
+        current_version = cursor.fetchone(sql_frozen_scn)
+        if current_version is False:
+            return
+        current_version = current_version['FROZEN_SCN']
         if int(current_version) > int(merge_version):
             break
         time.sleep(5)
     stdio.verbose('current merge version is: %s' % current_version)
     # version updated
     while True:
-        ret = execute(cursor, sql_frozen_scn)
+        ret = cursor.fetchone(sql_frozen_scn)
+        if ret is False:
+            return
         if int(ret.get("FROZEN_SCN", 0)) / 1000 == int(ret.get("LAST_SCN", 0)) / 1000:
             break
         time.sleep(5)
     stdio.stop_loading('succeed')
-
 
     # create new tables
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableCreates.sql')):

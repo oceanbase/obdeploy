@@ -28,11 +28,22 @@ class Restart(object):
 
     def __init__(self, plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, repository, new_cluster_config=None, new_clients=None, bootstrap_plugin=None):
         self.local_home_path = local_home_path
-        self.plugin_context = plugin_context
+
+        self.namespace = plugin_context.namespace
+        self.namespaces = plugin_context.namespaces
+        self.deploy_name = plugin_context.deploy_name
+        self.repositories = plugin_context.repositories
+        self.plugin_name = plugin_context.plugin_name
+
         self.components = plugin_context.components
         self.clients = plugin_context.clients
         self.cluster_config = plugin_context.cluster_config
+        self.cmds = plugin_context.cmds
+        self.options = plugin_context.options
+        self.dev_mode = plugin_context.dev_mode
         self.stdio = plugin_context.stdio
+
+        self.plugin_context = plugin_context
         self.repository = repository
         self.start_plugin = start_plugin
         self.reload_plugin = reload_plugin
@@ -45,20 +56,29 @@ class Restart(object):
         self.sub_io = self.stdio.sub_io()
         self.dbs = None
         self.cursors = None
-
-    # def close(self):
-    #     if self.dbs:
-    #         for server in self.cursors:
-    #             self.cursors[server].close()
-    #         for db in self.dbs:
-    #             self.dbs[server].close()
-    #         self.cursors = None
-    #         self.dbs = None
+    
+    def call_plugin(self, plugin, **kwargs):
+        args = {
+            'namespace': self.namespace,
+            'namespaces': self.namespaces,
+            'deploy_name': self.deploy_name,
+            'cluster_config': self.cluster_config,
+            'repositories': self.repositories,
+            'repository': self.repository,
+            'components': self.components,
+            'clients': self.clients,
+            'cmd': self.cmds,
+            'options': self.options,
+            'stdio': self.sub_io
+        }
+        args.update(kwargs)
+        
+        self.stdio.verbose('Call %s for %s' % (plugin, self.repository))
+        return plugin(**args)
 
     def connect(self, cluster_config):
-        self.stdio.verbose('Call %s for %s' % (self.connect_plugin, self.repository))
         self.sub_io.start_loading('Connect to obproxy')
-        ret = self.connect_plugin(self.components, self.clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io)
+        ret = self.call_plugin(self.connect_plugin, cluster_config=cluster_config)
         if not ret:
             self.sub_io.stop_loading('fail')
             return False
@@ -79,18 +99,15 @@ class Restart(object):
         if self.new_cluster_config:
             if not self.connect(self.cluster_config):
                 return False
-            self.stdio.verbose('Call %s for %s' % (self.reload_plugin, self.repository))
-            self.reload_plugin(self.components, self.clients, self.cluster_config, [], {}, self.sub_io, cursor=self.cursors, new_cluster_config=self.new_cluster_config, repository_dir=self.repository.repository_dir)
+            self.call_plugin(self.reload_plugin, clients=clients, cursor=self.cursors, new_cluster_config=self.new_cluster_config)
 
-        self.stdio.verbose('Call %s for %s' % (self.stop_plugin, self.repository))
-        if not self.stop_plugin(self.components, clients, self.cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io):
+        if not self.call_plugin(self.stop_plugin, clients=clients):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
         
         if self.new_clients:
             self.stdio.verbose('use new clients')
             for server in self.cluster_config.servers:
-                client = clients[server]
                 new_client = self.new_clients[server]
                 server_config = self.cluster_config.get_server_conf(server)
                 home_path = server_config['home_path']
@@ -101,25 +118,22 @@ class Restart(object):
             clients = self.new_clients
 
         cluster_config = self.new_cluster_config if self.new_cluster_config else self.cluster_config
-        self.stdio.verbose('Call %s for %s' % (self.start_plugin, self.repository))
         need_bootstrap = self.bootstrap_plugin is not None
-        if not self.start_plugin(self.components, clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io, local_home_path=self.local_home_path, repository_dir=self.repository.repository_dir, need_bootstrap=need_bootstrap):
+        if not self.call_plugin(self.start_plugin, clients=clients, cluster_config=cluster_config, local_home_path=self.local_home_path, repository=self.repository, need_bootstrap=need_bootstrap):
             self.rollback()
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
         
         if self.connect(cluster_config):
             if self.bootstrap_plugin:
-                self.stdio.verbose('Call %s for %s' % (self.bootstrap_plugin, self.repository))
-                self.bootstrap_plugin(self.components, clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io, cursor=self.cursors)
-            self.stdio.verbose('Call %s for %s' % (self.display_plugin, self.repository))
-            ret = self.display_plugin(self.components, clients, cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io, cursor=self.cursors)
-            return ret
+                self.call_plugin(self.bootstrap_plugin, cursor=self.cursors)
+            return self.call_plugin(self.display_plugin, cursor=self.cursors)
         return False
 
     def rollback(self):
         if self.new_clients:
-            self.stop_plugin(self.components, self.new_clients, self.new_cluster_config, self.plugin_context.cmd, self.plugin_context.options, self.sub_io)
+            cluster_config = self.new_cluster_config if self.new_cluster_config else self.cluster_config
+            self.call_plugin(self.stop_plugin, clients=self.new_clients, cluster_config=cluster_config)
             for server in self.cluster_config.servers:
                 client = self.clients[server]
                 new_client = self.new_clients[server]
@@ -128,7 +142,8 @@ class Restart(object):
                 new_client.execute_command('sudo chown -R %s: %s' % (client.config.username, home_path))
 
 
-def restart(plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, repository, new_cluster_config=None, new_clients=None, rollback=False, bootstrap_plugin=None, *args, **kwargs):
+def restart(plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, new_cluster_config=None, new_clients=None, rollback=False, bootstrap_plugin=None, *args, **kwargs):
+    repository = kwargs.get('repository')
     task = Restart(plugin_context, local_home_path, start_plugin, reload_plugin, stop_plugin, connect_plugin, display_plugin, repository, new_cluster_config, new_clients, bootstrap_plugin=bootstrap_plugin)
     call = task.rollback if rollback else task.restart
     if call():

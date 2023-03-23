@@ -74,7 +74,7 @@ def confirm_port(client, pid, port, stdio):
     return False
 
 
-def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False, repository_dir_map=None, *args, **kwargs):  
+def start(plugin_context, *args, **kwargs):
    
     def spear_dict(di_, con_s='.'):
         def prefix_dict(di_, prefix_s=''):
@@ -207,6 +207,7 @@ def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False,
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    options = plugin_context.options
     global _grafana_conf_from_prometheus
     _grafana_conf_from_prometheus = None
     need_bootstrap = True
@@ -234,45 +235,61 @@ def start(plugin_context, local_home_path, repository_dir, need_bootstrap=False,
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
+    
+        remote_pid_path = os.path.join(home_path, 'run/grafana.pid')
+        remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
+        if remote_pid:
+            if client.execute_command('ls /proc/%s' % remote_pid):
+                servers_pid[server] = [remote_pid]
+                stdio.verbose('%s is runnning in %s, skip' % (server, remote_pid))
+                continue
 
-        ini_dict = generate_ini()
-        fail_message = check_parameter(ini_dict)
-        if fail_message:
-            for msg in fail_message:
-                stdio.warn('%s: %s' %(server, msg))
-            stdio.stop_loading('fail')
-            return False
+        config_flag = os.path.join(home_path, '.configured')
+        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % config_flag):
+            use_parameter = False
+        else:
+            use_parameter = True
 
-        prometheus_server_config = {}
-        prometheus_server = []
-        if 'prometheus' in cluster_config.depends:
-            prometheus_servers = cluster_config.get_depend_servers('prometheus')
-            prometheus_server.append(prometheus_servers[0])
-            prometheus_server_config = cluster_config.get_depend_config('prometheus', prometheus_servers[0])
-            
-        key_map = {'port': 'server.http_port',
-                    'domain': 'server.domain',
-                    'log_max_days': 'log.file.max_days',
-                    'temp_data_lifetime': 'paths.temp_data_lifetime'}
-        for key in key_map:
-            if key in server_config:
-                ini_dict[key_map[key]] = server_config[key]
+        if use_parameter:
+            ini_dict = generate_ini()
+            fail_message = check_parameter(ini_dict)
+            if fail_message:
+                for msg in fail_message:
+                    stdio.warn('%s: %s' %(server, msg))
+                stdio.stop_loading('fail')
+                return False
 
-        stdio.verbose('%s generate obd-grafana ini file' % server)
-        if not generate_ini_file(home_path, ini_dict):
-            stdio.verbose('%s obd-grafana ini file generate failed' % server)
-            stdio.stop_loading('fail')   
-            return False
-        stdio.verbose('%s generate datasources yaml' % server)
-        if not generate_datasource_yaml(prometheus_server, prometheus_server_config):
-            stdio.verbose('%s grafana datasources yaml generate failed' % server)
-            stdio.stop_loading('fail')
-            return False
-        stdio.verbose('%s generate providers yaml' % server)
-        if not generate_provider_yaml():
-            stdio.verbose('%s grafana providers yaml generate failed' % server)
-            stdio.stop_loading('fail')
-            return False
+            prometheus_server_config = {}
+            prometheus_server = []
+            if 'prometheus' in cluster_config.depends:
+                prometheus_servers = cluster_config.get_depend_servers('prometheus')
+                prometheus_server.append(prometheus_servers[0])
+                prometheus_server_config = cluster_config.get_depend_config('prometheus', prometheus_servers[0])
+
+            key_map = {'port': 'server.http_port',
+                        'domain': 'server.domain',
+                        'log_max_days': 'log.file.max_days',
+                        'temp_data_lifetime': 'paths.temp_data_lifetime'}
+            for key in key_map:
+                if key in server_config:
+                    ini_dict[key_map[key]] = server_config[key]
+
+            stdio.verbose('%s generate obd-grafana ini file' % server)
+            if not generate_ini_file(home_path, ini_dict):
+                stdio.verbose('%s obd-grafana ini file generate failed' % server)
+                stdio.stop_loading('fail')
+                return False
+            stdio.verbose('%s generate datasources yaml' % server)
+            if not generate_datasource_yaml(prometheus_server, prometheus_server_config):
+                stdio.verbose('%s grafana datasources yaml generate failed' % server)
+                stdio.stop_loading('fail')
+                return False
+            stdio.verbose('%s generate providers yaml' % server)
+            if not generate_provider_yaml():
+                stdio.verbose('%s grafana providers yaml generate failed' % server)
+                stdio.stop_loading('fail')
+                return False
+            client.execute_command('touch %s' % config_flag)
 
         ini_path = os.path.join(server_config["home_path"], 'conf/obd-grafana.ini')
         grafana_pid_path = os.path.join(server_config["home_path"], 'run/grafana.pid')

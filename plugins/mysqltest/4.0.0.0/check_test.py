@@ -89,7 +89,8 @@ def test_name(test_file):
         return base_name
 
 
-def check_test(plugin_context, opt, *args, **kwargs):
+def check_test(plugin_context, env, *args, **kwargs):
+    opt = env
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     tags = []
@@ -153,15 +154,12 @@ def check_test(plugin_context, opt, *args, **kwargs):
         else:
             test_zone = cluster_config.get_server_conf(opt['test_server'])['zone']
             query = 'select zone, count(*) as a from oceanbase.DBA_OB_ZONES group by region order by a desc limit 1'
-            try:
-                stdio.verbose('execute sql: {}'.format(query))
-                cursor = opt['cursor']
-                cursor.execute(query)
-                ret = cursor.fetchone()
-            except:
-                msg = 'execute sql exception: %s' % query
-                raise Exception(msg)
-            primary_zone = ret.get('zone', '')
+            cursor = opt['cursor']
+            ret = cursor.fetchone(query)
+            if ret is False:
+                return
+            if ret:
+                primary_zone = ret.get('zone', '')
             if test_zone != primary_zone:
                 opt["filter"] = 'slave'
     if regress_suites:

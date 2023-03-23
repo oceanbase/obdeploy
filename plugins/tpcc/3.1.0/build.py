@@ -43,18 +43,6 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     def local_execute_command(command, env=None, timeout=None):
         return LocalClient.execute_command(command, env, timeout, stdio)
 
-    def execute(cursor, query, args=None):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose('execute sql: %s' % msg)
-        stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            cursor.execute(query, args)
-            return cursor.fetchone()
-        except:
-            msg = 'execute sql exception: %s' % msg
-            stdio.exception(msg)
-            raise Exception(msg)
-
     def run_sql(sql_file, force=False):
         sql_cmd = "{obclient} -h{host} -P{port} -u{user}@{tenant} {password_arg} -A {db} {force_flag} < {sql_file}".format(
             obclient=obclient_bin, host=host, port=port, user=user, tenant=tenant_name,
@@ -112,57 +100,64 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
         stdio.exception('')
         return
     stdio.start_loading('Server check')
-    try:
-        # check for observer
+    # check for observer
+    while True:
+        sql = "select * from oceanbase.__all_server where status != 'active' or stop_time > 0 or start_service_time = 0"
+        ret = cursor.fetchone(sql)
+        if ret is False:
+            stdio.stop_loading('fail')
+            return
+        if ret is None:
+            break
+        time.sleep(3)
+    # check for obproxy
+    if odp_cursor:
         while True:
-            sql = "select * from oceanbase.__all_server where status != 'active' or stop_time > 0 or start_service_time = 0"
-            stdio.verbose('execute sql: %s' % sql)
-            cursor.execute(sql)
-            ret = cursor.fetchone()
-            if ret is None:
-                break
-            time.sleep(3)
-        # check for obproxy
-        if odp_cursor:
-            while True:
-                sql = "show proxycongestion all"
-                stdio.verbose('execute obproxy sql: %s' % sql)
-                odp_cursor.execute(sql)
-                proxy_congestions = odp_cursor.fetchall()
-                passed = True
-                for proxy_congestion in proxy_congestions:
-                    if proxy_congestion.get('dead_congested') != 0 or proxy_congestion.get('server_state') != 'ACTIVE':
-                        passed = False
-                        break
-                if passed:
+            sql = "show proxycongestion all"
+            proxy_congestions = odp_cursor.fetchall(sql)
+            if proxy_congestions is False:
+                stdio.stop_loading('fail')
+                return
+            passed = True
+            for proxy_congestion in proxy_congestions:
+                if proxy_congestion.get('dead_congested') != 0 or proxy_congestion.get('server_state') != 'ACTIVE':
+                    passed = False
                     break
-                else:
-                    time.sleep(3)
-    except:
-        stdio.stop_loading('fail')
-        stdio.exception('')
-        return
+            if passed:
+                break
+            else:
+                time.sleep(3)
     stdio.stop_loading('succeed')
 
     # drop old tables
     bmsql_sql_path = kwargs.get('bmsql_sql_path', '')
     run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableDrops.sql'), force=True)
 
-    merge_version = execute(cursor, "select value from oceanbase.__all_zone where name='frozen_version'")['value']
+    merge_version = cursor.fetchone("select value from oceanbase.__all_zone where name='frozen_version'")
+    if merge_version is False:
+        return
+    merge_version = merge_version['value']
     stdio.start_loading('Merge')
-    execute(cursor, 'alter system major freeze')
+    if cursor.fetchone('alter system major freeze') is False:
+        return
     sql = "select value from oceanbase.__all_zone where name='frozen_version' and value != %s" % merge_version
     while True:
-        if execute(cursor, sql):
+        res = cursor.fetchone(sql)
+        if res is False:
+            return
+        if res:
             break
         time.sleep(1)
 
     while True:
-        if not execute(cursor, """select * from  oceanbase.__all_zone 
-                        where name='last_merged_version'
-                        and value != (select value from oceanbase.__all_zone where name='frozen_version' limit 1)
-                        and zone in (select zone from  oceanbase.__all_zone where name='status' and info = 'ACTIVE')
-                        """):
+        res = cursor.fetchone("""select * from  oceanbase.__all_zone 
+                                 where name='last_merged_version'
+                                 and value != (select value from oceanbase.__all_zone where name='frozen_version' limit 1)
+                                 and zone in (select zone from  oceanbase.__all_zone where name='status' and info = 'ACTIVE')
+                              """)
+        if res is False:
+            return
+        if not res:
             break
         time.sleep(5)
     stdio.stop_loading('succeed')

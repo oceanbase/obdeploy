@@ -41,8 +41,8 @@ oceanbase-ce:
     # datafile_size: 200G
     # The size of disk space used by the clog files. When ignored, autodeploy calculates this value based on the current server available resource.
     # log_disk_size: 66G
-    # System log level. The default value is INFO.
-    # syslog_level: INFO
+    # System log level. The default value is WDIAG.
+    # syslog_level: WDIAG
     # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true. The default value for autodeploy mode is false.
     # enable_syslog_wf: false
     # Enable auto system log recycling or not. The default value is false. The default value for autodeploy mode is on.

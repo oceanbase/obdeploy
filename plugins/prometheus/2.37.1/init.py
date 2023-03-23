@@ -35,7 +35,7 @@ def _clean(server, client, path, stdio=None):
         return True
 
 
-def init(plugin_context, repositories_dir_map, *args, **kwargs):
+def init(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio

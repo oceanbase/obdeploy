@@ -65,18 +65,6 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
             value = default
         return value
 
-    def execute(cursor, query, args=None):
-        msg = query % tuple(args) if args is not None else query
-        stdio.verbose('execute sql: %s' % msg)
-        # stdio.verbose("query: %s. args: %s" % (query, args))
-        try:
-            cursor.execute(query, args)
-            return cursor.fetchone()
-        except:
-            msg = 'execute sql exception: %s' % msg
-            stdio.exception(msg)
-            raise Exception(msg)
-
     global stdio
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
@@ -120,20 +108,19 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
         return
 
     sql = "select * from oceanbase.gv$tenant where tenant_name = %s"
-    try:
-        stdio.verbose('execute sql: %s' % (sql % tenant_name))
-        cursor.execute(sql, [tenant_name])
-        tenant_meta = cursor.fetchone()
-        if not tenant_meta:
-            stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
-            return
-        sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta['tenant_id']
-        pool = execute(cursor, sql)
-        sql = "select * from oceanbase.__all_unit_config where unit_config_id = %d" % pool['unit_config_id']
-        max_cpu = execute(cursor, sql)['max_cpu']
-    except:
-        stdio.exception('')
+    tenant_meta = cursor.fetchone(sql, [tenant_name])
+    if not tenant_meta:
+        stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
         return
+    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta['tenant_id']
+    pool = cursor.fetchone(sql)
+    if pool is False:
+        return
+    sql = "select * from oceanbase.__all_unit_config where unit_config_id = %d" % pool['unit_config_id']
+    max_cpu = cursor.fetchone(sql)
+    if max_cpu is False:
+        return
+    max_cpu = max_cpu['max_cpu']
 
     exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A -e" % (
     obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
@@ -144,7 +131,9 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
         return
     server_num = len(cluster_config.servers)
     sql = "select count(1) server_num from oceanbase.__all_server where status = 'active'"
-    ret = execute(cursor, sql)
+    ret = cursor.fetchone(sql)
+    if ret is False:
+        return
     if ret:
         server_num = ret.get("server_num", server_num)
     return plugin_context.return_true(

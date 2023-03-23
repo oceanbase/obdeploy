@@ -28,7 +28,7 @@ stdio = None
 
 def get_port_socket_inode(client, port):
     port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{tcp,udp}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
     inode = res.stdout.strip()
     if not res or not inode:

@@ -1,0 +1,34 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+ocp-server:
+  servers:
+    - name: server1
+      ip: 192.168.1.1
+  global:
+    # The working directory for ocp express. ocp express is started under this directory. This is a required field.
+    home_path: /root/ocp-server
+    # log_dir: /root/ocp-server/log # The log directory of ocp express server. The default value is {home_path}/log.
+    memory_size: 1G # The memory size of ocp-express server.  The recommend value is 512MB * (expect node num + expect tenant num) * 60MB.
+    jdbc_url: jdbc:oceanbase://192.168.1.1:2881/meta_db # jdbc connection string to connect to the meta db
+    jdbc_username: username # username to connect to meta db
+    jdbc_password: '<meta db password>' # password to connect to meta db
+    port: 8080 # The http port to use.
+    cluster_name: obcluster # the cluster name of oceanbase cluster. Refer to the configuration item appname of oceanbase
+    ob_cluster_id: 1  # the cluster id of oceanbase cluster. Refer to the configuration item cluster_id of oceanbase
+    root_sys_password: <password for root@sys> # the pass of oceanbase cluster. Refer to the configuration item cluster_id of oceanbase
+    agent_username: <obagent> #  The username of obagent
+    agent_password: <password> # The password of obagent
+    # logging_file_total_size_cap: 10G # The total log file size of ocp-express server
+    # logging_file_max_history: 1 # The maximum of retention days the log archive log files to keep. The default value is unlimited
+    server_addresses:  # The cluster info for oceanbase cluster
+    - address: 127.0.0.1 # The address of oceanbase server
+      svrPort: 2882 # The rpc port of oceanbase server
+      sqlPort: 2881 # The mysql port of oceanbase server
+      withRootServer: true # Is the oceanbase server a root server of cluster.
+      agentMgrPort: 62888 # The port of obagent manager process
+      agentMonPort: 62889 # The port of obagent monitor process

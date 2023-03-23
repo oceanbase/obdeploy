@@ -52,10 +52,10 @@ function _obd_complete_func
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  all_cmds["obd"]="mirror cluster test update repo demo"
+  all_cmds["obd"]="mirror cluster test update repo demo web"
   all_cmds["obd cluster"]="autodeploy tenant start deploy redeploy restart reload destroy stop edit-config list display upgrade chst check4ocp reinstall"
   all_cmds["obd cluster *"]="_obd_reply_deploy_names"
-  all_cmds["obd cluster tenant"]="create drop"
+  all_cmds["obd cluster tenant"]="create drop show"
   all_cmds["obd cluster tenant *"]="_obd_reply_deploy_names"
   all_cmds["obd mirror"]="clone create list update enable disable"
   all_cmds["obd mirror clone"]="_obd_reply_current_files"
@@ -63,7 +63,7 @@ function _obd_complete_func
   all_cmds["obd test"]="mysqltest sysbench tpch tpcc"
   all_cmds["obd test *"]="_obd_reply_deploy_names"
 
-  if [ -f "$env_file" ] && [ "$(grep '"OBD_DEV_MODE": "1"' "$env_file")" != "" ]; then
+  # if [ -f "$env_file" ] && [ "$(grep '"OBD_DEV_MODE": "1"' "$env_file")" != "" ]; then
       all_cmds["obd"]="${all_cmds[obd]} devmode env tool"
       all_cmds["obd devmode"]="enable disable"
       all_cmds["obd tool"]="command db_connect dooba"
@@ -72,7 +72,7 @@ function _obd_complete_func
       all_cmds["obd tool command"]="_obd_reply_deploy_names"
       all_cmds["obd tool command *"]="_obd_reply_tool_commands"
       all_cmds["obd env"]="set unset show clear"
-  fi
+  # fi
   case $prev in
   list)
     return 0

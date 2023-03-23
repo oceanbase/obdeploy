@@ -188,6 +188,12 @@ class EXLock(Lock):
         self.mix_lock.ex_unlock()
 
 
+class LockMode(Enum):
+    NO_LOCK = 0
+    DEPLOY_SHARED_LOCK = 1
+    DEFAULT = 2
+
+
 class LockManager(Manager):
 
     TRY_TIMES = 6000
@@ -198,12 +204,13 @@ class LockManager(Manager):
     MIR_REPO_FN = LockType.MIR_REPO.value
     DEPLOY_FN_PERFIX = LockType.DEPLOY.value
     LOCKS = {}
-    
+
     def __init__(self, home_path, stdio=None):
         super(LockManager, self).__init__(home_path, stdio)
         self.locks = []
         self.global_path = os.path.join(self.path, self.GLOBAL_FN)
         self.mir_repo_path = os.path.join(self.path, self.MIR_REPO_FN)
+        self.mode = LockMode.DEFAULT
 
     @staticmethod
     def set_try_times(try_times):
@@ -226,14 +233,26 @@ class LockManager(Manager):
     @classmethod
     def shutdown(cls):
         for path in cls.LOCKS:
-            cls.LOCKS[path] = None
+            cls.LOCKS[path]._unlock()
         cls.LOCKS = None
 
+    def set_lock_mode(self, mode):
+        for key in LockMode:
+            if key.value == mode:
+                mode = key
+                break
+        if not isinstance(mode, LockMode) or mode not in LockMode:
+            getattr(self.stdio, 'verbose', print)('unknown lock mode {}'.format(mode))
+            return
+        self.stdio and getattr(self.stdio, 'verbose', print)('set lock mode to {}({})'.format(mode.name, mode.value))
+        self.mode = mode
+
     def _lock(self, path, clz):
-        mix_lock = self._get_mix_lock(path)
-        lock = clz(mix_lock)
-        lock.lock()
-        self.locks.append(lock)
+        if self.mode != LockMode.NO_LOCK:
+            mix_lock = self._get_mix_lock(path)
+            lock = clz(mix_lock)
+            lock.lock()
+            self.locks.append(lock)
         return True
 
     def _sh_lock(self, path):
@@ -258,7 +277,10 @@ class LockManager(Manager):
         return os.path.join(self.path, '%s_%s' % (self.DEPLOY_FN_PERFIX, deploy_name))
 
     def deploy_ex_lock(self, deploy_name):
-        return self._ex_lock(self._deploy_lock_fp(deploy_name))
+        if self.mode == LockMode.DEPLOY_SHARED_LOCK:
+            return self._sh_lock(self._deploy_lock_fp(deploy_name))
+        else:
+            return self._ex_lock(self._deploy_lock_fp(deploy_name))
 
     def deploy_sh_lock(self, deploy_name):
         return self._sh_lock(self._deploy_lock_fp(deploy_name))

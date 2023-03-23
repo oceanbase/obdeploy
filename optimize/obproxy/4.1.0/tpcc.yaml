@@ -1,0 +1,10 @@
+build:
+  system_config:
+  - name: proxy_mem_limited
+    value: 4G
+  - name: enable_compression_protocol
+    value: false
+    need_restart: true
+    value_type: BOOL
+  - name: enable_qos
+    value: false

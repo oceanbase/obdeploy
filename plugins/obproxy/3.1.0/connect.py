@@ -22,43 +22,101 @@ from __future__ import absolute_import, division, print_function
 
 import sys
 import time
+from copy import copy
 if sys.version_info.major == 2:
     import MySQLdb as mysql
 else:
     import pymysql as mysql
 
-from _errno import EC_FAIL_TO_CONNECT
+from _errno import EC_FAIL_TO_CONNECT, EC_SQL_EXECUTE_FAILED
+from _stdio import SafeStdio
 
 
-stdio = None
+class Cursor(SafeStdio):
 
+    def __init__(self, ip, port, user='root', tenant='sys', password='', stdio=None):
+        self.stdio = stdio
+        self.ip = ip
+        self.port = port
+        self._user = user
+        self.tenant = tenant
+        self.password = password
+        self.cursor = None
+        self.db = None
+        self._connect()
+        self._raise_exception = False
+        self._raise_cursor = None
 
-def _connect(ip, port, user, password=''):
-    stdio.verbose('connect %s -P%s -u%s -p%s' % (ip, port, user, password))
+    @property
+    def user(self):
+        if "@" in self._user:
+            return self._user
+        if self.tenant:
+            return "{}@{}".format(self._user, self.tenant)
+        else:
+            return self._user
+
+    @property
+    def raise_cursor(self):
+        if self._raise_cursor:
+            return self._raise_cursor
+        raise_cursor = copy(self)
+        raise_cursor._raise_exception = True
+        self._raise_cursor = raise_cursor
+        return raise_cursor
+
     if sys.version_info.major == 2:
-        db = mysql.connect(host=ip, user=user, port=int(port), passwd=str(password))
-        cursor = db.cursor(cursorclass=mysql.cursors.DictCursor)
+        def _connect(self):
+            self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), passwd=str(self.password))
+            self.cursor = self.db.cursor(cursorclass=mysql.cursors.DictCursor)
     else:
-        db = mysql.connect(host=ip, user=user, port=int(port), password=str(password), cursorclass=mysql.cursors.DictCursor)
-        cursor = db.cursor()
-    return db, cursor
+        def _connect(self):
+            self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password),
+                                    cursorclass=mysql.cursors.DictCursor)
+            self.cursor = self.db.cursor()
+
+    def new_cursor(self, tenant='sys', user='root', password=''):
+        try:
+            return Cursor(ip=self.ip, port=self.port, user=user, tenant=tenant, password=password, stdio=self.stdio)
+        except:
+            self.stdio.exception('')
+            self.stdio.verbose('fail to connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            return None
+
+    def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):
+        try:
+            stdio.verbose('execute sql: %s. args: %s' % (sql, args))
+            self.cursor.execute(sql, args)
+            if not execute_func:
+                return self.cursor
+            return getattr(self.cursor, execute_func)()
+        except Exception as e:
+            getattr(stdio, exc_level)(EC_SQL_EXECUTE_FAILED.format(sql=sql))
+            if raise_exception is None:
+                raise_exception = self._raise_exception
+            if raise_exception:
+                stdio.exception('')
+                raise e
+            return False
+
+    def fetchone(self, sql, args=None, raise_exception=False, exc_level='error', stdio=None):
+        return self.execute(sql, args=args, execute_func='fetchone', raise_exception=raise_exception, exc_level=exc_level, stdio=stdio)
+
+    def fetchall(self, sql, args=None, raise_exception=False, exc_level='error', stdio=None):
+        return self.execute(sql, args=args, execute_func='fetchall', raise_exception=raise_exception, exc_level=exc_level, stdio=stdio)
+
+    def close(self):
+        if self.cursor:
+            self.cursor.close()
+            self.cursor = None
+        if self.db:
+            self.db.close()
+            self.db = None
 
 
-def execute(cursor, query, args=None):
-    msg = query % tuple(args) if args is not None else query
-    stdio.verbose('execute sql: %s' % msg)
-    # stdio.verbose("query: %s. args: %s" % (query, args))
-    try:
-        cursor.execute(query, args)
-        return cursor.fetchone()
-    except:
-        msg = 'execute sql exception: %s' % msg
-        stdio.exception(msg)
-        raise Exception(msg)
-
-
-def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
-    global stdio
+def connect(plugin_context, target_server=None, connect_proxysys=True, *args, **kwargs):
     count = 10
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
@@ -72,7 +130,7 @@ def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
     user = kwargs.get('user')
     password = kwargs.get('password')
     if not user:
-        if sys_root:
+        if connect_proxysys:
             user = 'root@proxysys'
         else:
             user = 'root'
@@ -101,19 +159,17 @@ def connect(plugin_context, target_server=None, sys_root=True, *args, **kwargs):
         for server in servers:
             try:
                 server_config = cluster_config.get_server_conf(server)
-                if sys_root:
+                if connect_proxysys:
                     pwd_key = 'obproxy_sys_password'
                 else:
                     pwd_key = 'observer_root_password'
                 r_password = password if password else server_config.get(pwd_key)
                 if r_password is None:
                     r_password = ''
-                db, cursor = _connect(server.ip, server_config['listen_port'], user, r_password if count % 2 else '')
+                cursor = Cursor(ip=server.ip, port=server_config['listen_port'], user=user, tenant='', password=r_password if count % 2 else '', stdio=stdio)
                 if user in ['root', 'root@sys']:
-                    stdio.verbose('execute sql: select * from information_schema.TABLES limit 1')
-                    cursor.execute('select * from information_schema.TABLES limit 1')
-                    stdio.verbose("result: {}".format(cursor.fetchone()))
-                dbs[server] = db
+                    stdio.verbose("result: {}".format(cursor.fetchone('select * from information_schema.TABLES limit 1', raise_exception=True)))
+                dbs[server] = cursor.db
                 cursors[server] = cursor
             except:
                 tmp_servers.append(server)
