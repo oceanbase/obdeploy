@@ -5,14 +5,14 @@
 #   key_file: your ssh-key file path if need
 #   port: your ssh port, default 22
 #   timeout: ssh connection timeout (second), default 30
-ocp-server:
+ocp-express:
   servers:
     - name: server1
       ip: 192.168.1.1
   global:
     # The working directory for ocp express. ocp express is started under this directory. This is a required field.
-    home_path: /root/ocp-server
-    # log_dir: /root/ocp-server/log # The log directory of ocp express server. The default value is {home_path}/log.
+    home_path: /root/ocp-express
+    # log_dir: /root/ocp-express/log # The log directory of ocp express server. The default value is {home_path}/log.
     memory_size: 1G # The memory size of ocp-express server.  The recommend value is 512MB * (expect node num + expect tenant num) * 60MB.
     jdbc_url: jdbc:oceanbase://192.168.1.1:2881/meta_db # jdbc connection string to connect to the meta db
     jdbc_username: username # username to connect to meta db
@@ -30,5 +30,5 @@ ocp-server:
       svrPort: 2882 # The rpc port of oceanbase server
       sqlPort: 2881 # The mysql port of oceanbase server
       withRootServer: true # Is the oceanbase server a root server of cluster.
-      agentMgrPort: 62888 # The port of obagent manager process
-      agentMonPort: 62889 # The port of obagent monitor process
+      agentMgrPort: 8089 # The port of obagent manager process
+      agentMonPort: 8088 # The port of obagent monitor process

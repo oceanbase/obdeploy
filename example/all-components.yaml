@@ -115,8 +115,8 @@ ocp-express:
     - 172.19.33.5
   global:
     # The working directory for prometheus. prometheus is started under this directory. This is a required field.
-    home_path: /root/ocp-server
-    # log_dir: /home/oceanbase/ocp-server/log # The log directory of ocp express server. The default value is {home_path}/log.
+    home_path: /root/ocp-express
+    # log_dir: /home/oceanbase/ocp-express/log # The log directory of ocp express server. The default value is {home_path}/log.
     memory_size: 1G # The memory size of ocp-express server.  The recommend value is 512MB * (expect node num + expect tenant num) * 60MB.
     # logging_file_total_size_cap: 10G # The total log file size of ocp-express server
     # logging_file_max_history: 1 # The maximum of retention days the log archive log files to keep. The default value is unlimited
