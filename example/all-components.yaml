@@ -107,7 +107,7 @@ obagent:
   global:
     home_path: /root/obagent
 ocp-express:
-  depeneds:
+  depends:
     - oceanbase-ce
     - obproxy-ce
     - obagent
