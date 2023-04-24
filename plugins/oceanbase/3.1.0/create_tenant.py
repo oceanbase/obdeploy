@@ -96,6 +96,8 @@ def create_tenant(plugin_context, cursor, create_tenant_options=None,  *args, **
     options = create_tenant_options if create_tenant_options else plugin_context.options
     create_if_not_exists = get_option('create_if_not_exists', False)
     tenant_exists = False
+    global tenant_cursor
+    tenant_cursor = None
 
     mode = get_option('mode', 'mysql').lower()
     if not mode in ['mysql', 'oracle']:

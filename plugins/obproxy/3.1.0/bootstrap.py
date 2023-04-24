@@ -27,7 +27,7 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
     global_ret = True
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
-        for key in ['observer_sys_password', 'obproxy_sys_password']:
+        for key in ['observer_sys_password']:
             sql = 'alter proxyconfig set %s = %%s' % key
             value = server_config.get(key, '')
             value = '' if value is None else str(value)

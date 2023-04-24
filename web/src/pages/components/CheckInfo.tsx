@@ -205,8 +205,8 @@ export default function CheckInfo() {
         label: 'OBProxy Exporter 端口',
         value: obproxy?.prometheus_listen_port,
       },
-      { label: 'OBAgent 管理服务端口', value: obagent?.monagent_http_port },
-      { label: 'OBAgent 监控服务端口', value: obagent?.mgragent_http_port },
+      { label: 'OBAgent 监控服务端口', value: obagent?.monagent_http_port },
+      { label: 'OBAgent 管理服务端口', value: obagent?.mgragent_http_port },
     ];
 
     if (!lowVersion) {

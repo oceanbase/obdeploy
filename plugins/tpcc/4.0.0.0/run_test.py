@@ -147,13 +147,14 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
     with open(seq_file, 'w') as f:
         f.write(str(seq))
     log_path = os.path.join(run_path, 'tpcc_out_{}_{}'.format(seq, datetime.datetime.now().strftime('%Y%m%d%H%M%S')))
-    cmd = '{java_bin} -cp {cp} -Dprop={prop} -DrunID={seq} jTPCC 2>&1 | tee {output}'.format(
+    cmd = 'bash -c "{java_bin} -cp {cp} -Dprop={prop} -DrunID={seq} jTPCC 2>&1 | tee {output} && ( exit ${{PIPESTATUS[0]}})"'.format(
         java_bin=java_bin,
         run_path=run_path,
         cp=bmsql_classpath, prop=bmsql_prop_path, seq=seq, output=log_path)
     try:
         stdio.verbose('local execute: %s' % cmd)
-        subprocess.call(cmd, shell=True, stderr=subprocess.STDOUT, cwd=run_path)
+        return_code = subprocess.call(cmd, shell=True, stderr=subprocess.STDOUT, cwd=run_path)
+        stdio.verbose('return code: {}'.format(return_code))
         with open(log_path, 'r') as f:
             out = f.read()
         stdio.verbose('stdout: %s' % out)
@@ -183,20 +184,8 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
             output += '{} : {}\n'.format(key, value)
             args[key_map[k]] = value
         stdio.print(output)
-        # # html测试报告
-        # try:
-        #     tpcc_path = os.path.join(tmp_dir, 'tpcc.html')
-        #     tmp_path = os.path.join(tmp_dir, 'tpcc.html')
-        #     with open(tmp_path, "r", encoding='UTF-8') as h:
-        #         TPCC_TEMPLATE = h.read().replace('%2', '%')
-        #     with open(tpcc_path, 'w') as f:
-        #         f.write(TPCC_TEMPLATE.replace('%', '%%').replace('%%(', '%(') % args)
-        # except Exception as e:
-        #     stdio.exception(e)
-        #     stdio.error('Failed to generate html report for tpcc.')
-        #     stdio.stop_loading('fail')
-        #     return
-        # return plugin_context.return_true()
+        if return_code == 0:
+            return plugin_context.return_true()
     except Exception as e:
         error = str(e)
         verbose_msg = 'exited code 255, error output:\n%s' % error
