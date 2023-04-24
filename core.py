@@ -2447,11 +2447,11 @@ class ObdHome(object):
                 if not pkg:
                     self._call_stdio('error', 'No such package %s-%s-%s' % (component, current_repository.version, usable))
                     return False
-                repositories = []
-                install_plugins = self.get_install_plugin_and_install(repositories, [pkg])
+                repositories_temp = []
+                install_plugins = self.get_install_plugin_and_install(repositories_temp, [pkg])
                 if not install_plugins:
                     return False
-                dest_repository = repositories[0]
+                dest_repository = repositories_temp[0]
             else:
                 install_plugins = self.search_plugins([dest_repository], PluginType.INSTALL)
 
@@ -2832,6 +2832,8 @@ class ObdHome(object):
 
     @staticmethod
     def _get_first_db_and_cursor_from_connect(namespace):
+        if not namespace:
+            return None, None
         connect_ret = namespace.get_return('connect')
         dbs = connect_ret.get_return('connect')
         cursors = connect_ret.get_return('cursor')
@@ -3730,7 +3732,7 @@ class ObdHome(object):
                 kwargs.update(ret.kwargs)
             return True
         except Exception as e:
-            self._call_stdio('error', e)
+            self._call_stdio('exception', e)
             return False
         finally:
             if optimization and optimization_inited:

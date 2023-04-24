@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import time
+import hashlib
 from copy import deepcopy
 
 from _errno import EC_CONFLICT_PORT
@@ -185,7 +186,12 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
             ]
             start_unuse = ['home_path', 'observer_sys_password', 'obproxy_sys_password', 'observer_root_password']
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
-            opt_str = ["obproxy_sys_password=''"] if need_bootstrap else []
+            opt_str = []
+            if server_config.get('obproxy_sys_password'):
+                obproxy_sys_password = hashlib.sha1(server_config['obproxy_sys_password'].encode("utf-8")).hexdigest()
+            else:
+                obproxy_sys_password = ''
+            opt_str.append("obproxy_sys_password='%s'" % obproxy_sys_password)
             for key in server_config:
                 if key not in start_unuse and key not in not_opt_str:
                     value = get_value(key)

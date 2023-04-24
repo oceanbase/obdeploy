@@ -664,7 +664,7 @@ export default function ClusterConfig() {
                 <Space size="middle">
                   <ProFormDigit
                     name={['obagent', 'monagent_http_port']}
-                    label="OBAgent 管理服务端口"
+                    label="OBAgent 监控服务端口"
                     fieldProps={{ style: commonStyle }}
                     placeholder="请输入"
                     rules={[
@@ -674,7 +674,7 @@ export default function ClusterConfig() {
                   />
                   <ProFormDigit
                     name={['obagent', 'mgragent_http_port']}
-                    label="OBAgent 监控服务端口"
+                    label="OBAgent 管理服务端口"
                     fieldProps={{ style: commonStyle }}
                     placeholder="请输入"
                     rules={[

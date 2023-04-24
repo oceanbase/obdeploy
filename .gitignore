@@ -19,7 +19,7 @@ tags
 /web/node_modules
 /web/npm-debug.log*
 /web/yarn-error.log
-/web/yarn.lock
+# /web/yarn.lock
 /web/package-lock.json
 /web/.mfsu-dev
 /web/.mfsu-prod

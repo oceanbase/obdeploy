@@ -67,14 +67,15 @@ done
 
 echo "============update .bashrc============"
 
-ALIAS_OBD_EXIST=$(cat ~/.bashrc | grep "alias obd=" | head -n 1)
+ALIAS_OBD_EXIST=$(grep "alias obd=" ~/.bashrc | head -n 1)
 
 if [[ "${ALIAS_OBD_EXIST}" != "" ]]; then
     echo "need update obd alias"
 fi
 
-echo "alias obd='python ${WORK_DIR}/_cmd.py'" >>~/.bashrc
-echo -e "if [ -d ${WORK_DIR} ]\nthen\n    source ${WORK_DIR}/profile/obd.sh\nfi" >>~/.bashrc
+echo "export OBD_INSTALL_PATH=${WORK_DIR}" >> ~/.bashrc
+echo "alias obd='python ${WORK_DIR}/_cmd.py'" >> ~/.bashrc
+echo -e "if [ -d ${WORK_DIR} ]\nthen\n    source ${WORK_DIR}/profile/obd.sh\nfi" >> ~/.bashrc
 
 echo "Please enter ob-deploy dir and install python requirements by 'pip install -r requirements.txt' when your python version is '2.x' and replace requirements.txt with requirements3.txt when your python version is '3.x'"
 

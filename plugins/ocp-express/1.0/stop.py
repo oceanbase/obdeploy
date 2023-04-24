@@ -93,7 +93,7 @@ def stop(plugin_context, *args, **kwargs):
                 data[key] = ''
             else:
                 client.execute_command('rm -rf %s' % data['path'])
-                stdio.verbose('%s ocp-server is stopped', server)
+                stdio.verbose('%s ocp-express is stopped', server)
         servers = tmp_servers
         count -= 1
         if count and servers:

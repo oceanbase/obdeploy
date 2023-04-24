@@ -305,6 +305,7 @@ class IOProgressBar(ProgressBar):
     def finish(self):
         if self.finished:
             return
+        self.finished = True
         self.update(self.maxval)
         self._finish()
 
