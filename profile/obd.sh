@@ -52,7 +52,7 @@ function _obd_complete_func
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  all_cmds["obd"]="mirror cluster test update repo demo web"
+  all_cmds["obd"]="mirror cluster test update repo demo web obdiag display-trace"
   all_cmds["obd cluster"]="autodeploy tenant start deploy redeploy restart reload destroy stop edit-config list display upgrade chst check4ocp reinstall"
   all_cmds["obd cluster *"]="_obd_reply_deploy_names"
   all_cmds["obd cluster tenant"]="create drop show"
@@ -72,6 +72,9 @@ function _obd_complete_func
       all_cmds["obd tool command"]="_obd_reply_deploy_names"
       all_cmds["obd tool command *"]="_obd_reply_tool_commands"
       all_cmds["obd env"]="set unset show clear"
+      all_cmds["obd obdiag"]="gather deploy"
+      all_cmds["obd obdiag gather"]="all log clog slog obproxy_log perf plan_monitor stack sysstat"
+      all_cmds["obd obdiag gather *"]="_obd_reply_deploy_names"
   # fi
   case $prev in
   list)

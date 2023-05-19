@@ -174,8 +174,14 @@ EC_OCP_EXPRESS_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4304, 'OCP express {o
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant. (Avail: {avail}, Need: {need})')
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant.')
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM = OBDErrorCodeTemplate(4305, 'There is not enough memory for ocp meta tenant')
+EC_OCP_EXPRESS_ADMIN_PASSWD_ERROR = OBDErrorCodeTemplate(4306, '({ip}) ocp-express admin_passwd invalid.(Current :{current})')
 # sql
 EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
+
+# obdiag
+EC_OBDIAG_NOT_FOUND = OBDErrorCodeTemplate(6000, 'Failed to executable obdiag command, you may not have obdiag installed')
+EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT = OBDErrorCodeTemplate(6001, 'obdiag must contain depend components {components}')
+EC_OBDIAG_OPTIONS_FORMAT_ERROR = OBDErrorCodeTemplate(6002, 'obdiag options {option} format error, please check the value : {value}')
 
 # WARN CODE 
 WC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) The recommended number of {key} is {need} (Current value: {now})')
@@ -222,3 +228,4 @@ SUG_OCP_EXPRESS_REDUCE_DISK = OBDErrorSuggestionTemplate('Please reduce the `log
 SUG_OCP_EXPRESS_COMP_VERSION = OBDErrorSuggestionTemplate('Please use {comp} with version {version} or above')
 SUG_OCP_EXPRESS_REDUCE_META_DB_MEM = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_memory_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_memory_size')])
 SUG_OCP_EXPRESS_REDUCE_META_DB_LOG_DISK = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_log_disk_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_log_disk_size')])
+SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD_ERROR = OBDErrorSuggestionTemplate('Please edit the `admin_passwd`, must be 8 to 32 characters in length, and must contain at least two digits, two uppercase letters, two lowercase letters, and two of the following special characters:~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_passwd')], auto_fix=True)

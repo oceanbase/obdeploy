@@ -379,10 +379,9 @@ class IO(object):
     ):
         self.level = level
         self.msg_lv = msg_lv
-        self.log_path = None
-        self.trace_id = None
-        self.log_name = 'default'
-        self.log_path = None
+        self._log_path = None
+        self._trace_id = None
+        self._log_name = 'default'
         self._trace_logger = None
         self._log_cache = [] if use_cache else None
         self._root_io = root_io
@@ -419,13 +418,18 @@ class IO(object):
         self._output_is_tty = output_stream.isatty()
         return True
 
-    def init_trace_logger(self, log_path, log_name=None, trace_id=None):
-        if self._trace_logger is None:
-            self.log_path = log_path
-            if trace_id:
-                self.trace_id = trace_id
+    def init_trace_logger(self, log_path, log_name=None, trace_id=None, recreate=False):
+        if self._root_io:
+            return False
+        if self._trace_logger is None or recreate:
+            self._log_path = log_path
             if log_name:
-                self.log_name = log_name
+                self._log_name = log_name
+            if trace_id:
+                self._trace_id = trace_id
+            self._trace_logger = None
+            return True
+        return False
 
     def __getstate__(self):
         state = {}
@@ -437,6 +441,8 @@ class IO(object):
 
     @property
     def trace_logger(self):
+        if self._root_io:
+            return self._root_io.trace_logger
         if self.log_path and self._trace_logger is None:
             self._trace_logger = Logger(self.log_name)
             handler = handlers.TimedRotatingFileHandler(self.log_path, when='midnight', interval=1, backupCount=30)
@@ -446,6 +452,24 @@ class IO(object):
                 handler.setFormatter(logging.Formatter("[%%(asctime)s.%%(msecs)03d] [%%(levelname)s] %%(message)s", "%Y-%m-%d %H:%M:%S"))
             self._trace_logger.addHandler(handler)
         return self._trace_logger
+
+    @property
+    def trace_id(self):
+        if self._root_io:
+            return self._root_io.trace_id
+        return self._trace_id
+
+    @property
+    def log_path(self):
+        if self._root_io:
+            return self._root_io.log_path
+        return self._log_path
+
+    @property
+    def log_name(self):
+        if self._root_io:
+            return self._root_io.log_name
+        return self._log_name
 
     @property
     def log_cache(self):
@@ -618,10 +642,6 @@ class IO(object):
                 track_limit=self.track_limit,
                 root_io=self._root_io if self._root_io else self
             )
-            sub_io.log_name = self.log_name
-            sub_io.log_path = self.log_path
-            sub_io.trace_id = self.trace_id
-            sub_io._trace_logger = self.trace_logger
             self.sub_ios[key] = sub_io
         return self.sub_ios[key]
 

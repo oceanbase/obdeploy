@@ -64,9 +64,13 @@ def list_tenant(plugin_context, cursor, *args, **kwargs):
         stdio.stop_loading('fail')
         return
     for tenant in tenants:
-        unit_name = '%s_unit' % tenant['tenant_name'] if tenant['tenant_name'] != 'sys' else 'sys_unit_config'
-        sql = "select * from oceanbase.__all_unit_config where name = '%s'"
-        res = cursor.fetchone(sql % unit_name)
+        select_resource_pools_sql = "select unit_config_id from oceanbase.__all_resource_pool where tenant_id = {};"
+        res = cursor.fetchone(select_resource_pools_sql.format(tenant['tenant_id']))
+        if res is False:
+            stdio.stop_loading('fail')
+            return
+        select_unit_configs_sql = "select * from oceanbase.__all_unit_config where unit_config_id = {};"
+        res = cursor.fetchone(select_unit_configs_sql.format(res['unit_config_id']))
         if res is False:
             stdio.stop_loading('fail')
             return

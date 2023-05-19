@@ -25,8 +25,9 @@ import os
 import sys
 import time
 import textwrap
+import json
 from uuid import uuid1 as uuid, UUID
-from optparse import OptionParser, OptionGroup, BadOptionError, Option, IndentedHelpFormatter
+from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
 from core import ObdHome
 from _stdio import IO
@@ -34,20 +35,14 @@ from _lock import LockMode
 from tool import DirectoryUtil, FileUtil, NetUtil, COMMAND_ENV
 from _errno import DOC_LINK_MSG, LockError
 import _environ as ENV
+from ssh import LocalClient
+from const import *
 
 
 ROOT_IO = IO(1)
-VERSION = '<VERSION>'
-REVISION = '<CID>'
-BUILD_BRANCH = '<B_BRANCH>'
-BUILD_TIME = '<B_TIME>'
-
-CONST_OBD_HOME = "OBD_HOME"
-CONST_OBD_INSTALL_PRE = "OBD_INSTALL_PRE"
-CONST_OBD_INSTALL_PATH = "OBD_INSTALL_PATH"
-FORBIDDEN_VARS = (CONST_OBD_HOME, CONST_OBD_INSTALL_PRE, CONST_OBD_INSTALL_PATH)
 
 OBD_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
+OBDIAG_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), 'oceanbase-diagnostic-tool')
 COMMAND_ENV.load(os.path.join(OBD_HOME_PATH, '.obd_environ'), ROOT_IO)
 
 
@@ -212,6 +207,10 @@ class ObdCommand(BaseCommand):
     def lock_mode(self):
         return COMMAND_ENV.get(ENV.ENV_LOCK_MODE)
 
+    @property
+    def enable_log(self):
+        return True
+
     def parse_command(self):
         if self.parser.allow_undefine != True:
             self.parser.allow_undefine = self.dev_mode
@@ -226,11 +225,12 @@ class ObdCommand(BaseCommand):
             log_dir = os.path.join(self.OBD_PATH, 'log')
             DirectoryUtil.mkdir(log_dir)
             log_path = os.path.join(log_dir, 'obd')
-            ROOT_IO.init_trace_logger(log_path, 'obd', trace_id)
-            obd = ObdHome(home_path=self.OBD_PATH, dev_mode=self.dev_mode, lock_mode=self.lock_mode, stdio=ROOT_IO)
+            if self.enable_log:
+                ROOT_IO.init_trace_logger(log_path, 'obd', trace_id)
             ROOT_IO.track_limit += 1
             ROOT_IO.verbose('cmd: %s' % self.cmds)
             ROOT_IO.verbose('opts: %s' % self.opts)
+            obd = ObdHome(home_path=self.OBD_PATH, dev_mode=self.dev_mode, lock_mode=self.lock_mode, stdio=ROOT_IO)
             obd.set_options(self.opts)
             obd.set_cmds(self.cmds)
             ret = self._do_command(obd)
@@ -417,6 +417,45 @@ class EnvironmentMajorCommand(HiddenMajorCommand):
         self.register_command(EnvironmentUnsetCommand())
         self.register_command(EnvironmentShowCommand())
         self.register_command(EnvironmentClearCommand())
+
+
+class TelemetryPostCommand(HiddenObdCommand):
+
+    def __init__(self):
+        super(TelemetryPostCommand, self).__init__("post", "Post telemetry data to OceanBase.By default, OBD telemetry is enabled. To disable OBD telemetry, run the `obd env set TELEMETRY_MODE 0` command. To enable OBD telemetry data printing, run `obd env set TELEMETRY_LOG_MODE 1`.")
+        self.parser.add_option('-d', '--data', type='string', help="post obd data")
+
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    @property
+    def enable_log(self):
+        if COMMAND_ENV.get(ENV.TELEMETRY_LOG_MODE, default='1') == '0':
+            return False
+        return True
+
+    def init(self, cmd, args):
+        super(TelemetryPostCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        return obd.telemetry_post(self.cmds[0])
+
+
+class TelemetryMajorCommand(HiddenMajorCommand):
+
+    def __init__(self):
+        super(TelemetryMajorCommand, self).__init__("telemetry", "Telemetry for OB-Deploy.By default, OBD telemetry is enabled. To disable OBD telemetry, run the `obd env set TELEMETRY_MODE 0` command. To enable OBD telemetry data printing, run `obd env set TELEMETRY_LOG_MODE 1`.")
+        self.register_command(TelemetryPostCommand())
+
+    def do_command(self):
+        if COMMAND_ENV.get(ENV.TELEMETRY_MODE, default='1') == '1':
+            return super(TelemetryMajorCommand, self).do_command()
+        else:
+            ROOT_IO.critical('Telemetry is disabled. To enable OBD telemetry, run the `obd env set TELEMETRY_MODE 1` command.')
+            return False
 
 
 class MirrorCloneCommand(ObdCommand):
@@ -609,6 +648,16 @@ class ClusterMirrorCommand(ObdCommand):
         self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
         return self
 
+    def get_obd_namespaces_data(self, obd):
+        data = {}
+        for component, _ in obd.namespaces.items():
+            data[component] = _.get_variable('run_result')
+        return data
+
+    def background_telemetry_task(self, obd):
+        data = json.dumps(self.get_obd_namespaces_data(obd))
+        LocalClient.execute_command_background(f"nohup obd telemetry post {self.cmds[0]} --data='{data}' >/dev/null 2>&1 &")
+
 
 class ClusterConfigStyleChange(ClusterMirrorCommand):
 
@@ -701,7 +750,9 @@ class ClusterAutoDeployCommand(ClusterMirrorCommand):
             if obd.genconfig(name):
                 self.opts.config = ''
                 obd.set_cmds(self.cmds[1:])
-                return obd.deploy_cluster(name) and obd.start_cluster(name)
+                res = obd.deploy_cluster(name) and obd.start_cluster(name)
+                self.background_telemetry_task(obd)
+                return res
             return False
         else:
             return self._show_help()
@@ -723,7 +774,9 @@ class ClusterDeployCommand(ClusterMirrorCommand):
             if getattr(self.opts, 'force', False) or getattr(self.opts, 'clean', False):
                 setattr(self.opts, 'skip_cluster_status_check', True)
                 obd.set_options(self.opts)
-            return obd.deploy_cluster(self.cmds[0])
+            res = obd.deploy_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
         else:
             return self._show_help()
 
@@ -741,7 +794,9 @@ class ClusterStartCommand(ClusterMirrorCommand):
     def _do_command(self, obd):
         if self.cmds:
             obd.set_cmds(self.cmds[1:])
-            return obd.start_cluster(self.cmds[0])
+            res = obd.start_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
         else:
             return self._show_help()
 
@@ -755,7 +810,9 @@ class ClusterStopCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.stop_cluster(self.cmds[0])
+            res = obd.stop_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
         else:
             return self._show_help()
 
@@ -768,7 +825,8 @@ class ClusterDestroyCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.destroy_cluster(self.cmds[0])
+            res = obd.destroy_cluster(self.cmds[0])
+            return res
         else:
             return self._show_help()
 
@@ -798,7 +856,9 @@ class ClusterRestartCommand(ClusterMirrorCommand):
             if not getattr(self.opts, 'with_parameter', False):
                 setattr(self.opts, 'without_parameter', True)
             obd.set_options(self.opts)
-            return obd.restart_cluster(self.cmds[0])
+            res = obd.restart_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
         else:
             return self._show_help()
 
@@ -811,7 +871,9 @@ class ClusterRedeployCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.redeploy_cluster(self.cmds[0])
+            res = obd.redeploy_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
         else:
             return self._show_help()
 
@@ -823,7 +885,9 @@ class ClusterReloadCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.reload_cluster(self.cmds[0])
+            res = obd.reload_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
         else:
             return self._show_help()
 
@@ -881,10 +945,13 @@ class CLusterUpgradeCommand(ClusterMirrorCommand):
         self.parser.add_option('--usable', type='string', help="Hash list for priority mirrors, separated with `,`.", default='')
         self.parser.add_option('--disable', type='string', help="Hash list for disabled mirrors, separated with `,`.", default='')
         self.parser.add_option('-e', '--executer-path', type='string', help="Executer path.", default=os.path.join(ObdCommand.OBD_INSTALL_PATH, 'lib/executer'))
+        self.parser.add_option('-t', '--script-query-timeout', type='string', help="The timeout(s) for executing sql in upgrade scripts. Supported since version 4.1.0", default='')
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.upgrade_cluster(self.cmds[0])
+            res = obd.upgrade_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
         else:
             return self._show_help()
 
@@ -1321,28 +1388,251 @@ class DisplayTraceCommand(ObdCommand):
     def lock_mode(self):
         return LockMode.NO_LOCK
 
+    @property
+    def enable_log(self):
+        return False
+
     def _do_command(self, obd):
         from ssh import LocalClient
+        if not self.cmds:
+            return self._show_help()
+        log_dir = os.path.join(obd.home_path, 'log/obd')
+        trace_id = self.cmds[0]
+        ROOT_IO.verbose('Get log by trace_id')
+        try:
+            if UUID(trace_id).version != 1:
+                ROOT_IO.critical('%s is not trace id' % trace_id)
+                return False
+        except:
+            ROOT_IO.print('%s is not trace id' % trace_id)
+            return False
+        cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, log_dir, trace_id)
+        data = LocalClient.execute_command(cmd)
+        ROOT_IO.print(data.stdout)
+        return True
+
+
+class ObdiagCommand(MajorCommand):
+    
+    def __init__(self):
+        super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
+        self.register_command(ObdiagDeployCommand())
+        self.register_command(ObdiagGatherCommand())
+
+
+class ObdiagDeployCommand(ObdCommand):
+
+
+    def __init__(self):
+        super(ObdiagDeployCommand, self).__init__('deploy', 'deploy obdiag')
+        self.parser.allow_undefine = True
+        self.parser.undefine_warn = False
+
+    def _do_command(self, obd):
+        obd.set_options(self.opts)
+        return obd.obdiag_deploy()
+
+
+class ObdiagGatherMirrorCommand(ObdCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherMirrorCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
         if self.cmds:
-            if obd.stdio.log_path:
-                log_dir = obd.stdio.log_path
-                obd.stdio = IO(0, 20)
-                trace_id = self.cmds[0]
-                obd._call_stdio('verbose', 'Get log by trace_id')
-                try:
-                    if UUID(trace_id).version != 1:
-                        obd._call_stdio('critical', '%s is not trace id' % trace_id)
-                        return False
-                except:
-                    obd._call_stdio('critical', '%s is not trace id' % trace_id)
-                    return False
-                cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, log_dir, trace_id)
-                data = LocalClient.execute_command(cmd)
-                obd.stdio.print(data.stdout)
-                return True
+            return obd.obdiag_gather(self.cmds[0], "gather_%s" % self.name, self.opts)
         else:
-            self._show_help()
-        return False
+            return self._show_help()
+
+
+class ObdiagGatherCommand(MajorCommand):
+    
+    def __init__(self):
+        super(ObdiagGatherCommand, self).__init__('gather', 'Gather oceanbase diagnostic info')
+        self.register_command(ObdiagGatherAllCommand())
+        self.register_command(ObdiagGatherLogCommand())
+        self.register_command(ObdiagGatherSysStatCommand())
+        self.register_command(ObdiagGatherStackCommand())
+        self.register_command(ObdiagGatherPerfCommand())
+        self.register_command(ObdiagGatherSlogCommand())
+        self.register_command(ObdiagGatherClogCommand())
+        self.register_command(ObdiagGatherPlanMonitorCommand())
+        self.register_command(ObdiagGatherObproxyLogCommand())
+
+class ObdiagGatherAllCommand(ObdiagGatherMirrorCommand):
+
+    def init(self, cmd, args):
+        super(ObdiagGatherAllCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherAllCommand, self).__init__('all', 'Gather oceanbase diagnostic info')
+        self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
+        self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
+        self.parser.add_option('--grep', type='string', help="specify keywords constrain")
+        self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+class ObdiagGatherLogCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherLogCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherLogCommand, self).__init__('log', 'Gather oceanbase logs from oceanbase machines')
+        self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
+        self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
+        self.parser.add_option('--grep', type='string', help="specify keywords constrain")
+        self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherSysStatCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherSysStatCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherSysStatCommand, self).__init__('sysstat', 'Gather Host information')
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherStackCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherStackCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherStackCommand, self).__init__('stack', 'Gather stack')
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherPerfCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherPerfCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherPerfCommand, self).__init__('perf', 'Gather perf')
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--scope', type='string', help="perf type constrains, choices=[sample, flame, pstack, all]",default='all')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherSlogCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherSlogCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherSlogCommand, self).__init__('slog', 'Gather slog')
+        self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
+        self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherClogCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherClogCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherClogCommand, self).__init__('clog', 'Gather clog')
+        self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
+        self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherPlanMonitorCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherPlanMonitorCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherPlanMonitorCommand, self).__init__('plan_monitor', 'Gather ParalleSQL information')
+        self.parser.add_option('-c', '--component', type='string', help="Component name to connect.", default='oceanbase-ce')
+        self.parser.add_option('--trace_id', type='string', help='sql trace id')
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('-u', '--user', type='string', help='The username used by database connection. [root]',default='root')
+        self.parser.add_option('-p', '--password', type='string', help='The password used by database connection.',default='')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherObproxyLogCommand(ObdiagGatherMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherObproxyLogCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagGatherObproxyLogCommand, self).__init__('obproxy_log', 'Gather obproxy log from obproxy machines')
+        self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
+        self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
+        self.parser.add_option('--grep', type='string', help="specify keywords constrain")
+        self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
 class MainCommand(MajorCommand):
@@ -1359,7 +1649,9 @@ class MainCommand(MajorCommand):
         self.register_command(UpdateCommand())
         self.register_command(DisplayTraceCommand())
         self.register_command(EnvironmentMajorCommand())
+        self.register_command(TelemetryMajorCommand())
         self.register_command(ToolCommand())
+        self.register_command(ObdiagCommand())
         self.parser.version = '''OceanBase Deploy: %s
 REVISION: %s
 BUILD_BRANCH: %s

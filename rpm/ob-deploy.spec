@@ -58,7 +58,8 @@ cd $SRC_DIR/web
 yarn
 yarn build
 cd $SRC_DIR
-cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" | sed "s/<VERSION>/$VERSION/" > obd.py
+sed -i "s/<CID>/$CID/" const.py  && sed -i "s/<B_BRANCH>/$BRANCH/" const.py  && sed -i  "s/<B_TIME>/$DATE/" const.py  && sed -i "s/<DEBUG>/$OBD_DUBUG/" const.py && sed -i "s/<VERSION>/$VERSION/" const.py
+cp -f _cmd.py obd.py
 sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
 mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
 mkdir -p $BUILD_DIR/SOURCES/{site-packages}
@@ -129,6 +130,27 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Fri May 12 2023 obd 2.1.0
+ - new features: support oceanbase-ce V4.0 upgrade
+ - new features: support ocp-express V1.0.1
+ - new features: support oceanbase-diagnostic-tool
+ - new features: random password when password is empty
+ - new features: obd web support English
+* Mon Apr 24 2023 obd 2.0.1
+ - new features: support ocp-express reinstall
+ - bug fix: exit code is not 0 when obd test tpcc
+ - bug fix: tpcc test failed when the obproxy ce component is not included in the deployment
+* Thu Mar 23 2023 obd 2.0.0
+ - new features: obd web
+ - new features: obd display-trace
+ - new features: obd cluster tenant show
+ - new features: obd mirror add-repo
+ - new features: new option "--generate-consistent-config/--gcc" for autdeploy
+ - new features: support ocp-express
+ - new features: support obagent V1.3.0
+ - new features: support oceanbase-ce V4.1.0
+ - bug fix: start when system_memory is greater than memory_limit
+ - bug fix: Table 'TEST.LINEITEM' doesn't exist in obd tpch test
 * Wed Dec 14 2022 obd 1.6.2
  - new features: support OceanBaseCE BP upgrade
  - fix bug: grafana init failed when remote deploy

@@ -20,12 +20,21 @@
 
 from __future__ import absolute_import, division, print_function
 
+from tool import ConfigUtil
 
-def generate_config(plugin_context, auto_depend=False,  generate_config_mini=False, return_generate_keys=False, *args, **kwargs):
+
+def generate_config(plugin_context, auto_depend=False,  generate_config_mini=False, return_generate_keys=False, only_generate_password=False, *args, **kwargs):
     if return_generate_keys:
-        return plugin_context.return_true(generate_keys=['memory_size', 'log_dir', 'logging_file_max_history'])
+        generate_keys = ['system_password']
+        if not only_generate_password:
+            generate_keys += ['memory_size', 'log_dir', 'logging_file_max_history']
+        return plugin_context.return_true(generate_keys=generate_keys)
 
     cluster_config = plugin_context.cluster_config
+    generate_random_password(cluster_config)
+    if only_generate_password:
+        return plugin_context.return_true()
+
     stdio = plugin_context.stdio
     depend_comps = [['obagent'], ['oceanbase', 'oceanbase-ce'], ['obproxy', 'obproxy-ce']]
     generate_configs = {'global': {}}
@@ -62,3 +71,9 @@ def generate_config(plugin_context, auto_depend=False,  generate_config_mini=Fal
 
     stdio.stop_loading('succeed')
     plugin_context.return_true()
+
+
+def generate_random_password(cluster_config):
+    global_config = cluster_config.get_original_global_conf()
+    if 'system_password' not in global_config:
+        cluster_config.update_global_conf('system_password', ConfigUtil.get_random_pwd_by_total_length())

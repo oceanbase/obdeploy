@@ -22,8 +22,9 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import time
+
 import tool
-import datetime
+from _rpm import Version
 from ssh import LocalClient
 
 
@@ -153,6 +154,7 @@ class Upgrader(object):
         self.process_index = upgrade_ctx.get('process_index', 0)
         self.process_route_index = upgrade_ctx.get('process_route_index', self.route_index)
         self.process = [
+            self.disable_ddl_and_check,
             self.exec_upgrade_checker,
             self.upgrade_mode_on,
             self.exec_upgrade_pre,
@@ -357,6 +359,56 @@ class Upgrader(object):
         self.stdio.verbose('server cneck')
         self.broken_sql("select * from oceanbase.DBA_OB_SERVERS where STATUS != 'ACTIVE' or STOP_TIME is not NULL or START_SERVICE_TIME is NULL")
         self.broken_sql("select * from GV$OB_LOG_STAT where in_sync = 'NO'")
+        return True
+
+    def disable_ddl_and_check(self):
+        if self.repositories[self.route_index - 1].version == Version('4.0.0.0'):
+            self.stdio.start_loading('Disable DDL')
+            while True:
+                # check ddl end
+                while self.execute_sql("select task_id from __all_virtual_ddl_task_status", error=True):
+                    time.sleep(3)
+                # close ddl
+                if self.execute_sql('alter system set enable_ddl = false') is False:
+                    self.stdio.stop_loading('fail')
+                    return False
+                while self.execute_sql("select * from __all_virtual_sys_parameter_stat where name = 'enable_ddl' and value != 'false'"):
+                    time.sleep(3)
+
+                # check ddl end
+                if self.execute_sql("select task_id from __all_virtual_ddl_task_status", error=True):
+                    if not self.execute_sql('alter system set enable_ddl = true'):
+                        self.stdio.stop_loading('fail')
+                    continue
+                break
+                
+            # check clog
+            rets = self.execute_sql("select tenant_id, ls_id, max(max_scn) as max_scn from gv$ob_log_stat group by tenant_id, ls_id", one=False, error=True)
+            if rets is not None:
+                for ret in rets:
+                    while self.execute_sql("select unsubmitted_log_scn from __all_virtual_replay_stat where tenant_id = %s and ls_id = %s and role != 'leader' and unsubmitted_log_scn <= %s" % (ret['tenant_id'], ret['ls_id'], ret['max_scn']), error=True):
+                        time.sleep(3)
+
+            # major freeze
+            # 1. check merge status
+            pre_global_broadcast_scn = 0
+            while True:
+                merge_status = self.execute_sql("select max(global_broadcast_scn) as global_broadcast_scn, max(global_broadcast_scn > last_scn) as is_merging from CDB_OB_MAJOR_COMPACTION")
+                if merge_status['is_merging'] == 0:
+                    pre_global_broadcast_scn = merge_status['global_broadcast_scn']
+                    break
+                time.sleep(3)
+            # 2. begin merge
+            self.execute_sql("alter system major freeze tenant = all", error=False)
+            # 3. wait merge start
+            while self.execute_sql("select * from CDB_OB_MAJOR_COMPACTION where global_broadcast_scn <= %s", [pre_global_broadcast_scn]):
+                time.sleep(3)
+            # 4.wait merge finsh
+            while self.execute_sql("select * from CDB_OB_MAJOR_COMPACTION where global_broadcast_scn > last_scn"):
+                time.sleep(3)
+            
+            self.stdio.stop_loading('succeed')
+
         return True
 
     def start_zone(self, zone=None):

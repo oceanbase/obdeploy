@@ -23,6 +23,7 @@ from __future__ import absolute_import, division, print_function
 import os
 import re
 import sys
+import time
 from enum import Enum
 from glob import glob
 from copy import deepcopy, copy
@@ -78,8 +79,8 @@ class PluginContextNamespace:
     def variables(self):
         return self._variables
 
-    def get_variable(self, name):
-        return self._variables.get(name)
+    def get_variable(self, name, default=None):
+        return self._variables.get(name, default)
 
     def set_variable(self, name, value):
         self._variables[name] = value
@@ -177,12 +178,12 @@ class PluginContext(object):
         self._return.return_false(*args, **kwargs)
         self.namespace.set_return(self.plugin_name, self._return)
 
-    def get_variable(self, name, spacename=None):
+    def get_variable(self, name, spacename=None, default=None):
         if spacename:
             namespace = self.namespaces.get(spacename)
         else:
             namespace = self.namespace
-        return namespace.get_variable(name) if namespace else None
+        return namespace.get_variable(name, default) if namespace else None
 
     def set_variable(self, name, value):
         self.namespace.set_variable(name, value)
@@ -270,8 +271,11 @@ def pyScriptPluginExec(func):
         self.before_do(self.name, namespace, namespaces, deploy_name,
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs)
+        method_name = self.PLUGIN_NAME
+        run_result = self.context.get_variable('run_result', default={})
+        run_result[method_name] = {'result': True}
+        start_time = time.time()
         if self.module:
-            method_name = func.__name__
             method = getattr(self.module, method_name, False)
             namespace_vars = copy(self.context.namespace.variables)
             namespace_vars.update(kwargs)
@@ -280,10 +284,15 @@ def pyScriptPluginExec(func):
                 try:
                     ret = method(self.context, *arg, **kwargs)
                     if ret is None and self.context and self.context.get_return() is None:
+                        run_result[method_name]['result'] = False
                         self.context.return_false()
                 except Exception as e:
+                    run_result[method_name]['result'] = False
                     self.context.return_false(exception=e)
                     stdio and getattr(stdio, 'exception', print)('%s RuntimeError: %s' % (self, e))
+        end_time = time.time()
+        run_result[method_name]['time'] = end_time - start_time
+        self.context.set_variable('run_result', run_result)
         ret = self.context.get_return() if self.context else PluginReturn()
         self.after_do(stdio, *arg, **kwargs)
         return ret

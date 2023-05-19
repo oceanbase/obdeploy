@@ -82,30 +82,6 @@ obproxy-ce:
     enable_strict_kernel_release: false
     # obproxy_sys_password: # obproxy sys user password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # observer_sys_password: # proxyro user pasword, consistent with oceanbase-ce's proxyro_password, can be empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
-obproxy-ce:
-  depends:
-    - oceanbase-ce
-  servers:
-    - 192.168.1.5
-  global:
-    # The working directory for obproxy. Obproxy is started under this directory. This is a required field.
-    home_path: /root/obproxy
-    skip_proxy_sys_private_check: true
-    enable_strict_kernel_release: false
-    # External port. The default value is 2883.
-    # listen_port: 2883
-    # The Prometheus port. The default value is 2884.
-    # prometheus_listen_port: 2884
-    # rs_list is the root server list for observers. The default root server is the first server in the zone.
-    # The format for rs_list is observer_ip:observer_mysql_port;observer_ip:observer_mysql_port.
-    # Ignore this value in autodeploy mode.
-    # rs_list: 127.0.0.1:2881
-    # Cluster name for the proxy OceanBase Database. The default value is obcluster. This value must be set to the same with the appname for OceanBase Database.
-    # cluster_name: obcluster
-    # Password for obproxy system tenant. The default value is empty.
-    # obproxy_sys_password:
-    # Password for proxyro. proxyro_password must be the same with proxyro_password. The default value is empty.
-    # observer_sys_password:
 obagent:
   # Set dependent components for the component.
   # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.

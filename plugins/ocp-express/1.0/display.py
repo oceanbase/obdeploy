@@ -38,11 +38,11 @@ def display(plugin_context, cursor, *args, **kwargs):
             'ip': ip,
             'port': api_cursor.port,
             'user': "admin",
-            'password': "oceanbase",
+            'password': cluster_config.get_global_conf_with_default().get('_admin_password_', 'oceanbase'),
             'url': url,
             'status': 'active' if api_cursor and api_cursor.status(stdio) else 'inactive'
         })
-    stdio.print_list(results, ['url', 'username', 'default_password', 'status'], lambda x: [x['url'], 'admin', 'oceanbase', x['status']], title='ocp-express')
+    stdio.print_list(results, ['url', 'username', 'initial password', 'status'], lambda x: [x['url'], 'admin', x['password'], x['status']], title='ocp-express')
     active_result = [r for r in results if r['status'] == 'active']
     info_dict = active_result[0] if len(active_result) > 0 else None
     if info_dict is not None:
