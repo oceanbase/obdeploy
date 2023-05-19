@@ -1,6 +1,12 @@
+import { intl } from '@/utils/intl';
 import { useEffect, useState } from 'react';
 import { Space, Input, Select } from 'antd';
-import styles from './index.less';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 interface Props {
   value?: API.ParameterValue;
@@ -9,8 +15,20 @@ interface Props {
 }
 
 const optionConfig = [
-  { label: '自动分配', value: true },
-  { label: '自定义', value: false },
+  {
+    label: intl.formatMessage({
+      id: 'OBD.pages.components.Parameter.AutomaticAllocation',
+      defaultMessage: '自动分配',
+    }),
+    value: true,
+  },
+  {
+    label: intl.formatMessage({
+      id: 'OBD.pages.components.Parameter.Custom',
+      defaultMessage: '自定义',
+    }),
+    value: false,
+  },
 ];
 
 export default function Parameter({
@@ -40,6 +58,8 @@ export default function Parameter({
           setParameterValue({ ...parameterValue, adaptive: value })
         }
         disabled={!parameterValue?.auto}
+        dropdownMatchSelectWidth={false}
+        style={locale === 'zh-CN' ? { width: 100 } : { width: 180 }}
       >
         {optionConfig.map((option) => (
           <Select.Option value={option.value} key={`${option.value}`}>
@@ -48,7 +68,10 @@ export default function Parameter({
         ))}
       </Select>
       <Input
-        placeholder="请输入"
+        placeholder={intl.formatMessage({
+          id: 'OBD.pages.components.Parameter.PleaseEnter',
+          defaultMessage: '请输入',
+        })}
         defaultValue={parameterValue?.value}
         className={styles.paramterInput}
         style={{ width: 86 }}

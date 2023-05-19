@@ -1,5 +1,13 @@
 @backgroundColor: #f5f8ff;
 
+.container {
+  height: 100%;
+}
+
+.englishContainer {
+  font-family: SourceSansPro-Semibold, SourceSansPro-Regular;
+}
+
 .pageHeader {
   position: fixed;
   top: 0;
@@ -15,12 +23,12 @@
   .logo {
     position: relative;
     top: -2px;
-    width: 140px;
+    width: 125px;
     vertical-align: middle;
   }
   .logoText {
     margin-left: 8px;
-    font-size: 16px;
+    font-size: 14px;
   }
   .actionContent {
     float: right;
@@ -34,9 +42,9 @@
 }
 
 .pageContainer {
-  min-height: calc(100% - 220px);
+  min-height: calc(100% - 240px);
   padding-top: 170px;
-  padding-bottom: 50px;
+  padding-bottom: 70px;
   background-color: @backgroundColor;
   .pageMain {
     .pageContent {
@@ -45,4 +53,14 @@
       overflow: auto;
     }
   }
+}
+
+.mask {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
 }

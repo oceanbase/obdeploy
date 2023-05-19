@@ -121,7 +121,7 @@ declare namespace API {
     items?: RecoverChangeParameter[];
   };
 
-  type deleteDeploymentParams = {
+  type deployAndStartADeploymentParams = {
     name: string;
   };
 
@@ -152,8 +152,6 @@ declare namespace API {
   type DeploymentReport = {
     /** Name component name */
     name: string;
-    /** Type component type */
-    type: string;
     /** Version component version */
     version: string;
     /** Servers server ip */
@@ -166,21 +164,22 @@ declare namespace API {
 
   type DeployMode = 'DEMO' | 'PRODUCTION';
 
-  type getDestroyTaskInfoParams = {
+  type destroyDeploymentParams = {
     name: string;
   };
 
-  type getRemoteMirrorByNameParams = {
-    section_name: string;
+  type getDeploymentParams = {
+    /** task status,ex:INSTALLING,DRAFT */
+    task_status: DeploymentStatus;
+  };
+
+  type getDestroyTaskInfoParams = {
+    name: string;
   };
 
   type HTTPValidationError = {
     /** Detail */
     detail?: ValidationError[];
-  };
-
-  type installDeploymentParams = {
-    name: string;
   };
 
   type InstallLog = {
@@ -208,9 +207,9 @@ declare namespace API {
     /** Gpgcheck gpgcheck */
     gpgcheck?: string;
     /** Enabled remote mirror is enabled */
-    enabled?: string;
+    enabled?: boolean;
     /** Available remote mirror is enabled */
-    available?: string;
+    available?: boolean;
   };
 
   type ObAgent = {
@@ -383,16 +382,6 @@ declare namespace API {
     success?: boolean;
   };
 
-  type OBResponseMirror_ = {
-    /** Code */
-    code?: number;
-    data?: Mirror;
-    /** Msg */
-    msg?: string;
-    /** Success */
-    success?: boolean;
-  };
-
   type OBResponsePreCheckResult_ = {
     /** Code */
     code?: number;
@@ -472,7 +461,7 @@ declare namespace API {
     release: string;
     /** Home Path install ocp-express home path */
     home_path?: string;
-    /** Server Port server port */
+    /** Port server port */
     port: number;
     /** Parameters config parameter */
     parameters?: Parameter[];
@@ -562,6 +551,10 @@ declare namespace API {
     component: string;
   };
 
+  type queryComponentParametersParams = {
+    'accept-language'?: string;
+  };
+
   type queryConnectionInfoParams = {
     /** deployment name */
     name: string;
@@ -570,11 +563,6 @@ declare namespace API {
   type queryDeploymentConfigParams = {
     /** deployment name */
     name: string;
-  };
-
-  type queryDeploymentInfoByTaskStatusTypeParams = {
-    /** task status,ex:INSTALLING,DRAFT */
-    task_status: DeploymentStatus;
   };
 
   type queryDeploymentReportParams = {
@@ -587,6 +575,8 @@ declare namespace API {
     name: string;
     /** log offset */
     offset?: number;
+    /** component name */
+    component_name?: string;
   };
 
   type queryInstallStatusParams = {
@@ -662,6 +652,13 @@ declare namespace API {
   type TaskResult = 'SUCCESSFUL' | 'FAILED' | 'RUNNING';
 
   type TaskStatus = 'PENDING' | 'RUNNING' | 'FINISHED';
+
+  type validateOrSetKeepAliveTokenParams = {
+    /** token */
+    token?: string;
+    /** force set token when conflict */
+    overwrite?: boolean;
+  };
 
   type ValidationError = {
     /** Location */

@@ -64,6 +64,7 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
     clients = plugin_context.clients
     servers = cluster_config.servers
     is_lib_repo = install_repository.name.endswith("-libs")
+    is_utils_repo = install_repository.name.endswith("-utils")
     home_path_map = {}
     for server in servers:
         server_config = cluster_config.get_server_conf(server)
@@ -85,6 +86,8 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
         else:
             if is_lib_repo:
                 install_path = os.path.join(remote_home_path, 'lib')
+            elif is_utils_repo:
+                install_path = os.path.join(remote_home_path, 'bin')
             else:
                 install_path = remote_home_path
             client.execute_command('mkdir -p {}'.format(install_path))
@@ -131,34 +134,64 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
     stdio.stop_loading('succeed')
 
     # check lib
-    lib_check = True
-    stdio.start_loading('Remote %s repository lib check' % check_repository)
-    for server in servers:
-        stdio.verbose('%s %s repository lib check' % (server, check_repository))
-        client = clients[server]
-        remote_home_path = home_path_map[server]
-        need_libs = set()
-        client.add_env('LD_LIBRARY_PATH', '%s/lib:' % remote_home_path, True)
+    def check_lib():
+        lib_check = True
+        stdio.start_loading('Remote %s repository lib check' % check_repository)
+        for server in servers:
+            stdio.verbose('%s %s repository lib check' % (server, check_repository))
+            client = clients[server]
+            remote_home_path = home_path_map[server]
+            need_libs = set()
+            client.add_env('LD_LIBRARY_PATH', '%s/lib:' % remote_home_path, True)
 
-        for file_item in check_file_map.values():
-            if file_item.type == InstallPlugin.FileItemType.BIN:
-                remote_file_path = os.path.join(remote_home_path, file_item.target_path)
-                ret = client.execute_command('ldd %s' % remote_file_path)
-                libs = re.findall('(/?[\w+\-/]+\.\w+[\.\w]+)[\s\\n]*\=\>[\s\\n]*not found', ret.stdout)
-                if not libs:
-                    libs = re.findall('(/?[\w+\-/]+\.\w+[\.\w]+)[\s\\n]*\=\>[\s\\n]*not found', ret.stderr)
-                if not libs and not ret:
-                    stdio.error('Failed to execute repository lib check.')
-                    return
-                need_libs.update(libs)
-        if need_libs:
-            for lib in need_libs:
-                getattr(stdio, msg_lv, '%s %s require: %s' % (server, check_repository, lib))
-            lib_check = False
-        client.add_env('LD_LIBRARY_PATH', '', True)
+            for file_item in check_file_map.values():
+                if file_item.type == InstallPlugin.FileItemType.BIN:
+                    remote_file_path = os.path.join(remote_home_path, file_item.target_path)
+                    ret = client.execute_command('ldd %s' % remote_file_path)
+                    libs = re.findall('(/?[\w+\-/]+\.\w+[\.\w]+)[\s\\n]*\=\>[\s\\n]*not found', ret.stdout)
+                    if not libs:
+                        libs = re.findall('(/?[\w+\-/]+\.\w+[\.\w]+)[\s\\n]*\=\>[\s\\n]*not found', ret.stderr)
+                    if not libs and not ret:
+                        stdio.error('Failed to execute repository lib check.')
+                        return
+                    need_libs.update(libs)
+            if need_libs:
+                for lib in need_libs:
+                    getattr(stdio, msg_lv, '%s %s require: %s' % (server, check_repository, lib))
+                lib_check = False
+            client.add_env('LD_LIBRARY_PATH', '', True)
 
-    if msg_lv == 'error':
-        stdio.stop_loading('succeed' if lib_check else 'fail')
-    elif msg_lv == 'warn':
-        stdio.stop_loading('succeed' if lib_check else 'warn')
-    return plugin_context.return_true(checked=lib_check)
+        if msg_lv == 'error':
+            stdio.stop_loading('succeed' if lib_check else 'fail')
+        elif msg_lv == 'warn':
+            stdio.stop_loading('succeed' if lib_check else 'warn')
+        return plugin_context.return_true(checked=lib_check)
+
+    # check utils
+    def check_utils():
+        utils_check = True
+        for server in servers:
+            client = clients[server]
+            remote_home_path = home_path_map[server]
+            need_utils = set()
+
+            for file_item in check_file_map.values():
+                if file_item.type == InstallPlugin.FileItemType.BIN:
+                    utils_file_path = os.path.join(remote_home_path, 'bin')
+                    remote_file_path = os.path.join(utils_file_path, file_item.target_path)
+                    ret = client.execute_command('ls -1 %s' % remote_file_path)
+                    utils = file_item.target_path
+                    if not ret:
+                        stdio.error('Failed to execute repository utils check.')
+                        return
+                    need_utils.update(utils)
+            if need_utils:
+                for util in need_utils:
+                    getattr(stdio, '%s %s require: %s' % (server, check_repository, util))
+                utils_check = False
+        return plugin_context.return_true(checked=utils_check)
+
+    if is_utils_repo:
+        return check_utils()
+    else:
+        return check_lib()

@@ -6,34 +6,14 @@ import type {
 } from '@ahooksjs/use-request/lib/types';
 import { handleResponseError } from '@/utils';
 
-interface Options<R = any, P extends any[] = any> extends BaseOptions<R, P> {
-  skipStatusError?: boolean;
-  skipTypeError?: boolean;
-}
+interface Options<R = any, P extends any[] = any> extends BaseOptions<R, P> {}
 
-const errorHandle = (
-  error: any,
-  onError: any,
-  skipStatusError?: boolean,
-  skipTypeError?: boolean,
-) => {
-  const { response, data, type } = error;
+const errorHandle = (error: any, onError: any) => {
+  const { response } = error;
 
   if (onError) {
     onError(error);
   }
-  if (!skipStatusError) {
-    if (response && response.status) {
-      handleResponseError(data?.msg || data?.detail || response?.statusText);
-    }
-  }
-
-  if (type === 'Timeout') {
-    handleResponseError('您的网络发生异常，无法连接服务器', '网络超时');
-  } else if (!response && !skipTypeError) {
-    handleResponseError('您的网络发生异常，无法连接服务器', '网络异常');
-  }
-
   return response;
 };
 
@@ -55,13 +35,7 @@ const request: any = <R, P extends any[]>(
     throwOnError: options?.throwOnError || false,
     formatResult: (result: any) => result,
     ...options,
-    onError: (error: any) =>
-      errorHandle(
-        error,
-        options?.onError,
-        options?.skipStatusError,
-        options?.skipTypeError,
-      ),
+    onError: (error: any) => errorHandle(error, options?.onError),
     onSuccess: (res, ...arg) => successHandle(options?.onSuccess, res, arg),
   });
   return { ...response, data: response?.data?.data };

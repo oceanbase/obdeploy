@@ -1,5 +1,7 @@
+import { getLocale } from 'umi';
 import type { RequestConfig } from 'umi';
 
+const locale = getLocale() || 'zh-CN';
 export const request: RequestConfig = {
   errorConfig: {
     adaptor: (resData) => {
@@ -30,4 +32,7 @@ export const request: RequestConfig = {
       };
     },
   ],
+  headers: {
+    'Accept-Language': locale,
+  },
 };

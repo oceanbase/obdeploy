@@ -51,4 +51,9 @@ declare namespace API {
     ocpexpress?: any;
     obagent?: any;
   }
+
+  interface ErrorInfo {
+    title: string;
+    desc?: string;
+  }
 }

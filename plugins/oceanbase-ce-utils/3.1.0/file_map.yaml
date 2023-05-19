@@ -1,0 +1,3 @@
+- src_path: ./usr/bin
+  target_path: ''
+  type: dir

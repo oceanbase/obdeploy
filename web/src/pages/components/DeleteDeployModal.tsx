@@ -1,12 +1,18 @@
+import { intl } from '@/utils/intl';
 import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 import { Modal, Progress, message } from 'antd';
 import { getDestroyTaskInfo } from '@/services/ob-deploy-web/Deployments';
 import useRequest from '@/utils/useRequest';
-import { checkLowVersion, handleResponseError } from '@/utils';
+import { checkLowVersion, getErrorInfo } from '@/utils';
 import NP from 'number-precision';
 import { oceanbaseComponent } from '../constants';
-import styles from './index.less';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 interface Props {
   visible: boolean;
@@ -40,6 +46,9 @@ export default function DeleteDeployModal({
     setCurrentType,
     getInfoByName,
     setLowVersion,
+    setErrorVisible,
+    setErrorsList,
+    errorsList,
   } = useModel('global');
 
   const [status, setStatus] = useState('RUNNING');
@@ -59,6 +68,7 @@ export default function DeleteDeployModal({
             NP.divide(data?.finished, data?.total),
             100,
           );
+
           setProgress(newProgress);
           let step = NP.minus(newProgress, progress);
           let stepNum = 1;
@@ -66,6 +76,7 @@ export default function DeleteDeployModal({
             setShowProgress(
               NP.plus(progress, NP.times(NP.divide(step, 100), stepNum)),
             );
+
             stepNum += 1;
           }, 10);
         } else if (data?.status === 'SUCCESSFUL') {
@@ -75,6 +86,7 @@ export default function DeleteDeployModal({
             setShowProgress(
               NP.plus(progress, NP.times(NP.divide(step, 100), stepNum)),
             );
+
             stepNum += 1;
           }, 10);
           try {
@@ -91,6 +103,7 @@ export default function DeleteDeployModal({
               setCurrentType(
                 components?.oceanbase && !components?.obproxy ? 'ob' : 'all',
               );
+
               const newSelectedVersionInfo = componentsVersionInfo?.[
                 oceanbaseComponent
               ]?.dataSource?.filter(
@@ -100,6 +113,7 @@ export default function DeleteDeployModal({
                 setOBVersionValue(
                   `${components?.oceanbase?.version}-${components?.oceanbase?.release}-${components?.oceanbase?.package_hash}`,
                 );
+
                 setComponentsVersionInfo({
                   ...componentsVersionInfo,
                   [oceanbaseComponent]: {
@@ -113,14 +127,18 @@ export default function DeleteDeployModal({
               }, 2000);
             } else {
               setIsDraft(false);
-              message.error('获取配置信息失败');
+              message.error(
+                intl.formatMessage({
+                  id: 'OBD.pages.components.DeleteDeployModal.FailedToObtainConfigurationInformation',
+                  defaultMessage: '获取配置信息失败',
+                }),
+              );
               onCancel();
             }
           } catch (e: any) {
-            const { response, data } = e;
-            handleResponseError(
-              data?.msg || data?.detail || response?.statusText,
-            );
+            const errorInfo = getErrorInfo(e);
+            setErrorVisible(true);
+            setErrorsList([...errorsList, errorInfo]);
           }
         } else {
           message.error(data?.msg);
@@ -128,6 +146,11 @@ export default function DeleteDeployModal({
         }
         setStatus(data?.status);
       }
+    },
+    onError: (e: any) => {
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
     },
   });
 
@@ -167,8 +190,14 @@ export default function DeleteDeployModal({
               style={{ marginBottom: '25px' }}
             >
               {status === 'SUCCESSFUL'
-                ? '清理失败历史部署环境成功'
-                : '清理失败历史部署环境失败'}
+                ? intl.formatMessage({
+                    id: 'OBD.pages.components.DeleteDeployModal.FailedHistoryDeploymentEnvironmentCleared',
+                    defaultMessage: '清理失败历史部署环境成功',
+                  })
+                : intl.formatMessage({
+                    id: 'OBD.pages.components.DeleteDeployModal.FailedToCleanUpThe',
+                    defaultMessage: '清理失败历史部署环境失败',
+                  })}
             </div>
             <Progress
               className={styles.deleteDeployProgress}
@@ -181,8 +210,17 @@ export default function DeleteDeployModal({
         ) : (
           <>
             <div className={styles.deleteDeployText}>
-              正在清理失败的历史部署环境
-              <div>请耐心等待</div>
+              {intl.formatMessage({
+                id: 'OBD.pages.components.DeleteDeployModal.CleaningFailedHistoricalDeploymentEnvironments',
+                defaultMessage: '正在清理失败的历史部署环境',
+              })}
+
+              <div>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.DeleteDeployModal.PleaseWaitPatiently',
+                  defaultMessage: '请耐心等待',
+                })}
+              </div>
             </div>
             <Progress
               className={styles.deleteDeployProgress}

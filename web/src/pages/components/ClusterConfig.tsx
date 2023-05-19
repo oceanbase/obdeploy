@@ -1,3 +1,4 @@
+import { intl } from '@/utils/intl';
 import { useState, useEffect } from 'react';
 import { useModel } from 'umi';
 import {
@@ -20,12 +21,11 @@ import {
   ProFormDigit,
 } from '@ant-design/pro-components';
 import type { ColumnsType } from 'antd/es/table';
-import { handleQuit } from '@/utils';
+import { handleQuit, getErrorInfo, getRandomPassword } from '@/utils';
 import useRequest from '@/utils/useRequest';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import RandExp from 'randexp';
 import Parameter from './Parameter';
-import DirInput from './DirInput';
+import TooltipInput from './TooltipInput';
 import {
   commonStyle,
   pathRule,
@@ -33,7 +33,12 @@ import {
   componentsConfig,
   componentVersionTypeToComponent,
 } from '../constants';
-import styles from './index.less';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 interface Parameter extends API.Parameter {
   description?: string;
@@ -56,6 +61,7 @@ const showConfigKeys = {
     'mysql_port',
     'rpc_port',
   ],
+
   obproxy: ['home_path', 'listen_port', 'prometheus_listen_port'],
   obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
   ocpexpress: ['home_path', 'port'],
@@ -77,6 +83,9 @@ export default function ClusterConfig() {
     componentsMoreConfig,
     setComponentsMoreConfig,
     handleQuitProgress,
+    setErrorVisible,
+    setErrorsList,
+    errorsList,
   } = useModel('global');
   const { components = {}, home_path } = configData || {};
   const {
@@ -89,6 +98,7 @@ export default function ClusterConfig() {
   const [currentMode, setCurrentMode] = useState(
     oceanbase?.mode || 'PRODUCTION',
   );
+
   const [passwordVisible, setPasswordVisible] = useState(true);
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
   const [componentsMoreLoading, setComponentsMoreLoading] = useState(false);
@@ -143,6 +153,9 @@ export default function ClusterConfig() {
     const formValues = form.getFieldsValue(true);
     setData(formValues);
     setCurrentStep(2);
+    setErrorVisible(false);
+    setErrorsList([]);
+    window.scrollTo(0, 0);
   };
 
   const nextStep = () => {
@@ -151,13 +164,21 @@ export default function ClusterConfig() {
       .then((values) => {
         setData(values);
         setCurrentStep(4);
+        setErrorVisible(false);
+        setErrorsList([]);
+        window.scrollTo(0, 0);
       })
       .catch(({ errorFields }) => {
         const errorName = errorFields?.[0].name;
         form.scrollToField(errorName);
         message.destroy();
         if (errorName.includes('parameters')) {
-          message.warning('更多配置有必填参数未填入');
+          message.warning(
+            intl.formatMessage({
+              id: 'OBD.pages.components.ClusterConfig.RequiredParametersForMoreConfigurations',
+              defaultMessage: '更多配置有必填参数未填入',
+            }),
+          );
         }
       });
   };
@@ -173,7 +194,14 @@ export default function ClusterConfig() {
       if (value >= 1024 && value <= 65535) {
         return Promise.resolve();
       }
-      return Promise.reject(new Error('端口号只支持 1024~65535 范围'));
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.ClusterConfig.ThePortNumberCanOnly',
+            defaultMessage: '端口号只支持 1024~65535 范围',
+          }),
+        ),
+      );
     }
   };
 
@@ -202,10 +230,11 @@ export default function ClusterConfig() {
           };
         },
       );
+
       const result: API.NewParameterMeta = {
         ...item,
         componentKey: componentConfig.componentKey,
-        label: componentConfig.name,
+        label: componentConfig.labelName,
         configParameter: newConfigParameter,
       };
       return result;
@@ -237,6 +266,7 @@ export default function ClusterConfig() {
           if (item.name === dataItem.key) {
             parameter = {
               key: dataItem.key,
+              description: parameter.description,
               params: {
                 ...parameter.params,
                 ...dataItem,
@@ -257,15 +287,18 @@ export default function ClusterConfig() {
   const getClusterMoreParamsters = async () => {
     setClusterMoreLoading(true);
     try {
-      const { success, data } = await getMoreParamsters({
-        filters: [
-          {
-            component: oceanbase?.component,
-            version: oceanbase?.version,
-            is_essential_only: true,
-          },
-        ],
-      });
+      const { success, data } = await getMoreParamsters(
+        {},
+        {
+          filters: [
+            {
+              component: oceanbase?.component,
+              version: oceanbase?.version,
+              is_essential_only: true,
+            },
+          ],
+        },
+      );
       if (success) {
         const newClusterMoreConfig = formatMoreConfig(data?.items);
         setClusterMoreConfig(newClusterMoreConfig);
@@ -279,8 +312,11 @@ export default function ClusterConfig() {
           },
         });
       }
-    } catch {
+    } catch (e: any) {
       setClusterMore(false);
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
     }
     setClusterMoreLoading(false);
   };
@@ -304,7 +340,7 @@ export default function ClusterConfig() {
     });
     setComponentsMoreLoading(true);
     try {
-      const { success, data } = await getMoreParamsters({ filters });
+      const { success, data } = await getMoreParamsters({}, { filters });
       if (success) {
         const newComponentsMoreConfig = formatMoreConfig(data?.items);
         setComponentsMoreConfig(newComponentsMoreConfig);
@@ -335,8 +371,11 @@ export default function ClusterConfig() {
         }
         form.setFieldsValue(setValues);
       }
-    } catch {
+    } catch (e) {
       setComponentsMore(false);
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
     }
 
     setComponentsMoreLoading(false);
@@ -360,7 +399,14 @@ export default function ClusterConfig() {
     if (value?.adaptive) {
       return Promise.resolve();
     } else if (value?.require && !value?.value) {
-      return Promise.reject(new Error('自定义参数时必填'));
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.ClusterConfig.RequiredForCustomParameters',
+            defaultMessage: '自定义参数时必填',
+          }),
+        ),
+      );
     }
     return Promise.resolve();
   };
@@ -368,13 +414,17 @@ export default function ClusterConfig() {
   const getMoreColumns = (label: string, componentKey: string) => {
     const columns: ColumnsType<API.NewConfigParameter> = [
       {
-        title: `${label}参数名称`,
+        title: label,
         dataIndex: 'name',
         width: 250,
         render: (text) => text || '-',
       },
       {
-        title: '参数值',
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.ClusterConfig.ParameterValue',
+          defaultMessage: '参数值',
+        }),
+        width: locale === 'zh-CN' ? 240 : 320,
         dataIndex: 'parameterValue',
         render: (text, record) => {
           return (
@@ -389,9 +439,11 @@ export default function ClusterConfig() {
         },
       },
       {
-        title: '介绍',
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.ClusterConfig.Introduction',
+          defaultMessage: '介绍',
+        }),
         dataIndex: 'description',
-        width: 500,
         render: (text, record) =>
           text ? (
             <Form.Item
@@ -412,6 +464,7 @@ export default function ClusterConfig() {
           ),
       },
     ];
+
     return columns;
   };
 
@@ -448,16 +501,6 @@ export default function ClusterConfig() {
         </Space>
       </Spin>
     ) : null;
-  };
-
-  const getRandomPassword = () => {
-    const randomPasswordReg =
-      /^(?=(.*[a-z]){2,})(?=(.*[A-Z]){2,})(?=(.*\d){2,})(?=(.*[~!@#%^&*_\-+=|(){}\[\]:;,.?/]){2,})[A-Za-z\d~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/;
-    const newValue = new RandExp(randomPasswordReg).gen();
-    if (randomPasswordReg.test(newValue)) {
-      return newValue;
-    }
-    return getRandomPassword();
   };
 
   useEffect(() => {
@@ -529,26 +572,73 @@ export default function ClusterConfig() {
     >
       <Space className={styles.spaceWidth} direction="vertical" size="middle">
         <ProCard className={styles.pageCard} split="horizontal">
-          <ProCard title="集群配置" className="card-padding-bottom-24">
+          <ProCard
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.ClusterConfig.ClusterConfiguration',
+              defaultMessage: '集群配置',
+            })}
+            className="card-padding-bottom-24"
+          >
             <ProFormRadio.Group
               name={['oceanbase', 'mode']}
-              fieldProps={{ optionType: 'button' }}
-              label="模式配置"
+              fieldProps={{ optionType: 'button', style: { marginBottom: 16 } }}
+              label={intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.ModeConfiguration',
+                defaultMessage: '模式配置',
+              })}
               options={[
-                { label: '最大占用', value: 'PRODUCTION' },
-                { label: '最小可用', value: 'DEMO' },
+                {
+                  label: intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.MaximumOccupancy',
+                    defaultMessage: '最大占用',
+                  }),
+                  value: 'PRODUCTION',
+                },
+                {
+                  label: intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.MinimumAvailability',
+                    defaultMessage: '最小可用',
+                  }),
+                  value: 'DEMO',
+                },
               ]}
             />
+            <a
+              className={styles.viewRule}
+              href="https://www.oceanbase.com/docs/obd-cn"
+              target="_blank"
+              data-aspm-click="c307508.d326703"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.ClusterConfigurationViewModeConfiguration',
+                defaultMessage: '集群配置-查看模式配置规则',
+              })}
+              data-aspm-expo
+            >
+              {intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.ViewModeConfigurationRules',
+                defaultMessage: '查看模式配置规则',
+              })}
+            </a>
             <div className={styles.modeExtra}>
               <div className={styles.modeExtraContent}>
                 {currentMode === 'PRODUCTION'
-                  ? '此模式将最大化利用环境资源，保证集群的性能与稳定性，推荐使用此模式。'
-                  : '配置满足集群正常运行的资源参数'}
+                  ? intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.ThisModeWillMaximizeThe',
+                      defaultMessage:
+                        '此模式将最大化利用环境资源，保证集群的性能与稳定性，推荐使用此模式。',
+                    })
+                  : intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.ConfigureResourceParametersThatMeet',
+                      defaultMessage: '配置满足集群正常运行的资源参数',
+                    })}
               </div>
             </div>
             <ProFormText.Password
               name={['oceanbase', 'root_password']}
-              label="root@sys 密码"
+              label={intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.RootSysPassword',
+                defaultMessage: 'root@sys 密码',
+              })}
               fieldProps={{
                 style: singleItemStyle,
                 autoComplete: 'new-password',
@@ -557,31 +647,50 @@ export default function ClusterConfig() {
                   onVisibleChange: setPasswordVisible,
                 },
               }}
-              placeholder="请输入"
+              placeholder={intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                defaultMessage: '请输入',
+              })}
               rules={[
-                { required: true, message: '请输入' },
+                {
+                  required: true,
+                  message: intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                    defaultMessage: '请输入',
+                  }),
+                },
                 {
                   pattern: /^[0-9a-zA-Z~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/,
-                  message:
-                    '仅支持英文、数字和特殊字符（~!@#%^&*_-+=|(){}[]:;,.?/），长度在 8-32 个字符之内',
+                  message: intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.OnlyEnglishNumbersAndSpecial',
+                    defaultMessage:
+                      '仅支持英文、数字和特殊字符（~!@#%^&*_-+=|(){}[]:;,.?/），长度在 8-32 个字符之内',
+                  }),
                 },
               ]}
             />
+
             <Row>
               <Space direction="vertical" size={0}>
                 <Form.Item
-                  label="数据目录"
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.DataDirectory',
+                    defaultMessage: '数据目录',
+                  })}
                   name={['oceanbase', 'data_dir']}
                   rules={[pathRule]}
                 >
-                  <DirInput placeholder={initDir} name="data_dir" />
+                  <TooltipInput placeholder={initDir} name="data_dir" />
                 </Form.Item>
                 <Form.Item
-                  label="日志目录"
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.LogDirectory',
+                    defaultMessage: '日志目录',
+                  })}
                   name={['oceanbase', 'redo_dir']}
                   rules={[pathRule]}
                 >
-                  <DirInput placeholder={initDir} name="redo_dir" />
+                  <TooltipInput placeholder={initDir} name="redo_dir" />
                 </Form.Item>
               </Space>
             </Row>
@@ -589,28 +698,57 @@ export default function ClusterConfig() {
               <Space size="middle">
                 <ProFormDigit
                   name={['oceanbase', 'mysql_port']}
-                  label="SQL 端口"
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.SqlPort',
+                    defaultMessage: 'SQL 端口',
+                  })}
                   fieldProps={{ style: commonStyle }}
-                  placeholder="请输入"
+                  placeholder={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                    defaultMessage: '请输入',
+                  })}
                   rules={[
-                    { required: true, message: '请输入' },
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                        defaultMessage: '请输入',
+                      }),
+                    },
                     { validator: portValidator },
                   ]}
                 />
+
                 <ProFormDigit
                   name={['oceanbase', 'rpc_port']}
-                  label="RPC 端口"
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.RpcPort',
+                    defaultMessage: 'RPC 端口',
+                  })}
                   fieldProps={{ style: commonStyle }}
-                  placeholder="请输入"
+                  placeholder={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                    defaultMessage: '请输入',
+                  })}
                   rules={[
-                    { required: true, message: '请输入' },
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                        defaultMessage: '请输入',
+                      }),
+                    },
                     { validator: portValidator },
                   ]}
                 />
               </Space>
             </Row>
             <div className={styles.moreSwitch}>
-              更多配置
+              {intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
+                defaultMessage: '更多配置',
+              })}
+
               <Switch
                 className="ml-20"
                 checked={clusterMore}
@@ -628,33 +766,71 @@ export default function ClusterConfig() {
         </ProCard>
         {currentType === 'all' ? (
           <ProCard className={styles.pageCard} split="horizontal">
-            <ProCard title="组件配置" className="card-padding-bottom-24">
+            <ProCard
+              title={intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.ComponentConfiguration',
+                defaultMessage: '组件配置',
+              })}
+              className="card-padding-bottom-24"
+            >
               <Row>
                 <Space size="middle">
                   <ProFormDigit
                     name={['obproxy', 'listen_port']}
-                    label="OBProxy 服务端口"
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.ObproxyServicePort',
+                      defaultMessage: 'OBProxy 服务端口',
+                    })}
                     fieldProps={{ style: commonStyle }}
-                    placeholder="请输入"
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                      defaultMessage: '请输入',
+                    })}
                     rules={[
-                      { required: true, message: '请输入' },
+                      {
+                        required: true,
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                          defaultMessage: '请输入',
+                        }),
+                      },
                       { validator: portValidator },
                     ]}
                   />
+
                   <ProFormDigit
                     name={['obproxy', 'prometheus_listen_port']}
                     label={
                       <>
-                        OBProxy Exporter 端口
-                        <Tooltip title="OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。">
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.ClusterConfig.PortObproxyExporter',
+                          defaultMessage: 'OBProxy Exporter 端口',
+                        })}
+
+                        <Tooltip
+                          title={intl.formatMessage({
+                            id: 'OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs',
+                            defaultMessage:
+                              'OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。',
+                          })}
+                        >
                           <QuestionCircleOutlined className="ml-10" />
                         </Tooltip>
                       </>
                     }
                     fieldProps={{ style: commonStyle }}
-                    placeholder="请输入"
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                      defaultMessage: '请输入',
+                    })}
                     rules={[
-                      { required: true, message: '请输入' },
+                      {
+                        required: true,
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                          defaultMessage: '请输入',
+                        }),
+                      },
                       { validator: portValidator },
                     ]}
                   />
@@ -664,21 +840,46 @@ export default function ClusterConfig() {
                 <Space size="middle">
                   <ProFormDigit
                     name={['obagent', 'monagent_http_port']}
-                    label="OBAgent 监控服务端口"
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.ObagentMonitoringServicePort',
+                      defaultMessage: 'OBAgent 监控服务端口',
+                    })}
                     fieldProps={{ style: commonStyle }}
-                    placeholder="请输入"
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                      defaultMessage: '请输入',
+                    })}
                     rules={[
-                      { required: true, message: '请输入' },
+                      {
+                        required: true,
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                          defaultMessage: '请输入',
+                        }),
+                      },
                       { validator: portValidator },
                     ]}
                   />
+
                   <ProFormDigit
                     name={['obagent', 'mgragent_http_port']}
-                    label="OBAgent 管理服务端口"
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.ObagentManageServicePorts',
+                      defaultMessage: 'OBAgent 管理服务端口',
+                    })}
                     fieldProps={{ style: commonStyle }}
-                    placeholder="请输入"
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                      defaultMessage: '请输入',
+                    })}
                     rules={[
-                      { required: true, message: '请输入' },
+                      {
+                        required: true,
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                          defaultMessage: '请输入',
+                        }),
+                      },
                       { validator: portValidator },
                     ]}
                   />
@@ -688,18 +889,34 @@ export default function ClusterConfig() {
                 <Row>
                   <ProFormDigit
                     name={['ocpexpress', 'port']}
-                    label="OCPExpress 端口"
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.PortOcpExpress',
+                      defaultMessage: 'OCP Express 端口',
+                    })}
                     fieldProps={{ style: commonStyle }}
-                    placeholder="请输入"
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                      defaultMessage: '请输入',
+                    })}
                     rules={[
-                      { required: true, message: '请输入' },
+                      {
+                        required: true,
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                          defaultMessage: '请输入',
+                        }),
+                      },
                       { validator: portValidator },
                     ]}
                   />
                 </Row>
               ) : null}
               <div className={styles.moreSwitch}>
-                更多配置
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
+                  defaultMessage: '更多配置',
+                })}
+
                 <Switch
                   className="ml-20"
                   checked={componentsMore}
@@ -722,32 +939,55 @@ export default function ClusterConfig() {
               <Button
                 onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
                 data-aspm-click="c307508.d317282"
-                data-aspm-desc="集群配置-退出"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.ClusterConfig.ClusterConfigurationExit',
+                  defaultMessage: '集群配置-退出',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                退出
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.ClusterConfig.Exit',
+                  defaultMessage: '退出',
+                })}
               </Button>
-              <Tooltip title="当前页面配置已保存">
+              <Tooltip
+                title={intl.formatMessage({
+                  id: 'OBD.pages.components.ClusterConfig.TheCurrentPageConfigurationHas',
+                  defaultMessage: '当前页面配置已保存',
+                })}
+              >
                 <Button
                   onClick={prevStep}
                   data-aspm-click="c307508.d317281"
-                  data-aspm-desc="集群配置-上一步"
+                  data-aspm-desc={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.ClusterConfigurationPreviousStep',
+                    defaultMessage: '集群配置-上一步',
+                  })}
                   data-aspm-param={``}
                   data-aspm-expo
                 >
-                  上一步
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.PreviousStep',
+                    defaultMessage: '上一步',
+                  })}
                 </Button>
               </Tooltip>
               <Button
                 type="primary"
                 onClick={nextStep}
                 data-aspm-click="c307508.d317283"
-                data-aspm-desc="集群配置-下一步"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.ClusterConfig.ClusterConfigurationNextStep',
+                  defaultMessage: '集群配置-下一步',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                下一步
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.ClusterConfig.NextStep',
+                  defaultMessage: '下一步',
+                })}
               </Button>
             </Space>
           </div>

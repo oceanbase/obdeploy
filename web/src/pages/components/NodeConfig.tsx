@@ -1,12 +1,22 @@
+import { intl } from '@/utils/intl';
 import { useEffect, useState, useRef } from 'react';
 import { useModel } from 'umi';
-import { Space, Button, Tooltip, Select, Popconfirm, message } from 'antd';
+import {
+  Space,
+  Button,
+  Tooltip,
+  Select,
+  Popconfirm,
+  message,
+  Form,
+} from 'antd';
 import { QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   ProCard,
   ProForm,
   ProFormText,
   ProFormSelect,
+  ProFormDigit,
   EditableProTable,
 } from '@ant-design/pro-components';
 import type {
@@ -15,15 +25,22 @@ import type {
 } from '@ant-design/pro-components';
 import { getObdInfo } from '@/services/ob-deploy-web/Info';
 import useRequest from '@/utils/useRequest';
-import { handleQuit } from '@/utils';
+import { handleQuit, getErrorInfo } from '@/utils';
 import { commonStyle, pathRule } from '../constants';
 import ServerTags from './ServerTags';
-import styles from './index.less';
+import TooltipInput from './TooltipInput';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 interface FormValues extends API.Components {
   auth?: {
     user?: string;
     password?: string;
+    port?: number;
   };
   home_path?: string;
 }
@@ -38,6 +55,9 @@ export default function NodeConfig() {
     handleQuitProgress,
     nameIndex,
     setNameIndex,
+    setErrorVisible,
+    setErrorsList,
+    errorsList,
   } = useModel('global');
   const { components = {}, auth, home_path } = configData || {};
   const { oceanbase = {}, ocpexpress = {}, obproxy = {} } = components;
@@ -83,11 +103,14 @@ export default function NodeConfig() {
   const [editableKeys, setEditableRowKeys] = useState<React.Key[]>(() =>
     dbConfigData.map((item) => item.id),
   );
+
   // all servers
   const [allOBServer, setAllOBServer] = useState<string[]>([]);
   // all zone servers
   const [allZoneOBServer, setAllZoneOBServer] = useState<any>({});
   const [lastDeleteServer, setLastDeleteServer] = useState<string>('');
+  const [ocpServerDropdownVisible, setOcpServerDropdownVisible] =
+    useState<boolean>(false);
 
   const serverReg =
     /^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.){3}(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])?$/;
@@ -102,6 +125,11 @@ export default function NodeConfig() {
           home_path: data?.user === 'root' ? '/root' : `/home/${data?.user}`,
         });
       }
+    },
+    onError: (e: any) => {
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
     },
   });
 
@@ -150,6 +178,9 @@ export default function NodeConfig() {
     const formValues = form.getFieldsValue(true);
     setData(formValues);
     setCurrentStep(1);
+    setErrorVisible(false);
+    setErrorsList([]);
+    window.scrollTo(0, 0);
   };
 
   const nextStep = () => {
@@ -169,6 +200,9 @@ export default function NodeConfig() {
       const formValues = result?.[1];
       setData(formValues);
       setCurrentStep(3);
+      setErrorVisible(false);
+      setErrorsList([]);
+      window.scrollTo(0, 0);
     });
   };
 
@@ -209,10 +243,12 @@ export default function NodeConfig() {
       (item: string) =>
         !(allServers?.includes(item) || item === lastDeleteServer),
     );
+
     const customOcpexpressServers = ocpexpressServers?.filter(
       (item: string) =>
         !(allServers?.includes(item) || item === lastDeleteServer),
     );
+
     let obproxyServersValue;
     let ocpexpressServersValue;
     if (allServers?.length) {
@@ -236,7 +272,12 @@ export default function NodeConfig() {
             form.setFields([
               {
                 name: ['obproxy', 'servers'],
-                errors: ['请选择正确的 OBProxy 节点'],
+                errors: [
+                  intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
+                    defaultMessage: '请选择正确的 OBProxy 节点',
+                  }),
+                ],
               },
             ]);
           }
@@ -265,7 +306,12 @@ export default function NodeConfig() {
             form.setFields([
               {
                 name: ['ocpexpress', 'servers'],
-                errors: ['请选择正确的 OCPExpress 节点'],
+                errors: [
+                  intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
+                    defaultMessage: '请选择正确的 OCP Express 节点',
+                  }),
+                ],
               },
             ]);
           }
@@ -319,7 +365,11 @@ export default function NodeConfig() {
       } else {
         return Promise.reject(
           new Error(
-            '以英文字母开头，英文或数字结尾，可包含英文数字和下划线且长度在 2-32 个字符之间',
+            intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.ItStartsWithALetter',
+              defaultMessage:
+                '以英文字母开头，英文或数字结尾，可包含英文数字和下划线且长度在 2-32 个字符之间',
+            }),
           ),
         );
       }
@@ -327,13 +377,27 @@ export default function NodeConfig() {
     if (validtor) {
       return Promise.resolve();
     }
-    return Promise.reject(new Error('Zone 名称已被占用'));
+    return Promise.reject(
+      new Error(
+        intl.formatMessage({
+          id: 'OBD.pages.components.NodeConfig.ZoneNameAlreadyOccupied',
+          defaultMessage: 'Zone 名称已被占用',
+        }),
+      ),
+    );
   };
 
   const ocpServersValidator = (_: any, value: string[]) => {
     let validtor = true;
     if (value?.length > 1) {
-      return Promise.reject(new Error('仅可选择或输入一个节点'));
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.OnlyOneNodeCanBe',
+            defaultMessage: '仅可选择或输入一个节点',
+          }),
+        ),
+      );
     }
     if (value && value.length) {
       value.some((item) => {
@@ -344,7 +408,14 @@ export default function NodeConfig() {
     if (validtor) {
       return Promise.resolve();
     }
-    return Promise.reject(new Error('请选择正确的 OCPExpress 节点'));
+    return Promise.reject(
+      new Error(
+        intl.formatMessage({
+          id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
+          defaultMessage: '请选择正确的 OCP Express 节点',
+        }),
+      ),
+    );
   };
 
   const serversValidator = (_: any, value: string[], type: string) => {
@@ -359,9 +430,48 @@ export default function NodeConfig() {
       return Promise.resolve();
     }
     if (type === 'OBServer') {
-      return Promise.reject(new Error('请输入正确的 IP 地址'));
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.EnterTheCorrectIpAddress',
+            defaultMessage: '请输入正确的 IP 地址',
+          }),
+        ),
+      );
     } else {
-      return Promise.reject(new Error('请选择正确的 OBProxy 节点'));
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
+            defaultMessage: '请选择正确的 OBProxy 节点',
+          }),
+        ),
+      );
+    }
+  };
+
+  const portValidator = (_: any, value: number) => {
+    if (value) {
+      if (value >= 0 && value <= 65535) {
+        return Promise.resolve();
+      }
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.ThePortNumberCanOnly',
+            defaultMessage: '端口号只支持 0~65535 范围',
+          }),
+        ),
+      );
+    } else {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.EnterTheSSHPort',
+            defaultMessage: '请输入 SSH 端口',
+          }),
+        ),
+      );
     }
   };
 
@@ -369,17 +479,35 @@ export default function NodeConfig() {
     {
       title: (
         <>
-          Zone 名称
-          <Tooltip title="可用区，表示集群内具有相似硬件可用性的一组节点，通常为同一个机架、机房或地域。">
+          {intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.ZoneName',
+            defaultMessage: 'Zone 名称',
+          })}
+
+          <Tooltip
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.AZoneThatRepresentsA',
+              defaultMessage:
+                '可用区，表示集群内具有相似硬件可用性的一组节点，通常为同一个机架、机房或地域。',
+            })}
+          >
             <QuestionCircleOutlined className="ml-10" />
           </Tooltip>
         </>
       ),
+
       dataIndex: 'name',
       width: 224,
       formItemProps: {
         rules: [
-          { required: true, whitespace: false, message: '此项是必填项' },
+          {
+            required: true,
+            whitespace: false,
+            message: intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.ThisItemIsRequired',
+              defaultMessage: '此项是必填项',
+            }),
+          },
           { validator: nameValidator },
         ],
       },
@@ -387,16 +515,33 @@ export default function NodeConfig() {
     {
       title: (
         <>
-          OBServer 节点
-          <Tooltip title="数据库服务（OBServer）所在节点，包含 SQL 引擎、事务引擎和存储引擎，并服务多个数据分区。">
+          {intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.ObserverNodes',
+            defaultMessage: 'OBServer 节点',
+          })}
+
+          <Tooltip
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.TheNodeWhereDatabaseService',
+              defaultMessage:
+                '数据库服务（OBServer）所在节点，包含 SQL 引擎、事务引擎和存储引擎，并服务多个数据分区。',
+            })}
+          >
             <QuestionCircleOutlined className="ml-10" />
           </Tooltip>
         </>
       ),
+
       dataIndex: 'servers',
       formItemProps: {
         rules: [
-          { required: true, message: '此项是必填项' },
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.ThisItemIsRequired',
+              defaultMessage: '此项是必填项',
+            }),
+          },
           {
             validator: (_: any, value: string[]) =>
               serversValidator(_, value, 'OBServer'),
@@ -415,17 +560,40 @@ export default function NodeConfig() {
     {
       title: (
         <>
-          RootServer 节点
-          <Tooltip title="总控服务（RootService）所在节点，用于执行集群管理、服务器管理、自动负载均衡等操作。">
+          {intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.RootserverNodes',
+            defaultMessage: 'RootServer 节点',
+          })}
+
+          <Tooltip
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.TheNodeWhereTheMaster',
+              defaultMessage:
+                '总控服务（RootService）所在节点，用于执行集群管理、服务器管理、自动负载均衡等操作。',
+            })}
+          >
             <QuestionCircleOutlined className="ml-10" />
           </Tooltip>
         </>
       ),
+
       dataIndex: 'rootservice',
       formItemProps: {
         rules: [
-          { required: true, message: '此项是必选项' },
-          { pattern: serverReg, message: '请选择正确的 RootServer 节点' },
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.ThisOptionIsRequired',
+              defaultMessage: '此项是必选项',
+            }),
+          },
+          {
+            pattern: serverReg,
+            message: intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.SelectTheCorrectRootserverNode',
+              defaultMessage: '请选择正确的 RootServer 节点',
+            }),
+          },
         ],
       },
       width: 224,
@@ -433,7 +601,13 @@ export default function NodeConfig() {
         // rootservice options are items entered by the OBServer
         const options = record?.servers ? formatOptions(record?.servers) : [];
         return isEditable ? (
-          <Select options={options} placeholder="请选择" />
+          <Select
+            options={options}
+            placeholder={intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+              defaultMessage: '请选择',
+            })}
+          />
         ) : null;
       },
     },
@@ -451,6 +625,7 @@ export default function NodeConfig() {
     auth: {
       user: auth?.user || undefined,
       password: auth?.password || undefined,
+      port: auth?.port || 22,
     },
     home_path: initHomePath,
   };
@@ -469,9 +644,16 @@ export default function NodeConfig() {
       onValuesChange={onValuesChange}
       initialValues={initialValues}
       grid={true}
+      validateTrigger={['onBlur', 'onChange']}
     >
       <Space direction="vertical" size="middle">
-        <ProCard className={styles.pageCard} title="数据库节点配置">
+        <ProCard
+          className={styles.pageCard}
+          title={intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.DatabaseNodeConfiguration',
+            defaultMessage: '数据库节点配置',
+          })}
+        >
           <EditableProTable<API.DBConfig>
             className={styles.nodeEditabletable}
             columns={columns}
@@ -486,7 +668,10 @@ export default function NodeConfig() {
                 name: `zone${nameIndex}`,
               }),
               onClick: () => setNameIndex(nameIndex + 1),
-              creatorButtonText: '新增 Zone',
+              creatorButtonText: intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.AddZone',
+                defaultMessage: '新增 Zone',
+              }),
             }}
             editable={{
               type: 'multiple',
@@ -495,7 +680,12 @@ export default function NodeConfig() {
               actionRender: (row) => {
                 if (dbConfigData?.length === 1) {
                   return (
-                    <Tooltip title="至少保留一个 zone">
+                    <Tooltip
+                      title={intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.KeepAtLeastOneZone',
+                        defaultMessage: '至少保留一个 zone',
+                      })}
+                    >
                       <span className={styles.disabledDel}>
                         <DeleteOutlined />
                       </span>
@@ -512,7 +702,10 @@ export default function NodeConfig() {
                 }
                 return (
                   <Popconfirm
-                    title="确定删除该条 Zone 的相关配置吗？"
+                    title={intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.AreYouSureYouWant',
+                      defaultMessage: '确定删除该条 Zone 的相关配置吗？',
+                    })}
                     onConfirm={() => handleDelete(row.id)}
                   >
                     <DeleteOutlined style={{ color: '#8592ad' }} />
@@ -531,6 +724,7 @@ export default function NodeConfig() {
                   editableItem?.id,
                   'servers',
                 ]);
+
                 if (editorServers.length) {
                   if (!rootService || !editorServers.includes(rootService)) {
                     newRootService = editorServers[0];
@@ -557,7 +751,12 @@ export default function NodeConfig() {
                   tableFormRef?.current?.setFields([
                     {
                       name: [editableItem.id, 'rootservice'],
-                      errors: ['请选择正确的 RootServer 节点'],
+                      errors: [
+                        intl.formatMessage({
+                          id: 'OBD.pages.components.NodeConfig.SelectTheCorrectRootserverNode',
+                          defaultMessage: '请选择正确的 RootServer 节点',
+                        }),
+                      ],
                     },
                   ]);
                 }
@@ -574,11 +773,17 @@ export default function NodeConfig() {
                       editorServers[editorServers.length - 1],
                     )
                   ) {
-                    message.warning('禁止输入重复节点');
+                    message.warning(
+                      intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.DoNotEnterDuplicateNodes',
+                        defaultMessage: '禁止输入重复节点',
+                      }),
+                    );
                     const rawData = editorServers.slice(
                       0,
                       editorServers.length - 1,
                     );
+
                     editableForm.setFieldsValue({
                       [editableItem?.id]: {
                         servers: rawData?.length ? rawData : undefined,
@@ -590,6 +795,7 @@ export default function NodeConfig() {
                     editableItem?.id,
                     'servers',
                   ]);
+
                   if (errors?.length) {
                     tableFormRef?.current?.setFields([
                       {
@@ -624,20 +830,56 @@ export default function NodeConfig() {
         {currentType === 'all' ? (
           <ProCard
             className={styles.pageCard}
-            title="组件节点配置"
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.ComponentNodeConfiguration',
+              defaultMessage: '组件节点配置',
+            })}
             bodyStyle={{ paddingBottom: '0' }}
           >
-            <Space>
+            <Space size={16}>
               {!lowVersion ? (
                 <ProFormSelect
                   mode="tags"
                   name={['ocpexpress', 'servers']}
-                  label="OCPExpress 节点"
-                  fieldProps={{ style: commonStyle }}
-                  placeholder="请选择"
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.OcpExpressNodes',
+                    defaultMessage: 'OCP Express 节点',
+                  })}
+                  fieldProps={{
+                    style: commonStyle,
+                    open: ocpServerDropdownVisible,
+                    onChange: (value) => {
+                      if (value?.length) {
+                        form.setFieldsValue({
+                          ocpexpress: {
+                            servers: [value[value.length - 1]],
+                          },
+                        });
+                      }
+                      setOcpServerDropdownVisible(false);
+                    },
+                    onFocus: () => setOcpServerDropdownVisible(true),
+                    onClick: () =>
+                      setOcpServerDropdownVisible(!ocpServerDropdownVisible),
+                    onBlur: () => setOcpServerDropdownVisible(false),
+                  }}
+                  validateTrigger={['onBlur']}
+                  placeholder={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                    defaultMessage: '请选择',
+                  })}
                   rules={[
-                    { required: true, message: '请选择或输入 OCPExpress 节点' },
-                    { validator: ocpServersValidator },
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.SelectOrEnterOcpExpress',
+                        defaultMessage: '请选择或输入 OCP Express 节点',
+                      }),
+                    },
+                    {
+                      validator: ocpServersValidator,
+                      validateTrigger: 'onBlur',
+                    },
                   ]}
                   options={formatOptions(allOBServer)}
                 />
@@ -645,11 +887,23 @@ export default function NodeConfig() {
               <ProFormSelect
                 mode="tags"
                 name={['obproxy', 'servers']}
-                label="OBProxy 节点"
+                label={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.ObproxyNodes',
+                  defaultMessage: 'OBProxy 节点',
+                })}
                 fieldProps={{ style: { width: 504 }, maxTagCount: 3 }}
-                placeholder="请选择"
+                placeholder={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                  defaultMessage: '请选择',
+                })}
                 rules={[
-                  { required: true, message: '请选择或输入 OBProxy 节点' },
+                  {
+                    required: true,
+                    message: intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.SelectOrEnterObproxyNodes',
+                      defaultMessage: '请选择或输入 OBProxy 节点',
+                    }),
+                  },
                   {
                     validator: (_: any, value: string[]) =>
                       serversValidator(_, value, 'OBProxy'),
@@ -662,52 +916,153 @@ export default function NodeConfig() {
         ) : null}
         <ProCard
           className={styles.pageCard}
-          title="部署用户配置"
+          title={intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.DeployUserConfiguration',
+            defaultMessage: '部署用户配置',
+          })}
           bodyStyle={{ paddingBottom: '0' }}
         >
           <Space size={16}>
             <ProFormText
               name={['auth', 'user']}
-              label="用户名"
+              label={intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.Username',
+                defaultMessage: '用户名',
+              })}
               fieldProps={{ style: commonStyle }}
-              placeholder="启动用户"
+              placeholder={intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.StartUser',
+                defaultMessage: '启动用户',
+              })}
               rules={[
-                { required: true, message: '请输入用户名' },
+                {
+                  required: true,
+                  message: intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.EnterAUsername',
+                    defaultMessage: '请输入用户名',
+                  }),
+                },
                 {
                   pattern: /^([a-zA-Z0-9.]{1,20})$/,
-                  message: '仅支持英文、数字和点且长度不超过20',
+                  message: intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.OnlyEnglishNumbersAndDots',
+                    defaultMessage: '仅支持英文、数字和点且长度不超过20',
+                  }),
                 },
               ]}
             />
-            <ProFormText.Password
-              name={['auth', 'password']}
-              label={
-                <>
-                  密码
-                  <Tooltip title="密码为空时，将使用密钥登录，请勿使用带口令的密钥">
-                    <QuestionCircleOutlined className="ml-10" />
-                  </Tooltip>
-                </>
-              }
-              fieldProps={{
-                style: { width: 328 },
-                autoComplete: 'new-password',
-              }}
-              placeholder="若各节点间已完成免密配置，则密码可置空"
+
+            {locale === 'zh-CN' ? (
+              <ProFormText.Password
+                name={['auth', 'password']}
+                label={
+                  <>
+                    {intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.Password',
+                      defaultMessage: '密码',
+                    })}
+
+                    <Tooltip
+                      title={intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.IfThePasswordIsEmpty',
+                        defaultMessage:
+                          '密码为空时，将使用密钥登录，请勿使用带口令的密钥',
+                      })}
+                    >
+                      <QuestionCircleOutlined className="ml-10" />
+                    </Tooltip>
+                  </>
+                }
+                fieldProps={{
+                  style: { width: 328 },
+                  autoComplete: 'new-password',
+                }}
+                placeholder={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.IfThePasswordFreeConfiguration',
+                  defaultMessage: '若各节点间已完成免密配置，则密码可置空',
+                })}
+              />
+            ) : (
+              <Form.Item
+                name={['auth', 'password']}
+                label={
+                  <>
+                    {intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.Password',
+                      defaultMessage: '密码',
+                    })}
+
+                    <Tooltip
+                      title={intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.IfThePasswordIsEmpty',
+                        defaultMessage:
+                          '密码为空时，将使用密钥登录，请勿使用带口令的密钥',
+                      })}
+                    >
+                      <QuestionCircleOutlined className="ml-10" />
+                    </Tooltip>
+                  </>
+                }
+              >
+                <TooltipInput
+                  name="auth_password"
+                  placeholder={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.IfThePasswordFreeConfiguration',
+                    defaultMessage: '若各节点间已完成免密配置，则密码可置空',
+                  })}
+                  fieldProps={{
+                    style: { width: 328 },
+                    autoComplete: 'new-password',
+                  }}
+                  isPassword
+                />
+              </Form.Item>
+            )}
+
+            <ProFormDigit
+              name={['auth', 'port']}
+              label={intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.SshPort',
+                defaultMessage: 'SSH 端口',
+              })}
+              fieldProps={{ style: commonStyle }}
+              placeholder={intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.PleaseEnter',
+                defaultMessage: '请输入',
+              })}
+              rules={[{ validator: portValidator }]}
             />
           </Space>
         </ProCard>
         <ProCard
           className={styles.pageCard}
-          title="软件路径配置"
+          title={intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.SoftwarePathConfiguration',
+            defaultMessage: '软件路径配置',
+          })}
           bodyStyle={{ paddingBottom: '0' }}
         >
           <ProFormText
             name="home_path"
-            label="软件路径"
+            label={intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.SoftwarePath',
+              defaultMessage: '软件路径',
+            })}
             fieldProps={{ style: { width: 568 }, addonAfter: homePathSuffix }}
-            placeholder="/home/启动用户"
-            rules={[{ required: true, message: '请输入软件路径' }, pathRule]}
+            placeholder={intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.HomeStartUser',
+              defaultMessage: '/home/启动用户',
+            })}
+            rules={[
+              {
+                required: true,
+                message: intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.EnterTheSoftwarePath',
+                  defaultMessage: '请输入软件路径',
+                }),
+              },
+              pathRule,
+            ]}
           />
         </ProCard>
         <footer className={styles.pageFooterContainer}>
@@ -716,32 +1071,55 @@ export default function NodeConfig() {
               <Button
                 onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
                 data-aspm-click="c307506.d317278"
-                data-aspm-desc="节点配置-退出"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationExit',
+                  defaultMessage: '节点配置-退出',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                退出
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.Exit',
+                  defaultMessage: '退出',
+                })}
               </Button>
-              <Tooltip title="当前页面配置已保存">
+              <Tooltip
+                title={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.TheCurrentPageConfigurationHas',
+                  defaultMessage: '当前页面配置已保存',
+                })}
+              >
                 <Button
                   onClick={prevStep}
                   data-aspm-click="c307506.d317277"
-                  data-aspm-desc="节点配置-上一步"
+                  data-aspm-desc={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.NodeConfigurationPreviousStep',
+                    defaultMessage: '节点配置-上一步',
+                  })}
                   data-aspm-param={``}
                   data-aspm-expo
                 >
-                  上一步
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.PreviousStep',
+                    defaultMessage: '上一步',
+                  })}
                 </Button>
               </Tooltip>
               <Button
                 type="primary"
                 onClick={nextStep}
                 data-aspm-click="c307506.d317279"
-                data-aspm-desc="节点配置-下一步"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationNext',
+                  defaultMessage: '节点配置-下一步',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                下一步
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.NextStep',
+                  defaultMessage: '下一步',
+                })}
               </Button>
             </Space>
           </div>

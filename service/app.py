@@ -29,7 +29,7 @@ from asgi_correlation_id import CorrelationIdMiddleware
 
 from service.common import log
 from service.common.core import CoreManager
-from service.api.v1 import components, deployments, process, service_info, mirror
+from service.api.v1 import components, deployments, common, service_info, mirror
 from service.middleware.request_response_log import RequestResponseLogMiddleware
 from service.middleware.process_time import ProcessTimeMiddleware
 from service.handler import handler_utils
@@ -44,7 +44,7 @@ class OBDWeb(object):
         self.app.add_route("/metrics", metrics)
         self.app.include_router(components.router, prefix='/api/v1')
         self.app.include_router(deployments.router, prefix='/api/v1')
-        self.app.include_router(process.router, prefix='/api/v1')
+        self.app.include_router(common.router, prefix='/api/v1')
         self.app.include_router(service_info.router, prefix='/api/v1')
         self.app.include_router(mirror.router, prefix='/api/v1')
         self.app.add_middleware(ProcessTimeMiddleware)

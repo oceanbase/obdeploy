@@ -5,10 +5,15 @@ export default defineConfig({
     type: 'none',
   },
   routes: [{ path: '/', component: 'index' }],
-  title: 'OceanBase 部署',
+  title: 'OceanBase Deployer',
   fastRefresh: {},
   mfsu: {},
   favicon: '/assets/logo.png',
+  locale: {
+    default: 'zh-CN',
+    antd: false,
+    title: false,
+  },
   metas: [
     {
       'http-equiv': 'Cache-Control',
