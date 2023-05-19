@@ -75,6 +75,52 @@ class SshReturn(object):
     
     def __nonzero__(self):
         return self.__bool__()
+    
+
+class FeatureSshReturn(SshReturn, SafeStdio):
+
+    def __init__(self, popen, timeout, stdio):
+        self.popen = popen
+        self.timeout = timeout
+        self.stdio = stdio
+        self._code = None
+        self._stdout = None
+        self._stderr = None
+
+    def _get_return(self):
+        if self._code is None:
+            try:
+                p = self.popen
+                output, error = p.communicate(timeout=self.timeout)
+                self._stdout = output.decode(errors='replace')
+                self._stderr = error.decode(errors='replace')
+                self._code = p.returncode
+                verbose_msg = 'exited code %s' % self._code
+                if self._code:
+                    verbose_msg += ', error output:\n%s' % self._stderr
+                self.stdio.verbose(verbose_msg)
+            except Exception as e:
+                self._stdout = ''
+                self._stderr = str(e)
+                self._code = 255
+                verbose_msg = 'exited code 255, error output:\n%s' % self._stderr
+                self.stdio.verbose(verbose_msg)
+                self.stdio.exception('')
+    
+    @property
+    def code(self):
+        self._get_return()
+        return self._code
+
+    @property
+    def stdout(self):
+        self._get_return()
+        return self._stdout
+
+    @property
+    def stderr(self):
+        self._get_return()
+        return self._stderr
 
 
 class FutureSshReturn(SshReturn):
@@ -130,12 +176,36 @@ class ConcurrentExecutor(object):
 
 
 class LocalClient(SafeStdio):
+    
+    @staticmethod
+    def init_env(env=None):
+        if env is None:
+            return None
+        env_t = COMMAND_ENV.copy()
+        env_t.update(env)
+        return env_t
+
+    @staticmethod
+    def execute_command_background(command, env=None, timeout=None, stdio=None):
+        stdio.verbose('local background execute: %s ' % command, end='')
+        try:
+            p = Popen(command, env=LocalClient.init_env(env), shell=True, stdout=PIPE, stderr=PIPE)
+            return FeatureSshReturn(p, timeout, stdio)
+        except Exception as e:
+            output = ''
+            error = str(e)
+            code = 255
+            verbose_msg = 'exited code 255, error output:\n%s' % error
+            stdio.verbose(verbose_msg)
+            stdio.exception('')
+            return SshReturn(code, output, error)
+
 
     @staticmethod
     def execute_command(command, env=None, timeout=None, stdio=None):
         stdio.verbose('local execute: %s ' % command, end='')
         try:
-            p = Popen(command, env=env, shell=True, stdout=PIPE, stderr=PIPE)
+            p = Popen(command, env=LocalClient.init_env(env), shell=True, stdout=PIPE, stderr=PIPE)
             output, error = p.communicate(timeout=timeout)
             code = p.returncode
             output = output.decode(errors='replace')
@@ -205,6 +275,9 @@ class RemoteTransporter(enum.Enum):
 
 class SshClient(SafeStdio):
 
+    DEFAULT_PATH = '/sbin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:'
+    LOCAL_HOST = ['127.0.0.1', 'localhost', '127.1', '127.0.1']
+
     def __init__(self, config, stdio=None):
         self.config = config
         self.stdio = stdio
@@ -215,10 +288,12 @@ class SshClient(SafeStdio):
         self._remote_transporter = None
         self.task_queue = None
         self.result_queue = None
-        if self._is_local():
-            self.env = COMMAND_ENV.copy()
+        self._is_local = self.is_localhost() and self.config.username ==  getpass.getuser()
+
+        if self._is_local:
+            self.env = {}
         else:
-            self.env = {'PATH': '/sbin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:'}
+            self.env = {'PATH': self.DEFAULT_PATH}
             self._update_env()
         super(SshClient, self).__init__()
 
@@ -236,11 +311,25 @@ class SshClient(SafeStdio):
     def add_env(self, key, value, rewrite=False, stdio=None):
         if key not in self.env or not self.env[key] or rewrite:
             stdio.verbose('%s@%s set env %s to \'%s\'' % (self.config.username, self.config.host, key, value))
-            self.env[key] = value
+            if self._is_local:
+                self._add_env_for_local(key, value, rewrite)
+            else:
+                self.env[key] = value
         else:
             stdio.verbose('%s@%s append \'%s\' to %s' % (self.config.username, self.config.host, value, key))
-            self.env[key] += value
+            if self._is_local:
+                self._add_env_for_local(key, value, rewrite)
+            else:
+                self.env[key] += value
         self._update_env()
+
+    def _add_env_for_local(self, key, value, rewrite=False):
+        if rewrite:
+            self.env[key] = value
+        else:
+            if key not in self.env:
+                self.env[key] = COMMAND_ENV.get(key, '')
+            self.env[key] += value
 
     def get_env(self, key, stdio=None):
         return self.env[key] if key in self.env else None
@@ -254,11 +343,8 @@ class SshClient(SafeStdio):
     def __str__(self):
         return '%s@%s:%d' % (self.config.username, self.config.host, self.config.port)
 
-    def _is_local(self):
-        return self.is_localhost() and self.config.username ==  getpass.getuser()
-
     def is_localhost(self, stdio=None):
-        return self.config.host in ['127.0.0.1', 'localhost', '127.1', '127.0.1']
+        return self.config.host in self.LOCAL_HOST
 
     def _login(self, stdio=None):
         if self.is_connected:
@@ -299,7 +385,7 @@ class SshClient(SafeStdio):
         return False
 
     def connect(self, stdio=None):
-        if self._is_local():
+        if self._is_local:
             return True
         return self._login(stdio=stdio)
 
@@ -308,7 +394,7 @@ class SshClient(SafeStdio):
         return self.connect(stdio=stdio)
 
     def close(self, stdio=None):
-        if self._is_local():
+        if self._is_local:
             return True
         if self.is_connected:
             self.ssh_client.close()
@@ -355,8 +441,8 @@ class SshClient(SafeStdio):
             timeout = self.config.timeout
         elif timeout <= 0:
             timeout = None
-        if self._is_local():
-            return LocalClient.execute_command(command, self.env, timeout, stdio=stdio)
+        if self._is_local:
+            return LocalClient.execute_command(command, self.env if self.env else None, timeout, stdio=stdio)
 
         verbose_msg = '%s execute: %s ' % (self.config, command)
         stdio.verbose(verbose_msg, end='')
@@ -372,7 +458,7 @@ class SshClient(SafeStdio):
         if self._remote_transporter is not None:
             return self._remote_transporter
         _transporter = RemoteTransporter.CLIENT
-        if not self._is_local() and self._remote_transporter is None:
+        if not self._is_local and self._remote_transporter is None:
             if not self.config.password and not self.disable_rsync:
                 ret = LocalClient.execute_command('rsync -h', stdio=self.stdio) and self.execute_command('rsync -h', stdio=self.stdio)
                 if ret:
@@ -385,14 +471,14 @@ class SshClient(SafeStdio):
         if not os.path.isfile(local_path):
             stdio.error('path: %s is not file' % local_path)
             return False
-        if self._is_local():
+        if self._is_local:
             return LocalClient.put_file(local_path, remote_path, stdio=stdio)
         if not self._open_sftp(stdio=stdio):
             return False
         return self._put_file(local_path, remote_path, stdio=stdio)
 
     def write_file(self, content, file_path, mode='w', stdio=None):
-        if self._is_local():
+        if self._is_local:
             return LocalClient.write_file(content, file_path, mode, stdio)
         return self._write_file(content, file_path, mode, stdio)
 
@@ -458,7 +544,7 @@ class SshClient(SafeStdio):
             return False
 
     def put_dir(self, local_dir, remote_dir, stdio=None):
-        if self._is_local():
+        if self._is_local:
             return LocalClient.put_dir(local_dir, remote_dir, stdio=stdio)
         if not self._open_sftp(stdio=stdio):
             return False
@@ -514,7 +600,7 @@ class SshClient(SafeStdio):
         if os.path.exists(local_path) and not os.path.isfile(local_path):
             stdio.error('path: %s is not file' % local_path)
             return False
-        if self._is_local():
+        if self._is_local:
             return LocalClient.get_file(local_path, remote_path, stdio=stdio)
         if not self._open_sftp(stdio=stdio):
             return False
@@ -574,7 +660,7 @@ class SshClient(SafeStdio):
         if os.path.exists(local_dir) and not os.path.isdir(local_dir):
             stdio.error('%s is not directory' % local_dir)
             return False
-        if self._is_local():
+        if self._is_local:
             return LocalClient.get_dir(local_dir, remote_dir, stdio=stdio)
         if not self._open_sftp(stdio=stdio):
             return False

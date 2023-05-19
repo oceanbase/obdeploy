@@ -6,9 +6,9 @@ export default {
     res
       .status(200)
       .send({
-        code: 92,
+        code: 67,
         data: null,
-        msg: '半质他运步己很自却力效头西效。',
+        msg: '气省组人车别传正对酸半传打反委育天。',
         success: true,
       });
   },

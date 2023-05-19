@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 
-from typing import List
+from typing import Optional
 
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Path, Header
 
 from service.api.response import OBResponse, DataList
 
@@ -37,9 +37,9 @@ router = APIRouter()
             description='query component parameters',
             operation_id='queryComponentParameters',
             tags=['Components'])
-async def list_component_parameters(parameter_request: ParameterRequest = ...):
+async def list_component_parameters(parameter_request: ParameterRequest = ..., accept_language: Optional[str] = Header(None),):
     handler = handler_utils.new_component_handler()
-    parameters = handler.list_component_parameters(parameter_request)
+    parameters = handler.list_component_parameters(parameter_request, accept_language)
     return response_utils.new_ok_response(parameters)
 
 

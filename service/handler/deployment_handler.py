@@ -20,7 +20,7 @@
 import json
 import tempfile
 from collections import defaultdict
-
+from uuid import uuid1 as uuid
 from optparse import Values
 from singleton_decorator import singleton
 import yaml
@@ -37,6 +37,7 @@ from service.common import log, task, util, const
 from service.common.task import TaskStatus, TaskResult
 from service.common.task import Serial as serial
 from service.common.task import AutoRegister as auto_register
+from ssh import LocalClient
 
 
 @singleton
@@ -286,6 +287,11 @@ class DeploymentHandler(BaseHandler):
 
         log.get_logger().info("start do deploy %s", name)
         self.obd.set_options(Values())
+        trace_id = str(uuid())
+        self.context['component_trace']['deploy'] = trace_id
+        ret = self.obd.stdio.init_trace_logger(self.obd.stdio.log_path, trace_id=trace_id, recreate=True)
+        if ret is False:
+            log.get_logger().warn("component deploy log init error")
         deploy_success = self.obd.deploy_cluster(name)
         if not deploy_success:
             log.get_logger().warn("deploy %s failed", name)
@@ -300,6 +306,11 @@ class DeploymentHandler(BaseHandler):
             opt = Values()
             setattr(opt, "components", repository.name)
             self.obd.set_options(opt)
+            trace_id = str(uuid())
+            self.context['component_trace'][repository.name] = trace_id
+            ret = self.obd.stdio.init_trace_logger(self.obd.stdio.log_path, trace_id=trace_id, recreate=True)
+            if ret is False:
+                log.get_logger().warn("component: {}, start log init error".format(repository.name))
             ret = self.obd._start_cluster(self.obd.deploy, repositories)
             if not ret:
                 log.get_logger().warn("failed to start component: %s", repository.name)
@@ -319,19 +330,22 @@ class DeploymentHandler(BaseHandler):
         self.context["connection_info"][name] = connection_info_list
         deployment_report = self.get_deployment_report(name)
         self.context["deployment_report"][name] = deployment_report
+        self.obd.deploy.deploy_config.dump()
+        self.obd.set_deploy(None)
 
     def get_install_task_info(self, name):
         task_info = task.get_task_manager().get_task_info(name, task_type="install")
         if task_info is None:
             raise Exception("task {0} not found".format(name))
-        components = self.obd.deploy.deploy_config.components
+        deploy = self.get_deploy(name)
+        components = deploy.deploy_config.components
         total_count = (len(const.START_PLUGINS) + len(const.INIT_PLUGINS)) * len(components)
         finished_count = 0
         current = ""
         task_result = TaskResult.RUNNING
         info_dict = dict()
 
-        for component in self.obd.deploy.deploy_config.components:
+        for component in components:
             info_dict[component] = ComponentInfo(component=component, status=TaskStatus.PENDING,
                                                  result=TaskResult.RUNNING)
             if component in self.obd.namespaces:
@@ -343,7 +357,7 @@ class DeploymentHandler(BaseHandler):
                         if not self.obd.namespaces[component].get_return(plugin):
                             info_dict[component].result = TaskResult.FAILED
 
-        for component in self.obd.deploy.deploy_config.components:
+        for component in components:
             for plugin in const.START_PLUGINS:
                 if component not in self.obd.namespaces:
                     break
@@ -383,9 +397,7 @@ class DeploymentHandler(BaseHandler):
         if self.context["connection_info"][name] is not None:
             log.get_logger().info("get deployment {0} connection info from context".format(name))
             return self.context["connection_info"][name]
-        if name != self.obd.deploy.name:
-            raise Exception("deployment name not match, current: {0}, from param: {1}".format(self.obd.deploy.name, name))
-        deploy = self.obd.deploy_manager.get_deploy_config(name)
+        deploy = self.get_deploy(name)
         connection_info_list = list()
         task_info = self.get_install_task_info(name)
         component_info = task_info.info
@@ -405,6 +417,15 @@ class DeploymentHandler(BaseHandler):
             else:
                 log.get_logger().warn("can not get connection info for component: {0}".format(component))
         return connection_info_list
+
+    def get_deploy(self, name):
+        if self.obd.deploy is not None and self.obd.deploy.name == name:
+            deploy = self.obd.deploy
+        else:
+            deploy = self.obd.deploy_manager.get_deploy_config(name)
+        if not deploy:
+            raise Exception("no such deploy {0}".format(name))
+        return deploy
 
     @serial("precheck")
     def precheck(self, name, background_tasks):
@@ -531,10 +552,9 @@ class DeploymentHandler(BaseHandler):
         if self.context["deployment_report"][name] is not None:
             log.get_logger().info("get deployment {0} report from context".format(name))
             return self.context["deployment_report"][name]
-        if name != self.obd.deploy.name:
-            raise Exception("deployment name not match, current: {0}, from param: {1}".format(self.obd.deploy.name, name))
+        deploy = self.get_deploy(name)
         report_list = list()
-        for component, config in self.obd.deploy.deploy_config.components.items():
+        for component, config in deploy.deploy_config.components.items():
             status = TaskResult.FAILED
             if self.obd.namespaces[component].get_return("display"):
                 status = TaskResult.SUCCESSFUL
@@ -703,3 +723,12 @@ class DeploymentHandler(BaseHandler):
                 return config_dict, old_value
         return None, None
 
+    def get_install_log_by_component(self, component_name):
+        trace_id = self.context['component_trace'][component_name]
+        cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, self.obd.stdio.log_path, trace_id)
+        stdout = LocalClient.execute_command(cmd).stdout
+        if not stdout:
+            trace_id = self.context['component_trace']['deploy']
+            cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, self.obd.stdio.log_path, trace_id)
+            stdout = LocalClient.execute_command(cmd).stdout
+        return stdout

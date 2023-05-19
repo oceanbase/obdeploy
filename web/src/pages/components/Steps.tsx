@@ -1,7 +1,13 @@
+import { intl } from '@/utils/intl';
 import { useModel } from 'umi';
 import { Space } from 'antd';
 import { ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import styles from './index.less';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 import { useEffect, useState } from 'react';
 
 export default function Steps() {
@@ -22,11 +28,46 @@ export default function Steps() {
 
   const getStepsItems = () => {
     return [
-      { title: '部署配置', key: 1, icon: getIcon(1) },
-      { title: '节点配置', key: 2, icon: getIcon(2) },
-      { title: '集群配置', key: 3, icon: getIcon(3) },
-      { title: '预检查', key: 4, icon: getIcon(4) },
-      { title: '部署', key: 5, icon: getIcon(5) },
+      {
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.Steps.DeploymentConfiguration',
+          defaultMessage: '部署配置',
+        }),
+        key: 1,
+        icon: getIcon(1),
+      },
+      {
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.Steps.NodeConfiguration',
+          defaultMessage: '节点配置',
+        }),
+        key: 2,
+        icon: getIcon(2),
+      },
+      {
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.Steps.ClusterConfiguration',
+          defaultMessage: '集群配置',
+        }),
+        key: 3,
+        icon: getIcon(3),
+      },
+      {
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.Steps.PreCheck',
+          defaultMessage: '预检查',
+        }),
+        key: 4,
+        icon: getIcon(4),
+      },
+      {
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.Steps.Deployment',
+          defaultMessage: '部署',
+        }),
+        key: 5,
+        icon: getIcon(5),
+      },
     ];
   };
 
@@ -58,7 +99,7 @@ export default function Steps() {
                 style={{ width: `${(currentStep - 1) * 25}%` }}
               ></div>
             </div>
-            <Space size={100}>
+            <Space size={locale === 'zh-CN' ? 100 : 0}>
               {getStepsItems().map((item) => (
                 <span className={styles.stepItem} key={item.key}>
                   {item.icon}

@@ -28,6 +28,11 @@ export async function queryComponentByComponentName(
 
 /** List Component Parameters query component parameters POST /api/v1/components/parameters */
 export async function queryComponentParameters(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.queryComponentParametersParams & {
+    // header
+    'accept-language'?: string;
+  },
   body: API.ParameterRequest,
   options?: { [key: string]: any },
 ) {
@@ -38,6 +43,7 @@ export async function queryComponentParameters(
       headers: {
         'Content-Type': 'application/json',
       },
+      params: { ...params },
       data: body,
       ...(options || {}),
     },

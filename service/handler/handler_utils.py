@@ -20,7 +20,7 @@
 from service.handler.component_handler import ComponentHandler
 from service.handler.deployment_handler import DeploymentHandler
 from service.handler.service_info_handler import ServiceInfoHandler
-from service.handler.process_handler import ProcessHandler
+from service.handler.comment_handler import CommonHandler
 from service.handler.mirror_handler import MirrorHandler
 
 
@@ -32,8 +32,8 @@ def new_deployment_handler():
     return DeploymentHandler()
 
 
-def new_process_handler():
-    return ProcessHandler()
+def new_common_handler():
+    return CommonHandler()
 
 
 def new_service_info_handler():

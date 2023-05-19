@@ -1,0 +1,349 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: STRING
+  need_redeploy: true
+  description_en: the directory for the work data
+  description_local: OCP express server工作目录
+- name: log_dir
+  name_local: 日志目录
+  type: STRING
+  require: false
+  essential: true
+  need_redeploy: true
+  description_en: The directory for logging file. The default value is $home_path/log.
+  description_local: OCP express server日志目录， 默认为工作目录下的log
+- name: java_bin
+  name_local: java路径
+  type: STRING
+  require: true
+  essential: true
+  default: java
+  need_restart: true
+  description_en: The path of java binary
+  description_local: OCP express 使用的java可执行文件的路径
+- name: memory_size
+  name_local: 进程内存
+  require: true
+  essential: true
+  type: CAPACITY
+  min_value: 512M
+  need_restart: true
+  description_en: the memroy size of ocp express server. Please enter an capacity, such as 2G
+  description_local: OCP express server进程内存大小。请输入带容量带单位的整数，如2G
+- name: logging_file_max_size
+  name_local: 单个日志文件大小
+  type: STRING
+  require: false
+  essential: true
+  default: 100MB
+  need_restart: true
+  description_local: 单个日志文件大小
+  description_en: When logging_file_name is configured, specify the log file size through this configuration
+- name: logging_file_total_size_cap
+  name_local: 日志总大小
+  type: STRING
+  require: true
+  essential: true
+  default: 1GB
+  need_restart: true
+  description_local: 日志文件总大小
+  description_en: When logging_file_name is configured, specify the total log file size through this configuration
+- name: port
+  name_local: 端口
+  require: true
+  essential: true
+  type: INT
+  default: 8180
+  need_restart: true
+  description_en: the port of ocp server.
+  description_local: OCP server使用的端口
+- name: jdbc_url
+  require: false
+  type: STRING
+  need_redeploy: true
+  description_en: The jdbc connection url for ocp meta db
+  description_local: OCP使用的元数据库的jdbc连接串
+- name: jdbc_username
+  require: false
+  type: STRING
+  need_redeploy: true
+  description_en: The username name for ocp meta db
+  description_local: OCP使用的元数据库的用户名
+- name: jdbc_password
+  require: false
+  type: STRING
+  default:
+  need_redeploy: true
+  description_en: The password name for ocp meta db
+  description_local: OCP使用的元数据库的密码
+- name: admin_passwd
+  require: true
+  type: STRING
+  modify_limit: modify
+  default:
+  need_redeploy: true
+  description_en: The password for ocp web admin user,The password must be 8 to 32 characters in length, and must contain at least two digits, two uppercase letters, two lowercase letters, and two of the following special characters:~!@#%^&*_-+=|(){}[]:;,.?/
+  description_local: OCP登录页面的admin账户密码(密码长度8~32位，至少包含2位数字、2位大写字母、2位小写字母和2位特殊字符（~!@#%^&*_-+=|(){}[]:;,.?/）)
+# bootstrap parameters
+- name: cluster_name
+  requrire: false
+  type: STRING
+  default: obcluster
+  need_restart: true
+  description_en: The cluster name of observer
+  description_local: Oceanbase数据库的集群名称
+- name: ob_cluster_id
+  require: false
+  type: INT
+  min_value: 1
+  max_value: 4294901759
+  need_restart: true
+  description_en: ID of the cluster
+  description_local: OceanBase集群ID
+- name: root_sys_password
+  require: false
+  type: STRING
+  default:
+  need_restart: true
+  description_en: password of observer root user
+  description_local: sys租户root用户的密码
+- name: server_addresses
+  require: false
+  type: LIST
+  need_restart: true
+  description_en: the servers info for oceanbase cluster
+  description_local: Oceanbase集群的节点信息
+- name: 'session_timeout'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '登陆会话/Session超时的时间，默认是30m，最少60s。如果不加后缀单位，则默认是秒。重启生效。'
+  description_en: 'Session timeout interval, default is 30m, at least 60s. If the suffix unit is not added, the default is seconds. Restart OCP to take effect.'
+- name: 'login_encrypt_enabled'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '登录信息是否开启加密传输，默认开启，重启生效'
+  description_en: 'Switch to enable encrypted transmission of login information, enabled by default. Restart OCP to take effect.'
+- name: 'login_encrypt_public_key'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '加密登录信息的公钥，建议部署后修改此配置，修改后重启生效'
+  description_en: 'The public key for login encryption, It is recommended to modify this configuration after deployment. Restart OCP to take effect.'
+- name: 'login_encrypt_private_key'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '加密登录信息的私钥，建议部署后修改此配置，修改后重启生效'
+  description_en: 'The private key for encryption. It is recommended to modify this configuration after deployment. Restart OCP to take effect.'
+- name: 'enable_basic_auth'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '是否启用Basic Auth登陆模式，通常供程序和SDK等客户端场景使用，默认true。本配置与ocp.iam.auth可同时开启。重启生效。'
+  description_en: 'Whether to enable Basic Authentication, usually for client programs and SDKs to call server APIs. The default is true. This configuration and ocp.iam.auth can be enabled together. Restart OCP to take effect.'
+- name: 'enable_csrf'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '是否启用CSRF跨站点请求伪造安全保护，通常基于网页登陆的方式都推荐要启用，默认true。重启生效。'
+  description_en: 'Whether to enable CSRF cross-site request forgery security protection. It is recommended to enable it, the default is true. Restart OCP to take effect.'
+- name: 'vault_key'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '密码箱加密密钥'
+  description_en: 'vault secret key'
+- name: 'druid_name'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'metadb的druid连接池名称。重启生效'
+  description_en: 'metadb druid connection pool name. Restart to take effect'
+- name: 'druid_init_size'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '初始化时建立物理连接的个数。重启生效'
+  description_en: 'The number of physical connections established during initialization. Restart to take effect'
+- name: 'druid_min_idle'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '最小连接池数量。重启生效'
+  description_en: 'Minimum number of connections. Restart to take effect'
+- name: 'druid_max_active'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '最大连接池数量。重启生效'
+  description_en: 'The maximum number of connections. Restart to take effect'
+- name: 'druid_test_while_idle'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '建议配置为true，不影响性能，并且保证安全性。申请连接的时候检测。重启生效'
+  description_en: 'It is recommended to set it to true, which will not affect performance and ensure safety. Detect when applying for connection. Restart to take effect'
+- name: 'druid_validation_query'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '用来检测连接是否有效的sql。重启生效'
+  description_en: 'SQL used to detect whether the connection is valid. Restart to take effect'
+- name: 'druid_max_wait'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '获取连接时最大等待时间，单位毫秒。重启生效'
+  description_en: 'Maximum waiting time when getting a connection, in milliseconds. Restart to take effect'
+- name: 'druid_keep_alive'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '连接池中的minIdle数量以内的连接，空闲时间超过minEvictableIdleTimeMillis（缺省值1800秒），则会执行keepAlive操作。重启生效'
+  description_en: 'For connections within the number of minIdle in the connection pool, if the idle time exceeds minEvictableIdleTimeMillis (the default value is 1800 seconds), the keepAlive operation will be performed. Restart to take effect'
+- name: 'logging_pattern_console'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '用于控制台输出的日志格式'
+  description_en: 'Log format for console output'
+- name: 'logging_pattern_file'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '用于文件输出的日志格式'
+  description_en: 'Log format used for file output'
+- name: 'logging_file_clean_when_start'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '启动时删除压缩的日志文件'
+  description_en: 'Clean the archive log files on startup'
+- name: 'logging_file_max_history'
+  name_local: 日志保留天数
+  type: INT
+  require: false
+  essential: true
+  need_restart: true
+  min_value: 1
+  max_value: 2147483647
+  description_local: '最多保留的归档日志文件的天数，默认不限制'
+  description_en: 'When logging.file is configured, set the maximum of retention days the log archive log files to keep. The default value is unlimited'
+- name: 'default_timezone'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '系统默认时区，若不设置则使用 system default time zone，重启生效'
+  description_en: 'System default time zone, if not set, use system default time zone, restart to take effect'
+- name: 'default_lang'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '系统默认语言（非前端语言设置），若不设置则使用 zh-CN，重启生效'
+  description_en: 'System default language (non-front-end language setting), if not set, use zh-CN, restart to take effect'
+- name: 'ocp.idempotent.client-token.expire.time'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '幂等请求token的缓存过期时间，默认14d'
+  description_en: 'Expire time of idempotent client token, the default is 14d'
+- name: 'obsdk_sql_query_limit'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '基于 obsdk 的采集查询，SQL 查询行数限制，默认 10000'
+  description_en: 'Sql query row limit for obsdk based collect'
+- name: 'exporter_inactive_threshold'
+  type: 'INT'
+  require: false
+  need_restart: true
+  description_local: 'exporter地址判定为失效的连续不可用时间（秒）'
+  description_en: 'consecutive failure time of exporter address that is regarded as inactive (seconds)'
+- name: 'ocp.monitor.host.exporters'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '主机监控exporter'
+  description_en: 'exporters of ocp host'
+- name: 'ocp.monitor.ob.exporters'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'OB监控exporter'
+  description_en: 'exporters of ob'
+- name: 'monitor_collect_interval'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '秒级别监控采集间隔，默认 1s，支持配置选项是 1s, 5s, 10s, 15s'
+  description_en: 'The parameter determines the second-level monitoring and collection interval. The supported configuration options are 1s, 5s, 10s, 15s. Default value is 1s'
+- name: 'montior_retention_days'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '监控数据保存天数，key 是监控数据的表名，value 是保存的天数，修改后重启生效.'
+  description_en: 'Retention days for monitor data, key is table name for monitor data, value is the retention days. Restart to take effect.'
+- name: 'obsdk_cache_size'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk连接器池容量，取值范围10~200，默认值100'
+  description_en: 'Obsdk connector holder capacity, value range 10~200, default value 100'
+- name: 'obsdk_max_idle'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk空闲连接器的过期时间，单位秒，取值范围300~18000，默认值3600'
+  description_en: 'The expiration time of the obsdk idle connector, in seconds, the value range is 300~18000, and the default value is 3600'
+- name: 'obsdk_cleanup_period'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk过期连接器的清理周期，单位秒，取值范围30~1800，默认值300'
+  description_en: 'The interval for obsdk to clean up the expired connector, in seconds, the value range is 30~1800, and the default value is 300'
+- name: 'obsdk_print_sql'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk中sql打印开关，默认开启'
+  description_en: 'Sql print switch in obsdk, enabled by default'
+- name: 'obsdk_slow_query_threshold'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk中慢查询日志阈值，单位毫秒，默认值 1000'
+  description_en: 'Slow query log threshold in obsdk, in milliseconds, the default value is 1000'
+- name: 'obsdk_init_timeout'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk中连接器初始化超时时间，单位毫秒，默认值 3000'
+  description_en: 'Timeout of connector initialization in obsdk, in milliseconds, the default value is 5000'
+- name: 'obsdk_init_core_size'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk中连接器初始化的线程个数'
+  description_en: 'The thread count of connector initialization in obsdk, the default value is 16'
+- name: 'obsdk_global_timeout'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk中运维命令全局超时时间，单位毫秒，取值范围10000~7200000，默认值 300000'
+  description_en: 'Global timeout of operation in obsdk, in milliseconds, the value range is 10000~7200000, and the default value is 300000'
+- name: 'obsdk_connect_timeout'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'obsdk建立Socket连接的超时时间，单位:ms'
+  description_en: 'The timeout period for obsdk to connect to ob, unit: ms'
+- name: 'obsdk_read_timeout'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'Obsdk的Socket读取数据的超时时间，单位:ms'
+  description_en: 'Obsdk socket read data timeout time, unit: ms'

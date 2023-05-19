@@ -20,12 +20,26 @@
 
 from __future__ import absolute_import, division, print_function
 
+import hashlib
 
-def generate_config(plugin_context, generate_config_mini=False, auto_depend=False, return_generate_keys=False, *args, **kwargs):
+from tool import ConfigUtil
+
+
+def generate_config(plugin_context, generate_config_mini=False, auto_depend=False, return_generate_keys=False, only_generate_password=False, generate_password=True, *args, **kwargs):
     if return_generate_keys:
-        return plugin_context.return_true(generate_keys=['skip_proxy_sys_private_check', 'enable_strict_kernel_release', 'enable_cluster_checkout', 'proxy_mem_limited'])
+        generate_keys = []
+        if generate_password:
+            generate_keys += ['obproxy_sys_password']
+        if not only_generate_password:
+            generate_keys += ['skip_proxy_sys_private_check', 'enable_strict_kernel_release', 'enable_cluster_checkout', 'proxy_mem_limited']
+        return plugin_context.return_true(generate_keys=generate_keys)
 
     cluster_config = plugin_context.cluster_config
+    if generate_password:
+        generate_random_password(cluster_config)
+    if only_generate_password:
+        return plugin_context.return_true()
+
     stdio = plugin_context.stdio
     generate_configs = {'global': {}}
     plugin_context.set_variable('generate_configs', generate_configs)
@@ -43,7 +57,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
     if 'enable_cluster_checkout' not in global_config:
         generate_configs['global']['enable_cluster_checkout'] = False
         cluster_config.update_global_conf('enable_cluster_checkout', False, False)
-    
+
     if generate_config_mini:
         if 'proxy_mem_limited' not in global_config:
             generate_configs['global']['proxy_mem_limited'] = '500M'
@@ -57,3 +71,9 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
 
     stdio.stop_loading('succeed')
     return plugin_context.return_true()
+
+
+def generate_random_password(cluster_config):
+    global_config = cluster_config.get_original_global_conf()
+    if 'obproxy_sys_password' not in global_config:
+        cluster_config.update_global_conf('obproxy_sys_password', ConfigUtil.get_random_pwd_by_total_length())

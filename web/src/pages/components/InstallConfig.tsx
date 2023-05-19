@@ -1,3 +1,4 @@
+import { intl } from '@/utils/intl';
 import { useEffect, useState, useRef } from 'react';
 import { useModel } from 'umi';
 import {
@@ -25,11 +26,11 @@ import type { ColumnsType } from 'antd/es/table';
 import useRequest from '@/utils/useRequest';
 import { queryAllComponentVersions } from '@/services/ob-deploy-web/Components';
 import {
-  queryDeploymentInfoByTaskStatusType,
-  deleteDeployment,
+  getDeployment,
+  destroyDeployment,
 } from '@/services/ob-deploy-web/Deployments';
 import { listRemoteMirrors } from '@/services/ob-deploy-web/Mirror';
-import { handleQuit, handleResponseError, checkLowVersion } from '@/utils';
+import { handleQuit, checkLowVersion, getErrorInfo } from '@/utils';
 import NP from 'number-precision';
 import copy from 'copy-to-clipboard';
 import DeployType from './DeployType';
@@ -42,7 +43,12 @@ import {
   ocpexpressComponent,
   obagentComponent,
 } from '../constants';
-import styles from './index.less';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 interface FormValues {
   type?: string;
@@ -52,20 +58,30 @@ const appnameReg = /^[a-zA-Z]([a-zA-Z0-9]{0,19})$/;
 
 const componentsGroupInfo = [
   {
-    group: '数据库',
+    group: intl.formatMessage({
+      id: 'OBD.pages.components.InstallConfig.Database',
+      defaultMessage: '数据库',
+    }),
     key: 'database',
     content: [
       {
         key: oceanbaseComponent,
         name: 'OceanBase Database',
         onlyAll: false,
-        desc: '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
+        desc: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.ItIsAFinancialLevel',
+          defaultMessage:
+            '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
+        }),
         doc: 'https://www.oceanbase.com/docs/oceanbase-database-cn',
       },
     ],
   },
   {
-    group: '代理',
+    group: intl.formatMessage({
+      id: 'OBD.pages.components.InstallConfig.Proxy',
+      defaultMessage: '代理',
+    }),
     key: 'agency',
     onlyAll: true,
     content: [
@@ -73,28 +89,43 @@ const componentsGroupInfo = [
         key: obproxyComponent,
         name: 'OBProxy',
         onlyAll: true,
-        desc: '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
+        desc: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
+          defaultMessage:
+            '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
+        }),
         doc: 'https://www.oceanbase.com/docs/odp-enterprise-cn',
       },
     ],
   },
   {
-    group: '工具',
+    group: intl.formatMessage({
+      id: 'OBD.pages.components.InstallConfig.Tools',
+      defaultMessage: '工具',
+    }),
     key: 'tool',
     onlyAll: true,
     content: [
       {
         key: ocpexpressComponent,
-        name: 'OCPExpress',
+        name: 'OCP Express',
         onlyAll: true,
-        desc: '是专为 OceanBase 设计的管控平台，可实现对集群、租户的监控管理、诊断等核心能力。',
+        desc: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.ItIsAManagementAnd',
+          defaultMessage:
+            '是专为 OceanBase 设计的管控平台，可实现对集群、租户的监控管理、诊断等核心能力。',
+        }),
         doc: 'https://www.oceanbase.com/docs/common-oceanbase-database-cn-0000000001626262',
       },
       {
         key: obagentComponent,
         name: 'OBAgent',
         onlyAll: true,
-        desc: '是一个监控采集框架。OBAgent 支持推、拉两种数据采集模式，可以满足不同的应用场景。',
+        desc: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.IsAMonitoringAndCollection',
+          defaultMessage:
+            '是一个监控采集框架。OBAgent 支持推、拉两种数据采集模式，可以满足不同的应用场景。',
+        }),
         doc: 'https://www.oceanbase.com/docs/common-oceanbase-database-cn-10000000001576872',
       },
     ],
@@ -121,6 +152,9 @@ export default function InstallConfig() {
     handleQuitProgress,
     getInfoByName,
     setLowVersion,
+    setErrorVisible,
+    errorsList,
+    setErrorsList,
   } = useModel('global');
   const { components, home_path } = configData || {};
   const { oceanbase } = components || {};
@@ -128,6 +162,7 @@ export default function InstallConfig() {
   const [obVersionValue, setOBVersionValue] = useState<string | undefined>(
     undefined,
   );
+
   const [hasDraft, setHasDraft] = useState(false);
   const [deleteLoadingVisible, setDeleteLoadingVisible] = useState(false);
   const [deleteName, setDeleteName] = useState('');
@@ -137,25 +172,33 @@ export default function InstallConfig() {
   const [componentLoading, setComponentLoading] = useState(false);
   const draftNameRef = useRef();
 
-  const { run: fetchDeploymentInfo, loading } = useRequest(
-    queryDeploymentInfoByTaskStatusType,
-  );
-  const { run: handleDeleteDeployment } = useRequest(deleteDeployment);
+  const { run: fetchDeploymentInfo, loading } = useRequest(getDeployment, {
+    onError: (e: any) => {
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
+    },
+  });
+  const { run: handleDeleteDeployment } = useRequest(destroyDeployment, {
+    onError: (e: any) => {
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
+    },
+  });
   const { run: fetchListRemoteMirrors } = useRequest(listRemoteMirrors, {
-    skipStatusError: true,
     onSuccess: () => {
       setComponentLoading(false);
     },
-    onError: ({ response, data }: any) => {
+    onError: ({ response, data, type }: any) => {
       if (response?.status === 503) {
         setTimeout(() => {
           fetchListRemoteMirrors();
         }, 1000);
       } else {
-        if (response) {
-          const errorInfo = data?.msg || data?.detail || response?.statusText;
-          handleResponseError(errorInfo);
-        }
+        const errorInfo = getErrorInfo({ response, data, type });
+        setErrorVisible(true);
+        setErrorsList([...errorsList, errorInfo]);
         setComponentLoading(false);
       }
     },
@@ -181,7 +224,6 @@ export default function InstallConfig() {
 
   const { run: fetchAllComponentVersions, loading: versionLoading } =
     useRequest(queryAllComponentVersions, {
-      skipStatusError: true,
       onSuccess: async ({
         success,
         data,
@@ -201,6 +243,7 @@ export default function InstallConfig() {
                   setOBVersionValue(
                     `${currentSelectedVersionInfo?.version}-${currentSelectedVersionInfo?.release}-${currentSelectedVersionInfo?.md5}`,
                   );
+
                   newComponentsVersionInfo[item.name] = {
                     ...currentSelectedVersionInfo,
                     dataSource: item.info || [],
@@ -230,10 +273,12 @@ export default function InstallConfig() {
                 const mirrorName = mirrorData?.items?.map(
                   (item: API.Mirror) => item.section_name,
                 );
+
                 const noDataName = [...mirrorName, ...mirrors].filter(
                   (name) =>
                     mirrors.includes(name) && !mirrorName.includes(name),
                 );
+
                 noDataName.forEach((name) => {
                   nameList.push(name);
                 });
@@ -252,16 +297,15 @@ export default function InstallConfig() {
           }
         }
       },
-      onError: ({ response, data }: any) => {
+      onError: ({ response, data, type }: any) => {
         if (response?.status === 503) {
           setTimeout(() => {
             fetchAllComponentVersions();
           }, 1000);
         } else {
-          if (response) {
-            const errorInfo = data?.msg || data?.detail || response?.statusText;
-            handleResponseError(errorInfo);
-          }
+          const errorInfo = getErrorInfo({ response, data, type });
+          setErrorVisible(true);
+          setErrorsList([...errorsList, errorInfo]);
           setComponentLoading(false);
         }
       },
@@ -281,7 +325,12 @@ export default function InstallConfig() {
       }
       if (!appnameReg.test(value)) {
         return Promise.reject(
-          new Error('首字母英文且仅支持英文、数字，长度不超过20'),
+          new Error(
+            intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.TheInitialLetterIsEnglish',
+              defaultMessage: '首字母英文且仅支持英文、数字，长度不超过20',
+            }),
+          ),
         );
       }
       try {
@@ -291,18 +340,25 @@ export default function InstallConfig() {
             return Promise.resolve();
           }
           return Promise.reject(
-            new Error(`已存在为 ${value} 的部署名称，请指定新名称`),
+            new Error(
+              intl.formatMessage(
+                {
+                  id: 'OBD.pages.components.InstallConfig.ADeploymentNameWithValue',
+                  defaultMessage: '已存在为 {value} 的部署名称，请指定新名称',
+                },
+                { value: value },
+              ),
+            ),
           );
         }
         return Promise.resolve();
-      } catch (e: any) {
-        const { response, data } = e;
+      } catch ({ response, data, type }: any) {
         if (response?.status === 404) {
           return Promise.resolve();
         } else {
-          handleResponseError(
-            data?.msg || data?.detail || response?.statusText,
-          );
+          const errorInfo = getErrorInfo({ response, data, type });
+          setErrorVisible(true);
+          setErrorsList([...errorsList, errorInfo]);
         }
       }
     }
@@ -364,6 +420,9 @@ export default function InstallConfig() {
       });
       setCurrentStep(2);
       setIsFirstTime(false);
+      setErrorVisible(false);
+      setErrorsList([]);
+      window.scrollTo(0, 0);
     });
   };
 
@@ -414,13 +473,24 @@ export default function InstallConfig() {
               <>
                 {text}
                 {record.key === ocpexpressComponent && lowVersion ? (
-                  <Tooltip title=" OCPExpress 仅支持 4.0 及以上版本 OceanBase Database。">
+                  <Tooltip
+                    title={intl.formatMessage({
+                      id: 'OBD.pages.components.InstallConfig.OcpExpressOnlySupportsAnd',
+                      defaultMessage:
+                        'OCP Express 仅支持 4.0 及以上版本 OceanBase Database。',
+                    })}
+                  >
                     <span className={`${styles.iconContainer} warning-color`}>
                       <InfoOutlined className={styles.icon} />
                     </span>
                   </Tooltip>
                 ) : !componentsVersionInfo[record.key]?.version ? (
-                  <Tooltip title="无法获取安装包，请检查安装程序配置。">
+                  <Tooltip
+                    title={intl.formatMessage({
+                      id: 'OBD.pages.components.InstallConfig.UnableToObtainTheInstallation',
+                      defaultMessage: '无法获取安装包，请检查安装程序配置。',
+                    })}
+                  >
                     <span className={`${styles.iconContainer} error-color`}>
                       <CloseOutlined className={styles.icon} />
                     </span>
@@ -433,9 +503,12 @@ export default function InstallConfig() {
         },
       },
       {
-        title: '版本',
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.Version',
+          defaultMessage: '版本',
+        }),
         dataIndex: 'version',
-        width: 130,
+        width: locale === 'zh-CN' ? 130 : 154,
         render: (_, record) => {
           const versionInfo = componentsVersionInfo[record.key] || {};
           if (record?.key === oceanbaseComponent) {
@@ -459,15 +532,28 @@ export default function InstallConfig() {
                       {item.version}
                       {item?.release ? `-${item?.release}` : ''}
                       {item.version_type === 'ce' ? (
-                        <Tag className="default-tag ml-8">社区版</Tag>
+                        <Tag className="default-tag ml-8">
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.CommunityEdition',
+                            defaultMessage: '社区版',
+                          })}
+                        </Tag>
                       ) : (
-                        <Tag className="blue-tag ml-8">商业版</Tag>
+                        <Tag className="blue-tag ml-8">
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.CommercialEdition',
+                            defaultMessage: '商业版',
+                          })}
+                        </Tag>
                       )}
 
                       {item?.type === 'local' ? (
                         <span className={styles.localTag}>
                           <SafetyCertificateFilled />
-                          本地镜像
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.LocalImage',
+                            defaultMessage: '本地镜像',
+                          })}
                         </span>
                       ) : (
                         ''
@@ -481,7 +567,12 @@ export default function InstallConfig() {
             return versionInfo?.version ? (
               <>
                 {versionInfo?.version}
-                <Tag className="default-tag ml-8">最新</Tag>
+                <Tag className="default-tag ml-8">
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.InstallConfig.Latest',
+                    defaultMessage: '最新',
+                  })}
+                </Tag>
               </>
             ) : (
               '-'
@@ -490,7 +581,10 @@ export default function InstallConfig() {
         },
       },
       {
-        title: '描述',
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.Description',
+          defaultMessage: '描述',
+        }),
         dataIndex: 'desc',
         render: (text, record) => {
           let disabled = false;
@@ -510,19 +604,28 @@ export default function InstallConfig() {
                 }}
                 target="_blank"
               >
-                了解更多
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.LearnMore',
+                  defaultMessage: '了解更多',
+                })}
               </a>
             </>
           );
         },
       },
     ];
+
     return columns;
   };
 
   const handleCopy = (content: string) => {
     copy(content);
-    message.success('复制成功');
+    message.success(
+      intl.formatMessage({
+        id: 'OBD.pages.components.InstallConfig.CopiedSuccessfully',
+        defaultMessage: '复制成功',
+      }),
+    );
   };
 
   useEffect(() => {
@@ -536,15 +639,28 @@ export default function InstallConfig() {
             draftNameRef.current = defaultValue;
             setHasDraft(true);
             Modal.confirm({
-              title: '检测到系统中存在以下部署失败的历史配置',
-              okText: '继续部署',
-              cancelText: '忽略',
+              title: intl.formatMessage({
+                id: 'OBD.pages.components.InstallConfig.TheFollowingHistoricalConfigurationsOf',
+                defaultMessage: '检测到系统中存在以下部署失败的历史配置',
+              }),
+              okText: intl.formatMessage({
+                id: 'OBD.pages.components.InstallConfig.ContinueDeployment',
+                defaultMessage: '继续部署',
+              }),
+              cancelText: intl.formatMessage({
+                id: 'OBD.pages.components.InstallConfig.Ignore',
+                defaultMessage: '忽略',
+              }),
               closable: true,
               width: 424,
               content: (
                 <Space direction="vertical" size="middle">
                   <div style={{ color: '#5C6B8A' }}>
-                    继续部署将先清理失败的历史部署环境，是否继续历史部署流程？
+                    {intl.formatMessage({
+                      id: 'OBD.pages.components.InstallConfig.ContinuingDeploymentWillCleanUp',
+                      defaultMessage:
+                        '继续部署将先清理失败的历史部署环境，是否继续历史部署流程？',
+                    })}
                   </div>
                   <Select
                     style={commonStyle}
@@ -559,6 +675,7 @@ export default function InstallConfig() {
                   </Select>
                 </Space>
               ),
+
               onOk: () => {
                 return new Promise<void>(async (resolve) => {
                   try {
@@ -617,11 +734,19 @@ export default function InstallConfig() {
     });
   }, [configData]);
 
+  const size = NP.divide(NP.divide(installMemory, 1024), 1024).toFixed(2);
+
   return (
     <Spin spinning={loading}>
       <Space className={styles.spaceWidth} direction="vertical" size="middle">
         <ProCard className={styles.pageCard} split="horizontal">
-          <ProCard title="部署配置" className="card-padding-bottom-24">
+          <ProCard
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.DeploymentConfiguration',
+              defaultMessage: '部署配置',
+            })}
+            className="card-padding-bottom-24"
+          >
             <ProForm
               form={form}
               submitter={false}
@@ -633,28 +758,45 @@ export default function InstallConfig() {
             >
               <ProFormText
                 name="appname"
-                label="集群名称"
+                label={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.ClusterName',
+                  defaultMessage: '集群名称',
+                })}
                 fieldProps={{ style: commonStyle }}
-                placeholder="请输入集群名称"
+                placeholder={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.EnterAClusterName',
+                  defaultMessage: '请输入集群名称',
+                })}
                 validateTrigger={['onBlur', 'onChange']}
                 disabled={isDraft}
                 rules={[
                   {
                     required: true,
-                    message: '请输入集群名称',
+                    message: intl.formatMessage({
+                      id: 'OBD.pages.components.InstallConfig.EnterAClusterName',
+                      defaultMessage: '请输入集群名称',
+                    }),
                     validateTrigger: 'onChange',
                   },
                   {
                     pattern: appnameReg,
-                    message: '首字母英文且仅支持英文、数字，长度不超过20',
+                    message: intl.formatMessage({
+                      id: 'OBD.pages.components.InstallConfig.TheInitialLetterIsEnglish',
+                      defaultMessage:
+                        '首字母英文且仅支持英文、数字，长度不超过20',
+                    }),
                     validateTrigger: 'onChange',
                   },
                   { validator: nameValidator, validateTrigger: 'onBlur' },
                 ]}
               />
+
               <Form.Item
                 name="type"
-                label="部署类型"
+                label={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.DeploymentType',
+                  defaultMessage: '部署类型',
+                })}
                 className="form-item-no-bottom"
               >
                 <DeployType />
@@ -664,11 +806,20 @@ export default function InstallConfig() {
           <ProCard
             title={
               <>
-                部署组件
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.DeployComponents',
+                  defaultMessage: '部署组件',
+                })}
+
                 <span className={styles.titleExtra}>
-                  <InfoCircleOutlined /> 预计安装需要{' '}
-                  {NP.divide(NP.divide(installMemory, 1024), 1024).toFixed(2)}{' '}
-                  MB 空间
+                  <InfoCircleOutlined />{' '}
+                  {intl.formatMessage(
+                    {
+                      id: 'OBD.pages.components.InstallConfig.EstimatedInstallationRequiresSizeMb',
+                      defaultMessage: '预计安装需要 {size}MB 空间',
+                    },
+                    { size: size },
+                  )}
                 </span>
               </>
             }
@@ -684,13 +835,19 @@ export default function InstallConfig() {
                   <Alert
                     message={
                       <>
-                        如当前环境无法正常访问外网，建议使用 OceanBase
-                        离线安装包进行安装部署。
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.InstallConfig.IfTheCurrentEnvironmentCannot',
+                          defaultMessage:
+                            '如当前环境无法正常访问外网，建议使用 OceanBase 离线安装包进行安装部署。',
+                        })}
                         <a
                           href="https://open.oceanbase.com/softwareCenter/community"
                           target="_blank"
                         >
-                          前往下载离线安装
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.GoToDownloadOfflineInstallation',
+                            defaultMessage: '前往下载离线安装',
+                          })}
                         </a>
                       </>
                     }
@@ -702,13 +859,20 @@ export default function InstallConfig() {
                   <Alert
                     message={
                       <>
-                        如当前环境可正常访问外网，可启动 OceanBase
-                        在线镜像仓库，或联系您的镜像仓库管理员。
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.InstallConfig.IfTheCurrentEnvironmentHas',
+                          defaultMessage:
+                            '如当前环境可正常访问外网，可启动 OceanBase 在线镜像仓库，或联系您的镜像仓库管理员。',
+                        })}
                         <Tooltip
                           overlayClassName={styles.commandTooltip}
                           title={
                             <div>
-                              请在主机上执行一下命令启用在线镜像仓库
+                              {intl.formatMessage({
+                                id: 'OBD.pages.components.InstallConfig.RunTheCommandOnThe',
+                                defaultMessage:
+                                  '请在主机上执行一下命令启用在线镜像仓库',
+                              })}
                               <br /> obd mirror enable
                               oceanbase.community.stable
                               oceanbase.development-kit
@@ -724,7 +888,12 @@ export default function InstallConfig() {
                             </div>
                           }
                         >
-                          <a>如何启用在线镜像仓库</a>
+                          <a>
+                            {intl.formatMessage({
+                              id: 'OBD.pages.components.InstallConfig.HowToEnableOnlineImage',
+                              defaultMessage: '如何启用在线镜像仓库',
+                            })}
+                          </a>
                         </Tooltip>
                       </>
                     }
@@ -772,11 +941,17 @@ export default function InstallConfig() {
               <Button
                 onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
                 data-aspm-click="c307507.d317381"
-                data-aspm-desc="部署配置-退出"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationExit',
+                  defaultMessage: '部署配置-退出',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                退出
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.Exit',
+                  defaultMessage: '退出',
+                })}
               </Button>
               <Button
                 type="primary"
@@ -788,11 +963,17 @@ export default function InstallConfig() {
                   componentLoading
                 }
                 data-aspm-click="c307507.d317280"
-                data-aspm-desc="部署配置-下一步"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationNextStep',
+                  defaultMessage: '部署配置-下一步',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                下一步
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.NextStep',
+                  defaultMessage: '下一步',
+                })}
               </Button>
             </Space>
           </div>

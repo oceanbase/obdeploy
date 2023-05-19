@@ -150,6 +150,10 @@ obagent:
     # Monitor status for OceanBase Database.  Active is to enable. Inactive is to disable. The default value is active. When you deploy an cluster automatically, OBD decides whether to enable this parameter based on depends.
     # ob_monitor_status: active
 ocp-express:
+  depends:
+    - oceanbase-ce
+    - obproxy-ce
+    - obagent
   servers:
     - name: server1
       ip: 192.168.1.1

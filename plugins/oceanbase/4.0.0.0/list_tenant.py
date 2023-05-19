@@ -52,7 +52,6 @@ def format_size(size, precision=1):
 
 
 def list_tenant(plugin_context, cursor, *args, **kwargs):
-
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
 
@@ -65,11 +64,15 @@ def list_tenant(plugin_context, cursor, *args, **kwargs):
         return
 
     for tenant in tenants:
-        sql = "select * from oceanbase.__all_unit_config where name = '%s'"
+        select_resource_pools_sql = "select UNIT_CONFIG_ID from oceanbase.DBA_OB_RESOURCE_POOLS where TENANT_ID = {};"
         if tenant['TENANT_TYPE'] == 'META':
             continue
-        unit_name = '%s_unit' % tenant['TENANT_NAME'] if tenant['TENANT_NAME'] != 'sys' else 'sys_unit_config'
-        res = cursor.fetchone(sql % unit_name)
+        res = cursor.fetchone(select_resource_pools_sql.format(tenant['TENANT_ID']))
+        if res is False:
+            stdio.stop_loading('fail')
+            return
+        select_unit_configs_sql = "select * from oceanbase.DBA_OB_UNIT_CONFIGS where UNIT_CONFIG_ID = {};"
+        res = cursor.fetchone(select_unit_configs_sql.format(res['UNIT_CONFIG_ID']))
         if res is False:
             stdio.stop_loading('fail')
             return
@@ -78,10 +81,10 @@ def list_tenant(plugin_context, cursor, *args, **kwargs):
         stdio.print_list(tenant_infos, ['tenant_name', 'tenant_type', 'compatibility_mode', 'primary_zone', 'max_cpu',
                                         'min_cpu', 'memory_size', 'max_iops', 'min_iops', 'log_disk_size',
                                         'iops_weight'],
-                         lambda x: [x['TENANT_NAME'], x['TENANT_TYPE'], x['COMPATIBILITY_MODE'], x['PRIMARY_ZONE'],
-                                    x['max_cpu'], x['min_cpu'], format_size(x['memory_size']), x['max_iops'], x['min_iops'],
-                                    format_size(x['log_disk_size']), x['iops_weight']],
-                         title='tenant')
+            lambda x: [x['TENANT_NAME'], x['TENANT_TYPE'], x['COMPATIBILITY_MODE'], x['PRIMARY_ZONE'],
+                       x['MAX_CPU'], x['MIN_CPU'], format_size(x['MEMORY_SIZE']), x['MAX_IOPS'], x['MIN_IOPS'],
+                       format_size(x['LOG_DISK_SIZE']), x['IOPS_WEIGHT']],
+            title='tenant')
         stdio.stop_loading('succeed')
         return plugin_context.return_true()
 

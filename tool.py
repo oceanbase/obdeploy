@@ -23,6 +23,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import bz2
+import random
 import sys
 import stat
 import gzip
@@ -35,6 +36,7 @@ import hashlib
 import socket
 from io import BytesIO
 
+import string
 from ruamel.yaml import YAML, YAMLContextManager, representer
 
 from _stdio import SafeStdio
@@ -214,6 +216,33 @@ class ConfigUtil(object):
                 return return_list
         except:
             return []
+
+    @staticmethod
+    def get_random_pwd_by_total_length(pwd_length=10):
+        char = string.ascii_letters + string.digits
+        pwd = ""
+        for i in range(pwd_length):
+            pwd = pwd + random.choice(char)
+        return pwd
+
+    @staticmethod
+    def get_random_pwd_by_rule(lowercase_length=2, uppercase_length=2, digits_length=2, punctuation_length=2):
+        pwd = ""
+        for i in range(lowercase_length):
+            pwd += random.choice(string.ascii_lowercase)
+        for i in range(uppercase_length):
+            pwd += random.choice(string.ascii_uppercase)
+        for i in range(digits_length):
+            pwd += random.choice(string.digits)
+        for i in range(punctuation_length):
+            pwd += random.choice('(._+@#%)')
+        pwd_list = list(pwd)
+        random.shuffle(pwd_list)
+        return ''.join(pwd_list)
+
+    @staticmethod
+    def passwd_format(passwd):
+        return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 
 class DirectoryUtil(object):
@@ -644,3 +673,21 @@ class NetUtil(object):
         return ip
 
 COMMAND_ENV=CommandEnv()
+
+
+class TimeUtils(SafeStdio):
+
+    def parse_time_sec(time_str, stdio=None):
+        unit = time_str[-1]
+        value = int(time_str[:-1])
+        if unit == "s":
+            value *= 1
+        elif unit == "m":
+            value *= 60
+        elif unit == "h":
+            value *= 3600
+        elif unit == "d":
+            value *= 3600 * 24
+        else:
+            stdio.error('%s parse time to second fialed:' % (time_str))
+        return int(value)

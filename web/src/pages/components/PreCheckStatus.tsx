@@ -1,3 +1,4 @@
+import { intl } from '@/utils/intl';
 import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 import {
@@ -25,13 +26,18 @@ import useRequest from '@/utils/useRequest';
 import {
   preCheck,
   preCheckStatus,
-  installDeployment,
+  deployAndStartADeployment,
   createDeploymentConfig,
   recover,
 } from '@/services/ob-deploy-web/Deployments';
-import { handleQuit, handleResponseError } from '@/utils';
+import { handleQuit, getErrorInfo } from '@/utils';
 import NP from 'number-precision';
-import styles from './index.less';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 const { Text } = Typography;
 
@@ -57,6 +63,9 @@ export default function PreCheckStatus() {
     handleQuitProgress,
     getInfoByName,
     setConfigData,
+    setErrorVisible,
+    setErrorsList,
+    errorsList,
   } = useModel('global');
   const oceanbase = configData?.components?.oceanbase;
   const name = configData?.components?.oceanbase?.appname;
@@ -71,13 +80,10 @@ export default function PreCheckStatus() {
   const [isScrollFailed, setIsScrollFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkStatus, setCheckStatus] = useState(true);
-  const [lastError, setLastError] = useState('');
   const [currentPage, setCurrentPage] = useState(true);
   const [firstErrorTimestamp, setFirstErrorTimestamp] = useState<number>();
 
   const { run: fetchPreCheckStatus } = useRequest(preCheckStatus, {
-    skipStatusError: true,
-    skipTypeError: true,
     onSuccess: ({ success, data }: API.OBResponsePreCheckResult_) => {
       if (success) {
         let timer: NodeJS.Timer;
@@ -88,7 +94,15 @@ export default function PreCheckStatus() {
           }, 1000);
         }
         if (data?.status === 'FAILED') {
-          handleResponseError(data?.message);
+          let errorInfo: API.ErrorInfo = {
+            title: intl.formatMessage({
+              id: 'OBD.pages.components.PreCheckStatus.RequestError',
+              defaultMessage: '请求错误',
+            }),
+            desc: data?.message,
+          };
+          setErrorVisible(true);
+          setErrorsList([...errorsList, errorInfo]);
           setCheckStatus(false);
         } else {
           if (data?.all_passed) {
@@ -119,6 +133,7 @@ export default function PreCheckStatus() {
               const runningItemDom = document.getElementById(
                 'running-timeline-item',
               );
+
               timelineContainer.scrollTop = NP.minus(
                 NP.strip(runningItemDom?.offsetTop),
                 150,
@@ -146,19 +161,12 @@ export default function PreCheckStatus() {
     },
     onError: ({ response, data, type }: any) => {
       const handleError = () => {
-        const errorInfo =
-          data?.msg ||
-          data?.detail ||
-          response?.statusText ||
-          '您的网络发生异常，无法连接服务器';
-        const errorInfoStr = errorInfo ? JSON.stringify(errorInfo) : '';
-        if (errorInfoStr && lastError !== errorInfoStr) {
-          setLastError(errorInfoStr);
-          handleResponseError(errorInfo);
-        }
+        const errorInfo = getErrorInfo({ response, data, type });
+        setErrorVisible(true);
+        setErrorsList([...errorsList, errorInfo]);
       };
       if (response?.status === 504 || (!response && type === 'TypeError')) {
-        const nowTime = new Date().getTime();
+        const nowTime = Date.now();
         if (!firstErrorTimestamp) {
           setFirstErrorTimestamp(nowTime);
         }
@@ -189,16 +197,25 @@ export default function PreCheckStatus() {
           handleStartCheck();
         }
       },
-      onError: () => {
+      onError: (e: any) => {
         setCheckStatus(false);
         if (loading) {
           setLoading(false);
         }
+        const errorInfo = getErrorInfo(e);
+        setErrorVisible(true);
+        setErrorsList([...errorsList, errorInfo]);
       },
     },
   );
 
-  const { run: handleInstallConfirm } = useRequest(installDeployment);
+  const { run: handleInstallConfirm } = useRequest(deployAndStartADeployment, {
+    onError: (e: any) => {
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
+    },
+  });
 
   const handelCheck = async () => {
     setLoading(true);
@@ -218,11 +235,14 @@ export default function PreCheckStatus() {
         }
         setLoading(false);
       },
-      onError: () => {
+      onError: (e: any) => {
         setCheckStatus(false);
         if (loading) {
           setLoading(false);
         }
+        const errorInfo = getErrorInfo(e);
+        setErrorVisible(true);
+        setErrorsList([...errorsList, errorInfo]);
       },
     },
   );
@@ -245,7 +265,12 @@ export default function PreCheckStatus() {
       success,
     }: API.OBResponseDataListRecoverChangeParameter_) => {
       if (success) {
-        message.success('自动修复成功');
+        message.success(
+          intl.formatMessage({
+            id: 'OBD.pages.components.PreCheckStatus.AutomaticRepairSucceeded',
+            defaultMessage: '自动修复成功',
+          }),
+        );
         try {
           const { success: nameSuccess, data: nameData } = await getInfoByName({
             name,
@@ -255,15 +280,24 @@ export default function PreCheckStatus() {
             setConfigData(config || {});
             handleRetryCheck(config);
           } else {
-            message.error('获取配置信息失败');
+            message.error(
+              intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.FailedToObtainConfigurationInformation',
+                defaultMessage: '获取配置信息失败',
+              }),
+            );
           }
         } catch (e: any) {
-          const { response, data } = e;
-          handleResponseError(
-            data?.msg || data?.detail || response?.statusText,
-          );
+          const errorInfo = getErrorInfo(e);
+          setErrorVisible(true);
+          setErrorsList([...errorsList, errorInfo]);
         }
       }
+    },
+    onError: (e: any) => {
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
     },
   });
 
@@ -275,6 +309,9 @@ export default function PreCheckStatus() {
     setCheckOK(false);
     setCurrentStep(3);
     setCurrentPage(false);
+    setErrorVisible(false);
+    setErrorsList([]);
+    window.scrollTo(0, 0);
   };
 
   const handleInstall = async () => {
@@ -282,6 +319,8 @@ export default function PreCheckStatus() {
     if (success) {
       setCurrentStep(5);
       setCurrentPage(false);
+      setErrorVisible(false);
+      setErrorsList([]);
     }
   };
 
@@ -356,7 +395,8 @@ export default function PreCheckStatus() {
           failedContainer?.addEventListener(
             'DOMMouseScroll',
             handleScrollFailed,
-          ); // firefox
+          );
+          // firefox
         }
       } else {
         setTimeout(() => {
@@ -398,19 +438,41 @@ export default function PreCheckStatus() {
     </div>
   );
 
+  const checkItemLength = `${statusData?.finished || 0}/${
+    statusData?.total || 0
+  }`;
+  const failedItemLength = failedList?.length;
+
   return (
     <Space className={styles.spaceWidth} direction="vertical" size="middle">
       <ProCard
         title={
-          checkStatus ? (checkFinished ? '检查完成' : '检查中') : '检查失败'
+          checkStatus
+            ? checkFinished
+              ? intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.CheckCompleted',
+                  defaultMessage: '检查完成',
+                })
+              : intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.Checking',
+                  defaultMessage: '检查中',
+                })
+            : intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.CheckFailed',
+                defaultMessage: '检查失败',
+              })
         }
         gutter={16}
         className="card-padding-bottom-24"
       >
         <ProCard
-          title={`检查项 ${statusData?.finished || 0}/${
-            statusData?.total || 0
-          }`}
+          title={intl.formatMessage(
+            {
+              id: 'OBD.pages.components.PreCheckStatus.CheckItemCheckitemlength',
+              defaultMessage: '检查项 {checkItemLength}',
+            },
+            { checkItemLength: checkItemLength },
+          )}
           colSpan={12}
           className={`${styles.preCheckSubCard} card-padding-bottom-24 `}
           extra={
@@ -422,11 +484,17 @@ export default function PreCheckStatus() {
               }
               onClick={() => handleRetryCheck()}
               data-aspm-click="c307513.d317293"
-              data-aspm-desc="预检查结果-重新检查"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.PreCheckResultReCheck',
+                defaultMessage: '预检查结果-重新检查',
+              })}
               data-aspm-param={``}
               data-aspm-expo
             >
-              重新检查
+              {intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.ReCheck',
+                defaultMessage: '重新检查',
+              })}
             </Button>
           }
           headStyle={{ paddingLeft: '16px', paddingRight: '16px' }}
@@ -435,6 +503,7 @@ export default function PreCheckStatus() {
             spinning={loading}
             style={{ width: 400, lineHeight: '300px' }}
           />
+
           {loading ? null : (
             <>
               <Progress
@@ -489,7 +558,13 @@ export default function PreCheckStatus() {
           )}
         </ProCard>
         <ProCard
-          title={`失败项 ${failedList?.length}`}
+          title={intl.formatMessage(
+            {
+              id: 'OBD.pages.components.PreCheckStatus.FailedItemFaileditemlength',
+              defaultMessage: '失败项 {failedItemLength}',
+            },
+            { failedItemLength: failedItemLength },
+          )}
           split="horizontal"
           colSpan={12}
           className={styles.preCheckSubCard}
@@ -502,7 +577,10 @@ export default function PreCheckStatus() {
                   onChange={(e) => setOnlyManual(e.target.checked)}
                   disabled={!checkFinished || statusData?.all_passed}
                 >
-                  只看手动修复项
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.PreCheckStatus.OnlyManualFixes',
+                    defaultMessage: '只看手动修复项',
+                  })}
                 </Checkbox>
               ) : null}
               <Button
@@ -512,11 +590,17 @@ export default function PreCheckStatus() {
                 onClick={handleAutoRepair}
                 loading={recoverLoading}
                 data-aspm-click="c307513.d317292"
-                data-aspm-desc="预检查结果-自动修复"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.PreCheckResultAutomaticRepair',
+                  defaultMessage: '预检查结果-自动修复',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                自动修复
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.AutomaticRepair',
+                  defaultMessage: '自动修复',
+                })}
               </Button>
             </Space>
           }
@@ -539,7 +623,7 @@ export default function PreCheckStatus() {
                     direction="vertical"
                     key={`${item.name}_${index}`}
                   >
-                    <Text>
+                    <Text style={{ verticalAlign: 'top' }}>
                       <span
                         className={`${styles.iconContainer} ${styles.failedItemIcon} error-color mr-10 `}
                       >
@@ -556,7 +640,10 @@ export default function PreCheckStatus() {
                           className={`${styles.failedItemIcon} mr-10`}
                           style={{ color: '#8592ad', fontSize: '10px' }}
                         />
-                        原因：
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.PreCheckStatus.Reason',
+                          defaultMessage: '原因：',
+                        })}
                         <a href={errCodeUrl} target="_blank">
                           OBD-{item.code}
                         </a>{' '}
@@ -572,25 +659,37 @@ export default function PreCheckStatus() {
                           className={`${styles.failedItemIcon} mr-10`}
                           style={{ color: '#8592ad', fontSize: '10px' }}
                         />
-                        建议：
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.PreCheckStatus.Suggestions',
+                          defaultMessage: '建议：',
+                        })}
                         {item.recoverable ? (
-                          <Tag className="green-tag">自动修复</Tag>
+                          <Tag className="green-tag">
+                            {intl.formatMessage({
+                              id: 'OBD.pages.components.PreCheckStatus.AutomaticRepair',
+                              defaultMessage: '自动修复',
+                            })}
+                          </Tag>
                         ) : (
-                          <Tag className="default-tag">手动修复</Tag>
+                          <Tag className="default-tag">
+                            {intl.formatMessage({
+                              id: 'OBD.pages.components.PreCheckStatus.ManualRepair',
+                              defaultMessage: '手动修复',
+                            })}
+                          </Tag>
                         )}{' '}
                         {item.advisement?.description}
                       </Text>
                       <br />
                       <a
+                        className={styles.preCheckLearnMore}
                         href={errCodeUrl}
                         target="_blank"
-                        style={{
-                          display: 'inline-block',
-                          marginLeft: 60,
-                          marginTop: '6px',
-                        }}
                       >
-                        了解更多方案
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.PreCheckStatus.LearnMore',
+                          defaultMessage: '了解更多方案',
+                        })}
                       </a>
                     </Tooltip>
                   </Space>
@@ -605,14 +704,22 @@ export default function PreCheckStatus() {
               image="/assets/empty.png"
               style={{ marginTop: '100px' }}
               description={
-                <span style={{ color: '#8592ad' }}>太棒了！无失败项</span>
+                <span style={{ color: '#8592ad' }}>
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.PreCheckStatus.GreatNoFailedItems',
+                    defaultMessage: '太棒了！无失败项',
+                  })}
+                </span>
               }
             />
           ) : (
             <div className={styles.preLoading}>
               {shape}
               <div className={styles.desc} style={{ color: '#8592ad' }}>
-                暂未发现失败项
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.NoFailedItemsFoundYet',
+                  defaultMessage: '暂未发现失败项',
+                })}
               </div>
             </div>
           )}
@@ -628,33 +735,56 @@ export default function PreCheckStatus() {
                 (!checkFinished || recoverLoading || createLoading)
               }
               data-aspm-click="c307513.d317294"
-              data-aspm-desc="预检查结果-退出"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.PreCheckResultExit',
+                defaultMessage: '预检查结果-退出',
+              })}
               data-aspm-param={``}
               data-aspm-expo
             >
-              退出
+              {intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.Exit',
+                defaultMessage: '退出',
+              })}
             </Button>
             <Button
               onClick={prevStep}
               disabled={checkStatus && !checkFinished}
               data-aspm-click="c307513.d317291"
-              data-aspm-desc="预检查结果-上一步"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.PreCheckResultsPreviousStep',
+                defaultMessage: '预检查结果-上一步',
+              })}
               data-aspm-param={``}
               data-aspm-expo
             >
-              上一步
+              {intl.formatMessage({
+                id: 'OBD.pages.components.PreCheckStatus.PreviousStep',
+                defaultMessage: '上一步',
+              })}
             </Button>
             {!statusData?.all_passed ? (
-              <Tooltip title="请修复全部失败项">
+              <Tooltip
+                title={intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.FixAllFailedItems',
+                  defaultMessage: '请修复全部失败项',
+                })}
+              >
                 <Button
                   type="primary"
                   disabled={true}
                   data-aspm-click="c307510.d317287"
-                  data-aspm-desc="预检查失败-部署置灰"
+                  data-aspm-desc={intl.formatMessage({
+                    id: 'OBD.pages.components.PreCheckStatus.PreCheckFailedDeploymentGreyed',
+                    defaultMessage: '预检查失败-部署置灰',
+                  })}
                   data-aspm-param={``}
                   data-aspm-expo
                 >
-                  部署
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.PreCheckStatus.Deployment',
+                    defaultMessage: '部署',
+                  })}
                 </Button>
               </Tooltip>
             ) : (
@@ -662,11 +792,17 @@ export default function PreCheckStatus() {
                 type="primary"
                 onClick={handleInstall}
                 data-aspm-click="c307503.d317272"
-                data-aspm-desc="预检查成功-部署"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.PreCheckSuccessfulDeployment',
+                  defaultMessage: '预检查成功-部署',
+                })}
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                部署
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.PreCheckStatus.Deployment',
+                  defaultMessage: '部署',
+                })}
               </Button>
             )}
           </Space>

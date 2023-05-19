@@ -26,6 +26,7 @@ from math import sqrt
 
 from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED, EC_OBSERVER_GET_MEMINFO_FAIL
 import _errno as err
+from tool import ConfigUtil
 
 
 def parse_size(size):
@@ -76,12 +77,23 @@ def get_system_memory(memory_limit, min_pool_memory, generate_config_mini):
     return max(system_memory, min_pool_memory)
 
 
-def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, *args, **kwargs):
+def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
     if return_generate_keys:
-        return plugin_context.return_true(generate_keys=[
-            'memory_limit', 'datafile_size', 'log_disk_size', 'devname', 'system_memory', 'cpu_count', 'production_mode',
-            'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size'
-        ])
+        generate_keys = []
+        if not only_generate_password:
+            generate_keys += [
+                'memory_limit', 'datafile_size', 'log_disk_size', 'devname', 'system_memory', 'cpu_count', 'production_mode',
+                'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size'
+            ]
+        if generate_password:
+            generate_keys += ['root_password', 'proxyro_password', 'ocp_meta_password', 'ocp_agent_monitor_password']
+        return plugin_context.return_true(generate_keys=generate_keys)
+    
+    cluster_config = plugin_context.cluster_config
+    if generate_password:
+        generate_random_password(plugin_context, cluster_config)
+    if only_generate_password:
+        return plugin_context.return_true()
 
     def update_server_conf(server, key, value):
         if server not in generate_configs:
@@ -100,7 +112,6 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
             for key in generate_server_config:
                 cluster_config.update_server_conf(server, key, generate_server_config[key], False)
 
-    cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     success = True
@@ -482,6 +493,9 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         if generate_config_mini and 'ocp_meta_tenant_memory_size' not in global_config and 'memory_size' not in global_config.get('ocp_meta_tenant', {}):
             update_global_conf('ocp_meta_tenant_memory_size', '1536M')
 
+    if generate_password:
+        generate_random_password(plugin_context, cluster_config)
+
     if generate_consistent_config:
         generate_global_config = generate_configs['global']
         server_num = len(cluster_config.servers)
@@ -552,3 +566,16 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         return plugin_context.return_true()
 
     stdio.stop_loading('fail')
+
+
+def generate_random_password(plugin_context, cluster_config):
+    global_config = cluster_config.get_original_global_conf()
+    if 'root_password' not in global_config:
+        cluster_config.update_global_conf('root_password', ConfigUtil.get_random_pwd_by_total_length(20))
+    components_name_list = [repo.name for repo in plugin_context.repositories]
+    if 'obagent' in components_name_list and 'ocp_agent_monitor_password' not in global_config:
+        cluster_config.update_global_conf('ocp_agent_monitor_password', ConfigUtil.get_random_pwd_by_total_length())
+    if 'obproxy' in components_name_list or 'obproxy-ce' in components_name_list and 'proxyro_password' not in global_config:
+        cluster_config.update_global_conf('proxyro_password', ConfigUtil.get_random_pwd_by_total_length())
+    if 'ocp-express' in components_name_list and 'ocp_meta_password' not in global_config:
+        cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length())

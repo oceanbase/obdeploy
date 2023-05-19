@@ -24,6 +24,7 @@ from __future__ import absolute_import, division, print_function
 import re, os
 
 from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED
+from tool import ConfigUtil
 
 
 def parse_size(size):
@@ -66,13 +67,24 @@ def get_system_memory(memory_limit):
     return format_size(system_memory, 0)
 
 
-def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, *args, **kwargs):
+def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
     if return_generate_keys:
-        return plugin_context.return_true(generate_keys=[
-            'memory_limit', 'datafile_size', 'clog_disk_utilization_threshold', 'clog_disk_usage_limit_percentage',
-            'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id',
-            'devname', 'system_memory', 'cpu_count', 
-        ])
+        generate_keys = []
+        if not only_generate_password:
+            generate_keys += [
+                'memory_limit', 'datafile_size', 'clog_disk_utilization_threshold', 'clog_disk_usage_limit_percentage',
+                'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id',
+                'devname', 'system_memory', 'cpu_count'
+            ]
+        if generate_password:
+            generate_keys += ['root_password', 'proxyro_password']
+        return plugin_context.return_true(generate_keys=generate_keys)
+
+    cluster_config = plugin_context.cluster_config
+    if generate_password:
+        generate_random_password(plugin_context, cluster_config)
+    if only_generate_password:
+        return plugin_context.return_true()
 
     def update_server_conf(server, key, value):
         if server not in generate_configs:
@@ -92,7 +104,6 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
             for key in generate_server_config:
                 cluster_config.update_server_conf(server, key, generate_server_config[key], False)
 
-    cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     success = True
@@ -321,6 +332,8 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
             else:
                 datafile_size = max(5 << 30, data_dir_disk['avail'] * 0.8, 0)
                 update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
+    if generate_password:
+        generate_random_password(plugin_context, cluster_config)
 
     if generate_consistent_config:
         generate_global_config = generate_configs['global']
@@ -396,3 +409,12 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         return plugin_context.return_true()
 
     stdio.stop_loading('fail')
+
+
+def generate_random_password(plugin_context, cluster_config):
+    global_config = cluster_config.get_original_global_conf()
+    if 'root_password' not in global_config:
+        cluster_config.update_global_conf('root_password', ConfigUtil.get_random_pwd_by_total_length(20))
+    components_name_list = [repo.name for repo in plugin_context.repositories]
+    if 'obproxy' in components_name_list or 'obproxy-ce' in components_name_list and 'proxyro_password' not in global_config:
+        cluster_config.update_global_conf('proxyro_password', ConfigUtil.get_random_pwd_by_total_length())

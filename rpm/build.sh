@@ -129,7 +129,8 @@ function build()
     mkdir -p $BUILD_DIR/lib/site-packages
     mkdir -p $BUILD_DIR/mirror/remote
     wget https://mirrors.aliyun.com/oceanbase/OceanBase.repo -O $BUILD_DIR/mirror/remote/OceanBase.repo
-    cat _cmd.py | sed "s/<CID>/$CID/" | sed "s/<B_BRANCH>/$BRANCH/" | sed "s/<B_TIME>/$DATE/" | sed "s/<DEBUG>/$OBD_DUBUG/" | sed "s/<VERSION>/$VERSION/" > obd.py
+    sed -i "s/<CID>/$CID/" const.py  && sed -i "s/<B_BRANCH>/$BRANCH/" const.py  && sed -i  "s/<B_TIME>/$DATE/" const.py  && sed -i "s/<DEBUG>/$OBD_DUBUG/" const.py && sed -i "s/<VERSION>/$VERSION/" const.py
+    cp -f _cmd.py obd.py
     sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
     pip install -r $req_fn.txt || exit 1
     pip install -r plugins-$req_fn.txt --target=$BUILD_DIR/lib/site-packages || exit 1

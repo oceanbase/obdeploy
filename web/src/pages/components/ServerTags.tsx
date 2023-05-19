@@ -1,3 +1,4 @@
+import { intl } from '@/utils/intl';
 import { useEffect, useState, useRef } from 'react';
 import { Select, Tooltip, Tag } from 'antd';
 
@@ -62,6 +63,7 @@ export default ({
     const tooltipOverlay = document.querySelector(
       `.server-tooltip-overlay-${name}`,
     );
+
     if (tooltipOverlay) {
       tooltipOverlay?.addEventListener('mouseenter', onMouseEnterTooltip);
       tooltipOverlay?.addEventListener('mouseleave', onMouseLeaveTooltip);
@@ -88,6 +90,7 @@ export default ({
     const tooltipOverlay = document.querySelector(
       `.server-tooltip-overlay-${name}`,
     );
+
     const inputConatiner = document.querySelector(`.server-${name}`);
     addEventTooltipOverlay();
     addEventInputConatiner();
@@ -136,7 +139,10 @@ export default ({
         className={`server-${name}`}
         mode="tags"
         value={currentValues}
-        placeholder="点击回车可以输入多个节点"
+        placeholder={intl.formatMessage({
+          id: 'OBD.pages.components.ServerTags.ClickEnterToEnterMultiple',
+          defaultMessage: '点击回车可以输入多个节点',
+        })}
         maxTagCount={3}
         allowClear
         open={false}

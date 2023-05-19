@@ -2,10 +2,10 @@
 /* eslint-disable */
 import { request } from 'umi';
 
-/** Get Deploy Task query deployment info by task status type GET /api/v1/deployments */
-export async function queryDeploymentInfoByTaskStatusType(
+/** Get Deployments get deployment GET /api/v1/deployments */
+export async function getDeployment(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.queryDeploymentInfoByTaskStatusTypeParams,
+  params: API.getDeploymentParams,
   options?: { [key: string]: any },
 ) {
   return request<API.OBResponseDataListDeployment_>('/api/v1/deployments', {
@@ -17,7 +17,15 @@ export async function queryDeploymentInfoByTaskStatusType(
   });
 }
 
-/** Get Deployment Config query deployment config GET /api/v1/deployments/${param0} */
+/** Get Destroy Task Info get destroy task info GET /api/v1/deployments_test */
+export async function getDestroyTaskInfo_2(options?: { [key: string]: any }) {
+  return request<API.OBResponse>('/api/v1/deployments_test', {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** Get Deployment query deployment config GET /api/v1/deployments/${param0} */
 export async function queryDeploymentConfig(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: API.queryDeploymentConfigParams,
@@ -53,10 +61,10 @@ export async function createDeploymentConfig(
   });
 }
 
-/** Delete Deployment delete deployment DELETE /api/v1/deployments/${param0} */
-export async function deleteDeployment(
+/** Destroy Deployment destroy deployment DELETE /api/v1/deployments/${param0} */
+export async function destroyDeployment(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.deleteDeploymentParams,
+  params: API.destroyDeploymentParams,
   options?: { [key: string]: any },
 ) {
   const { name: param0, ...queryParams } = params;
@@ -118,10 +126,10 @@ export async function queryInstallStatus(
   );
 }
 
-/** Install install deployment POST /api/v1/deployments/${param0}/install */
-export async function installDeployment(
+/** Install deploy and start a deployment POST /api/v1/deployments/${param0}/install */
+export async function deployAndStartADeployment(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.installDeploymentParams,
+  params: API.deployAndStartADeploymentParams,
   options?: { [key: string]: any },
 ) {
   const { name: param0, ...queryParams } = params;

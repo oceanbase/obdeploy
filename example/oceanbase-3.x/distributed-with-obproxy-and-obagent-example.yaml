@@ -98,62 +98,52 @@ obagent:
   depends:
     - oceanbase-ce
   global:
-    # The working directory for obagent. obagent is started under this directory. This is a required field.
     home_path: /root/obagent
-    # The port of monitor agent. The default port number is 8088.
-    monagent_http_port: 8088
-    # The port of manager agent. The default port number is 8089.
-    mgragent_http_port: 8089
+    # The port that pulls and manages the metrics. The default port number is 8088.
+    server_port: 8088
+    # Debug port for pprof. The default port number is 8089.
+    pprof_port: 8089
     # Log path. The default value is log/monagent.log.
     log_path: log/monagent.log
-    # The log level of manager agent.
-    mgragent_log_level: info
-    # The total size of manager agent.Log size is measured in Megabytes. The default value is 30M.
-    mgragent_log_max_size: 30
-    # Expiration time for manager agent logs. The default value is 30 days.
-    mgragent_log_max_days: 30
-    # The maximum number for manager agent log files. The default value is 15.
-    mgragent_log_max_backups: 15
-    # The log level of monitor agent.
-    monagent_log_level: info
-    # The total size of monitor agent.Log size is measured in Megabytes. The default value is 200M.
-    monagent_log_max_size: 200
-    # Expiration time for monitor agent logs. The default value is 30 days.
-    monagent_log_max_days: 30
-    # The maximum number for monitor agent log files. The default value is 15.
-    monagent_log_max_backups: 15
+    # Encryption method. OBD supports aes and plain. The default value is plain.
+    crypto_method: plain
+    # Path to store the crypto key. The default value is conf/.config_secret.key.
+    # crypto_path: conf/.config_secret.key
+    # Size for a single log file. Log size is measured in Megabytes. The default value is 30M.
+    log_size: 30
+    # Expiration time for logs. The default value is 7 days.
+    log_expire_day: 7
+    # The maximum number for log files. The default value is 10.
+    log_file_count: 10
+    # Whether to use local time for log files. The default value is true.
+    # log_use_localtime: true
+    # Whether to enable log compression. The default value is true.
+    # log_compress: true
     # Username for HTTP authentication. The default value is admin.
     http_basic_auth_user: admin
     # Password for HTTP authentication. The default value is root.
     http_basic_auth_password: root
-    # Monitor password for OceanBase Database. The default value is empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the ocp_agent_monitor_password in oceanbase-ce.
-    # monitor_password:
+    # Username for debug service. The default value is admin.
+    pprof_basic_auth_user: admin
+    # Password for debug service. The default value is root.
+    pprof_basic_auth_password: root
+    # Monitor username for OceanBase Database. The user must have read access to OceanBase Database as a system tenant. The default value is root.
+    monitor_user: root
+    # Monitor password for OceanBase Database. The default value is empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the root_password in oceanbase-ce.
+    monitor_password:
     # The SQL port for observer. The default value is 2881. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the mysql_port in oceanbase-ce.
-    # sql_port: 2881
+    sql_port: 2881
     # The RPC port for observer. The default value is 2882. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the rpc_port in oceanbase-ce.
-    # rpc_port: 2882
+    rpc_port: 2882
     # Cluster name for OceanBase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the appname in oceanbase-ce.
-    # cluster_name: obcluster
+    cluster_name: obcluster
     # Cluster ID for OceanBase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the cluster_id in oceanbase-ce.
-    # cluster_id: 1
-    # The redo dir for Oceanbase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the redo_dir in oceanbase-ce.
-    # ob_log_path: /root/observer/store
-    # The data dir for Oceanbase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the data_dir in oceanbase-ce.
-    # ob_data_path: /root/observer/store
-    # The work directory for Oceanbase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the home_path in oceanbase-ce.
-    # ob_install_path: /root/observer
-    # The log path for Oceanbase Database. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the {home_path}/log in oceanbase-ce.
-    # observer_log_path: /root/observer/log
+    cluster_id: 1
     # Monitor status for OceanBase Database.  Active is to enable. Inactive is to disable. The default value is active. When you deploy an cluster automatically, OBD decides whether to enable this parameter based on depends.
     ob_monitor_status: active
-    # Synchronize the obagent-related information to the specified path of the remote host, as the targets specified by `file_sd_config` in the Prometheus configuration.
-    # For prometheus that depends on obagent, it can be specified to $home_path/targets of prometheus.
-    # For independently deployed prometheus, specify the files to be collected by setting `config` -> `scrape_configs` -> `file_sd_configs` -> `files`. For details, please refer to prometheus-only-example.yaml.
-    # target_sync_configs:
-    #   - host: 192.168.1.1
-    #     target_dir: /root/prometheus/targets
-    #     username: your username
-    #     password: your password if need
-    #     key_file: your ssh-key file path if need
-    #     port: your ssh port, default 22
-    #     timeout: ssh connection timeout (second), default 30
+    # Monitor status for your host. Active is to enable. Inactive is to disable. The default value is active.
+    host_monitor_status: active
+    # Whether to disable the basic authentication for HTTP service. True is to disable. False is to enable. The default value is false.
+    disable_http_basic_auth: false
+    # Whether to disable the basic authentication for the debug interface. True is to disable. False is to enable. The default value is false.
+    disable_pprof_basic_auth: false

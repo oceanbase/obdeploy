@@ -1,3 +1,4 @@
+import { intl } from '@/utils/intl';
 import { useState } from 'react';
 import { useModel } from 'umi';
 import { Space, Button, Table, Row, Col, Alert, Tooltip } from 'antd';
@@ -6,15 +7,20 @@ import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import useRequest from '@/utils/useRequest';
 import { createDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
-import { handleQuit } from '@/utils';
+import { handleQuit, getErrorInfo } from '@/utils';
 import {
-  componentsNameConfig,
+  componentsConfig,
   allComponentsKeys,
   onlyComponentsKeys,
   modeConfig,
   obproxyComponent,
 } from '../constants';
-import styles from './index.less';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 interface ComponentsNodeConfig {
   name: string;
   servers: string[];
@@ -30,6 +36,9 @@ export default function CheckInfo() {
     lowVersion,
     setCurrentStep,
     handleQuitProgress,
+    setErrorVisible,
+    setErrorsList,
+    errorsList,
   } = useModel('global');
   const { components = {}, auth, home_path } = configData || {};
   const {
@@ -48,11 +57,17 @@ export default function CheckInfo() {
           setCheckOK(true);
         }
       },
+      onError: (e: any) => {
+        const errorInfo = getErrorInfo(e);
+        setErrorVisible(true);
+        setErrorsList([...errorsList, errorInfo]);
+      },
     },
   );
 
   const prevStep = () => {
     setCurrentStep(3);
+    window.scrollTo(0, 0);
   };
 
   const handlePreCheck = () => {
@@ -63,7 +78,7 @@ export default function CheckInfo() {
     const componentsList: API.TableComponentInfo[] = [];
     allComponentsKeys.forEach((key) => {
       if (components?.[key]) {
-        const componentConfig = componentsNameConfig?.[key] || {};
+        const componentConfig = componentsConfig?.[key] || {};
         componentsList.push({
           ...componentConfig,
           version: components?.[key].version,
@@ -79,34 +94,41 @@ export default function CheckInfo() {
     let currentOnlyComponentsKeys = onlyComponentsKeys.filter(
       (key) => key !== 'obagent',
     );
+
     if (lowVersion) {
       currentOnlyComponentsKeys = currentOnlyComponentsKeys.filter(
         (key) => key !== 'ocpexpress',
       );
     }
+
     currentOnlyComponentsKeys.forEach((key) => {
-      if (componentsNameConfig?.[key]) {
+      if (componentsConfig?.[key]) {
         componentsNodeConfigList.push({
           key,
-          name: componentsNameConfig?.[key]?.name,
+          name: componentsConfig?.[key]?.name,
           servers: components?.[key]?.servers?.join('，'),
           isTooltip: key === obproxyComponent,
         });
       }
     });
-
     return componentsNodeConfigList;
   };
 
   const dbConfigColumns: ColumnsType<API.DBConfig> = [
     {
-      title: 'Zone 名称',
+      title: intl.formatMessage({
+        id: 'OBD.pages.components.CheckInfo.ZoneName',
+        defaultMessage: 'Zone 名称',
+      }),
       dataIndex: 'name',
       width: 200,
       render: (text) => text || '-',
     },
     {
-      title: 'OB Server 节点',
+      title: intl.formatMessage({
+        id: 'OBD.pages.components.CheckInfo.ObServerNodes',
+        defaultMessage: 'OB Server 节点',
+      }),
       dataIndex: 'servers',
       render: (text) => {
         const serversIps = text.map((item: API.OceanbaseServers) => item.ip);
@@ -119,7 +141,10 @@ export default function CheckInfo() {
       },
     },
     {
-      title: 'Root Server 节点',
+      title: intl.formatMessage({
+        id: 'OBD.pages.components.CheckInfo.RootServerNodes',
+        defaultMessage: 'Root Server 节点',
+      }),
       dataIndex: 'rootservice',
       width: 200,
       render: (text) => text || '-',
@@ -129,17 +154,29 @@ export default function CheckInfo() {
   const getMoreColumns = (label: string) => {
     const columns: ColumnsType<API.MoreParameter> = [
       {
-        title: `${label}参数名称`,
+        title: label,
         dataIndex: 'key',
         render: (text) => text,
       },
       {
-        title: '参数值',
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.ParameterValue',
+          defaultMessage: '参数值',
+        }),
         dataIndex: 'value',
-        render: (text, record) => (record.adaptive ? '自适应' : text || '-'),
+        render: (text, record) =>
+          record.adaptive
+            ? intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.Adaptive',
+                defaultMessage: '自动分配',
+              })
+            : text || '-',
       },
       {
-        title: '介绍',
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.Introduction',
+          defaultMessage: '介绍',
+        }),
         dataIndex: 'description',
         render: (text) => (
           <Tooltip title={text} placement="topLeft">
@@ -148,6 +185,7 @@ export default function CheckInfo() {
         ),
       },
     ];
+
     return columns;
   };
 
@@ -157,11 +195,25 @@ export default function CheckInfo() {
   const clusterConfigInfo = [
     {
       key: 'cluster',
-      group: '集群配置',
+      group: intl.formatMessage({
+        id: 'OBD.pages.components.CheckInfo.ClusterConfiguration',
+        defaultMessage: '集群配置',
+      }),
       content: [
-        { label: '配置模式', value: modeConfig[oceanbase?.mode] },
         {
-          label: 'root@sys 密码',
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.ConfigurationMode',
+            defaultMessage: '配置模式',
+          }),
+          colSpan: 5,
+          value: modeConfig[oceanbase?.mode],
+        },
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.RootSysPassword',
+            defaultMessage: 'root@sys 密码',
+          }),
+          colSpan: 5,
           value: (
             <Tooltip title={oceanbase?.root_password} placement="topLeft">
               <div className="ellipsis">{oceanbase?.root_password}</div>
@@ -169,7 +221,10 @@ export default function CheckInfo() {
           ),
         },
         {
-          label: '数据目录',
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.DataDirectory',
+            defaultMessage: '数据目录',
+          }),
           value: (
             <Tooltip title={oceanbase?.data_dir || initDir} placement="topLeft">
               <div className="ellipsis">{oceanbase?.data_dir || initDir}</div>
@@ -177,20 +232,38 @@ export default function CheckInfo() {
           ),
         },
         {
-          label: '日志目录',
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.LogDirectory',
+            defaultMessage: '日志目录',
+          }),
           value: (
             <Tooltip title={oceanbase?.redo_dir || initDir} placement="topLeft">
               <div className="ellipsis">{oceanbase?.redo_dir || initDir}</div>
             </Tooltip>
           ),
         },
-        { label: 'SQL 端口', value: oceanbase?.mysql_port },
-        { label: 'RPC 端口', value: oceanbase?.rpc_port },
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.SqlPort',
+            defaultMessage: 'SQL 端口',
+          }),
+          colSpan: 3,
+          value: oceanbase?.mysql_port,
+        },
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.RpcPort',
+            defaultMessage: 'RPC 端口',
+          }),
+          colSpan: 3,
+          value: oceanbase?.rpc_port,
+        },
       ],
+
       more: oceanbase?.parameters?.length
         ? [
             {
-              label: componentsNameConfig['oceanbase'].name,
+              label: componentsConfig['oceanbase'].labelName,
               parameters: oceanbase?.parameters,
             },
           ]
@@ -200,41 +273,72 @@ export default function CheckInfo() {
 
   if (currentType === 'all') {
     const content = [
-      { label: 'OBProxy 服务端口', value: obproxy?.listen_port },
       {
-        label: 'OBProxy Exporter 端口',
+        label: intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.ObproxyServicePort',
+          defaultMessage: 'OBProxy 服务端口',
+        }),
+        value: obproxy?.listen_port,
+      },
+      {
+        label: intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.PortObproxyExporter',
+          defaultMessage: 'OBProxy Exporter 端口',
+        }),
         value: obproxy?.prometheus_listen_port,
       },
-      { label: 'OBAgent 监控服务端口', value: obagent?.monagent_http_port },
-      { label: 'OBAgent 管理服务端口', value: obagent?.mgragent_http_port },
+      {
+        label: intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.ObagentMonitoringServicePort',
+          defaultMessage: 'OBAgent 监控服务端口',
+        }),
+        value: obagent?.monagent_http_port,
+      },
+      {
+        label: intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.ObagentManageServicePorts',
+          defaultMessage: 'OBAgent 管理服务端口',
+        }),
+        value: obagent?.mgragent_http_port,
+      },
     ];
 
     if (!lowVersion) {
-      content.push({ label: 'OCPExpress 端口', value: ocpexpress?.port });
+      content.push({
+        label: intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.PortOcpExpress',
+          defaultMessage: 'OCP Express 端口',
+        }),
+        value: ocpexpress?.port,
+      });
     }
 
     let more: any = [];
     if (obproxy?.parameters?.length) {
       more = [
         {
-          label: componentsNameConfig['obproxy'].name,
+          label: componentsConfig['obproxy'].labelName,
           parameters: obproxy?.parameters,
         },
         {
-          label: componentsNameConfig['obagent'].name,
+          label: componentsConfig['obagent'].labelName,
           parameters: obagent?.parameters,
         },
       ];
+
       if (!lowVersion) {
         more.push({
-          label: componentsNameConfig['ocpexpress'].name,
+          label: componentsConfig['ocpexpress'].labelName,
           parameters: ocpexpress?.parameters,
         });
       }
     }
     clusterConfigInfo.push({
       key: 'components',
-      group: '组件配置',
+      group: intl.formatMessage({
+        id: 'OBD.pages.components.CheckInfo.ComponentConfiguration',
+        defaultMessage: '组件配置',
+      }),
       content,
       more,
     });
@@ -247,26 +351,60 @@ export default function CheckInfo() {
       size="middle"
     >
       <Alert
-        message="OceanBase 安装信息配置已完成，请检查并确认以下配置信息，确定后开始预检查。"
+        message={intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.OceanbaseTheInstallationInformationConfiguration',
+          defaultMessage:
+            'OceanBase 安装信息配置已完成，请检查并确认以下配置信息，确定后开始预检查。',
+        })}
         type="info"
         showIcon
       />
+
       <ProCard className={styles.pageCard} split="horizontal">
         <Row gutter={16}>
-          <ProCard title="部署配置" className="card-padding-bottom-24">
+          <ProCard
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.DeploymentConfiguration',
+              defaultMessage: '部署配置',
+            })}
+            className="card-padding-bottom-24"
+          >
             <Col span={12}>
               <ProCard className={styles.infoSubCard} split="vertical">
-                <ProCard colSpan={10} title="部署集群名称">
+                <ProCard
+                  colSpan={10}
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.CheckInfo.DeploymentClusterName',
+                    defaultMessage: '部署集群名称',
+                  })}
+                >
                   {oceanbase?.appname}
                 </ProCard>
-                <ProCard colSpan={14} title="部署类型">
-                  {currentType === 'all' ? '完全部署' : '精简部署'}
+                <ProCard
+                  colSpan={14}
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.CheckInfo.DeploymentType',
+                    defaultMessage: '部署类型',
+                  })}
+                >
+                  {currentType === 'all'
+                    ? intl.formatMessage({
+                        id: 'OBD.pages.components.CheckInfo.FullyDeployed',
+                        defaultMessage: '完全部署',
+                      })
+                    : intl.formatMessage({
+                        id: 'OBD.pages.components.CheckInfo.ThinDeployment',
+                        defaultMessage: '精简部署',
+                      })}
                 </ProCard>
               </ProCard>
             </Col>
           </ProCard>
           <ProCard
-            title="部署组件"
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.DeployComponents',
+              defaultMessage: '部署组件',
+            })}
             className="card-header-padding-top-0 card-padding-bottom-24 "
           >
             <Row gutter={16}>
@@ -282,13 +420,31 @@ export default function CheckInfo() {
                       split="vertical"
                       key={item.key}
                     >
-                      <ProCard colSpan={10} title="组件">
+                      <ProCard
+                        colSpan={10}
+                        title={intl.formatMessage({
+                          id: 'OBD.pages.components.CheckInfo.Component',
+                          defaultMessage: '组件',
+                        })}
+                      >
                         {item?.showComponentName}
                       </ProCard>
-                      <ProCard colSpan={7} title="类型">
-                        {componentsNameConfig[item.key]?.type}
+                      <ProCard
+                        colSpan={7}
+                        title={intl.formatMessage({
+                          id: 'OBD.pages.components.CheckInfo.Type',
+                          defaultMessage: '类型',
+                        })}
+                      >
+                        {componentsConfig[item.key]?.type}
                       </ProCard>
-                      <ProCard colSpan={7} title="版本">
+                      <ProCard
+                        colSpan={7}
+                        title={intl.formatMessage({
+                          id: 'OBD.pages.components.CheckInfo.Version',
+                          defaultMessage: '版本',
+                        })}
+                      >
                         {item?.version}
                       </ProCard>
                     </ProCard>
@@ -301,7 +457,13 @@ export default function CheckInfo() {
       </ProCard>
       <ProCard className={styles.pageCard} split="horizontal">
         <Row gutter={16}>
-          <ProCard title="数据库节点配置" className="card-padding-bottom-24">
+          <ProCard
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.DatabaseNodeConfiguration',
+              defaultMessage: '数据库节点配置',
+            })}
+            className="card-padding-bottom-24"
+          >
             <ProCard
               className={styles.infoSubCard}
               style={{ border: '1px solid #e2e8f3' }}
@@ -319,7 +481,10 @@ export default function CheckInfo() {
           </ProCard>
           {currentType === 'all' ? (
             <ProCard
-              title="组件节点配置"
+              title={intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.ComponentNodeConfiguration',
+                defaultMessage: '组件节点配置',
+              })}
               className="card-header-padding-top-0 card-padding-bottom-24"
             >
               <Col span={componentsNodeConfigList?.length === 1 ? 12 : 24}>
@@ -342,13 +507,28 @@ export default function CheckInfo() {
             </ProCard>
           ) : null}
           <ProCard
-            title="部署用户配置"
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.DeployUserConfiguration',
+              defaultMessage: '部署用户配置',
+            })}
             className="card-header-padding-top-0 card-padding-bottom-24"
           >
             <Col span={12}>
               <ProCard className={styles.infoSubCard} split="vertical">
-                <ProCard title="用户名">{auth?.user}</ProCard>
-                <ProCard title="密码">
+                <ProCard
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.CheckInfo.Username',
+                    defaultMessage: '用户名',
+                  })}
+                >
+                  {auth?.user}
+                </ProCard>
+                <ProCard
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.CheckInfo.Password',
+                    defaultMessage: '密码',
+                  })}
+                >
                   {auth?.password ? (
                     <div style={{ position: 'relative' }}>
                       {showPwd ? (
@@ -384,12 +564,20 @@ export default function CheckInfo() {
             </Col>
           </ProCard>
           <ProCard
-            title="软件路径配置"
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.SoftwarePathConfiguration',
+              defaultMessage: '软件路径配置',
+            })}
             className="card-header-padding-top-0 card-padding-bottom-24"
           >
             <Col span={12}>
               <ProCard className={styles.infoSubCard} split="vertical">
-                <ProCard title="软件路径">
+                <ProCard
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.CheckInfo.SoftwarePath',
+                    defaultMessage: '软件路径',
+                  })}
+                >
                   <Tooltip title={home_path} placement="topLeft">
                     {home_path}
                   </Tooltip>
@@ -414,7 +602,11 @@ export default function CheckInfo() {
               <Col span={24}>
                 <ProCard className={styles.infoSubCard} split="vertical">
                   {item.content.map((subItem) => (
-                    <ProCard title={subItem.label} key={subItem.label}>
+                    <ProCard
+                      title={subItem.label}
+                      key={subItem.label}
+                      colSpan={subItem.colSpan}
+                    >
                       {subItem.value}
                     </ProCard>
                   ))}
@@ -455,31 +647,49 @@ export default function CheckInfo() {
             <Button
               onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
               data-aspm-click="c307504.d317275"
-              data-aspm-desc="预检查-退出"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.PreCheckExit',
+                defaultMessage: '预检查-退出',
+              })}
               data-aspm-param={``}
               data-aspm-expo
             >
-              退出
+              {intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.Exit',
+                defaultMessage: '退出',
+              })}
             </Button>
             <Button
               onClick={prevStep}
               data-aspm-click="c307504.d317274"
-              data-aspm-desc="预检查-上一步"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.PreCheckPreviousStep',
+                defaultMessage: '预检查-上一步',
+              })}
               data-aspm-param={``}
               data-aspm-expo
             >
-              上一步
+              {intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.PreviousStep',
+                defaultMessage: '上一步',
+              })}
             </Button>
             <Button
               type="primary"
               onClick={handlePreCheck}
               loading={loading}
               data-aspm-click="c307504.d317273"
-              data-aspm-desc="预检查-预检查"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.PreCheck',
+                defaultMessage: '预检查-预检查',
+              })}
               data-aspm-param={``}
               data-aspm-expo
             >
-              预检查
+              {intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.PreCheck.1',
+                defaultMessage: '预检查',
+              })}
             </Button>
           </Space>
         </div>

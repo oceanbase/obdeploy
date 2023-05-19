@@ -20,12 +20,24 @@
 
 from __future__ import absolute_import, division, print_function
 
+from tool import ConfigUtil
 
-def generate_config(plugin_context, auto_depend=False, return_generate_keys=False, *args, **kwargs):
+
+def generate_config(plugin_context, auto_depend=False, return_generate_keys=False, only_generate_password=False, generate_password=True, *args, **kwargs):
     if return_generate_keys:
-        return plugin_context.return_true(generate_keys=['ob_monitor_status'])
+        generate_keys = []
+        if generate_password:
+            generate_keys += ['http_basic_auth_password']
+        if not only_generate_password:
+            generate_keys += ['ob_monitor_status']
+        return plugin_context.return_true(generate_keys=generate_keys)
 
     cluster_config = plugin_context.cluster_config
+    if generate_password:
+        generate_random_password(cluster_config)
+    if only_generate_password:
+        return plugin_context.return_true()
+
     stdio = plugin_context.stdio
     have_depend = False
     depends = ['oceanbase', 'oceanbase-ce']
@@ -63,3 +75,9 @@ def generate_config(plugin_context, auto_depend=False, return_generate_keys=Fals
 
     stdio.stop_loading('succeed')
     plugin_context.return_true()
+
+
+def generate_random_password(cluster_config):
+    global_config = cluster_config.get_original_global_conf()
+    if 'http_basic_auth_password' not in global_config:
+        cluster_config.update_global_conf('http_basic_auth_password', ConfigUtil.get_random_pwd_by_total_length())

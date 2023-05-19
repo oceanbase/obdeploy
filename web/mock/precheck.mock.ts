@@ -6,9 +6,9 @@ export default {
     res
       .status(200)
       .send({
-        code: 88,
+        code: 63,
         data: null,
-        msg: '主四路复离些收素志标算才价具。',
+        msg: '局风厂很物类面还队张土将。',
         success: true,
       });
   },

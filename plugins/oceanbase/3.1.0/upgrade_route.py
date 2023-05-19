@@ -173,7 +173,7 @@ def upgrade_route(plugin_context, current_repository, dest_repository, *args, **
     stdio = plugin_context.stdio
     repository_dir = dest_repository.repository_dir
 
-    if dest_repository.version >= Version("4.1"):
+    if dest_repository.version > Version("4.1.0.0"):
         stdio.error('upgrade observer to version {} is not support, please upgrade obd first.'.format(dest_repository.version))
         return
 

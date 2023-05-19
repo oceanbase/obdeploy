@@ -36,3 +36,4 @@ tags
 /web/src/.umi-production
 /web/src/.umi-test
 /web/.env.local
+/web/.must.config.js

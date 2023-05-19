@@ -1,3 +1,4 @@
+import { intl } from '@/utils/intl';
 import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 import { ProCard } from '@ant-design/pro-components';
@@ -6,98 +7,113 @@ import {
   queryInstallStatus,
   queryInstallLog,
 } from '@/services/ob-deploy-web/Deployments';
-import { handleResponseError } from '@/utils';
+import { getErrorInfo } from '@/utils';
 import lottie from 'lottie-web';
 import NP from 'number-precision';
-import styles from './index.less';
+import videojs from 'video.js';
+import 'video.js/dist/video-js.css';
+import { getLocale } from 'umi';
+import EnStyles from './indexEn.less';
+import ZhStyles from './indexZh.less';
+
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 let timerLogScroll: NodeJS.Timer;
 let timerProgress: NodeJS.Timer;
 
 export default function InstallProcess() {
-  const { setCurrentStep, configData, installStatus, setInstallStatus } =
-    useModel('global');
+  const {
+    setCurrentStep,
+    configData,
+    installStatus,
+    setInstallStatus,
+    setErrorVisible,
+    setErrorsList,
+    errorsList,
+  } = useModel('global');
   const name = configData?.components?.oceanbase?.appname;
+  const progressCoverInitWidth = 282;
   const [toBottom, setToBottom] = useState(true);
   const [progress, setProgress] = useState(0);
   const [showProgress, setShowProgress] = useState(0);
-  const [lottieProgress, setlottieProgress] = useState();
-  const [lastError, setLastError] = useState('');
+  const [progressCoverStyle, setProgreddCoverStyle] = useState({
+    width: progressCoverInitWidth,
+    background: '#fff',
+    borderRadius: '5px',
+  });
   const [currentPage, setCurrentPage] = useState(true);
+  const [statusData, setStatusData] = useState<API.TaskInfo>({});
+  const [logData, setLogData] = useState<API.InstallLog>({});
+  let Video: any;
 
-  const { run: fetchInstallStatus, data: statusData } = useRequest(
-    queryInstallStatus,
-    {
-      skipStatusError: true,
-      onSuccess: ({ success, data }: API.OBResponseTaskInfo_) => {
-        if (success) {
-          clearInterval(timerProgress);
-          if (data?.status !== 'RUNNING') {
-            setInstallStatus(data?.status);
-            setCurrentPage(false);
-            setTimeout(() => {
-              setCurrentStep(6);
-            }, 2000);
-          } else {
-            setTimeout(() => {
-              fetchInstallStatus({ name });
-            }, 1000);
-          }
-          const newProgress = NP.divide(data?.finished, data?.total).toFixed(2);
-          setProgress(newProgress);
-          let step = NP.minus(newProgress, progress);
-          let stepNum = 1;
-          timerProgress = setInterval(() => {
-            const currentProgressNumber = NP.plus(
-              progress,
-              NP.times(NP.divide(step, 100), stepNum),
-            );
-            if (currentProgressNumber >= 1) {
-              clearInterval(timerProgress);
-            } else {
-              stepNum += 1;
-              setShowProgress(currentProgressNumber);
-            }
-          }, 10);
-        }
-      },
-      onError: ({ response, data }: any) => {
-        if (currentPage) {
+  const { run: fetchInstallStatus } = useRequest(queryInstallStatus, {
+    onSuccess: ({ success, data }: API.OBResponseTaskInfo_) => {
+      if (success) {
+        setStatusData(data || {});
+        clearInterval(timerProgress);
+        if (data?.status !== 'RUNNING') {
+          setInstallStatus(data?.status);
+          setCurrentPage(false);
+          setTimeout(() => {
+            setCurrentStep(6);
+            setErrorVisible(false);
+            setErrorsList([]);
+          }, 2000);
+        } else {
           setTimeout(() => {
             fetchInstallStatus({ name });
           }, 1000);
         }
-        const errorInfo = data?.msg || data?.detail || response?.statusText;
-        const errorInfoStr = errorInfo ? JSON.stringify(errorInfo) : '';
-        if (errorInfo && lastError !== errorInfoStr) {
-          setLastError(errorInfoStr);
-          handleResponseError(errorInfo);
-        }
-      },
-    },
-  );
+        const newProgress = NP.divide(data?.finished, data?.total).toFixed(2);
+        setProgress(newProgress);
+        let step = NP.minus(newProgress, progress);
+        let stepNum = 1;
+        timerProgress = setInterval(() => {
+          const currentProgressNumber = NP.plus(
+            progress,
+            NP.times(NP.divide(step, 100), stepNum),
+          );
 
-  const { run: handleInstallLog, data: logData } = useRequest(queryInstallLog, {
-    skipStatusError: true,
-    onSuccess: ({ success }: API.OBResponseInstallLog_) => {
+          if (currentProgressNumber >= 1) {
+            clearInterval(timerProgress);
+          } else {
+            stepNum += 1;
+            setShowProgress(currentProgressNumber);
+          }
+        }, 10);
+      }
+    },
+    onError: (e: any) => {
+      if (currentPage) {
+        setTimeout(() => {
+          fetchInstallStatus({ name });
+        }, 1000);
+      }
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
+    },
+  });
+
+  const { run: handleInstallLog } = useRequest(queryInstallLog, {
+    onSuccess: ({ success, data }: API.OBResponseInstallLog_) => {
       if (success && installStatus === 'RUNNING') {
+        setLogData(data || {});
         setTimeout(() => {
           handleInstallLog({ name });
         }, 1000);
       }
     },
-    onError: ({ response, data }: any) => {
+    onError: (e: any) => {
       if (installStatus === 'RUNNING' && currentPage) {
         setTimeout(() => {
           handleInstallLog({ name });
         }, 1000);
       }
-      const errorInfo = data?.msg || data?.detail || response?.statusText;
-      const errorInfoStr = errorInfo ? JSON.stringify(errorInfo) : '';
-      if (errorInfoStr && lastError !== errorInfoStr) {
-        setLastError(errorInfoStr);
-        handleResponseError(errorInfo);
-      }
+      const errorInfo = getErrorInfo(e);
+      setErrorVisible(true);
+      setErrorsList([...errorsList, errorInfo]);
     },
   });
 
@@ -124,6 +140,15 @@ export default function InstallProcess() {
     const spacemanAnimate = document.querySelector('.spaceman-animate');
     const sqlAnimate = document.querySelector('.database-animate');
 
+    if (progressAnimate) {
+      Video = videojs(progressAnimate, {
+        controls: false,
+        autoplay: true,
+        loop: true,
+        preload: 'auto',
+      });
+    }
+
     lottie.loadAnimation({
       prefetch: true,
       container: computerAnimate,
@@ -133,17 +158,6 @@ export default function InstallProcess() {
       path: '/assets/computer/data.json',
     });
 
-    setlottieProgress(
-      lottie.loadAnimation({
-        prefetch: true,
-        container: progressAnimate,
-        renderer: 'svg',
-        loop: false,
-        autoplay: false,
-        path: '/assets/progress/data.json',
-      }),
-    );
-
     lottie.loadAnimation({
       prefetch: true,
       container: spacemanAnimate,
@@ -152,6 +166,7 @@ export default function InstallProcess() {
       autoplay: true,
       path: '/assets/spaceman/data.json',
     });
+
     lottie.loadAnimation({
       prefetch: true,
       container: sqlAnimate,
@@ -177,6 +192,7 @@ export default function InstallProcess() {
       log.removeEventListener('DOMMouseScroll', handleScroll);
       clearInterval(timerLogScroll);
       clearInterval(timerProgress);
+      Video.dispose();
     };
   }, []);
 
@@ -190,29 +206,61 @@ export default function InstallProcess() {
   }, [toBottom]);
 
   useEffect(() => {
-    if (lottieProgress) {
-      lottieProgress.goToAndStop(
-        NP.times(showProgress, lottieProgress.totalFrames - 1),
-        true,
-      );
+    let newCoverStyle: any = { ...progressCoverStyle };
+    const newCoverWidth = NP.times(
+      NP.minus(1, showProgress),
+      progressCoverInitWidth,
+    );
+
+    if (showProgress > 0) {
+      newCoverStyle = {
+        width: `${newCoverWidth}px`,
+        background:
+          'linear-gradient( to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 1) 10px, rgba(255, 255, 255, 1) )',
+      };
     }
-  }, [lottieProgress, showProgress]);
+    setProgreddCoverStyle(newCoverStyle);
+  }, [showProgress]);
+
+  const getText = (name?: string) => {
+    return intl.formatMessage(
+      {
+        id: 'OBD.pages.components.InstallProcess.DeployingName',
+        defaultMessage: '正在部署 {name}',
+      },
+      { name: name },
+    );
+  };
 
   return (
     <ProCard direction="column" className="card-padding-bottom-24">
       <ProCard>
         <div className={styles.progressEffectContainer}>
+          <div className={styles.deployTitle}>
+            {intl.formatMessage({
+              id: 'OBD.pages.components.InstallProcess.Deploying',
+              defaultMessage: '部署中...',
+            })}
+          </div>
           <div className={styles.computer}>
             <div
-              className={`computer-animate ${styles.computerAnimate}`}
+              className={`computer-animate ${styles.computerAnimate} `}
               data-anim-path="/assets/computer/data.json"
             ></div>
           </div>
           <div className={styles.progress}>
+            <video
+              className={`${styles.progressVedio} progress-animate video-js`}
+              muted
+            >
+              <source src="/assets/progress/data.mp4" type="video/mp4"></source>
+            </video>
             <div
-              className={`progress-animate ${styles.progressAnimate}`}
-              data-anim-path="/assets/progress/data.json"
-            ></div>
+              className={styles.progressCover}
+              style={{ ...progressCoverStyle }}
+            >
+              <div className={styles.progressStart}></div>
+            </div>
           </div>
           <div className={styles.spaceman}>
             <div
@@ -230,14 +278,23 @@ export default function InstallProcess() {
         <span
           className={styles.deploymentName}
           data-aspm-click="c307512.d317290"
-          data-aspm-desc="部署中-正在部署"
+          data-aspm-desc={intl.formatMessage({
+            id: 'OBD.pages.components.InstallProcess.DeployingDeploying',
+            defaultMessage: '部署中-正在部署',
+          })}
           data-aspm-param={``}
           data-aspm-expo
         >
-          正在部署 {statusData?.current}
+          {getText(statusData?.current)}
         </span>
       </ProCard>
-      <ProCard title="部署日志" className={styles.installSubCard}>
+      <ProCard
+        title={intl.formatMessage({
+          id: 'OBD.pages.components.InstallProcess.DeploymentLogs',
+          defaultMessage: '部署日志',
+        })}
+        className={styles.installSubCard}
+      >
         <pre className={styles.installLog} id="installLog">
           {logData?.log}
           {installStatus === 'RUNNING' ? (

@@ -134,12 +134,13 @@ async def get_connect_info(name: str = Path(description='deployment name')):
             operation_id='queryInstallLog',
             tags=['Deployments'])
 async def get_install_log(name: str = Path(description='deployment name'),
-                          offset: int = Query(None, description='log offset')):
+                          offset: int = Query(None, description='log offset'),
+                          component_name: str = Query(None, description='component name')):
     handler = handler_utils.new_deployment_handler()
     task_info = handler.get_install_task_info(name)
     if task_info is None:
         return response_utils.new_not_found_exception("task {0} not found".format(name))
-    log_content = handler.buffer.read()
+    log_content = handler.buffer.read() if component_name is None else handler.get_install_log_by_component(component_name)
     log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
     return response_utils.new_ok_response(log_info)
 

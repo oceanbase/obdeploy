@@ -30,7 +30,7 @@ from collections import defaultdict
 from _rpm import Version
 from service.common import const
 
-def map_to_config_parameter(param):
+def map_to_config_parameter(param, is_cn):
     log.get_logger().info("param {0} type: {1}".format(param.name, param._param_type.__name__))
     config_parameter = ConfigParameter()
     config_parameter.auto = False
@@ -46,7 +46,7 @@ def map_to_config_parameter(param):
     config_parameter.need_redeploy = param.need_redeploy
     config_parameter.need_reload = param.need_reload
     config_parameter.section = param.section
-    config_parameter.description = param.description_local if param.description_local else param.description_en
+    config_parameter.description = param.description_local if is_cn else param.description_en
     return config_parameter
 
 @singleton
@@ -138,7 +138,7 @@ class ComponentHandler(BaseHandler):
         return component
 
 
-    def list_component_parameters(self, parameter_request):
+    def list_component_parameters(self, parameter_request, accept_language):
         parameter_metas = list()
         for parameter_filter in parameter_request.filters:
             name=uuid.uuid4().hex
@@ -170,8 +170,9 @@ class ComponentHandler(BaseHandler):
             parameter_plugin = self.obd.plugin_manager.get_best_plugin(PluginType.PARAM, parameter_filter.component, parameter_filter.version)
             ## use plugin.params to generate parameter meta
             config_parameters = list()
+            is_cn = 'zh-CN' in accept_language
             for param in parameter_plugin.params.values():
-                config_parameter = map_to_config_parameter(param)
+                config_parameter = map_to_config_parameter(param, is_cn)
                 if config_parameter.name in auto_keys:
                     config_parameter.auto = True
                 if config_parameter.is_essential or not parameter_filter.is_essential_only:
