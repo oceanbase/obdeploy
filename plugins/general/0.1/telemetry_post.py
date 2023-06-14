@@ -20,20 +20,25 @@
 
 from __future__ import absolute_import, division, print_function
 
+import json
 import requests
 
 from const import TELEMETRY_URL
 from tool import timeout
 
 
-def telemetry_post(plugin_context, *args, **kwargs):
+def telemetry_post(plugin_context, telemetry_post_data={}, *args, **kwargs):
     stdio = plugin_context.stdio
-    data = kwargs.get('data', {})
-    if data:
+    if telemetry_post_data:
+        data = json.dumps(telemetry_post_data, indent=4)
         stdio.verbose('post data: %s' % data)
-        with timeout(30):
-            requests.post(url=TELEMETRY_URL, data=data)
+        try:
+            with timeout(30):
+                requests.post(url=TELEMETRY_URL, data=json.dumps({'content': data}), headers={'sig': 'dbe97393a695335d67de91dd4049ba', 'Content-Type': 'application/json'})
             return plugin_context.return_true()
+        except:
+            stdio.exception('post data failed')
+            return plugin_context.return_false()
     else:
         stdio.verbose('noting to post')
         return plugin_context.return_false()

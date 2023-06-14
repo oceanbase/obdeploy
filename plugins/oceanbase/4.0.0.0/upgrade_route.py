@@ -156,31 +156,45 @@ class ObVersionGraph(object):
             i += 1
         if len(res) == 1:
             res.insert(0, start_node)
-        if res and res[-1].deprecated:
+        if len(res) > 0 and res[-1].deprecated:
             raise Exception('upgrade destination version:{}{} is deprecated, not support upgrade.'.format(res[-1].version, '-{}'.format(res[-1].release) if res[-1].release else ''))
         return format_route(res)
 
 
 def format_route(routes):
     route_res = []
-    for node in routes:
+    for i, node in enumerate(routes):
         require_from_binary = getattr(node, 'require_from_binary', False)
-        if node.when_come_from:
+        if getattr(node, 'when_come_from', False):
             require_from_binary = require_from_binary and routes[0].version in node.when_come_from
+
         route_res.append({
-            'version': node.version,
-            'release': None if node.release == VersionNode.RELEASE_NULL else node.release,
-            'direct_upgrade': getattr(node, 'direct_upgrade', False),
-            'require_from_binary': require_from_binary
-        })
-    return route_res
+                'version': node.version,
+                'release': None if node.release == VersionNode.RELEASE_NULL else node.release,
+                'direct_upgrade': getattr(node, 'direct_upgrade', False),
+                'require_from_binary': require_from_binary
+            })
+
+    first_result = []
+    second_result = [route_res[-1]]
+    for j in range(len(route_res[1:-1]), 0, -1):
+        if route_res[j].get('version') < '4.1.0.0':
+            if route_res[j].get('require_from_binary'):
+                first_result = route_res[1: j + 1]
+                break
+        elif route_res[j].get('require_from_binary'):
+            second_result.insert(0, route_res[j])
+
+    first_result.insert(0, route_res[0])
+    return first_result + second_result
+
 
 
 def upgrade_route(plugin_context, current_repository, dest_repository, *args, **kwargs):
     stdio = plugin_context.stdio
     repository_dir = dest_repository.repository_dir
 
-    if dest_repository.version > Version("4.1.0.0"):
+    if dest_repository.version >= Version("4.2"):
         stdio.error('upgrade observer to version {} is not support, please upgrade obd first.'.format(dest_repository.version))
         return
 

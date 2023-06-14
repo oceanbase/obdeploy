@@ -21,7 +21,8 @@
 OB_OFFICIAL_WEBSITE = 'https://www.oceanbase.com/'
 
 # post telemetry data to OceanBase official
-TELEMETRY_URL = 'http://openwebapi.dev.alipay.net/api/web/oceanbase/report'
+TELEMETRY_WEBSITE = '<TELEMETRY_WEBSITE>'
+TELEMETRY_URL = '{}/api/web/oceanbase/report'.format(TELEMETRY_WEBSITE if TELEMETRY_WEBSITE else 'https://openwebapi.oceanbase.com')
 
 # obdeploy version
 VERSION = '<VERSION>'

@@ -55,7 +55,6 @@ body,
         td,
         th {
           padding: 12px 16px;
-          // 弱化列标题字体
           color: #5c6b8a;
           font-weight: normal;
           font-size: 14px;
@@ -68,13 +67,10 @@ body,
       tr {
         td {
           padding: 12px 16px;
-          // 去掉表格边框
           border: none;
-          // 去掉 hover 时的背景圆角
           border-radius: 0;
         }
       }
-      // 斑马纹样式
       tr:nth-child(2n + 1):not(.ant-table-placeholder) {
         td {
           background-color: @colorBgContainer;
@@ -85,7 +81,6 @@ body,
           background-color: @colorFillQuaternary;
         }
       }
-      // 伪类选择器样式优先级: hover < nth-child，因此需要将 hover 样式写到后面
       tr:not(.ant-table-placeholder):hover {
         td {
           background-color: @colorPrimaryBgHover;
@@ -177,7 +172,6 @@ body,
       border-radius: 8px;
     }
 
-    // 嵌套表格样式
     .ant-table-tbody > tr > td > .ant-table-wrapper:only-child .ant-table,
     .ant-table.ant-table-middle
       .ant-table-tbody

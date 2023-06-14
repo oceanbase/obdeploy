@@ -27,6 +27,7 @@ from copy import deepcopy
 
 import bcrypt
 
+from _errno import EC_CONFLICT_PORT
 from tool import YamlLoader, FileUtil
 from _rpm import Version
 
@@ -263,9 +264,19 @@ def start(plugin_context, *args, **kwargs):
                 stdio.stop_loading('fail')
                 return False
         cmd_args_map[server] = cmd_items
+
+        remote_pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
+        if remote_pid:
+            if client.execute_command('ls /proc/{}'.format(remote_pid)):
+                if confirm_port(client, remote_pid, int(server_config["port"]), stdio):
+                    continue
+                stdio.stop_loading('fail')
+                stdio.error(EC_CONFLICT_PORT.format(server=server.ip, port=port))
+                return plugin_context.return_false()
         if not prometheusd(home_path, client, server, cmd_items, start_only=True, stdio=stdio) or not client.execute_command('pid=`cat %s` && ls /proc/$pid' % pid_path[server]):
-            stdio.stop_loading('fail')
-            return False
+                stdio.stop_loading('fail')
+                return False
+
     stdio.stop_loading('succeed')
     time.sleep(1)
 
@@ -283,7 +294,7 @@ def start(plugin_context, *args, **kwargs):
             stdio.verbose('%s program health check' % server)
             remote_pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
             if remote_pid:
-                for pid in remote_pid.split('\n'):
+                for pid in re.findall('\d+',remote_pid):
                     confirm = confirm_port(client, pid, int(server_config["port"]), stdio)
                     if confirm:
                         prometheusd_pid_path = os.path.join(home_path, 'run/prometheusd.pid')

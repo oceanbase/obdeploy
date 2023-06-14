@@ -21,6 +21,7 @@
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
 import datetime
+import os
 from tool import TimeUtils
 from subprocess import call, Popen, PIPE
 import _errno as err
@@ -81,10 +82,9 @@ def gather_log(plugin_context, *args, **kwargs):
     since_option = get_option('since')
     grep_option = get_option('grep')
     encrypt_option = get_option('encrypt')
-    store_dir_option = get_option('store_dir')
+    store_dir_option = os.path.abspath(get_option('store_dir'))
     ob_install_dir_option = global_conf.get('home_path')
     obdiag_install_dir = get_option('obdiag_dir')
-
     try:
         if (not from_option) and (not to_option) and since_option:
             now_time = datetime.datetime.now()

@@ -25,6 +25,8 @@ import time
 import hashlib
 from copy import deepcopy
 
+import re
+
 from _errno import EC_CONFLICT_PORT
 
 stdio = None
@@ -250,7 +252,7 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
             stdio.verbose('%s program health check' % server)
             remote_pid = client.execute_command("cat %s" % pid_path[server]).stdout.strip()
             if remote_pid:          
-                for pid in remote_pid.split('\n'):
+                for pid in re.findall('\d+',remote_pid):
                     confirm = confirm_port(client, pid, int(server_config["listen_port"]))
                     if confirm:
                         proxyd_Pid_path = os.path.join(server_config["home_path"], 'run/obproxyd-%s-%d.pid' % (server.ip, server_config["listen_port"]))

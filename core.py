@@ -3963,21 +3963,14 @@ class ObdHome(object):
         if repositories == []:
             return
         self.set_repositories(repositories)
-        target_repository = None
-        for repository in repositories:
-            if repository.name in ['oceanbase', 'oceanbase-ce']:
-                target_repository = repository
-                break
-            else:
-                target_repository = repository
-        telemetry_info_collect_plugin = self.plugin_manager.get_best_py_script_plugin('telemetry_info_collect', 'general', '0.1')
-        ret = self.call_plugin(telemetry_info_collect_plugin, target_repository, target_repository=target_repository)
-        if ret:
-            post_data = ret.get_return('post_data')
-            self._call_stdio('verbose', 'telemetry_data: %s' % post_data)
 
-            telemetry_post_plugin = self.plugin_manager.get_best_py_script_plugin('telemetry_post', 'general', '0.1')
-            return self.call_plugin(telemetry_post_plugin, target_repository, data=post_data)
+        telemetry_info_collect_plugin = self.plugin_manager.get_best_py_script_plugin('telemetry_info_collect', 'general', '0.1')
+        for repository in repositories:
+            if not self.call_plugin(telemetry_info_collect_plugin, repository, spacename='telemetry'):
+                return False
+            
+        telemetry_post_plugin = self.plugin_manager.get_best_py_script_plugin('telemetry_post', 'general', '0.1')
+        return self.call_plugin(telemetry_post_plugin, repository, spacename='telemetry')
 
 
     def obdiag_gather(self, name, gather_type, opts):

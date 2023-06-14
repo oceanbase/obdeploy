@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
 from subprocess import call, Popen, PIPE
 import _errno as err
+import os
 
 
 def gather_plan_monitor(plugin_context, *args, **kwargs):
@@ -64,7 +65,7 @@ def gather_plan_monitor(plugin_context, *args, **kwargs):
     options = plugin_context.options
     obdiag_bin = "obdiag"
     stdio = plugin_context.stdio
-    store_dir_option = get_option('store_dir')
+    store_dir_option = os.path.abspath(get_option('store_dir'))
     obdiag_install_dir = get_option('obdiag_dir')
     trace_id = get_option('trace_id')
 

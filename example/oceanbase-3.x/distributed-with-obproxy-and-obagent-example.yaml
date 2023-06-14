@@ -6,6 +6,7 @@
 #   port: your ssh port, default 22
 #   timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
+  version: 3.1.4
   servers:
     - name: server1
       # Please don't use hostname, only IP can be supported
