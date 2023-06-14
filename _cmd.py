@@ -422,7 +422,7 @@ class EnvironmentMajorCommand(HiddenMajorCommand):
 class TelemetryPostCommand(HiddenObdCommand):
 
     def __init__(self):
-        super(TelemetryPostCommand, self).__init__("post", "Post telemetry data to OceanBase.By default, OBD telemetry is enabled. To disable OBD telemetry, run the `obd env set TELEMETRY_MODE 0` command. To enable OBD telemetry data printing, run `obd env set TELEMETRY_LOG_MODE 1`.")
+        super(TelemetryPostCommand, self).__init__('post', "Post telemetry data to OceanBase.By default, OBD telemetry is enabled. To disable OBD telemetry, run the `obd env set TELEMETRY_MODE 0` command. To enable OBD telemetry data printing, run `obd env set TELEMETRY_LOG_MODE 1`.")
         self.parser.add_option('-d', '--data', type='string', help="post obd data")
 
     @property
@@ -431,9 +431,7 @@ class TelemetryPostCommand(HiddenObdCommand):
 
     @property
     def enable_log(self):
-        if COMMAND_ENV.get(ENV.TELEMETRY_LOG_MODE, default='1') == '0':
-            return False
-        return True
+        return COMMAND_ENV.get(ENV.TELEMETRY_LOG_MODE, default='0') == '1'
 
     def init(self, cmd, args):
         super(TelemetryPostCommand, self).init(cmd, args)
@@ -447,7 +445,7 @@ class TelemetryPostCommand(HiddenObdCommand):
 class TelemetryMajorCommand(HiddenMajorCommand):
 
     def __init__(self):
-        super(TelemetryMajorCommand, self).__init__("telemetry", "Telemetry for OB-Deploy.By default, OBD telemetry is enabled. To disable OBD telemetry, run the `obd env set TELEMETRY_MODE 0` command. To enable OBD telemetry data printing, run `obd env set TELEMETRY_LOG_MODE 1`.")
+        super(TelemetryMajorCommand, self).__init__('telemetry', "Telemetry for OB-Deploy.By default, OBD telemetry is enabled. To disable OBD telemetry, run the `obd env set TELEMETRY_MODE 0` command. To enable OBD telemetry data printing, run `obd env set TELEMETRY_LOG_MODE 1`.")
         self.register_command(TelemetryPostCommand())
 
     def do_command(self):
@@ -654,9 +652,11 @@ class ClusterMirrorCommand(ObdCommand):
             data[component] = _.get_variable('run_result')
         return data
 
-    def background_telemetry_task(self, obd):
+    def background_telemetry_task(self, obd, demploy_name=None):
+        if demploy_name is None:
+            demploy_name = self.cmds[0]
         data = json.dumps(self.get_obd_namespaces_data(obd))
-        LocalClient.execute_command_background(f"nohup obd telemetry post {self.cmds[0]} --data='{data}' >/dev/null 2>&1 &")
+        LocalClient.execute_command_background(f"nohup obd telemetry post {demploy_name} --data='{data}' >/dev/null 2>&1 &")
 
 
 class ClusterConfigStyleChange(ClusterMirrorCommand):
@@ -704,7 +704,10 @@ class DemoCommand(ClusterMirrorCommand):
         setattr(self.opts, 'force', True)
         setattr(self.opts, 'force_delete', True)
         obd.set_options(self.opts)
-        return obd.demo()
+
+        res = obd.demo()
+        self.background_telemetry_task(obd, 'demo')
+        return res
 
 
 class WebCommand(ObdCommand):
@@ -1479,7 +1482,7 @@ class ObdiagGatherAllCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
         self.parser.add_option('--grep', type='string', help="specify keywords constrain")
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 class ObdiagGatherLogCommand(ObdiagGatherMirrorCommand):
@@ -1500,7 +1503,7 @@ class ObdiagGatherLogCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
         self.parser.add_option('--grep', type='string', help="specify keywords constrain")
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1516,7 +1519,7 @@ class ObdiagGatherSysStatCommand(ObdiagGatherMirrorCommand):
 
     def __init__(self):
         super(ObdiagGatherSysStatCommand, self).__init__('sysstat', 'Gather Host information')
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1532,7 +1535,7 @@ class ObdiagGatherStackCommand(ObdiagGatherMirrorCommand):
 
     def __init__(self):
         super(ObdiagGatherStackCommand, self).__init__('stack', 'Gather stack')
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1548,7 +1551,7 @@ class ObdiagGatherPerfCommand(ObdiagGatherMirrorCommand):
 
     def __init__(self):
         super(ObdiagGatherPerfCommand, self).__init__('perf', 'Gather perf')
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--scope', type='string', help="perf type constrains, choices=[sample, flame, pstack, all]",default='all')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
@@ -1569,7 +1572,7 @@ class ObdiagGatherSlogCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
         self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1589,7 +1592,7 @@ class ObdiagGatherClogCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
         self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1607,7 +1610,7 @@ class ObdiagGatherPlanMonitorCommand(ObdiagGatherMirrorCommand):
         super(ObdiagGatherPlanMonitorCommand, self).__init__('plan_monitor', 'Gather ParalleSQL information')
         self.parser.add_option('-c', '--component', type='string', help="Component name to connect.", default='oceanbase-ce')
         self.parser.add_option('--trace_id', type='string', help='sql trace id')
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('-u', '--user', type='string', help='The username used by database connection. [root]',default='root')
         self.parser.add_option('-p', '--password', type='string', help='The password used by database connection.',default='')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
@@ -1631,7 +1634,7 @@ class ObdiagGatherObproxyLogCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
         self.parser.add_option('--grep', type='string', help="specify keywords constrain")
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
-        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default=os.getcwd())
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1673,7 +1676,7 @@ if __name__ == '__main__':
         sys.setdefaultencoding(defaultencoding)
     sys.path.append(os.path.join(ObdCommand.OBD_INSTALL_PATH, 'lib/site-packages'))
     ROOT_IO.track_limit += 2
-    if MainCommand().init('obd', sys.argv[1:]).do_command():
+    if MainCommand().init(sys.argv[0], sys.argv[1:]).do_command():
         ROOT_IO.exit(0)
     ROOT_IO.exit(1)
 

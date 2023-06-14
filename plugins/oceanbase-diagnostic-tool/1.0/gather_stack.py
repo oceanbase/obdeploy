@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
 from subprocess import call, Popen, PIPE
 import _errno as err
+import os
 
 
 def gather_stack(plugin_context, *args, **kwargs):
@@ -67,7 +68,7 @@ def gather_stack(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     global_conf = cluster_config.get_global_conf()
-    store_dir_option = get_option('store_dir')
+    store_dir_option = os.path.abspath(get_option('store_dir'))
     obdiag_install_dir = get_option('obdiag_dir')
     ob_install_dir_option=global_conf.get('home_path')
 

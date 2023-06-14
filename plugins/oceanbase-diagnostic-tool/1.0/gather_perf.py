@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
 from subprocess import call, Popen, PIPE
 import _errno as err
+import os
 
 
 def gather_perf(plugin_context, *args, **kwargs):
@@ -70,7 +71,7 @@ def gather_perf(plugin_context, *args, **kwargs):
     global_conf = cluster_config.get_global_conf()
     ob_install_dir_option=global_conf.get('home_path')
     scope_option = get_option('scope')
-    store_dir_option = get_option('store_dir')
+    store_dir_option = os.path.abspath(get_option('store_dir'))
     obdiag_install_dir = get_option('obdiag_dir')
 
     ret = local_execute_command('%s --help' % obdiag_bin)

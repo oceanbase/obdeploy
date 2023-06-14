@@ -58,7 +58,7 @@ cd $SRC_DIR/web
 yarn
 yarn build
 cd $SRC_DIR
-sed -i "s/<CID>/$CID/" const.py  && sed -i "s/<B_BRANCH>/$BRANCH/" const.py  && sed -i  "s/<B_TIME>/$DATE/" const.py  && sed -i "s/<DEBUG>/$OBD_DUBUG/" const.py && sed -i "s/<VERSION>/$VERSION/" const.py
+sed -i "s/<CID>/$CID/" const.py  && sed -i "s/<B_BRANCH>/$BRANCH/" const.py  && sed -i  "s/<B_TIME>/$DATE/" const.py  && sed -i "s/<DEBUG>/$OBD_DUBUG/" const.py && sed -i "s/<VERSION>/$VERSION/" const.py && sed -i "s/<TELEMETRY_WEBSITE>/$TELEMETRY_WEBSITE/" const.py
 cp -f _cmd.py obd.py
 sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
 mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
@@ -130,6 +130,12 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Mon Jun 12 2023 obd 2.1.1
+ - new features: support upgrade keyword 'when_come_from' and 'deprecated'
+ - fix bug: start server failed when other servers downtime #171
+ - fix bug: The signed '%' password causes a stack overflow in the upgrade plugin
+ - fix bug: system_memory check failed when memory_limit is 0
+ - fix bug: xtend ocp-express meta ob connect time
 * Fri May 12 2023 obd 2.1.0
  - new features: support oceanbase-ce V4.0 upgrade
  - new features: support ocp-express V1.0.1

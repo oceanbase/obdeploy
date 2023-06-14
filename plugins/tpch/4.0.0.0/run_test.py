@@ -192,22 +192,15 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
                 if int(ret.get("FROZEN_SCN", 0)) / 1000 == int(ret.get("LAST_SCN", 0)) / 1000:
                     break
                 time.sleep(5)
-            ret = LocalClient.execute_command("%s -e \"show parameters where name = 'enable_sql_extension' \G;\"" % sql_cmd_prefix, stdio=stdio)
-            if ret:
-                output = ret.stdout.strip()
-                searched = re.search('\s+value:\s+(\S+)\n', output)
-                if searched:
-                    value = searched.group(1).lower()
-                    if value == 'true':
-                        # analyze
-                        local_dir, _ = os.path.split(__file__)
-                        analyze_path = os.path.join(local_dir, 'analyze.sql')
-                        with FileUtil.open(analyze_path, stdio=stdio) as f:
-                            content = f.read()
-                        analyze_content = content.format(cpu_total=cpu_total, database=mysql_db)
-                        ret = LocalClient.execute_command('%s -e """%s"""' % (sql_cmd_prefix, analyze_content), stdio=stdio)
-                        if not ret:
-                            raise Exception(ret.stderr)
+            # analyze
+            local_dir, _ = os.path.split(__file__)
+            analyze_path = os.path.join(local_dir, 'analyze.sql')
+            with FileUtil.open(analyze_path, stdio=stdio) as f:
+                content = f.read()
+            analyze_content = content.format(cpu_total=cpu_total, database=mysql_db)
+            ret = LocalClient.execute_command('%s -e """%s"""' % (sql_cmd_prefix, analyze_content), stdio=stdio)
+            if not ret:
+                raise Exception(ret.stderr)
             stdio.stop_loading('succeed')
 
         # 替换并发数

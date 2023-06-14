@@ -230,22 +230,39 @@ export default function InstallConfig() {
       }: API.OBResponseDataListComponent_) => {
         if (success) {
           const newComponentsVersionInfo = {};
+          const oceanbaseVersionsData = data?.items?.filter(item => item.name === oceanbaseComponent);
+
+          const initOceanbaseVersionInfo = oceanbaseVersionsData[0]?.info[0] || {};
+          const newSelectedOceanbaseVersionInfo = oceanbaseVersionsData[0]?.info?.filter(
+            (item) => item.md5 === oceanbase?.package_hash,
+          )?.[0];
+
+          const currentOceanbaseVersionInfo =
+            newSelectedOceanbaseVersionInfo || initOceanbaseVersionInfo;
+
           data?.items?.forEach((item) => {
             if (allComponentsName.includes(item.name)) {
               if (item?.info?.length) {
                 const initVersionInfo = item?.info[0] || {};
                 if (item.name === oceanbaseComponent) {
-                  const newSelectedVersionInfo = item.info.filter(
-                    (item) => item.md5 === oceanbase?.package_hash,
-                  )?.[0];
-                  const currentSelectedVersionInfo =
-                    newSelectedVersionInfo || initVersionInfo;
                   setOBVersionValue(
-                    `${currentSelectedVersionInfo?.version}-${currentSelectedVersionInfo?.release}-${currentSelectedVersionInfo?.md5}`,
+                    `${currentOceanbaseVersionInfo?.version}-${currentOceanbaseVersionInfo?.release}-${currentOceanbaseVersionInfo?.md5}`,
                   );
-
                   newComponentsVersionInfo[item.name] = {
-                    ...currentSelectedVersionInfo,
+                    ...currentOceanbaseVersionInfo,
+                    dataSource: item.info || [],
+                  };
+                } else if (item.name === obproxyComponent) {
+                  let currentObproxyVersionInfo = {};
+                  item?.info?.some(subItem => {
+                    if (subItem?.version_type === currentOceanbaseVersionInfo?.version_type) {
+                      currentObproxyVersionInfo = subItem;
+                      return true;
+                    }
+                    return false
+                  });
+                  newComponentsVersionInfo[item.name] = {
+                    ...currentObproxyVersionInfo,
                     dataSource: item.info || [],
                   };
                 } else {
@@ -435,12 +452,27 @@ export default function InstallConfig() {
     const newSelectedVersionInfo = dataSource.filter(
       (item) => item.md5 === md5,
     )[0];
+
+    let currentObproxyVersionInfo = {};
+    componentsVersionInfo?.[
+      obproxyComponent
+    ]?.dataSource?.some((item: API.service_model_components_ComponentInfo) => {
+      if (item?.version_type === newSelectedVersionInfo?.version_type) {
+        currentObproxyVersionInfo = item;
+        return true;
+      }
+      return false
+    });
     setComponentsVersionInfo({
       ...componentsVersionInfo,
       [oceanbaseComponent]: {
         ...componentsVersionInfo[oceanbaseComponent],
         ...newSelectedVersionInfo,
       },
+      [obproxyComponent]: {
+        ...componentsVersionInfo[obproxyComponent],
+        ...currentObproxyVersionInfo
+      }
     });
     setLowVersion(
       !!(
@@ -451,12 +483,10 @@ export default function InstallConfig() {
   };
 
   const directTo = (url: string) => {
-    // 在新的标签页中打开
     const blankWindow = window.open('about:blank');
     if (blankWindow) {
       blankWindow.location.href = url;
     } else {
-      // 兜底逻辑，在当前标签页打开
       window.location.href = url;
     }
   };
@@ -907,11 +937,10 @@ export default function InstallConfig() {
                 {componentsGroupInfo.map((info) => (
                   <ProCard
                     type="inner"
-                    className={`${styles.componentCard} ${
-                      currentType === 'ob' && info.onlyAll
-                        ? styles.disabledCard
-                        : ''
-                    }`}
+                    className={`${styles.componentCard} ${currentType === 'ob' && info.onlyAll
+                      ? styles.disabledCard
+                      : ''
+                      }`}
                     key={info.group}
                   >
                     <Table

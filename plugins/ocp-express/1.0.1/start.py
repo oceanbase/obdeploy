@@ -339,7 +339,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             sql_port = matched.group(2)[1:]
             database = matched.group(3)
             connected = False
-            retries = 10
+            retries = 300
             while not connected and retries:
                 retries -= 1
                 try:
@@ -418,7 +418,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
     stdio.start_loading("ocp-express program health check")
     failed = []
     servers = cluster_config.servers
-    count = 60
+    count = 200
     while servers and count:
         count -= 1
         tmp_servers = []

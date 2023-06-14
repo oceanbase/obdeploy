@@ -44,6 +44,7 @@ from _arch import getArchList, getBaseArch
 from _rpm import Package, PackageInfo
 from tool import ConfigUtil, FileUtil, var_replace
 from _manager import Manager
+from tool import timeout
 
 
 _ARCH = getArchList()
@@ -276,10 +277,13 @@ class RemoteMirrorRepository(MirrorRepository):
         
     @property
     def available(self):
+        if not self.enabled:
+            return False
         if self._available is None:
             try:
-                req = requests.request('get', self.baseurl)
-                self._available = req.status_code < 400
+                with timeout(5):
+                    req = requests.request('get', self.baseurl)
+                    self._available = req.status_code < 400
             except Exception:
                 self.stdio and getattr(self.stdio, 'exception', print)('')
                 self._available = False

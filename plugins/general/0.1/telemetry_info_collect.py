@@ -28,7 +28,6 @@ import resource
 import hashlib
 
 from tool import NetUtil
-from ssh import LocalClient
 from const import VERSION, REVISION
 
 
@@ -46,6 +45,7 @@ shell_command_map = {
     "os_name": 'cat /etc/os-release | grep "^ID=" | cut -f2 -d=',
     "os_release": 'cat /etc/os-release | grep "^VERSION_ID=" | cut -f2 -d='
 }
+current_client = None
 
 
 def shell_command(func):
@@ -53,8 +53,9 @@ def shell_command(func):
         name = func.__name__
         command = shell_command_map.get(name)
         assert command, f"{name} is not in shell_command.yaml"
+        assert current_client, "current_client is None"
 
-        res = LocalClient.execute_command(command)
+        res = current_client.execute_command(command)
         kwargs["bash_result"] = res.stdout.strip() if res.code == 0 else None
         return func(*args, **kwargs)
 
@@ -78,9 +79,9 @@ class BaseInfo:
 class HostInfo:
 
     @staticmethod
-    def host_ip_hash():
+    def host_ip_hash(ip=None):
         sha1 = hashlib.sha1()
-        sha1.update(NetUtil.get_host_ip().encode())
+        sha1.update(ip.encode() if ip else NetUtil.get_host_ip().encode())
         return sha1.hexdigest()
 
     @staticmethod
@@ -148,7 +149,7 @@ class DiskInfo:
     def get_disks_info():
         data = []
         sha1 = hashlib.sha1()
-        for _ in LocalClient.execute_command("df -h | awk '{if(NR>1)print}'").stdout.strip().split('\n'):
+        for _ in current_client.execute_command("df -h | awk '{if(NR>1)print}'").stdout.strip().split('\n'):
             _disk_info = {}
             _ = [i for i in _.split(' ') if i != '']
             _disk_info['deviceName'] = _[0]
@@ -181,9 +182,6 @@ class MachineInfo:
 
 
 class ObdInfo:
-    @staticmethod
-    def obd_type():
-        return sys.argv[0]
 
     @staticmethod
     def obd_version(*args, **kwargs):
@@ -194,15 +192,45 @@ class ObdInfo:
         return REVISION
 
 
-def telemetry_machine_data():
+def init_telemetry_data(opt_data):
+    data = telemetry_base_data()
+    for component, _ in json.loads(opt_data).items():
+        for plugin_name, _ in _.items():
+            plugin_data = {}
+            plugin_data['component'] = component
+            plugin_data['name'] = plugin_name
+            plugin_data['runTime'] = _['time']
+            plugin_data['runResult'] = _['result']
+            data['plugins'].append(plugin_data)
+
+    return data
+
+
+def telemetry_base_data():
     data = {}
     data['reporter'] = BaseInfo.reporter()
     data['reportTime'] = BaseInfo.report_time()
     data['eventId'] = BaseInfo.event_id()
+    data['telemetryVersion'] = 1
+
+    data['obdVersion'] = ObdInfo.obd_version()
+    data['obdRevision'] = ObdInfo.obd_revision()
+
     data['hosts'] = []
+    data['instances'] = []
+
+    data['plugins'] = []
+    return data
+
+
+def telemetry_machine_data(data):
+    ip_hash = HostInfo.host_ip_hash(current_client.config.host)
+    for host in data['hosts']:
+        if host['basic']['hostHash'] == ip_hash:
+            return data
 
     _hosts = dict(basic={}, cpu={}, memory={}, disks=[], os={}, ulimit={})
-    _hosts['basic']['hostHash'] = HostInfo.host_ip_hash()
+    _hosts['basic']['hostHash'] = ip_hash
     _hosts['basic']['hostType'] = HostInfo.host_type()
 
     _hosts['cpu']['physicalCores'] = CpuInfo.cpu_physical_cores()
@@ -223,47 +251,41 @@ def telemetry_machine_data():
     _hosts['ulimit'] = MachineInfo.get_nofile()
     data['hosts'].append(_hosts)
 
-    data['instances'] = []
-    obd_info = {}
-    obd_info['type'] = ObdInfo.obd_type()
-    obd_info['version'] = ObdInfo.obd_version()
-    obd_info['revision'] = ObdInfo.obd_revision()
-    data['instances'].append(obd_info)
     return data
 
 
-def telemetry_info_collect(plugin_context, *args, **kwargs):
+def telemetry_info_collect(plugin_context, telemetry_post_data={}, *args, **kwargs):
+    global current_client
     repositories = plugin_context.repositories
-    repository = kwargs.get('target_repository')
-    options = plugin_context.options
-    stdio = plugin_context.stdio
+    clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-    post_data = telemetry_machine_data()
+
+    if not telemetry_post_data:
+        options = plugin_context.options
+        telemetry_post_data = init_telemetry_data(getattr(options, 'data', {}))
+
+    for server in cluster_config.servers:
+        current_client = clients[server]
+        telemetry_post_data = telemetry_machine_data(telemetry_post_data)
 
     for repository in repositories:
-        data = {}
-        data['type'] = repository.name
-        data['version'] = repository.version
-        data['revision'] = repository.hash
-        post_data['instances'].append(data)
+        if repository.name != cluster_config.name:
+            continue
+        is_ob = cluster_config.name in ['oceanbase', 'oceanbase-ce']
 
-    for component, _ in json.loads(getattr(options, 'data', {})).items():
-        for plugin_name, _ in _.items():
+        for server in cluster_config.servers:
             data = {}
-            data['type'] = 'plugins'
-            data['component'] = component
-            data['name'] = plugin_name
-            data['runTime'] = _['time']
-            data['runResult'] = _['result']
-            post_data['instances'].append(data)
+            data['type'] = repository.name
+            data['version'] = repository.version
+            data['revision'] = repository.release
+            config = cluster_config.get_server_conf(server)
+            data['hostHash'] = HostInfo.host_ip_hash(server.ip)
+            if is_ob:
+                data['memoryLimit'] = config.get('memory_limit', '0')
+                data['dataFileSize'] = config.get('datafile_size', '0')
+                data['logDiskSize'] = config.get('log_disk_size', '0')
+                data['cpuCount'] = config.get('cpu_count', '0')
+            telemetry_post_data['instances'].append(data)
 
-    if repository.name in ['oceanbase', 'oceanbase-ce']:
-        _ = cluster_config.get_global_conf()
-        data = {}
-        data['type'] = 'config'
-        data['name'] = repository.name
-        data['memoryLimit'] = _.get('memory_limit', '0') if _ else '0'
-        data['cpuCount'] = _.get('cpu_count', '0') if _ else '0'
-        data['syslogLevel'] = _.get('syslog_level', 'INFO') if _ else 'INFO'
-        post_data['instances'].append(data)
-    return plugin_context.return_true(post_data=json.dumps(post_data, indent=4))
+    plugin_context.set_variable('telemetry_post_data', telemetry_post_data)
+    return plugin_context.return_true(telemetry_post_data=telemetry_post_data)

@@ -28,7 +28,7 @@ from ssh import LocalClient
 from _rpm import Version
 
 import _errno as err
-from tool import YamlLoader, FileUtil
+from tool import DirectoryUtil
 
 def pre_check(plugin_context, gather_type=None, obdiag_path='', obdiag_new_version='1.0', utils_work_dir_check=False, version_check=False, *args, **kwargs):
     def utils_work_dir_checker(util_name):
@@ -70,6 +70,13 @@ def pre_check(plugin_context, gather_type=None, obdiag_path='', obdiag_new_versi
                 check_status = {'version_checker_status': False, 'obdiag_version': major_version, 'obdiag_found': True}
                 return check_status
 
+    def store_dir_checker_and_handler():
+        store_dir_option = getattr(plugin_context.options, 'store_dir', None)
+        if (store_dir_option is not None) and (not DirectoryUtil.mkdir(store_dir_option, stdio=stdio)):
+            return False
+        else:
+            return True
+
     stdio = plugin_context.stdio
     utils_work_dir_check_status = True
     version_check_status = True
@@ -86,8 +93,8 @@ def pre_check(plugin_context, gather_type=None, obdiag_path='', obdiag_new_versi
         version_check_status = res['version_checker_status']
         obdiag_version = res['obdiag_version']
         obdiag_found = res['obdiag_found']
-
-    status = utils_work_dir_check_status and version_check_status
+    store_dir_checker_status = store_dir_checker_and_handler()
+    status = utils_work_dir_check_status and version_check_status and store_dir_checker_status
     if status:
         return plugin_context.return_true(version_status = version_check_status, utils_status = utils_work_dir_check_status, obdiag_version = obdiag_version, obdiag_found = obdiag_found, skip = skip)
     else:

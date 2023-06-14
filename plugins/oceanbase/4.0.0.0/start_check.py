@@ -170,6 +170,21 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         check_fail(item, error, suggests)
         stdio.error(error)
 
+    def system_memory_check():
+        server_memory_config = server_memory_stat['servers']
+        for server in server_memory_config:
+            if server_memory_config[server]['system_memory']:
+                memory_limit = server_memory_config[server]['num']
+                if not memory_limit:
+                    server_memory_config[server]['num'] = memory_limit = server_memory_config[server]['percentage'] * server_memory_stats['total']
+                factor = 0.75
+                suggest = err.SUG_OBSERVER_SYS_MEM_TOO_LARGE.format(factor=factor)
+                suggest.auto_fix = 'system_memory' not in global_generate_config and 'system_memory' not in generate_configs.get(server, {})
+                if memory_limit < server_memory_config[server]['system_memory']:
+                    critical('mem', err.EC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server), [suggest])
+                elif memory_limit * factor < server_memory_config[server]['system_memory']:
+                    alert('mem', err.WC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server, factor=factor), [suggest])
+
     global stdio, success
     success = True
     check_status = {}
@@ -328,7 +343,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
 
         memory_limit = 0
         percentage = 0
-        if 'memory_limit' in server_config:
+        if server_config.get('memory_limit'):
             memory_limit = parse_size(server_config['memory_limit'])
             if server_config.get('production_mode') and memory_limit < PRO_MEMORY_MIN:
                 error('mem', err.EC_OBSERVER_PRODUCTION_MODE_LIMIT.format(server=server, key='memory_limit', limit=format_size(PRO_MEMORY_MIN)), [err.SUB_SET_NO_PRODUCTION_MODE.format()])
@@ -475,23 +490,11 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                             break
                     error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(total_use)), [suggest])
             elif total_use > server_memory_stats['free']:
+                system_memory_check()
                 for server in ip_servers:
                     alert('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(server_memory_stats['free']), need=format_size(total_use)), [err.SUG_OBSERVER_REDUCE_MEM.format()])
             else:
-                server_memory_config = server_memory_stat['servers']
-                for server in server_memory_config:
-                    if server_memory_config[server]['system_memory']:
-                        memory_limit = server_memory_config[server]['num']
-                        if not memory_limit:
-                            server_memory_config[server]['num'] = memory_limit = server_memory_config[server]['percentage'] * server_memory_stats['total']
-                        
-                        factor = 0.75
-                        suggest = err.SUG_OBSERVER_SYS_MEM_TOO_LARGE.format(factor=factor)
-                        suggest.auto_fix = 'system_memory' not in global_generate_config and 'system_memory' not in generate_configs.get(server, {})
-                        if memory_limit < server_memory_config[server]['system_memory']:
-                            critical('mem', err.EC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server), [suggest])
-                        elif memory_limit * factor < server_memory_config[server]['system_memory']:
-                            alert('mem', err.WC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server, factor=factor), [suggest])
+                system_memory_check()
 
         # disk
         all_path = set(list(servers_disk[ip].keys()) + list(servers_clog_mount[ip].keys()))

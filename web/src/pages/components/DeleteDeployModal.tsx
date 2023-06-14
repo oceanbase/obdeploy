@@ -6,7 +6,7 @@ import { getDestroyTaskInfo } from '@/services/ob-deploy-web/Deployments';
 import useRequest from '@/utils/useRequest';
 import { checkLowVersion, getErrorInfo } from '@/utils';
 import NP from 'number-precision';
-import { oceanbaseComponent } from '../constants';
+import { oceanbaseComponent, obproxyComponent } from '../constants';
 import { getLocale } from 'umi';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
@@ -114,12 +114,27 @@ export default function DeleteDeployModal({
                   `${components?.oceanbase?.version}-${components?.oceanbase?.release}-${components?.oceanbase?.package_hash}`,
                 );
 
+                let currentObproxyVersionInfo = {};
+                componentsVersionInfo?.[
+                  obproxyComponent
+                ]?.dataSource?.some((item: API.service_model_components_ComponentInfo) => {
+                  if (item?.version_type === newSelectedVersionInfo?.version_type) {
+                    currentObproxyVersionInfo = item;
+                    return true;
+                  }
+                  return false
+                });
+
                 setComponentsVersionInfo({
                   ...componentsVersionInfo,
                   [oceanbaseComponent]: {
                     ...componentsVersionInfo[oceanbaseComponent],
                     ...newSelectedVersionInfo,
                   },
+                  [obproxyComponent]: {
+                    ...componentsVersionInfo[obproxyComponent],
+                    ...currentObproxyVersionInfo
+                  }
                 });
               }
               setTimeout(() => {
@@ -191,13 +206,13 @@ export default function DeleteDeployModal({
             >
               {status === 'SUCCESSFUL'
                 ? intl.formatMessage({
-                    id: 'OBD.pages.components.DeleteDeployModal.FailedHistoryDeploymentEnvironmentCleared',
-                    defaultMessage: '清理失败历史部署环境成功',
-                  })
+                  id: 'OBD.pages.components.DeleteDeployModal.FailedHistoryDeploymentEnvironmentCleared',
+                  defaultMessage: '清理失败历史部署环境成功',
+                })
                 : intl.formatMessage({
-                    id: 'OBD.pages.components.DeleteDeployModal.FailedToCleanUpThe',
-                    defaultMessage: '清理失败历史部署环境失败',
-                  })}
+                  id: 'OBD.pages.components.DeleteDeployModal.FailedToCleanUpThe',
+                  defaultMessage: '清理失败历史部署环境失败',
+                })}
             </div>
             <Progress
               className={styles.deleteDeployProgress}

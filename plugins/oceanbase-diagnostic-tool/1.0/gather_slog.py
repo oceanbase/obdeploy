@@ -24,6 +24,7 @@ import datetime
 from tool import TimeUtils
 from subprocess import call, Popen, PIPE
 import _errno as err
+import os
 
 
 def gather_slog(plugin_context, *args, **kwargs):
@@ -78,7 +79,7 @@ def gather_slog(plugin_context, *args, **kwargs):
     to_option = get_option('to')
     since_option = get_option('since')
     encrypt_option = get_option('encrypt')
-    store_dir_option = get_option('store_dir')
+    store_dir_option = os.path.abspath(get_option('store_dir'))
     ob_install_dir_option=global_conf.get('home_path')
     data_dir = ob_install_dir_option + "/store"
     obdiag_install_dir = get_option('obdiag_dir')

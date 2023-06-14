@@ -107,7 +107,7 @@ class Exector(object):
         path = os.path.join(script_dir, name)
         self.stdio.verbose('exec %s %s' % (repository, name))
         if os.path.exists(path):
-            cmd = self.cmd % path
+            cmd = self.cmd.replace('%s', path, 1)
             self.stdio.start_loading('Exec %s %s' % (repository, name))
             if LocalClient.execute_command(cmd, stdio=self.stdio):
                 self.stdio.stop_loading('succeed')

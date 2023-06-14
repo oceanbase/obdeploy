@@ -116,23 +116,16 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
             break
         time.sleep(5)
     # analyze
-    ret = LocalClient.execute_command("%s \"show parameters where name = 'enable_sql_extension' \G;\"" % exec_sql_cmd, stdio=stdio)
-    if ret:
-        output = ret.stdout.strip()
-        searched = re.search('\s+value:\s+(\S+)\n', output)
-        if searched:
-            value = searched.group(1).lower()
-            if value == 'true':
-                local_dir, _ = os.path.split(__file__)
-                analyze_path = os.path.join(local_dir, 'analyze.sql')
-                with FileUtil.open(analyze_path, stdio=stdio) as f:
-                    content = f.read()
-                analyze_content = content.format(cpu_total=cpu_total, database=db_name)
-                ret = LocalClient.execute_command('%s """%s"""' % (exec_sql_cmd, analyze_content), stdio=stdio)
-                if not ret:
-                    stdio.error('failed to analyze table: {}'.format(ret.stderr))
-                    stdio.stop_loading('fail')
-                    return
+    local_dir, _ = os.path.split(__file__)
+    analyze_path = os.path.join(local_dir, 'analyze.sql')
+    with FileUtil.open(analyze_path, stdio=stdio) as f:
+        content = f.read()
+    analyze_content = content.format(cpu_total=cpu_total, database=db_name)
+    ret = LocalClient.execute_command('%s """%s"""' % (exec_sql_cmd, analyze_content), stdio=stdio)
+    if not ret:
+        stdio.error('failed to analyze table: {}'.format(ret.stderr))
+        stdio.stop_loading('fail')
+        return
     stdio.stop_loading('succeed')
 
     stdio.verbose('Benchmark run')

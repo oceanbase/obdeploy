@@ -24,37 +24,22 @@ oceanbase-ce:
     # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
     # if set severs as "127.0.0.1", please set devname as "lo"
     # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
-    # devname: eth0
-    # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
-    # mysql_port: 2881
-    # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
-    # rpc_port: 2882
-    # Defines the zone for an observer. The default value is zone1.
-    # zone: zone1
-    # The maximum running memory for an observer. When ignored, autodeploy calculates this value based on the current server available resource.
-    # memory_limit: 58G
-    # The percentage of the maximum available memory to the total memory. This value takes effect only when memory_limit is 0. The default value is 80.
-    # memory_limit_percentage: 80
-    # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G. Autodeploy calculates this value based on the current server available resource.
-    # system_memory: 22G
-    # The size of a data file. When ignored, autodeploy calculates this value based on the current server available resource.
-    # datafile_size: 200G
-    # The size of disk space used by the clog files. When ignored, autodeploy calculates this value based on the current server available resource.
-    # log_disk_size: 66G
-    # System log level. The default value is WDIAG.
-    # syslog_level: WDIAG
-    # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true. The default value for autodeploy mode is false.
-    # enable_syslog_wf: false
-    # Enable auto system log recycling or not. The default value is false. The default value for autodeploy mode is on.
-    # enable_syslog_recycle: true
-    # The maximum number of reserved log files before enabling auto recycling. When set to 0, no logs are deleted. The default value for autodeploy mode is 4.
-    # max_syslog_file_count: 4
+    devname: eth0
+    cluster_id: 1
+    # please set memory limit to a suitable value which is matching resource. 
+    memory_limit: 6G # The maximum running memory for an observer
+    system_memory: 1G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
+    datafile_size: 20G # Size of the data file. 
+    log_disk_size: 15G # The size of disk space used by the clog files.
+    cpu_count: 16
+    production_mode: false
+    enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
+    enable_syslog_recycle: true # Enable auto system log recycling or not. The default value is false.
+    max_syslog_file_count: 4 # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
     # Cluster name for OceanBase Database. The default value is obcluster. When you deploy OceanBase Database and obproxy, this value must be the same as the cluster_name for obproxy.
     # appname: obcluster
-    # Password for root. The default value is empty.
-    # root_password:
-    # Password for proxyro. proxyro_password must be the same as observer_sys_password. The default value is empty.
-    # proxyro_password:
+    # root_password: # root user password
+    # proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
   server1:
     zone: zone1
   server2:

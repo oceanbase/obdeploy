@@ -53,7 +53,8 @@ def display(plugin_context, cursor, *args, **kwargs):
                     }
                     return plugin_context.return_true(info=info_dict)
             except Exception as e:
-                if e.args[0] != 1146:
+                code =  e.args[0]
+                if code != 1146 and code != 4012:
                     raise e
                 time.sleep(3)
     except:
