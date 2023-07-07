@@ -132,3 +132,7 @@ A：You can use the `obd update` command to update OBD. When you are done with t
 ## Protocol
 
 OBD complies with [GPL-3.0](/LICENSE).
+
+## Sysbench benchmark
+
+- [Run the Sysbench benchmark test in OceanBase Database (Paetica, VLDB 2023)](https://github.com/oceanbase/oceanbase-doc/blob/V4.1.0/en-US/7.reference/3.performance-tuning-guide/6.performance-whitepaper/3.run-the-sysbench-benchmark-test-in-oceanbase-database.md)
