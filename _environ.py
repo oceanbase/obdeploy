@@ -42,3 +42,6 @@ TELEMETRY_MODE = "TELEMETRY_MODE"
 
 # telemetry log mode. 0 - disable, 1 - enable.
 TELEMETRY_LOG_MODE = "TELEMETRY_LOG_MODE"
+
+# ROOT IO DEFAULT CONFIRM. 0 - disable, 1 - enable.
+ENV_DEFAULT_CONFIRM = "IO_DEFAULT_CONFIRM"

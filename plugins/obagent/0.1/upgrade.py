@@ -37,7 +37,7 @@ def call_plugin(plugin, plugin_context, repositories, *args, **kwargs):
         stdio, *args, **kwargs)
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
 
@@ -57,7 +57,8 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
 
     apply_param_plugin(cur_repository)
     if not call_plugin(stop_plugin, plugin_context, [cur_repository], *args, **kwargs):
-        return 
+        return
+    install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
 
     apply_param_plugin(dest_repository)
     if not call_plugin(start_plugin, plugin_context, [dest_repository], *args, **kwargs):

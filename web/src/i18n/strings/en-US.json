@@ -285,5 +285,6 @@
   "OBD.pages.components.NodeConfig.OnlyOneNodeCanBe": "Only one node can be selected or entered",
   "OBD.pages.components.NodeConfig.NodeConfigurationPreviousStep": "Node Configuration-Previous Step",
   "OBD.pages.components.NodeConfig.AreYouSureYouWant": "Are you sure to delete the configuration of this Zone?",
-  "OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs": "Used for Prometheus to pull OBProxy monitoring data."
+  "OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs": "Used for Prometheus to pull OBProxy monitoring data.",
+  "OBD.pages.components.InstallConfig.OptionalComponents": "Optional components"
 }

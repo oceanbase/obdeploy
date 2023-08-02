@@ -77,7 +77,7 @@ grafana:
     - prometheus
   global:
     home_path: /root/grafana
-    login_password: oceanbase # Grafana login password. The default value is 'oceanbase'.
+    login_password: xxxxxxxxx # Grafana login password.
     # data_dir: # Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used).$data_dir can be empty. The default value is $home_path/data.
     # logs_dir: # Directory where grafana can store logs, can be empty. The default value is $data_dir/log.
     # plugins_dir: # Directory where grafana will automatically scan and look for plugins, can be empty. The default value is $data_dir/plugins.

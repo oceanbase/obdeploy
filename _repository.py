@@ -232,7 +232,7 @@ class ParallerExtractor(object):
                 pool.close()
                 pool = None
         except:
-            self.stdio and getattr(self.stdio, 'exception', print)()
+            self.stdio and getattr(self.stdio, 'exception', print)('')
         finally:
             pool and pool.close()
         return False

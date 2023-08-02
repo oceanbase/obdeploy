@@ -15,3 +15,4 @@ inspect2==0.1.2
 six==1.16.0
 pyinstaller==3.6
 bcrypt==3.1.7
+zstandard==0.14.1

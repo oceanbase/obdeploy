@@ -37,13 +37,14 @@ export default function DeleteDeployModal({
   setOBVersionValue,
 }: Props) {
   const {
+    selectedConfig,
+    setSelectedConfig,
     setConfigData,
     setIsDraft,
     setClusterMore,
     setComponentsMore,
     componentsVersionInfo,
     setComponentsVersionInfo,
-    setCurrentType,
     getInfoByName,
     setLowVersion,
     setErrorVisible,
@@ -95,14 +96,21 @@ export default function DeleteDeployModal({
             if (nameSuccess) {
               const { config } = nameData;
               const { components = {} } = config;
+              const newSelectedConfig:string[] = []
+              Object.keys(components).forEach((key)=>{
+                if(selectedConfig.includes(key) && components[key]){
+                  newSelectedConfig.push(key)
+                }else if(key === 'ocpexpress' && components[key]){
+                  // todo:同步为ocpexpress
+                  newSelectedConfig.push('ocp-express')
+                }
+              })
+              setSelectedConfig(newSelectedConfig)
               setConfigData(config || {});
               setLowVersion(checkLowVersion(components?.oceanbase?.version));
               setClusterMore(!!components?.oceanbase?.parameters?.length);
               setComponentsMore(!!components?.obproxy?.parameters?.length);
               setIsDraft(true);
-              setCurrentType(
-                components?.oceanbase && !components?.obproxy ? 'ob' : 'all',
-              );
 
               const newSelectedVersionInfo = componentsVersionInfo?.[
                 oceanbaseComponent

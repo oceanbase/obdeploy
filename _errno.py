@@ -175,6 +175,9 @@ EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE = OBDErrorCodeTemplate(4305
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant.')
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM = OBDErrorCodeTemplate(4305, 'There is not enough memory for ocp meta tenant')
 EC_OCP_EXPRESS_ADMIN_PASSWD_ERROR = OBDErrorCodeTemplate(4306, '({ip}) ocp-express admin_passwd invalid.(Current :{current})')
+
+# 4350-4399 had been used by ocp
+
 # sql
 EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
 

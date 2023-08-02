@@ -96,12 +96,14 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
     def summit_config():
         generate_global_config = generate_configs['global']
         for key in generate_global_config:
+            stdio.verbose('Update global config %s to %s' % (key, generate_global_config[key]))
             cluster_config.update_global_conf(key, generate_global_config[key], False)
         for server in cluster_config.servers:
             if server not in generate_configs:
                 continue
             generate_server_config = generate_configs[server]
             for key in generate_server_config:
+                stdio.verbose('Update server %s config %s to %s' % (server, key, generate_server_config[key]))
                 cluster_config.update_server_conf(server, key, generate_server_config[key], False)
 
     clients = plugin_context.clients
@@ -145,7 +147,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         ip = server.ip
         client = clients[server]
         server_config = cluster_config.get_server_conf_with_default(server)
-        user_server_config = cluster_config.get_original_server_conf_with_global(server)
+        user_server_config = cluster_config.get_original_server_conf_with_global(server, format_conf=True)
 
         if user_server_config.get('devname') is None:
             if client.is_localhost():

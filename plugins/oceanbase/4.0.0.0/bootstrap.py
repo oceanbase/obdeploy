@@ -119,9 +119,10 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
         has_ocp = True
     if has_ocp:
         global_conf_with_default = deepcopy(cluster_config.get_global_conf_with_default())
+        original_global_conf = cluster_config.get_original_global_conf()
         ocp_meta_tenant_prefix = 'ocp_meta_tenant_'
         for key in global_conf_with_default:
-            if key.startswith(ocp_meta_tenant_prefix):
+            if key.startswith(ocp_meta_tenant_prefix) and original_global_conf.get(key, None):
                 global_conf_with_default['ocp_meta_tenant'][key.replace(ocp_meta_tenant_prefix, '', 1)] = global_conf_with_default[key]
         tenant_info = global_conf_with_default["ocp_meta_tenant"]
         tenant_info["variables"] = "ob_tcp_invited_nodes='%'"

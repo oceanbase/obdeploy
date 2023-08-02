@@ -158,15 +158,15 @@ class ObVersionGraph(object):
             res.insert(0, start_node)
         if len(res) > 0 and res[-1].deprecated:
             raise Exception('upgrade destination version:{}{} is deprecated, not support upgrade.'.format(res[-1].version, '-{}'.format(res[-1].release) if res[-1].release else ''))
-        return format_route(res)
+        return format_route(res, current_repository)
 
 
-def format_route(routes):
+def format_route(routes, repository):
     route_res = []
     for i, node in enumerate(routes):
         require_from_binary = getattr(node, 'require_from_binary', False)
         if getattr(node, 'when_come_from', False):
-            require_from_binary = require_from_binary and routes[0].version in node.when_come_from
+            require_from_binary = require_from_binary and (repository.version in node.when_come_from or '%s-%s' % (repository.version, repository.release.split('.')[0]) in node.when_come_from)
 
         route_res.append({
                 'version': node.version,
@@ -194,17 +194,17 @@ def upgrade_route(plugin_context, current_repository, dest_repository, *args, **
     stdio = plugin_context.stdio
     repository_dir = dest_repository.repository_dir
 
-    if dest_repository.version >= Version("4.2"):
+    if dest_repository.version >= Version("4.3"):
         stdio.error('upgrade observer to version {} is not support, please upgrade obd first.'.format(dest_repository.version))
         return
 
     if current_repository.version == dest_repository.version:
-        return plugin_context.return_true(route=format_route([current_repository, dest_repository]))
+        return plugin_context.return_true(route=format_route([current_repository, dest_repository], current_repository))
 
     upgrade_dep_name = 'etc/oceanbase_upgrade_dep.yml'
     upgrade_dep_path = os.path.join(repository_dir, upgrade_dep_name)
     if not os.path.isfile(upgrade_dep_path):
-        stdio.error('%s No such file: %s' % (dest_repository, upgrade_dep_name))
+        stdio.error('%s No such file: %s. \n No upgrade route available' % (dest_repository, upgrade_dep_name))
         return
 
     version_dep = {}

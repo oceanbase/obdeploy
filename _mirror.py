@@ -271,9 +271,9 @@ class RemoteMirrorRepository(MirrorRepository):
             self._load_repo_age()
         if self.enabled:
             repo_age = ConfigUtil.get_value_from_dict(meta_data, 'repo_age', 0, int)
-            if repo_age > self.repo_age or int(time.time()) - 86400 > self.repo_age:
-                self.repo_age = repo_age
-                self.update_mirror()
+            if (repo_age > self.repo_age or int(time.time()) - 86400 > self.repo_age) and self.available:
+                if self.update_mirror():
+                    self.repo_age = repo_age
         
     @property
     def available(self):

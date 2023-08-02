@@ -2284,12 +2284,15 @@ class ObdHome(object):
             self._call_stdio('stop_loading', 'succeed')
         return False
 
-    def redeploy_cluster(self, name, search_repo=True):
+    def redeploy_cluster(self, name, search_repo=True, need_confirm=False):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
         self.set_deploy(deploy)
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+        
+        if need_confirm and not self._call_stdio('confirm', 'Are you sure to  destroy the "%s" cluster and rebuild it?' % name):
             return False
         deploy_info = deploy.deploy_info
 
@@ -2630,9 +2633,9 @@ class ObdHome(object):
 
             route = []
             use_images = []
-            upgrade_route_plugins = self.search_py_script_plugin([current_repository], 'upgrade_route', no_found_act='warn')
-            if current_repository in upgrade_route_plugins:
-                ret = self.call_plugin(upgrade_route_plugins[current_repository], current_repository , current_repository=current_repository, dest_repository=dest_repository)
+            upgrade_route_plugins = self.search_py_script_plugin([dest_repository], 'upgrade_route', no_found_act='warn')
+            if dest_repository in upgrade_route_plugins:
+                ret = self.call_plugin(upgrade_route_plugins[dest_repository], current_repository , current_repository=current_repository, dest_repository=dest_repository)
                 route = ret.get_return('route')
                 if not route:
                     return False
@@ -2740,9 +2743,6 @@ class ObdHome(object):
 
         install_plugins = self.get_install_plugin_and_install(upgrade_repositories, [])
         if not install_plugins:
-            return False
-
-        if not self.install_repositories_to_servers(deploy_config, upgrade_repositories[1:], install_plugins, ssh_clients, self.options):
             return False
 
         script_query_timeout = getattr(self.options, 'script_query_timeout', '')
@@ -4006,7 +4006,7 @@ class ObdHome(object):
 
         cluster_config = deploy_config.components[component_name]
         if not cluster_config.servers:
-            self._call_stdio('error', '%s server list is empty' % allow_components[0])
+            self._call_stdio('error', '%s server list is empty' % allow_components)
             return False
         self._call_stdio('start_loading', 'Get local repositories and plugins')
         # Get the repository
@@ -4015,8 +4015,9 @@ class ObdHome(object):
         self._call_stdio('stop_loading', 'succeed')
         target_repository = None
         for repository in repositories:
-            if repository.name == allow_components[0]:
+            if repository.name == component_name:
                 target_repository = repository
+                break
         if gather_type in ['gather_plan_monitor']:
             setattr(opts, 'connect_cluster', True)          
         obdiag_path = getattr(opts, 'obdiag_dir', None) 

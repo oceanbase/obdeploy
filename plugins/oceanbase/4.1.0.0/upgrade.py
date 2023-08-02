@@ -374,20 +374,36 @@ class Upgrader(object):
                         time.sleep(3)
 
             # major freeze
-            # 1. check merge status
-            pre_global_broadcast_scn = 0
-            while True:
-                merge_status = self.execute_sql("select max(global_broadcast_scn) as global_broadcast_scn, max(global_broadcast_scn > last_scn) as is_merging from CDB_OB_MAJOR_COMPACTION")
-                if merge_status['is_merging'] == 0:
-                    pre_global_broadcast_scn = merge_status['global_broadcast_scn']
-                    break
-                time.sleep(3)
+            # 1. wait all tenant global_broadcast_scn = last_scn,  record tenant_id, global_broadcast_scn
+            pre_tenant_scn_dict = {}
+            tenant_ids = []
+            for tenant_info in self.execute_sql("select tenant_id from CDB_OB_MAJOR_COMPACTION", one=False):
+                tenant_ids.append(tenant_info['tenant_id'])
+            while tenant_ids:
+                pre_tenant_scn_list = self.execute_sql("select tenant_id, global_broadcast_scn, last_scn from CDB_OB_MAJOR_COMPACTION where tenant_id in ({})".format(",".join([str(x) for x in tenant_ids])), one=False)
+                tenant_ids = []
+                for pre_tenant_scn in pre_tenant_scn_list:
+                    if pre_tenant_scn['global_broadcast_scn'] > pre_tenant_scn['last_scn']:
+                        tenant_ids.append(pre_tenant_scn['tenant_id'])
+                        continue
+                    pre_tenant_scn_dict[pre_tenant_scn['tenant_id']] = pre_tenant_scn['global_broadcast_scn']
+                time.sleep(1)
+
             # 2. begin merge
             self.execute_sql("alter system major freeze tenant = all", error=False)
+
             # 3. wait merge start
-            while self.execute_sql("select * from CDB_OB_MAJOR_COMPACTION where global_broadcast_scn <= %s", [pre_global_broadcast_scn]):
+            tenant_ids = pre_tenant_scn_dict.keys()
+            while tenant_ids:
+                tenant_scn_list = self.execute_sql("select tenant_id, global_broadcast_scn from CDB_OB_MAJOR_COMPACTION where tenant_id in ({})".format(",".join([str(x) for x in tenant_ids])), one=False)
+                tenant_ids = []
+                for tenant_scn in tenant_scn_list:
+                    if pre_tenant_scn_dict[tenant_scn['tenant_id']] >= tenant_scn['global_broadcast_scn']:
+                        tenant_ids.append(tenant_scn['tenant_id'])
+                        continue
                 time.sleep(3)
-            # 4.wait merge finsh
+
+            # 4. wait merge finish
             while self.execute_sql("select * from CDB_OB_MAJOR_COMPACTION where global_broadcast_scn > last_scn"):
                 time.sleep(3)
 

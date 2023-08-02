@@ -102,16 +102,6 @@
   need_redeploy: true
   description_en: specifies the zone name
   description_local: 节点所在的zone的名字。
-- name: max_px_worker_count
-  require: false
-  type: INT
-  default: 64
-  min_value: 0
-  max_value: 65535
-  section: TENANT
-  need_restart: false
-  description_en: maximum parallel execution worker count can be used for all parallel requests.
-  description_local: SQL并行查询引擎使用的最大线程数
 - name: sys_cpu_limit_trigger
   require: false
   type: INT
@@ -265,6 +255,32 @@
   need_restart: false
   description_en: size of the data file. Please enter an capacity, such as 20G
   description_local: 数据文件大小。请输入带容量带单位的整数，如20G
+- name: datafile_maxsize
+  name_local: 数据文件最大空间
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend max size. Please enter an capacity, such as 20G
+  description_local: 数据文件最大空间。请输入带容量带单位的整数，如20G
+- name: datafile_next
+  name_local: 数据文件自增步长
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend step. Please enter an capacity, such as 2G
+  description_local: 数据文件自增步长。请输入带容量带单位的整数，如2G
 - name: log_disk_percentage
   require: false
   type: INT
@@ -1005,16 +1021,6 @@
   need_restart: false
   description_en: default row format in mysql mode
   description_local: MySQL模式下，建表时使用的默认行格式
-- name: token_reserved_percentage
-  require: false
-  type: DOUBLE
-  default: 30
-  min_value: 0
-  max_value: 100
-  section: TENANT
-  need_restart: false
-  description_en: specifies the amount of token increase allocated to a tenant based on his consumption from the last round (without exceeding his upper limit).
-  description_local: 控制租户CPU调度中每次预留多少比例的空闲token数给租户
 - name: stack_size
   require: false
   type: CAPACITY_MB
@@ -1178,26 +1184,6 @@
   need_restart: false
   description_en: EXTERNAL, use extrernal redundancy; NORMAL, tolerate one disk failure, HIGH tolerate two disk failure if disk count is enough
   description_local: OB内置本地磁盘RAID特性。暂勿使用
-- name: rootservice_memory_limit
-  require: false
-  type: CAPACITY_MB
-  default: 2G
-  min_value: 2G
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: max memory size which can be used by rs tenant
-  description_local: RootService最大内存限制
-- name: plan_cache_low_watermark
-  require: false
-  type: CAPACITY_MB
-  default: 1500M
-  min_value: NULL
-  max_value: NULL
-  section: TENANT
-  need_restart: false
-  description_en: memory usage at which plan cache eviction will be stopped.
-  description_local: 执行计划缓存占用内存低于该阈值时将停止淘汰
 - name: trx_2pc_retry_interval
   require: false
   type: TIME
@@ -1208,16 +1194,6 @@
   need_restart: false
   description_en: the time interval between the retries in case of failure during a transactions two-phase commit phase
   description_local: 两阶段提交失败时候自动重试的间隔
-- name: global_write_halt_residual_memory
-  require: false
-  type: INT
-  default: 30
-  min_value: 1
-  max_value: 99
-  section: OBSERVER
-  need_restart: false
-  description_en: disable write to memstore when observer memstore free memory(plus memory hold by blockcache) lower than this limit,
-  description_local: 当全局剩余内存小于这个百分比时，暂停普通租户写入（sys租户不受影响）
 - name: cpu_count
   name_local: 系统CPU总数
   require: false
@@ -1560,16 +1536,6 @@
   need_restart: false
   description_en: a balance task failed count to be putted into blacklist
   description_local: 副本迁移等后台任务连续失败超过该阈值后，将被放入黑名单
-- name: system_trace_level
-  require: false
-  type: INT
-  default: 1
-  min_value: 0
-  max_value: 2
-  section: OBSERVER
-  need_restart: false
-  description_en: system trace log level, 0:none, 1:standard, 2:debug.
-  description_local: 系统追踪日志的日志打印级别
 - name: wait_leader_batch_count
   require: false
   type: INT
@@ -1580,16 +1546,6 @@
   need_restart: false
   description_en: leader batch count everytime leader coordinator wait.
   description_local: RootService发送切主命令的批次大小
-- name: trace_log_sampling_interval
-  require: false
-  type: TIME
-  default: 10ms
-  min_value: 0ms
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: the time interval for periodically printing log info in trace log. When force_trace_log is set to FALSE, for each time interval specifies by sampling_trace_log_interval, logging info regarding ‘slow query’ and ‘white list’ will be printed out.
-  description_local: 追踪日志的采样间隔，当force_trace_log关闭的时候生效
 - name: proxyro_password
   require: false
   type: STRING

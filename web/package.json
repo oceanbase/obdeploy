@@ -28,7 +28,7 @@
     "antd": "5.0.7",
     "copy-to-clipboard": "3.3.3",
     "cross-env": "7.0.3",
-    "i18next": "22.4.15",
+    "i18next": "^23.2.11",
     "lottie-web": "5.10.2",
     "moment": "2.29.4",
     "number-precision": "1.6.0",
@@ -51,5 +51,6 @@
   },
   "gitHooks": {
     "pre-commit": "lint-staged"
-  }
+  },
+  "repository": "git@gitlab.alibaba-inc.com:oceanbase/ob-deploy.git"
 }

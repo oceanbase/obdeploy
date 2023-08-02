@@ -31,13 +31,13 @@ interface ComponentsNodeConfig {
 export default function CheckInfo() {
   const {
     configData,
-    currentType,
     setCheckOK,
     lowVersion,
     setCurrentStep,
     handleQuitProgress,
     setErrorVisible,
     setErrorsList,
+    selectedConfig,
     errorsList,
   } = useModel('global');
   const { components = {}, auth, home_path } = configData || {};
@@ -91,8 +91,15 @@ export default function CheckInfo() {
 
   const getComponentsNodeConfigList = () => {
     const componentsNodeConfigList: ComponentsNodeConfig[] = [];
+    //todo:待优化
+    let _selectedConfig = [...selectedConfig];
+    _selectedConfig.forEach((item, idx) => {
+      if (item === 'ocp-express') {
+        _selectedConfig[idx] = 'ocpexpress';
+      }
+    });
     let currentOnlyComponentsKeys = onlyComponentsKeys.filter(
-      (key) => key !== 'obagent',
+      (key) => key !== 'obagent' && _selectedConfig.includes(key),
     );
 
     if (lowVersion) {
@@ -271,39 +278,58 @@ export default function CheckInfo() {
     },
   ];
 
-  if (currentType === 'all') {
-    const content = [
-      {
-        label: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.ObproxyServicePort',
-          defaultMessage: 'OBProxy 服务端口',
-        }),
-        value: obproxy?.listen_port,
-      },
-      {
-        label: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.PortObproxyExporter',
-          defaultMessage: 'OBProxy Exporter 端口',
-        }),
-        value: obproxy?.prometheus_listen_port,
-      },
-      {
-        label: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.ObagentMonitoringServicePort',
-          defaultMessage: 'OBAgent 监控服务端口',
-        }),
-        value: obagent?.monagent_http_port,
-      },
-      {
-        label: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.ObagentManageServicePorts',
-          defaultMessage: 'OBAgent 管理服务端口',
-        }),
-        value: obagent?.mgragent_http_port,
-      },
-    ];
+  if (selectedConfig.length) {
+    let content: any[] = [],
+      more: any = [];
+    if (selectedConfig.includes('obproxy')) {
+      content = content.concat(
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.ObproxyServicePort',
+            defaultMessage: 'OBProxy 服务端口',
+          }),
+          value: obproxy?.listen_port,
+        },
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.PortObproxyExporter',
+            defaultMessage: 'OBProxy Exporter 端口',
+          }),
+          value: obproxy?.prometheus_listen_port,
+        },
+      );
+      obproxy?.parameters?.length &&
+        more.push({
+          label: componentsConfig['obproxy'].labelName,
+          parameters: obproxy?.parameters,
+        });
+    }
 
-    if (!lowVersion) {
+    if (selectedConfig.includes('obagent')) {
+      content = content.concat(
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.ObagentMonitoringServicePort',
+            defaultMessage: 'OBAgent 监控服务端口',
+          }),
+          value: obagent?.monagent_http_port,
+        },
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.ObagentManageServicePorts',
+            defaultMessage: 'OBAgent 管理服务端口',
+          }),
+          value: obagent?.mgragent_http_port,
+        },
+      );
+      obagent?.parameters?.length &&
+        more.push({
+          label: componentsConfig['obagent'].labelName,
+          parameters: obagent?.parameters,
+        });
+    }
+    // more是否有数据跟前面是否打开更多配置有关
+    if (!lowVersion && selectedConfig.includes('ocp-express')) {
       content.push({
         label: intl.formatMessage({
           id: 'OBD.pages.components.CheckInfo.PortOcpExpress',
@@ -311,28 +337,13 @@ export default function CheckInfo() {
         }),
         value: ocpexpress?.port,
       });
-    }
-
-    let more: any = [];
-    if (obproxy?.parameters?.length) {
-      more = [
-        {
-          label: componentsConfig['obproxy'].labelName,
-          parameters: obproxy?.parameters,
-        },
-        {
-          label: componentsConfig['obagent'].labelName,
-          parameters: obagent?.parameters,
-        },
-      ];
-
-      if (!lowVersion) {
+      ocpexpress?.parameters?.length &&
         more.push({
           label: componentsConfig['ocpexpress'].labelName,
           parameters: ocpexpress?.parameters,
         });
-      }
     }
+
     clusterConfigInfo.push({
       key: 'components',
       group: intl.formatMessage({
@@ -342,6 +353,7 @@ export default function CheckInfo() {
       content,
       more,
     });
+    console.log('clusterConfigInfo', clusterConfigInfo);
   }
 
   return (
@@ -379,23 +391,6 @@ export default function CheckInfo() {
                   })}
                 >
                   {oceanbase?.appname}
-                </ProCard>
-                <ProCard
-                  colSpan={14}
-                  title={intl.formatMessage({
-                    id: 'OBD.pages.components.CheckInfo.DeploymentType',
-                    defaultMessage: '部署类型',
-                  })}
-                >
-                  {currentType === 'all'
-                    ? intl.formatMessage({
-                        id: 'OBD.pages.components.CheckInfo.FullyDeployed',
-                        defaultMessage: '完全部署',
-                      })
-                    : intl.formatMessage({
-                        id: 'OBD.pages.components.CheckInfo.ThinDeployment',
-                        defaultMessage: '精简部署',
-                      })}
                 </ProCard>
               </ProCard>
             </Col>
@@ -479,7 +474,7 @@ export default function CheckInfo() {
               />
             </ProCard>
           </ProCard>
-          {currentType === 'all' ? (
+          {selectedConfig.length ? (
             <ProCard
               title={intl.formatMessage({
                 id: 'OBD.pages.components.CheckInfo.ComponentNodeConfiguration',
@@ -612,31 +607,31 @@ export default function CheckInfo() {
                   ))}
                 </ProCard>
               </Col>
-              <Space
-                direction="vertical"
-                size="middle"
-                style={{ marginTop: 16 }}
-              >
-                {item?.more?.length
-                  ? item?.more.map((moreItem) => (
-                      <ProCard
-                        className={styles.infoSubCard}
-                        style={{ border: '1px solid #e2e8f3' }}
-                        split="vertical"
-                        key={moreItem.label}
-                      >
-                        <Table
-                          className={`${styles.infoCheckTable}  ob-table`}
-                          columns={getMoreColumns(moreItem.label)}
-                          dataSource={moreItem?.parameters}
-                          pagination={false}
-                          scroll={{ y: 300 }}
-                          rowKey="key"
-                        />
-                      </ProCard>
-                    ))
-                  : null}
-              </Space>
+              {item?.more?.length ? (
+                <Space
+                  direction="vertical"
+                  size="middle"
+                  style={{ marginTop: 16 }}
+                >
+                  {item?.more.map((moreItem) => (
+                    <ProCard
+                      className={styles.infoSubCard}
+                      style={{ border: '1px solid #e2e8f3' }}
+                      split="vertical"
+                      key={moreItem.label}
+                    >
+                      <Table
+                        className={`${styles.infoCheckTable}  ob-table`}
+                        columns={getMoreColumns(moreItem.label)}
+                        dataSource={moreItem?.parameters}
+                        pagination={false}
+                        scroll={{ y: 300 }}
+                        rowKey="key"
+                      />
+                    </ProCard>
+                  ))}
+                </Space>
+              ) : null}
             </ProCard>
           ))}
         </Row>
