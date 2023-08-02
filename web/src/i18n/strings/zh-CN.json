@@ -285,5 +285,6 @@
   "OBD.pages.components.NodeConfig.NodeConfigurationPreviousStep": "节点配置-上一步",
   "OBD.pages.components.NodeConfig.AreYouSureYouWant": "确定删除该条 Zone 的相关配置吗？",
   "OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs": "OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。",
-  "OBD.pages.components.InstallProcess.Deploying": "部署中..."
+  "OBD.pages.components.InstallProcess.Deploying": "部署中...",
+  "OBD.pages.components.InstallConfig.OptionalComponents": "可选组件"
 }

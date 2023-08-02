@@ -47,36 +47,39 @@ import { getLocale } from 'umi';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
+type rowDataType = {
+  key: string;
+  name: string;
+  onlyAll: boolean;
+  desc: string;
+  doc: string;
+};
+
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
-
-interface FormValues {
-  type?: string;
-}
-
 const appnameReg = /^[a-zA-Z]([a-zA-Z0-9]{0,19})$/;
 
+const oceanBaseInfo = {
+  group: intl.formatMessage({
+    id: 'OBD.pages.components.InstallConfig.Database',
+    defaultMessage: '数据库',
+  }),
+  key: 'database',
+  content: [
+    {
+      key: oceanbaseComponent,
+      name: 'OceanBase Database',
+      onlyAll: false,
+      desc: intl.formatMessage({
+        id: 'OBD.pages.components.InstallConfig.ItIsAFinancialLevel',
+        defaultMessage:
+          '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
+      }),
+      doc: 'https://www.oceanbase.com/docs/oceanbase-database-cn',
+    },
+  ],
+};
 const componentsGroupInfo = [
-  {
-    group: intl.formatMessage({
-      id: 'OBD.pages.components.InstallConfig.Database',
-      defaultMessage: '数据库',
-    }),
-    key: 'database',
-    content: [
-      {
-        key: oceanbaseComponent,
-        name: 'OceanBase Database',
-        onlyAll: false,
-        desc: intl.formatMessage({
-          id: 'OBD.pages.components.InstallConfig.ItIsAFinancialLevel',
-          defaultMessage:
-            '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
-        }),
-        doc: 'https://www.oceanbase.com/docs/oceanbase-database-cn',
-      },
-    ],
-  },
   {
     group: intl.formatMessage({
       id: 'OBD.pages.components.InstallConfig.Proxy',
@@ -103,7 +106,7 @@ const componentsGroupInfo = [
       id: 'OBD.pages.components.InstallConfig.Tools',
       defaultMessage: '工具',
     }),
-    key: 'tool',
+    key: 'ocpexpressTool',
     onlyAll: true,
     content: [
       {
@@ -117,6 +120,16 @@ const componentsGroupInfo = [
         }),
         doc: 'https://www.oceanbase.com/docs/common-oceanbase-database-cn-0000000001626262',
       },
+    ],
+  },
+  {
+    group: intl.formatMessage({
+      id: 'OBD.pages.components.InstallConfig.Tools',
+      defaultMessage: '工具',
+    }),
+    key: 'obagentTool',
+    onlyAll: true,
+    content: [
       {
         key: obagentComponent,
         name: 'OBAgent',
@@ -140,8 +153,6 @@ export default function InstallConfig() {
     setCurrentStep,
     configData,
     setConfigData,
-    currentType,
-    setCurrentType,
     lowVersion,
     isFirstTime,
     setIsFirstTime,
@@ -155,6 +166,8 @@ export default function InstallConfig() {
     setErrorVisible,
     errorsList,
     setErrorsList,
+    selectedConfig,
+    setSelectedConfig,
   } = useModel('global');
   const { components, home_path } = configData || {};
   const { oceanbase } = components || {};
@@ -166,7 +179,8 @@ export default function InstallConfig() {
   const [hasDraft, setHasDraft] = useState(false);
   const [deleteLoadingVisible, setDeleteLoadingVisible] = useState(false);
   const [deleteName, setDeleteName] = useState('');
-  const [installMemory, setInstallMemory] = useState(0);
+  const [deployMemory, setDeployMemory] = useState(0);
+  const [componentsMemory, setComponentsMemory] = useState(0);
   const [form] = ProForm.useForm();
   const [unavailableList, setUnavailableList] = useState<string[]>([]);
   const [componentLoading, setComponentLoading] = useState(false);
@@ -204,21 +218,11 @@ export default function InstallConfig() {
     },
   });
 
-  const judgVersions = (type: string, source: API.ComponentsVersionInfo) => {
-    if (type === 'all') {
-      if (Object.keys(source).length !== allComponentsName.length) {
-        setExistNoVersion(true);
-      } else {
-        setExistNoVersion(false);
-      }
+  const judgVersions = (source: API.ComponentsVersionInfo) => {
+    if (Object.keys(source).length !== allComponentsName.length) {
+      setExistNoVersion(true);
     } else {
-      if (
-        !(source?.[oceanbaseComponent] && source?.[oceanbaseComponent]?.version)
-      ) {
-        setExistNoVersion(true);
-      } else {
-        setExistNoVersion(false);
-      }
+      setExistNoVersion(false);
     }
   };
 
@@ -230,12 +234,16 @@ export default function InstallConfig() {
       }: API.OBResponseDataListComponent_) => {
         if (success) {
           const newComponentsVersionInfo = {};
-          const oceanbaseVersionsData = data?.items?.filter(item => item.name === oceanbaseComponent);
+          const oceanbaseVersionsData = data?.items?.filter(
+            (item) => item.name === oceanbaseComponent,
+          );
 
-          const initOceanbaseVersionInfo = oceanbaseVersionsData[0]?.info[0] || {};
-          const newSelectedOceanbaseVersionInfo = oceanbaseVersionsData[0]?.info?.filter(
-            (item) => item.md5 === oceanbase?.package_hash,
-          )?.[0];
+          const initOceanbaseVersionInfo =
+            oceanbaseVersionsData[0]?.info[0] || {};
+          const newSelectedOceanbaseVersionInfo =
+            oceanbaseVersionsData[0]?.info?.filter(
+              (item) => item.md5 === oceanbase?.package_hash,
+            )?.[0];
 
           const currentOceanbaseVersionInfo =
             newSelectedOceanbaseVersionInfo || initOceanbaseVersionInfo;
@@ -254,12 +262,15 @@ export default function InstallConfig() {
                   };
                 } else if (item.name === obproxyComponent) {
                   let currentObproxyVersionInfo = {};
-                  item?.info?.some(subItem => {
-                    if (subItem?.version_type === currentOceanbaseVersionInfo?.version_type) {
+                  item?.info?.some((subItem) => {
+                    if (
+                      subItem?.version_type ===
+                      currentOceanbaseVersionInfo?.version_type
+                    ) {
                       currentObproxyVersionInfo = subItem;
                       return true;
                     }
-                    return false
+                    return false;
                   });
                   newComponentsVersionInfo[item.name] = {
                     ...currentObproxyVersionInfo,
@@ -278,7 +289,7 @@ export default function InstallConfig() {
           const noVersion =
             Object.keys(newComponentsVersionInfo).length !==
             allComponentsName.length;
-          judgVersions(currentType, newComponentsVersionInfo);
+          judgVersions(newComponentsVersionInfo);
           setComponentsVersionInfo(newComponentsVersionInfo);
 
           if (noVersion) {
@@ -327,13 +338,6 @@ export default function InstallConfig() {
         }
       },
     });
-
-  const onValuesChange = (values: FormValues) => {
-    if (values?.type) {
-      setCurrentType(values?.type);
-      judgVersions(values?.type, componentsVersionInfo);
-    }
-  };
 
   const nameValidator = async (_: any, value: string) => {
     if (value) {
@@ -402,7 +406,7 @@ export default function InstallConfig() {
           package_hash: componentsVersionInfo?.[oceanbaseComponent]?.md5,
         },
       };
-      if (currentType === 'all') {
+      if (selectedConfig.includes('obproxy')) {
         newComponents.obproxy = {
           ...(components?.obproxy || {}),
           component:
@@ -413,15 +417,8 @@ export default function InstallConfig() {
           release: componentsVersionInfo?.[obproxyComponent]?.release,
           package_hash: componentsVersionInfo?.[obproxyComponent]?.md5,
         };
-        if (!lowVersion) {
-          newComponents.ocpexpress = {
-            ...(components?.ocpexpress || {}),
-            component: ocpexpressComponent,
-            version: componentsVersionInfo?.[ocpexpressComponent]?.version,
-            release: componentsVersionInfo?.[ocpexpressComponent]?.release,
-            package_hash: componentsVersionInfo?.[ocpexpressComponent]?.md5,
-          };
-        }
+      }
+      if (selectedConfig.includes('obagent')) {
         newComponents.obagent = {
           ...(components?.obagent || {}),
           component: obagentComponent,
@@ -430,6 +427,16 @@ export default function InstallConfig() {
           package_hash: componentsVersionInfo?.[obagentComponent]?.md5,
         };
       }
+      if (!lowVersion && selectedConfig.includes('ocp-express')) {
+        newComponents.ocpexpress = {
+          ...(components?.ocpexpress || {}),
+          component: ocpexpressComponent,
+          version: componentsVersionInfo?.[ocpexpressComponent]?.version,
+          release: componentsVersionInfo?.[ocpexpressComponent]?.release,
+          package_hash: componentsVersionInfo?.[ocpexpressComponent]?.md5,
+        };
+      }
+
       setConfigData({
         ...configData,
         components: newComponents,
@@ -454,15 +461,15 @@ export default function InstallConfig() {
     )[0];
 
     let currentObproxyVersionInfo = {};
-    componentsVersionInfo?.[
-      obproxyComponent
-    ]?.dataSource?.some((item: API.service_model_components_ComponentInfo) => {
-      if (item?.version_type === newSelectedVersionInfo?.version_type) {
-        currentObproxyVersionInfo = item;
-        return true;
-      }
-      return false
-    });
+    componentsVersionInfo?.[obproxyComponent]?.dataSource?.some(
+      (item: API.service_model_components_ComponentInfo) => {
+        if (item?.version_type === newSelectedVersionInfo?.version_type) {
+          currentObproxyVersionInfo = item;
+          return true;
+        }
+        return false;
+      },
+    );
     setComponentsVersionInfo({
       ...componentsVersionInfo,
       [oceanbaseComponent]: {
@@ -471,8 +478,8 @@ export default function InstallConfig() {
       },
       [obproxyComponent]: {
         ...componentsVersionInfo[obproxyComponent],
-        ...currentObproxyVersionInfo
-      }
+        ...currentObproxyVersionInfo,
+      },
     });
     setLowVersion(
       !!(
@@ -491,45 +498,42 @@ export default function InstallConfig() {
     }
   };
 
-  const getColumns = (group: string) => {
+  const getColumns = (group: string, supportCheckbox: boolean) => {
     const columns: ColumnsType<API.TableComponentInfo> = [
       {
         title: group,
         dataIndex: 'name',
-        width: 195,
+        width: supportCheckbox ? 147 : 195,
         render: (text, record) => {
-          if (currentType === 'all') {
-            return (
-              <>
-                {text}
-                {record.key === ocpexpressComponent && lowVersion ? (
-                  <Tooltip
-                    title={intl.formatMessage({
-                      id: 'OBD.pages.components.InstallConfig.OcpExpressOnlySupportsAnd',
-                      defaultMessage:
-                        'OCP Express 仅支持 4.0 及以上版本 OceanBase Database。',
-                    })}
-                  >
-                    <span className={`${styles.iconContainer} warning-color`}>
-                      <InfoOutlined className={styles.icon} />
-                    </span>
-                  </Tooltip>
-                ) : !componentsVersionInfo[record.key]?.version ? (
-                  <Tooltip
-                    title={intl.formatMessage({
-                      id: 'OBD.pages.components.InstallConfig.UnableToObtainTheInstallation',
-                      defaultMessage: '无法获取安装包，请检查安装程序配置。',
-                    })}
-                  >
-                    <span className={`${styles.iconContainer} error-color`}>
-                      <CloseOutlined className={styles.icon} />
-                    </span>
-                  </Tooltip>
-                ) : null}
-              </>
-            );
-          }
-          return text;
+          return (
+            <>
+              {text}
+              {record.key === ocpexpressComponent && lowVersion ? (
+                <Tooltip
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.InstallConfig.OcpExpressOnlySupportsAnd',
+                    defaultMessage:
+                      'OCP Express 仅支持 4.0 及以上版本 OceanBase Database。',
+                  })}
+                >
+                  <span className={`${styles.iconContainer} warning-color`}>
+                    <InfoOutlined className={styles.icon} />
+                  </span>
+                </Tooltip>
+              ) : !componentsVersionInfo[record.key]?.version ? (
+                <Tooltip
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.InstallConfig.UnableToObtainTheInstallation',
+                    defaultMessage: '无法获取安装包，请检查安装程序配置。',
+                  })}
+                >
+                  <span className={`${styles.iconContainer} error-color`}>
+                    <CloseOutlined className={styles.icon} />
+                  </span>
+                </Tooltip>
+              ) : null}
+            </>
+          );
         },
       },
       {
@@ -619,8 +623,8 @@ export default function InstallConfig() {
         render: (text, record) => {
           let disabled = false;
           if (
-            (record.key === ocpexpressComponent && lowVersion) ||
-            (currentType === 'ob' && record.onlyAll)
+            record.key === ocpexpressComponent &&
+            lowVersion
           ) {
             disabled = true;
           }
@@ -656,6 +660,36 @@ export default function InstallConfig() {
         defaultMessage: '复制成功',
       }),
     );
+  };
+
+  /**
+   * tip:如果选择OCP Express，则OBAgent则自动选择，无需提示
+   * 如果不选择 OBAgent, 则 OCP Express 则自动不选择，无需提示
+   */
+  const handleSelect = (record: rowDataType, selected: boolean) => {
+    if (!selected) {
+      let newConfig = [],
+        target = false;
+      target =
+        record.key === 'obagent' && selectedConfig.includes('ocp-express');
+      for (let val of selectedConfig) {
+        if (target && val === 'ocp-express') continue;
+        if (val !== record.key) {
+          newConfig.push(val);
+        }
+      }
+      setSelectedConfig(newConfig);
+    } else {
+      if (record.key === 'ocp-express' && !selectedConfig.includes('obagent')) {
+        setSelectedConfig([...selectedConfig, record.key, 'obagent']);
+      } else {
+        setSelectedConfig([...selectedConfig, record.key]);
+      }
+    }
+  };
+
+  const caculateSize = (originSize: number): string => {
+    return NP.divide(NP.divide(originSize, 1024), 1024).toFixed(2);
   };
 
   useEffect(() => {
@@ -740,31 +774,24 @@ export default function InstallConfig() {
   }, []);
 
   useEffect(() => {
-    let newInstallMemory = 0;
-    if (currentType === 'ob') {
-      newInstallMemory =
-        componentsVersionInfo?.[oceanbaseComponent]?.estimated_size;
-    } else {
-      const keys = Object.keys(componentsVersionInfo);
-      keys.forEach((key) => {
-        newInstallMemory =
-          newInstallMemory + componentsVersionInfo[key]?.estimated_size;
-      });
-    }
-    setInstallMemory(newInstallMemory);
-  }, [componentsVersionInfo, currentType]);
-
-  useEffect(() => {
-    form.setFieldsValue({ type: currentType });
-  }, [currentType]);
+    let deployMemory: number =
+      componentsVersionInfo?.[oceanbaseComponent]?.estimated_size || 0;
+    let componentsMemory: number = 0;
+    const keys = Object.keys(componentsVersionInfo);
+    keys.forEach((key) => {
+      if (key !== 'oceanbaseComponent' && selectedConfig.includes(key)) {
+        componentsMemory += componentsVersionInfo[key]?.estimated_size;
+      }
+    });
+    setDeployMemory(deployMemory);
+    setComponentsMemory(componentsMemory);
+  }, [componentsVersionInfo, selectedConfig]);
 
   useEffect(() => {
     form.setFieldsValue({
       appname: configData?.components?.oceanbase?.appname || initAppName,
     });
   }, [configData]);
-
-  const size = NP.divide(NP.divide(installMemory, 1024), 1024).toFixed(2);
 
   return (
     <Spin spinning={loading}>
@@ -782,9 +809,7 @@ export default function InstallConfig() {
               submitter={false}
               initialValues={{
                 appname: oceanbase?.appname || initAppName,
-                type: currentType,
               }}
-              onValuesChange={onValuesChange}
             >
               <ProFormText
                 name="appname"
@@ -821,16 +846,6 @@ export default function InstallConfig() {
                 ]}
               />
 
-              <Form.Item
-                name="type"
-                label={intl.formatMessage({
-                  id: 'OBD.pages.components.InstallConfig.DeploymentType',
-                  defaultMessage: '部署类型',
-                })}
-                className="form-item-no-bottom"
-              >
-                <DeployType />
-              </Form.Item>
             </ProForm>
           </ProCard>
           <ProCard
@@ -848,7 +863,7 @@ export default function InstallConfig() {
                       id: 'OBD.pages.components.InstallConfig.EstimatedInstallationRequiresSizeMb',
                       defaultMessage: '预计安装需要 {size}MB 空间',
                     },
-                    { size: size },
+                    { size: caculateSize(deployMemory) },
                   )}
                 </span>
               </>
@@ -934,34 +949,80 @@ export default function InstallConfig() {
                 )
               ) : null}
               <Spin spinning={componentLoading}>
-                {componentsGroupInfo.map((info) => (
-                  <ProCard
-                    type="inner"
-                    className={`${styles.componentCard} ${currentType === 'ob' && info.onlyAll
-                      ? styles.disabledCard
-                      : ''
-                      }`}
-                    key={info.group}
-                  >
-                    <Table
-                      className={styles.componentTable}
-                      columns={getColumns(info.group)}
-                      rowKey="key"
-                      dataSource={info.content}
-                      pagination={false}
-                      rowClassName={(record) => {
-                        if (
-                          (record.key === ocpexpressComponent && lowVersion) ||
-                          (currentType === 'ob' && record?.onlyAll)
-                        ) {
-                          return styles.disabledRow;
-                        }
-                      }}
-                    />
-                  </ProCard>
-                ))}
+                <ProCard
+                  type="inner"
+                  className={`${styles.componentCard}`}
+                  key={oceanBaseInfo.group}
+                >
+                  <Table
+                    className={styles.componentTable}
+                    columns={getColumns(oceanBaseInfo.group, false)}
+                    rowKey="key"
+                    dataSource={oceanBaseInfo.content}
+                    pagination={false}
+                    rowClassName={(record) => {
+                      if (record.key === ocpexpressComponent && lowVersion) {
+                        return styles.disabledRow;
+                      }
+                    }}
+                  />
+                </ProCard>
               </Spin>
             </Space>
+          </ProCard>
+          <ProCard
+            title={
+              <>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.OptionalComponents',
+                  defaultMessage: '可选组件',
+                })}
+
+                <span className={styles.titleExtra}>
+                  <InfoCircleOutlined />{' '}
+                  {intl.formatMessage(
+                    {
+                      id: 'OBD.pages.components.InstallConfig.EstimatedInstallationRequiresSizeMb',
+                      defaultMessage: '预计部署需要 {size}MB 空间',
+                    },
+                    { size: caculateSize(componentsMemory) },
+                  )}
+                </span>
+              </>
+            }
+            className="card-header-padding-top-0 card-padding-bottom-24  card-padding-top-0"
+          >
+            {componentsGroupInfo.map((componentInfo) => (
+              <Space
+                className={styles.spaceWidth}
+                direction="vertical"
+                size="middle"
+              >
+                <ProCard
+                  type="inner"
+                  className={`${styles.componentCard}`}
+                  key={componentInfo.group}
+                >
+                  <Table
+                    rowSelection={{
+                      hideSelectAll: true,
+                      selectedRowKeys: selectedConfig,
+                      onSelect: handleSelect,
+                    }}
+                    className={styles.componentTable}
+                    columns={getColumns(componentInfo.group, true)}
+                    rowKey="key"
+                    dataSource={componentInfo.content}
+                    pagination={false}
+                    rowClassName={(record) => {
+                      if (record.key === ocpexpressComponent && lowVersion) {
+                        return styles.disabledRow;
+                      }
+                    }}
+                  />
+                </ProCard>
+              </Space>
+            ))}
           </ProCard>
         </ProCard>
         <footer className={styles.pageFooterContainer}>

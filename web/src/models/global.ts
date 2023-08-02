@@ -6,6 +6,7 @@ import { getErrorInfo } from '@/utils';
 
 export default () => {
   const initAppName = 'myoceanbase';
+  const [selectedConfig,setSelectedConfig] = useState(['obproxy','ocp-express','obagent']); // 有ocpexpress必定有obagent
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [configData, setConfigData] = useState<any>({});
   const [currentType, setCurrentType] = useState('all');
@@ -41,13 +42,13 @@ export default () => {
   });
 
   return {
+    selectedConfig,
+    setSelectedConfig,
     initAppName,
     currentStep,
     setCurrentStep,
     configData,
     setConfigData,
-    currentType,
-    setCurrentType,
     checkOK,
     setCheckOK,
     installStatus,

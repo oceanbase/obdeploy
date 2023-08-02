@@ -37,7 +37,7 @@ def call_plugin(plugin, plugin_context, repositories, *args, **kwargs):
                   stdio, *args, **kwargs)
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, *args, **kwargs):
 
     def summit_config():
         generate_global_config = generate_configs['global']
@@ -71,6 +71,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     apply_param_plugin(cur_repository)
     if not call_plugin(stop_plugin, plugin_context, repositories=[cur_repository], *args, **kwargs):
         return
+    install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
     # clean useless config
     clean_files = [
         "conf/config_properties/monagent_basic_auth.yaml",

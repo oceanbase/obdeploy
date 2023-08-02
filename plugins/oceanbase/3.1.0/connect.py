@@ -134,8 +134,9 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
                 server_config = cluster_config.get_server_conf(server)
                 password = server_config.get('root_password', '') if count % 2 else ''
                 cursor = Cursor(ip=server.ip, port=server_config['mysql_port'], tenant='', password=password if password is not None else '', stdio=stdio)
-                stdio.stop_loading('succeed')
-                return plugin_context.return_true(connect=cursor.db, cursor=cursor, server=server)
+                if cursor.execute('select 1', raise_exception=True):
+                    stdio.stop_loading('succeed')
+                    return plugin_context.return_true(connect=cursor.db, cursor=cursor, server=server)
             except:
                 if count == 0:
                     stdio.exception('')

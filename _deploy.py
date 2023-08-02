@@ -820,15 +820,20 @@ class ClusterConfig(object):
             self._cache_server[server] = self._apply_temp_conf(self._get_unprocessed_server_conf(server))
         return self._cache_server[server]
 
-    def get_original_global_conf(self):
-        return deepcopy(self._original_global_conf)
+    def get_original_global_conf(self, format_conf=False):
+        conf = deepcopy(self._original_global_conf)
+        format_conf and self._apply_temp_conf(conf)
+        return conf
 
-    def get_original_server_conf(self, server):
-        return self._server_conf.get(server)
+    def get_original_server_conf(self, server, format_conf=False):
+        conf = deepcopy(self._server_conf.get(server))
+        format_conf and self._apply_temp_conf(conf)
+        return conf
 
-    def get_original_server_conf_with_global(self, server):
-        config = self.get_original_global_conf()
+    def get_original_server_conf_with_global(self, server, format_conf=False):
+        config = deepcopy(self.get_original_global_conf())
         config.update(self._server_conf.get(server, {}))
+        format_conf and self._apply_temp_conf(config)
         return config
 
 

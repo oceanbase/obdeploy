@@ -13,3 +13,4 @@ six==1.16.0
 pyinstaller>=4.3
 bcrypt==4.0.0
 configparser>=5.2.0
+zstandard==0.21.0

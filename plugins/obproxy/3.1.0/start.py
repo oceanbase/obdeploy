@@ -242,7 +242,7 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
     stdio.start_loading('obproxy program health check')
     failed = []
     servers = cluster_config.servers
-    count = 20
+    count = 300
     while servers and count:
         count -= 1
         tmp_servers = []

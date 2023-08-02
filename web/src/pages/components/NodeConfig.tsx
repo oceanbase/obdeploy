@@ -47,10 +47,10 @@ interface FormValues extends API.Components {
 
 export default function NodeConfig() {
   const {
+    selectedConfig,
     setCurrentStep,
     configData,
     setConfigData,
-    currentType,
     lowVersion,
     handleQuitProgress,
     nameIndex,
@@ -139,17 +139,19 @@ export default function NodeConfig() {
 
   const setData = (dataSource: FormValues) => {
     let newComponents: API.Components = {};
-    if (currentType === 'all') {
+    if (selectedConfig.includes('obproxy')) {
       newComponents.obproxy = {
         ...(components.obproxy || {}),
         ...dataSource.obproxy,
       };
-      if (!lowVersion) {
-        newComponents.ocpexpress = {
-          ...(components.ocpexpress || {}),
-          ...dataSource?.ocpexpress,
-        };
-      }
+    }
+    if (selectedConfig.includes('ocp-express') && !lowVersion) {
+      newComponents.ocpexpress = {
+        ...(components.ocpexpress || {}),
+        ...dataSource?.ocpexpress,
+      };
+    }
+    if (selectedConfig.includes('obagent')) {
       newComponents.obagent = {
         ...(components.obagent || {}),
         servers: allOBServer,
@@ -827,7 +829,8 @@ export default function NodeConfig() {
             }}
           />
         </ProCard>
-        {currentType === 'all' ? (
+        {selectedConfig.includes('ocp-express') ||
+        selectedConfig.includes('obproxy') ? (
           <ProCard
             className={styles.pageCard}
             title={intl.formatMessage({
@@ -837,7 +840,7 @@ export default function NodeConfig() {
             bodyStyle={{ paddingBottom: '0' }}
           >
             <Space size={16}>
-              {!lowVersion ? (
+              {selectedConfig.includes('ocp-express') && !lowVersion ? (
                 <ProFormSelect
                   mode="tags"
                   name={['ocpexpress', 'servers']}
@@ -884,36 +887,39 @@ export default function NodeConfig() {
                   options={formatOptions(allOBServer)}
                 />
               ) : null}
-              <ProFormSelect
-                mode="tags"
-                name={['obproxy', 'servers']}
-                label={intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.ObproxyNodes',
-                  defaultMessage: 'OBProxy 节点',
-                })}
-                fieldProps={{ style: { width: 504 }, maxTagCount: 3 }}
-                placeholder={intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.PleaseSelect',
-                  defaultMessage: '请选择',
-                })}
-                rules={[
-                  {
-                    required: true,
-                    message: intl.formatMessage({
-                      id: 'OBD.pages.components.NodeConfig.SelectOrEnterObproxyNodes',
-                      defaultMessage: '请选择或输入 OBProxy 节点',
-                    }),
-                  },
-                  {
-                    validator: (_: any, value: string[]) =>
-                      serversValidator(_, value, 'OBProxy'),
-                  },
-                ]}
-                options={formatOptions(allOBServer)}
-              />
+              {selectedConfig.includes('obproxy') && (
+                <ProFormSelect
+                  mode="tags"
+                  name={['obproxy', 'servers']}
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.ObproxyNodes',
+                    defaultMessage: 'OBProxy 节点',
+                  })}
+                  fieldProps={{ style: { width: 504 }, maxTagCount: 3 }}
+                  placeholder={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                    defaultMessage: '请选择',
+                  })}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.SelectOrEnterObproxyNodes',
+                        defaultMessage: '请选择或输入 OBProxy 节点',
+                      }),
+                    },
+                    {
+                      validator: (_: any, value: string[]) =>
+                        serversValidator(_, value, 'OBProxy'),
+                    },
+                  ]}
+                  options={formatOptions(allOBServer)}
+                />
+              )}
             </Space>
           </ProCard>
         ) : null}
+        {/* 设计稿字段好像写错了 */}
         <ProCard
           className={styles.pageCard}
           title={intl.formatMessage({

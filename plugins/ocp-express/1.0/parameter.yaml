@@ -27,7 +27,7 @@
   name_local: 进程内存
   require: true
   essential: true
-  type: CAPACITY
+  type: CAPACITY_MB
   min_value: 512M
   need_restart: true
   description_en: the memroy size of ocp express server. Please enter an capacity, such as 2G

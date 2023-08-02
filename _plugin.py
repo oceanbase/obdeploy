@@ -32,6 +32,7 @@ from _manager import Manager
 from _rpm import Version
 from ssh import ConcurrentExecutor
 from tool import ConfigUtil, DynamicLoading, YamlLoader, FileUtil
+from _types import *
 
 
 yaml = YamlLoader()
@@ -360,224 +361,8 @@ class Null(object):
     def __init__(self):
         pass
 
-
 class ParamPlugin(Plugin):
 
-
-    class ConfigItemType(object):
-
-        TYPE_STR = None
-        NULL = Null()
-
-        def __init__(self, s):
-            try:
-                self._origin = s
-                self._value = 0
-                self.value = self.NULL
-                self._format()
-                if self.value == self.NULL:
-                    self.value = self._origin
-            except:
-                raise Exception("'%s' is not %s" % (self._origin, self._type_str))
-
-        @property
-        def _type_str(self):
-            if self.TYPE_STR is None:
-                self.TYPE_STR = str(self.__class__.__name__).split('.')[-1]
-            return self.TYPE_STR
-
-        def _format(self):
-            raise NotImplementedError
-
-        def __str__(self):
-            return str(self._origin)
-
-        def __hash__(self):
-            return self._origin.__hash__()
-
-        @property
-        def __cmp_value__(self):
-            return self._value
-
-        def __eq__(self, value):
-            if value is None:
-                return False
-            return self.__cmp_value__ == value.__cmp_value__
-
-        def __gt__(self, value):
-            if value is None:
-                return True
-            return self.__cmp_value__ > value.__cmp_value__
-
-        def __ge__(self, value):
-            if value is None:
-                return True
-            return self.__eq__(value) or self.__gt__(value)
-
-        def __lt__(self, value):
-            if value is None:
-                return False
-            return self.__cmp_value__ < value.__cmp_value__
-
-        def __le__(self, value):
-            if value is None:
-                return False
-            return self.__eq__(value) or self.__lt__(value)
-
-
-    class Moment(ConfigItemType):
-
-        def _format(self):
-            if self._origin:
-                if self._origin.upper() == 'DISABLE':
-                    self._value = 0
-                else:
-                    r = re.match('^(\d{1,2}):(\d{1,2})$', self._origin)
-                    h, m = r.groups()
-                    h, m = int(h), int(m)
-                    if 0 <= h <= 23 and 0 <= m <= 60:
-                        self._value = h * 60 + m
-                    else:
-                        raise Exception('Invalid Value')
-            else:
-                self._value = 0
-
-    class Time(ConfigItemType):
-
-        UNITS = {
-            'ns': 0.000000001,
-            'us': 0.000001,
-            'ms': 0.001,
-            's': 1,
-            'm': 60,
-            'h': 3600,
-            'd': 86400
-        }
-
-        def _format(self):
-            if self._origin:
-                self._origin = str(self._origin).strip()
-                if self._origin.isdigit():
-                    n = self._origin
-                    unit = self.UNITS['s']
-                else:
-                    r = re.match('^(\d+)(\w+)$', self._origin.lower())
-                    n, u = r.groups()
-                unit = self.UNITS.get(u.lower())
-                if unit:
-                    self._value = int(n) * unit
-                else:
-                    raise Exception('Invalid Value')
-            else:
-                self._value = 0
-
-    class Capacity(ConfigItemType):
-
-        UNITS = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40, 'P': 1 << 50}
-
-        def _format(self):
-            if self._origin:
-                self._origin = str(self._origin).strip()
-                if self._origin.isdigit():
-                    n = self._origin
-                    unit = self.UNITS['M']
-                else:
-                    r = re.match('^(\d+)(\w)B?$', self._origin.upper())
-                    n, u = r.groups()
-                    unit = self.UNITS.get(u.upper())
-                if unit:
-                    self._value = int(n) * unit
-                else:
-                    raise Exception('Invalid Value')
-            else:
-                self._value = 0
-
-    class StringList(ConfigItemType):
-
-        def _format(self):
-            if self._origin:
-                self._origin = str(self._origin).strip()
-                self._value = self._origin.split(';')
-            else:
-                self._value = []
-
-    class Dict(ConfigItemType):
-
-        def _format(self):
-            if self._origin:
-                if not isinstance(self._origin, dict):
-                    raise Exception("Invalid Value")
-                self._value = self._origin
-            else:
-                self._value = self.value = {}
-
-    class List(ConfigItemType):
-
-        def _format(self):
-            if self._origin:
-                if not isinstance(self._origin, list):
-                    raise Exception("Invalid value: {} is not a list.".format(self._origin))
-                self._value = self._origin
-            else:
-                self._value = self.value = []
-
-    class StringOrKvList(ConfigItemType):
-
-        def _format(self):
-            if self._origin:
-                if not isinstance(self._origin, list):
-                    raise Exception("Invalid value: {} is not a list.".format(self._origin))
-                for item in self._origin:
-                    if not item:
-                        continue
-                    if not isinstance(item, (str, dict)):
-                        raise Exception("Invalid value: {} should be string or key-value format.".format(item))
-                    if isinstance(item, dict):
-                        if len(item.keys()) != 1:
-                            raise Exception("Invalid value: {} should be single key-value format".format(item))
-                self._value = self._origin
-            else:
-                self._value = self.value = []
-
-    class Double(ConfigItemType):
-
-        def _format(self):
-            self.value = self._value = float(self._origin) if self._origin else 0
-
-    class Boolean(ConfigItemType):
-
-        def _format(self):
-            if isinstance(self._origin, bool):
-                self._value = self._origin
-            else:
-                _origin = str(self._origin).lower()
-                if _origin == 'true':
-                    self._value = True
-                elif _origin == 'false':
-                    self._value = False
-                elif _origin.isdigit():
-                    self._value = bool(self._origin)
-                else:
-                    raise Exception('%s is not Boolean' % _origin)
-            self.value = self._value
-
-    class Integer(ConfigItemType):
-
-        def _format(self):
-            if self._origin is None:
-                self._value = 0
-                self._origin = 0
-            else:
-                _origin = str(self._origin)
-                try:
-                    self.value = self._value = int(_origin)
-                except:
-                    raise Exception('%s is not Integer' % _origin)
-
-    class String(ConfigItemType):
-
-        def _format(self):
-            self.value = self._value = str(self._origin) if self._origin else ''
 
     class ConfigItem(object):
 
@@ -667,17 +452,18 @@ class ParamPlugin(Plugin):
         if self._src_data is None:
             try:
                 TYPES = {
-                    'DOUBLE': ParamPlugin.Double,
-                    'BOOL': ParamPlugin.Boolean,
-                    'INT': ParamPlugin.Integer,
-                    'STRING': ParamPlugin.String,
-                    'MOMENT': ParamPlugin.Moment,
-                    'TIME': ParamPlugin.Time,
-                    'CAPACITY': ParamPlugin.Capacity,
-                    'STRING_LIST': ParamPlugin.StringList,
-                    'DICT': ParamPlugin.Dict,
-                    'LIST': ParamPlugin.List,
-                    'PARAM_LIST': ParamPlugin.StringOrKvList
+                    'DOUBLE': Double,
+                    'BOOL': Boolean,
+                    'INT': Integer,
+                    'STRING': String,
+                    'MOMENT': Moment,
+                    'TIME': Time,
+                    'CAPACITY': Capacity,
+                    'CAPACITY_MB': CapacityMB,
+                    'STRING_LIST': StringList,
+                    'DICT': Dict,
+                    'LIST': List,
+                    'PARAM_LIST': StringOrKvList
                 }
                 self._src_data = {}
                 with open(self.def_param_yaml_path, 'rb') as f:
@@ -688,7 +474,7 @@ class ParamPlugin(Plugin):
                             if param_type in TYPES:
                                 param_type = TYPES[param_type]
                             else:
-                                param_type = ParamPlugin.String
+                                param_type = String
 
                             self._src_data[conf['name']] = ParamPlugin.ConfigItem(
                                 name=conf['name'],

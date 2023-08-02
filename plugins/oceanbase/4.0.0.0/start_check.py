@@ -176,7 +176,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             if server_memory_config[server]['system_memory']:
                 memory_limit = server_memory_config[server]['num']
                 if not memory_limit:
-                    server_memory_config[server]['num'] = memory_limit = server_memory_config[server]['percentage'] * server_memory_stats['total']
+                    server_memory_config[server]['num'] = memory_limit = server_memory_config[server]['percentage'] * server_memory_stats['total'] / 100
                 factor = 0.75
                 suggest = err.SUG_OBSERVER_SYS_MEM_TOO_LARGE.format(factor=factor)
                 suggest.auto_fix = 'system_memory' not in global_generate_config and 'system_memory' not in generate_configs.get(server, {})
@@ -586,9 +586,10 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         has_ocp = True
     if has_ocp and need_bootstrap:
         global_conf_with_default = copy.deepcopy(cluster_config.get_global_conf_with_default())
+        original_global_conf = cluster_config.get_original_global_conf()
         ocp_meta_tenant_prefix = 'ocp_meta_tenant_'
         for key in global_conf_with_default:
-            if key.startswith(ocp_meta_tenant_prefix):
+            if key.startswith(ocp_meta_tenant_prefix) and original_global_conf.get(key, None):
                 global_conf_with_default['ocp_meta_tenant'][key.replace(ocp_meta_tenant_prefix, '', 1)] = global_conf_with_default[key]
         meta_db_memory_size = parse_size(global_conf_with_default['ocp_meta_tenant'].get('memory_size'))
         servers_sys_memory = {}

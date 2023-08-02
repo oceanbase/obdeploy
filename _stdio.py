@@ -379,6 +379,7 @@ class IO(object):
     ):
         self.level = level
         self.msg_lv = msg_lv
+        self.default_confirm = False
         self._log_path = None
         self._trace_id = None
         self._log_name = 'default'
@@ -672,6 +673,8 @@ class IO(object):
     def confirm(self, msg):
         msg = '%s [y/n]: ' % msg
         self.print(msg, end='')
+        if self.default_confirm:
+            return True
         if self._input_is_tty:
             while True:
                 try:
@@ -748,7 +751,7 @@ class IO(object):
         self._print(MsgLevel.VERBOSE, '%s %s' % (self._verbose_prefix, msg), *args, **kwargs)
 
     if sys.version_info.major == 2:
-        def exception(self, msg, *args, **kwargs):
+        def exception(self, msg='', *args, **kwargs):
             import linecache
             exception_msg = []
             ei = sys.exc_info()
@@ -780,7 +783,7 @@ class IO(object):
             msg and self.error(msg)
             print_stack('\n'.join(exception_msg))
     else:
-        def exception(self, msg, *args, **kwargs):
+        def exception(self, msg='', *args, **kwargs):
             ei = sys.exc_info()
             traceback_e = traceback.TracebackException(type(ei[1]), ei[1], ei[2], limit=None)
             pre_stach = traceback.extract_stack()[self.track_limit:-2]

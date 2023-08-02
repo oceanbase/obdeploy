@@ -145,14 +145,14 @@ def prepare_parameters(cluster_config, stdio):
                 if value is not None:
                     depend_info[key] = value
             ob_servers = cluster_config.get_depend_servers(comp)
+            connect_infos = []
             for ob_server in ob_servers:
                 ob_servers_conf[ob_server] = ob_server_conf = cluster_config.get_depend_config(comp, ob_server)
-                if 'server_ip' not in depend_info:
-                    depend_info['server_ip'] = ob_server.ip
-                    depend_info['mysql_port'] = ob_server_conf['mysql_port']
+                connect_infos.append([ob_server.ip, ob_server_conf['mysql_port']])
                 zone = ob_server_conf['zone']
                 if zone not in ob_zones:
                     ob_zones[zone] = ob_server
+            depend_info['connect_infos'] = connect_infos
             root_servers = ob_zones.values()
             break
     for comp in ['obproxy', 'obproxy-ce']:
@@ -209,7 +209,12 @@ def prepare_parameters(cluster_config, stdio):
         missed_keys = get_missing_required_parameters(original_server_config)
         if missed_keys:
             if 'jdbc_url' in missed_keys and depend_observer:
-                server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'], depend_info['mysql_port'], depend_info['ocp_meta_db'])
+                if depend_info.get('server_ip'):
+                    server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'], depend_info['mysql_port'], depend_info['ocp_meta_db'])
+                else:
+                    server_config['connect_infos'] = depend_info.get('connect_infos')
+                    server_config['ocp_meta_db'] = depend_info.get('ocp_meta_db')
+                    server_config['jdbc_url'] = ''
             if 'jdbc_username' in missed_keys and depend_observer:
                 server_config['jdbc_username'] = "{}@{}".format(depend_info['ocp_meta_username'], depend_info.get('ocp_meta_tenant', {}).get("tenant_name"))
             depends_key_maps = {

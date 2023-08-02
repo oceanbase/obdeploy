@@ -149,6 +149,7 @@ export default function IndexPage() {
 
   useEffect(() => {
     let token = '';
+
     fetchDeploymentInfo({ task_status: 'INSTALLING' }).then(
       ({ success, data }: API.OBResponse) => {
         if (success && data?.items?.length) {

@@ -38,7 +38,6 @@ shell_command_map = {
     "cpu_logical_cores": 'cat /proc/cpuinfo | grep "processor" | wc -l',
     "cpu_model_name": 'cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq',
     "cpu_frequency": 'cat /proc/cpuinfo | grep MHz | cut -f2 -d: | uniq',
-    "cpu_flags": 'cat /proc/cpuinfo | grep flags | cut -f2 -d: | uniq',
     "memory_total": 'cat /proc/meminfo | grep MemTotal | cut -f2 -d: | uniq',
     "memory_free": 'cat /proc/meminfo | grep MemFree | cut -f2 -d: | uniq',
     "memory_avaiable": 'cat /proc/meminfo | grep MemAvailable | cut -f2 -d: | uniq',
@@ -119,11 +118,6 @@ class CpuInfo:
     @staticmethod
     @shell_command
     def cpu_frequency(*args, **kwargs):
-        return kwargs["bash_result"]
-
-    @staticmethod
-    @shell_command
-    def cpu_flags(*args, **kwargs):
         return kwargs["bash_result"]
 
 
@@ -237,7 +231,6 @@ def telemetry_machine_data(data):
     _hosts['cpu']['logicalCores'] = CpuInfo.cpu_logical_cores()
     _hosts['cpu']['modelName'] = CpuInfo.cpu_model_name()
     _hosts['cpu']['frequency'] = CpuInfo.cpu_frequency()
-    _hosts['cpu']['flags'] = CpuInfo.cpu_flags()
 
     _hosts['memory']['total'] = MemInfo.memory_total()
     _hosts['memory']['free'] = MemInfo.memory_free()

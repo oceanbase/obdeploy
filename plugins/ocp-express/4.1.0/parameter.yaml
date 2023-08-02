@@ -233,18 +233,6 @@
   max_value: 2147483647
   description_local: '最多保留的归档日志文件的天数，默认不限制'
   description_en: 'When logging.file is configured, set the maximum of retention days the log archive log files to keep. The default value is unlimited'
-- name: 'default_timezone'
-  type: 'STRING'
-  require: false
-  need_restart: true
-  description_local: '系统默认时区，若不设置则使用 system default time zone，重启生效'
-  description_en: 'System default time zone, if not set, use system default time zone, restart to take effect'
-- name: 'default_lang'
-  type: 'STRING'
-  require: false
-  need_restart: true
-  description_local: '系统默认语言（非前端语言设置），若不设置则使用 zh-CN，重启生效'
-  description_en: 'System default language (non-front-end language setting), if not set, use zh-CN, restart to take effect'
 - name: 'ocp.idempotent.client-token.expire.time'
   type: 'STRING'
   require: false
@@ -257,12 +245,6 @@
   need_restart: true
   description_local: '基于 obsdk 的采集查询，SQL 查询行数限制，默认 10000'
   description_en: 'Sql query row limit for obsdk based collect'
-- name: 'exporter_inactive_threshold'
-  type: 'INT'
-  require: false
-  need_restart: true
-  description_local: 'exporter地址判定为失效的连续不可用时间（秒）'
-  description_en: 'consecutive failure time of exporter address that is regarded as inactive (seconds)'
 - name: 'ocp.monitor.host.exporters'
   type: 'STRING'
   require: false

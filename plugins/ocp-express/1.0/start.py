@@ -201,14 +201,15 @@ def prepare_parameters(cluster_config, stdio):
                 if value is not None:
                     depend_info[key] = value
             ob_servers = cluster_config.get_depend_servers(comp)
+
+            connect_infos = []
             for ob_server in ob_servers:
                 ob_servers_conf[ob_server] = ob_server_conf = cluster_config.get_depend_config(comp, ob_server)
-                if 'server_ip' not in depend_info:
-                    depend_info['server_ip'] = ob_server.ip
-                    depend_info['mysql_port'] = ob_server_conf['mysql_port']
+                connect_infos.append([ob_server.ip, ob_server_conf['mysql_port']])
                 zone = ob_server_conf['zone']
                 if zone not in ob_zones:
                     ob_zones[zone] = ob_server
+            depend_info['connect_infos'] = connect_infos
             root_servers = ob_zones.values()
             break
     for comp in ['obproxy', 'obproxy-ce']:
@@ -265,7 +266,12 @@ def prepare_parameters(cluster_config, stdio):
         missed_keys = get_missing_required_parameters(original_server_config)
         if missed_keys:
             if 'jdbc_url' in missed_keys and depend_observer:
-                server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'], depend_info['mysql_port'], depend_info['ocp_meta_db'])
+                if depend_info.get('server_ip'):
+                    server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'], depend_info['mysql_port'], depend_info['ocp_meta_db'])
+                else:
+                    server_config['connect_infos'] = depend_info.get('connect_infos')
+                    server_config['ocp_meta_db'] = depend_info.get('ocp_meta_db')
+                    server_config['jdbc_url'] = ''
             if 'jdbc_username' in missed_keys and depend_observer:
                 server_config['jdbc_username'] = "{}@{}".format(depend_info['ocp_meta_username'],
                     depend_info.get('ocp_meta_tenant', {}).get("tenant_name"))
@@ -333,26 +339,37 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         else:
             use_parameter = True
         # check meta db connect before start
-        matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
-        if matched:
+        if jdbc_url:
+            matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
+            if not matched:
+                stdio.error("Invalid jdbc url: %s" % jdbc_url)
+                return
             ip = matched.group(1)
             sql_port = matched.group(2)[1:]
             database = matched.group(3)
-            connected = False
-            retries = 300
-            while not connected and retries:
+            connect_infos = [[ip, sql_port]]
+        else:
+            connect_infos = server_config.get('connect_infos', '')
+            database = server_config.get('ocp_meta_db', '')
+        connected = False
+        retries = 300
+        while not connected and retries:
+            for connect_info in connect_infos:
                 retries -= 1
+                server_ip = connect_info[0]
+                server_port = connect_info[-1]
                 try:
-                    Cursor(ip=ip, port=sql_port, user=jdbc_username, password=jdbc_password, database=database, stdio=stdio)
+                    Cursor(ip=server_ip, port=server_port, user=jdbc_username, password=jdbc_password, database=database, stdio=stdio)
+                    jdbc_url = 'jdbc:oceanbase://{}:{}/{}'.format(server_ip, server_port, database)
                     connected = True
+                    break
                 except:
                     time.sleep(1)
-            if not connected:
-                success = False
-                stdio.error("{}: failed to connect meta db".format(server))
-                continue
-        else:
-            stdio.verbose('unmatched jdbc url, skip meta db connection check')
+        if not connected:
+            success = False
+            stdio.error("{}: failed to connect meta db".format(server))
+            continue
+
         if server_config.get('encrypt_password', False):
             private_key, public_key = get_key(client, os.path.join(home_path, 'conf'), stdio)
             public_key_str = get_plain_public_key(public_key)

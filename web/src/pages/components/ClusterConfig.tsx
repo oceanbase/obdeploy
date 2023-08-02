@@ -69,10 +69,10 @@ const showConfigKeys = {
 
 export default function ClusterConfig() {
   const {
+    selectedConfig,
     setCurrentStep,
     configData,
     setConfigData,
-    currentType,
     lowVersion,
     clusterMore,
     setClusterMore,
@@ -122,19 +122,21 @@ export default function ClusterConfig() {
 
   const setData = (dataSource: FormValues) => {
     let newComponents: API.Components = { ...components };
-    if (currentType === 'all') {
+    if (selectedConfig.includes('obproxy')) {
       newComponents.obproxy = {
         ...(components.obproxy || {}),
         ...dataSource.obproxy,
         parameters: formatParameters(dataSource.obproxy?.parameters),
       };
-      if (!lowVersion) {
-        newComponents.ocpexpress = {
-          ...(components.ocpexpress || {}),
-          ...dataSource.ocpexpress,
-          parameters: formatParameters(dataSource.ocpexpress?.parameters),
-        };
-      }
+    }
+    if (selectedConfig.includes('ocp-express') && !lowVersion) {
+      newComponents.ocpexpress = {
+        ...(components.ocpexpress || {}),
+        ...dataSource.ocpexpress,
+        parameters: formatParameters(dataSource.ocpexpress?.parameters),
+      };
+    }
+    if (selectedConfig.includes('obagent')) {
       newComponents.obagent = {
         ...(components.obagent || {}),
         ...dataSource.obagent,
@@ -504,13 +506,13 @@ export default function ClusterConfig() {
   };
 
   useEffect(() => {
-    if (clusterMore && !clusterMoreConfig?.length) {
+    if (clusterMore) {
       getClusterMoreParamsters();
     }
-    if (componentsMore && !componentsMoreConfig?.length) {
+    if (componentsMore) {
       getComponentsMoreParamsters();
     }
-  }, []);
+  }, [selectedConfig]);
 
   const initPassword = getRandomPassword();
 
@@ -764,7 +766,7 @@ export default function ClusterConfig() {
               : null}
           </ProCard>
         </ProCard>
-        {currentType === 'all' ? (
+        {selectedConfig.length ? (
           <ProCard className={styles.pageCard} split="horizontal">
             <ProCard
               title={intl.formatMessage({
@@ -773,119 +775,123 @@ export default function ClusterConfig() {
               })}
               className="card-padding-bottom-24"
             >
-              <Row>
-                <Space size="middle">
-                  <ProFormDigit
-                    name={['obproxy', 'listen_port']}
-                    label={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.ObproxyServicePort',
-                      defaultMessage: 'OBProxy 服务端口',
-                    })}
-                    fieldProps={{ style: commonStyle }}
-                    placeholder={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                      defaultMessage: '请输入',
-                    })}
-                    rules={[
-                      {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                          defaultMessage: '请输入',
-                        }),
-                      },
-                      { validator: portValidator },
-                    ]}
-                  />
+              {selectedConfig.includes('obproxy') && (
+                <Row>
+                  <Space size="middle">
+                    <ProFormDigit
+                      name={['obproxy', 'listen_port']}
+                      label={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.ObproxyServicePort',
+                        defaultMessage: 'OBProxy 服务端口',
+                      })}
+                      fieldProps={{ style: commonStyle }}
+                      placeholder={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                        defaultMessage: '请输入',
+                      })}
+                      rules={[
+                        {
+                          required: true,
+                          message: intl.formatMessage({
+                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                            defaultMessage: '请输入',
+                          }),
+                        },
+                        { validator: portValidator },
+                      ]}
+                    />
 
-                  <ProFormDigit
-                    name={['obproxy', 'prometheus_listen_port']}
-                    label={
-                      <>
-                        {intl.formatMessage({
-                          id: 'OBD.pages.components.ClusterConfig.PortObproxyExporter',
-                          defaultMessage: 'OBProxy Exporter 端口',
-                        })}
-
-                        <Tooltip
-                          title={intl.formatMessage({
-                            id: 'OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs',
-                            defaultMessage:
-                              'OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。',
+                    <ProFormDigit
+                      name={['obproxy', 'prometheus_listen_port']}
+                      label={
+                        <>
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.ClusterConfig.PortObproxyExporter',
+                            defaultMessage: 'OBProxy Exporter 端口',
                           })}
-                        >
-                          <QuestionCircleOutlined className="ml-10" />
-                        </Tooltip>
-                      </>
-                    }
-                    fieldProps={{ style: commonStyle }}
-                    placeholder={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                      defaultMessage: '请输入',
-                    })}
-                    rules={[
-                      {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                          defaultMessage: '请输入',
-                        }),
-                      },
-                      { validator: portValidator },
-                    ]}
-                  />
-                </Space>
-              </Row>
-              <Row>
-                <Space size="middle">
-                  <ProFormDigit
-                    name={['obagent', 'monagent_http_port']}
-                    label={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.ObagentMonitoringServicePort',
-                      defaultMessage: 'OBAgent 监控服务端口',
-                    })}
-                    fieldProps={{ style: commonStyle }}
-                    placeholder={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                      defaultMessage: '请输入',
-                    })}
-                    rules={[
-                      {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                          defaultMessage: '请输入',
-                        }),
-                      },
-                      { validator: portValidator },
-                    ]}
-                  />
 
-                  <ProFormDigit
-                    name={['obagent', 'mgragent_http_port']}
-                    label={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.ObagentManageServicePorts',
-                      defaultMessage: 'OBAgent 管理服务端口',
-                    })}
-                    fieldProps={{ style: commonStyle }}
-                    placeholder={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                      defaultMessage: '请输入',
-                    })}
-                    rules={[
-                      {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                          defaultMessage: '请输入',
-                        }),
-                      },
-                      { validator: portValidator },
-                    ]}
-                  />
-                </Space>
-              </Row>
-              {!lowVersion ? (
+                          <Tooltip
+                            title={intl.formatMessage({
+                              id: 'OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs',
+                              defaultMessage:
+                                'OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。',
+                            })}
+                          >
+                            <QuestionCircleOutlined className="ml-10" />
+                          </Tooltip>
+                        </>
+                      }
+                      fieldProps={{ style: commonStyle }}
+                      placeholder={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                        defaultMessage: '请输入',
+                      })}
+                      rules={[
+                        {
+                          required: true,
+                          message: intl.formatMessage({
+                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                            defaultMessage: '请输入',
+                          }),
+                        },
+                        { validator: portValidator },
+                      ]}
+                    />
+                  </Space>
+                </Row>
+              )}
+              {selectedConfig.includes('obagent') && (
+                <Row>
+                  <Space size="middle">
+                    <ProFormDigit
+                      name={['obagent', 'monagent_http_port']}
+                      label={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.ObagentMonitoringServicePort',
+                        defaultMessage: 'OBAgent 监控服务端口',
+                      })}
+                      fieldProps={{ style: commonStyle }}
+                      placeholder={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                        defaultMessage: '请输入',
+                      })}
+                      rules={[
+                        {
+                          required: true,
+                          message: intl.formatMessage({
+                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                            defaultMessage: '请输入',
+                          }),
+                        },
+                        { validator: portValidator },
+                      ]}
+                    />
+
+                    <ProFormDigit
+                      name={['obagent', 'mgragent_http_port']}
+                      label={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.ObagentManageServicePorts',
+                        defaultMessage: 'OBAgent 管理服务端口',
+                      })}
+                      fieldProps={{ style: commonStyle }}
+                      placeholder={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                        defaultMessage: '请输入',
+                      })}
+                      rules={[
+                        {
+                          required: true,
+                          message: intl.formatMessage({
+                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
+                            defaultMessage: '请输入',
+                          }),
+                        },
+                        { validator: portValidator },
+                      ]}
+                    />
+                  </Space>
+                </Row>
+              )}
+              {selectedConfig.includes('ocp-express') && !lowVersion && (
                 <Row>
                   <ProFormDigit
                     name={['ocpexpress', 'port']}
@@ -910,7 +916,7 @@ export default function ClusterConfig() {
                     ]}
                   />
                 </Row>
-              ) : null}
+              )}
               <div className={styles.moreSwitch}>
                 {intl.formatMessage({
                   id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',

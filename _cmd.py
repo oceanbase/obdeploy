@@ -44,6 +44,7 @@ ROOT_IO = IO(1)
 OBD_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
 OBDIAG_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), 'oceanbase-diagnostic-tool')
 COMMAND_ENV.load(os.path.join(OBD_HOME_PATH, '.obd_environ'), ROOT_IO)
+ROOT_IO.default_confirm = COMMAND_ENV.get(ENV.ENV_DEFAULT_CONFIRM, '0') == '1'
 
 
 class OptionHelpFormatter(IndentedHelpFormatter):
@@ -871,10 +872,11 @@ class ClusterRedeployCommand(ClusterMirrorCommand):
     def __init__(self):
         super(ClusterRedeployCommand, self).__init__('redeploy', 'Redeploy a started cluster.')
         self.parser.add_option('-f', '--force-kill', action='store_true', help="Force kill the running observer process in the working directory.")
+        self.parser.add_option('--confirm', action='store_true', help='Confirm to redeploy.')
 
     def _do_command(self, obd):
         if self.cmds:
-            res = obd.redeploy_cluster(self.cmds[0])
+            res = obd.redeploy_cluster(self.cmds[0], need_confirm=not getattr(self.opts, 'confirm', False))
             self.background_telemetry_task(obd)
             return res
         else:

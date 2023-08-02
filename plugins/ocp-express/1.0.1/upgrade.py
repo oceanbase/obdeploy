@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function
 from tool import ConfigUtil
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, *args, **kwargs):
     namespace = plugin_context.namespace
     namespaces = plugin_context.namespaces
     deploy_name = plugin_context.deploy_name
@@ -51,8 +51,8 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
 
     apply_param_plugin(cur_repository)
     if not stop_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs):
-        return 
-
+        return
+    install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
     apply_param_plugin(dest_repository)
     warns = {}
     not_support = ['system_password']

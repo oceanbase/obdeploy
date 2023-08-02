@@ -83,7 +83,8 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         if not only_generate_password:
             generate_keys += [
                 'memory_limit', 'datafile_size', 'log_disk_size', 'devname', 'system_memory', 'cpu_count', 'production_mode',
-                'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size'
+                'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size',
+                'datafile_next', 'datafile_maxsize'
             ]
         if generate_password:
             generate_keys += ['root_password', 'proxyro_password', 'ocp_meta_password', 'ocp_agent_monitor_password']
@@ -134,13 +135,15 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
 
     MIN_MEMORY = 6 << 30
     PRO_MEMORY_MIN = 16 << 30
-    SLOG_SIZE = 10 << 30
+    SLOG_SIZE = 4 << 30
     MIN_CPU_COUNT = 16
     START_NEED_MEMORY = 3 << 30
 
     MINI_MEMORY_SIZE = MIN_MEMORY
-    MINI_DATA_FILE_SIZE = 20 << 30
-    MINI_LOG_DISK_SIZE = 15 << 30
+    MINI_DATA_FILE_SIZE = 2 << 30
+    MINI_DATA_FILE_NEXT = 2 << 30
+    MINI_DATA_FILE_MAX_SIZE = 8 << 30
+    MINI_LOG_DISK_SIZE = 13 << 30
 
     has_ocp = 'ocp-express' in [repo.name for repo in plugin_context.repositories]
     ip_server_memory_info = {}
@@ -314,6 +317,10 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                 elif generate_config_mini:
                     datafile_size = MINI_DATA_FILE_SIZE
                     update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
+                    if 'datafile_maxsize' not in user_server_config:
+                        update_server_conf(server, 'datafile_maxsize', format_size(MINI_DATA_FILE_MAX_SIZE, 0))
+                    if 'datafile_next' not in user_server_config:
+                        update_server_conf(server, 'datafile_next', format_size(MINI_DATA_FILE_NEXT, 0))
                 else:
                     auto_set_datafile_size = True
 
@@ -336,17 +343,15 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                 min_log_size = log_size if clog_dir_mount == home_path_mount else 0
                 MIN_NEED = min_log_size + SLOG_SIZE
                 if auto_set_datafile_size:
-                    min_datafile_size = memory_limit * 3
-                    MIN_NEED += min_memory * 3
+                    datafile_size =min_datafile_size = MINI_DATA_FILE_SIZE
                 else:
                     min_datafile_size = datafile_size
-                    MIN_NEED += datafile_size
+                MIN_NEED += min_datafile_size
                 if auto_set_log_disk_size:
-                    min_log_disk_size = memory_limit * 3
-                    MIN_NEED += min_memory * 3
+                    log_disk_size = min_log_disk_size = (memory_limit - system_memory) * 3 + system_memory
                 else:
                     min_log_disk_size = log_disk_size
-                    MIN_NEED += log_disk_size
+                MIN_NEED += min_log_disk_size
                 min_need = min_log_size + min_datafile_size + min_log_disk_size
 
                 disk_free = data_dir_disk['avail']
@@ -356,16 +361,16 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                         success = False
                         continue
                     else:
-                        if auto_set_datafile_size:
-                            datafile_size = MIN_MEMORY * 3
-                        if auto_set_log_disk_size:
-                            log_disk_size = MIN_MEMORY * 3
                         if auto_set_memory:
                             memory_limit = MIN_MEMORY
                             update_server_conf(server, 'memory_limit', format_size(memory_limit, 0))
                         if auto_set_system_memory:
                             system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
                             update_server_conf(server, 'system_memory', format_size(system_memory, 0))
+                        if auto_set_datafile_size:
+                            datafile_size = MINI_DATA_FILE_SIZE
+                        if auto_set_log_disk_size:
+                            log_disk_size = (memory_limit - system_memory) * 3 + system_memory
                 elif min_need > disk_free:
                     if generate_check and not auto_set_memory:
                         stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
@@ -386,11 +391,15 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                     if auto_set_system_memory:
                         system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
                         update_server_conf(server, 'system_memory', format_size(system_memory, 0))
-                    log_disk_size = memory_limit * 3
-                    datafile_size = max(disk_free - log_disk_size, log_disk_size)
+                    if auto_set_log_disk_size:
+                        log_disk_size = (memory_limit - system_memory) * 3 + system_memory
+                    if auto_set_datafile_size:
+                        datafile_size = max(disk_free - log_disk_size, memory_limit * 3)
                 else:
-                    log_disk_size = memory_limit * 3
-                    datafile_size = max(disk_free - log_size - SLOG_SIZE - log_disk_size, log_disk_size)
+                    if auto_set_log_disk_size:
+                        log_disk_size = (memory_limit - system_memory) * 3 + system_memory
+                    if auto_set_datafile_size:
+                        datafile_size = max(disk_free - log_size - SLOG_SIZE - log_disk_size, memory_limit * 3)
 
                 if auto_set_datafile_size:
                     update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
@@ -399,7 +408,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
             else:
                 datafile_min_memory_limit = memory_limit
                 if auto_set_datafile_size:
-                    datafile_size = 3 * memory_limit
+                    datafile_size = 3 * datafile_min_memory_limit
                     min_log_size = log_size if data_dir_mount == home_path_mount else 0
                     disk_free = data_dir_disk['avail']
                     min_need = min_log_size + datafile_size + SLOG_SIZE
@@ -408,7 +417,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                             stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
                             success = False
                             continue
-                        datafile_min_memory_limit = (disk_free - log_size - SLOG_SIZE) / 3
+                        datafile_min_memory_limit = (disk_free - min_log_size - SLOG_SIZE) / 3
                         if datafile_min_memory_limit < min_memory:
                             stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=format_size(disk_free), need=format_size(min_need)))
                             success = False
