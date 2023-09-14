@@ -1,0 +1,5 @@
+- src_path: ./home/admin/ob-configserver/bin/ob-configserver
+  target_path: bin/ob-configserver
+  type: bin
+  mode: 755
+

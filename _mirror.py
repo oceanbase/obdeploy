@@ -56,6 +56,8 @@ SUP_MAP = {
     'sles': (([15, 2], 7), ),
     'fedora': (([33], 7), ),
     'uos': (([20], 8), ),
+    'anolis': (([23], 7), ),
+    'openEuler': (([22, 3], 7), ),
 }
 _SERVER_VARS = {
     'basearch': getBaseArch(),

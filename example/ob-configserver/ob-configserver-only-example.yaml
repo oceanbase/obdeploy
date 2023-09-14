@@ -1,0 +1,36 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+ob-configserver:
+  servers:
+    - 127.0.0.1
+  global:
+    listen_port: 8080 # The port of ob-configserver web
+    # server_ip: 0.0.0.0 # Listen to the ob-configserver server IP。When you want to listen to the specified IP address,use it.
+    home_path: /home/admin/ob-configserver  # The working directory for prometheus. ob-configserver is started under this directory. This is a required field.
+    ## log config
+    # log_level: info # Log printing level of ob-configserver。The default value is `info`
+    # log_maxsize: 30 # The total size of manager ob-configserver.Log size is measured in Megabytes.The default value is 30
+    # log_maxage：7 # The days of manager expired ob-configserver.Log retention days. The default value is 7
+    # log_maxbackups: 10  #The number of manager expired ob-configserver.Log. The default value is 10
+    # log_localtime: true #  Switch of ob-configserver.Log naming with localtime. The default value is true
+    # log_compress: true # Compress ob-configserver.Log switch. The default value is true
+
+    ## vip config, configserver will generate url with vip_address and port and return it to the client
+    ## do not use some random value that can't be connected
+    # vip_address: "10.10.10.1"
+    # vip_port：8080
+    ## storage config
+    # storage:
+      ## database type, support sqlite3 or mysql
+      ## sqlite3 Usage:
+      # database_type: sqlite3
+      # connection_url: "/home/admin/ob-configserver/.data.db?cache=shared&_fk=1" # connection_url can be empty When database_type used sqlite3
+
+      ## mysql Usage:
+      # database_type: mysql
+      # connection_url: "user:password@tcp(10.10.10.1:2883)/test?parseTime=true"

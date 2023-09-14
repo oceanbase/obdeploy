@@ -76,12 +76,14 @@ class Cursor(SafeStdio):
                                     cursorclass=mysql.cursors.DictCursor)
             self.cursor = self.db.cursor()
 
-    def new_cursor(self, tenant='sys', user='root', password=''):
+    def new_cursor(self, tenant='sys', user='root', password='', ip='', port='', print_exception=True):
         try:
-            return Cursor(ip=self.ip, port=self.port, user=user, tenant=tenant, password=password, stdio=self.stdio)
+            ip = ip if ip else self.ip
+            port = port if port else self.port
+            return Cursor(ip=ip, port=port, user=user, tenant=tenant, password=password, stdio=self.stdio)
         except:
-            self.stdio.exception('')
-            self.stdio.verbose('fail to connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            print_exception and self.stdio.exception('')
+            self.stdio.verbose('fail to connect %s -P%s -u%s@%s -p%s' % (self.ip, self.port, user, tenant, password))
             return None
 
     def execute(self, sql, args=None, execute_func=None, raise_exception=None, exc_level='error', stdio=None):
@@ -116,8 +118,8 @@ class Cursor(SafeStdio):
             self.db = None
 
 
-def connect(plugin_context, target_server=None, *args, **kwargs):
-    count = 100
+def connect(plugin_context, target_server=None, retry_times=101, *args, **kwargs):
+    count = retry_times
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     if target_server:
@@ -132,11 +134,14 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         for server in servers:
             try:
                 server_config = cluster_config.get_server_conf(server)
-                password = server_config.get('root_password', '') if count % 2 else ''
+                password = server_config.get('root_password', '') if count % 2 == 0 else ''
                 cursor = Cursor(ip=server.ip, port=server_config['mysql_port'], tenant='', password=password if password is not None else '', stdio=stdio)
-                if cursor.execute('select 1', raise_exception=True):
-                    stdio.stop_loading('succeed')
+
+                if cursor.execute('select 1', raise_exception=False, exc_level='verbose'):
+                    stdio.stop_loading('succeed', text='Connect to observer {}:{}'.format(server.ip, server_config['mysql_port']))
                     return plugin_context.return_true(connect=cursor.db, cursor=cursor, server=server)
+                else:
+                    raise Exception('Connect to observer {}:{} failed'.format(server.ip, server_config['mysql_port']))
             except:
                 if count == 0:
                     stdio.exception('')

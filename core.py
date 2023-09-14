@@ -923,6 +923,24 @@ class ObdHome(object):
                 client = ssh_clients[server]
         return ret
 
+    # check cluster server status, running/stopped
+    def cluster_server_status_check(self, status='running'):
+        if status not in ['running', 'stopped']:
+            self.stdio.error(err.EC_INVALID_PARAMETER.format('status', status))
+            return False
+        component_status = {}
+        cluster_status = self.cluster_status_check(self.repositories, component_status)
+        value = 0 if status == 'running' else 1
+        if cluster_status is False or cluster_status == value:
+            self.stdio.error(err.EC_SOME_SERVER_STOPED.format())
+            for repository in component_status:
+                cluster_status = component_status[repository]
+                for server in cluster_status:
+                    if cluster_status[server] == value:
+                        self. stdio.error('server status error: %s %s is %s' % (server, repository.name, status))
+            return False
+        return True
+
     # If the cluster states are consistent, the status value is returned. Else False is returned.
     def cluster_status_check(self, repositories, ret_status={}):
         self._call_stdio('start_loading', 'Cluster status check')
@@ -1684,7 +1702,7 @@ class ObdHome(object):
 
                     if deploy_config.auto_create_tenant:
                         create_tenant_options = Values({"variables": "ob_tcp_invited_nodes='%'", "create_if_not_exists": True})
-                        self.call_plugin(create_tenant_plugins[repository], repository, create_tenant_options=create_tenant_options, cursor=cursor)
+                        self.call_plugin(create_tenant_plugins[repository], repository, cursor=cursor, create_tenant_options=create_tenant_options)
 
             if not start_all:
                 component_num -= 1
@@ -1751,6 +1769,145 @@ class ObdHome(object):
                 return False
         return True
 
+    def get_component_repositories(self, deploy_info, components):
+        repositories = self.load_local_repositories(deploy_info)
+        component_repositories = []
+        for repository in repositories:
+            if repository.name in components:
+                component_repositories.append(repository)
+        return component_repositories
+
+    def create_standby_tenant(self, standby_deploy_name, primary_deploy_name, primary_tenant):
+        standby_deploy = self.deploy_manager.get_deploy_config(standby_deploy_name)
+        if not standby_deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % standby_deploy_name)
+            return None
+        self.set_deploy(standby_deploy)
+        primary_deploy = self.deploy_manager.get_deploy_config(primary_deploy_name)
+        if not primary_deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % primary_deploy_name)
+            return None
+        if standby_deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" is %s' % (standby_deploy_name, standby_deploy.deploy_info.status.value))
+            return False
+        if primary_deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" is %s' % (primary_deploy_name, primary_deploy.deploy_info.status.value))
+            return False
+        primary_repositories = self.load_local_repositories(primary_deploy.deploy_info)
+        standby_repositories = self.get_component_repositories(standby_deploy.deploy_info, ['oceanbase-ce', 'oceanbase'])
+        standby_version_check_plugins = self.search_py_script_plugin(standby_repositories, 'standby_version_check')
+        self.set_repositories(standby_repositories)
+        for repository in standby_version_check_plugins:
+            if not self.call_plugin(standby_version_check_plugins[repository], repository, primary_repositories=primary_repositories):
+                return
+        # Check the status for standby cluster
+        if not self.cluster_server_status_check():
+            return
+        create_standby_tenant_pre_plugins = self.search_py_script_plugin(standby_repositories, 'create_standby_tenant_pre')
+        connect_plugins = self.search_py_script_plugin(standby_repositories, 'connect')
+        get_relation_tenants_plugins = self.search_py_script_plugin(standby_repositories, 'get_relation_tenants')
+        create_tenant_plugins = self.search_py_script_plugin(standby_repositories, 'create_tenant')
+        get_deployment_connections_plugins = self.search_py_script_plugin(standby_repositories, 'get_deployment_connections')
+        for repository in get_relation_tenants_plugins:
+            if not self.call_plugin(get_relation_tenants_plugins[repository], repository, deployment_name=primary_deploy_name, get_deploy=self.deploy_manager.get_deploy_config, tenant_name=primary_tenant):
+                return False
+        for repository in get_deployment_connections_plugins:
+            if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository], relation_deploy_names=[primary_deploy_name, standby_deploy_name]):
+                return False
+
+        for repository in create_standby_tenant_pre_plugins:
+            if not self.call_plugin(create_standby_tenant_pre_plugins[repository], repository,
+                    primary_deploy_name=primary_deploy_name,
+                    primary_tenant=primary_tenant):
+                return False
+
+        for repository in create_tenant_plugins:
+            if not self.call_plugin(create_tenant_plugins[repository], repository, cursor=None):
+                return False
+        return True
+
+    def switchover_tenant(self, standby_deploy_name, tenant_name):
+        # check oceanbase connect status
+        deploy = self.deploy_manager.get_deploy_config(standby_deploy_name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % standby_deploy_name)
+            return False
+        self.set_deploy(deploy)
+        if deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" is %s' % (standby_deploy_name, deploy.deploy_info.status.value))
+            return False
+        standby_repositories = self.get_component_repositories(deploy.deploy_info, ['oceanbase-ce', 'oceanbase'])
+        self.set_repositories(standby_repositories)
+        get_relation_tenants_plugins = self.search_py_script_plugin(standby_repositories, 'get_relation_tenants')
+        get_deployment_connections_plugins = self.search_py_script_plugin(standby_repositories, 'get_deployment_connections')
+        switchover_tenant_pre_plugins = self.search_py_script_plugin(standby_repositories, 'switchover_tenant_pre')
+        switchover_tenant_plugins = self.search_py_script_plugin(standby_repositories, 'switchover_tenant')
+        get_standbys_plugins = self.search_py_script_plugin(standby_repositories, 'get_standbys')
+        connect_plugins = self.search_py_script_plugin(standby_repositories, 'connect')
+        # Check the status for standby cluster
+        if not self.cluster_server_status_check():
+            return False
+        setattr(self.options, 'tenant_name', tenant_name)
+        for repository in get_relation_tenants_plugins:
+            if not self.call_plugin(get_relation_tenants_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config):
+                return False
+
+        for repository in get_deployment_connections_plugins:
+            if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository]):
+                return False
+
+        for repository in switchover_tenant_pre_plugins:
+            if not self.call_plugin(switchover_tenant_pre_plugins[repository], repository):
+                return False
+
+        for repository in switchover_tenant_plugins:
+            if not self.call_plugin(switchover_tenant_plugins[repository], repository, get_standbys_plugins=get_standbys_plugins):
+                return False
+        return True
+
+    def failover_decouple_tenant(self, standby_deploy_name, tenant_name, option_type='failover'):
+        deploy = self.deploy_manager.get_deploy_config(standby_deploy_name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % standby_deploy_name)
+            return False
+        self.set_deploy(deploy)
+        if deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" is %s' % (standby_deploy_name, deploy.deploy_info.status.value))
+            return False
+        standby_repositories = self.get_component_repositories(deploy.deploy_info, ['oceanbase-ce', 'oceanbase'])
+        self.set_repositories(standby_repositories)
+        self.search_py_script_plugin(standby_repositories, 'standby_version_check')
+        get_deployment_connections_plugins = self.search_py_script_plugin(standby_repositories, 'get_deployment_connections')
+        failover_decouple_tenant_pre_plugins = self.search_py_script_plugin(standby_repositories, 'failover_decouple_tenant_pre')
+        connect_plugins = self.search_py_script_plugin(standby_repositories, 'connect')
+        get_relation_tenants_plugins = self.search_py_script_plugin(standby_repositories, 'get_relation_tenants')
+        failover_decouple_tenant_plugins = self.search_py_script_plugin(standby_repositories, 'failover_decouple_tenant')
+        # Check the status for standby cluster
+        if not self.cluster_server_status_check():
+            return
+        setattr(self.options, 'tenant_name', tenant_name)
+        for repository in get_relation_tenants_plugins:
+            if not self.call_plugin(get_relation_tenants_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config):
+                return False
+
+        for repository in get_deployment_connections_plugins:
+            if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository]):
+                return False
+
+        for repository in failover_decouple_tenant_pre_plugins:
+            if not self.call_plugin(failover_decouple_tenant_pre_plugins[repository], repository, option_type=option_type):
+                return False
+
+        for repository in failover_decouple_tenant_plugins:
+            if not self.call_plugin(failover_decouple_tenant_plugins[repository], repository, option_type=option_type):
+                return False
+
+        delete_standby_info_plugins = self.search_py_script_plugin(standby_repositories, 'delete_standby_info', no_found_act='ignore')
+        for repository in delete_standby_info_plugins:
+            if not self.call_plugin(delete_standby_info_plugins[repository], repository, delete_password=False):
+                self._call_stdio('warn', 'Delete relation of standby tenant failed')
+        return True
+
     def drop_tenant(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
@@ -1777,13 +1934,15 @@ class ObdHome(object):
             
         connect_plugins = self.search_py_script_plugin(repositories, 'connect')
         drop_tenant_plugins = self.search_py_script_plugin(repositories, 'drop_tenant', no_found_act='ignore')
+        get_standbys_plugins = self.search_py_script_plugin(repositories, 'get_standbys', no_found_act='ignore')
+        get_relation_tenants_plugins = self.search_py_script_plugin(repositories, 'get_relation_tenants', no_found_act='ignore')
+        get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
+        check_exit_standby_plugins = self.search_py_script_plugin(repositories, 'check_exit_standby', no_found_act='ignore')
         self._call_stdio('stop_loading', 'succeed')
 
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
-            
         for repository in drop_tenant_plugins:
-            cluster_config = deploy_config.components[repository.name]
             db = None
             cursor = None
             ret = self.call_plugin(connect_plugins[repository], repository)
@@ -1793,8 +1952,34 @@ class ObdHome(object):
             if not db:
                 return False
 
+            if repository in get_relation_tenants_plugins:
+                if not self.call_plugin(get_relation_tenants_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config):
+                    self._call_stdio('error', err.EC_UNEXPECTED_EXCEPTION)
+                    return False
+            if not getattr(self.options, 'ignore_standby', False):
+                # check if the current tenant has a standby tenant in other cluster
+                if repository in get_relation_tenants_plugins and repository in get_deployment_connections_plugins\
+                        and repository in get_standbys_plugins and repository in check_exit_standby_plugins:
+
+                    if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository]):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+
+                    if not self.call_plugin(get_standbys_plugins[repository], repository, primary_deploy_name=name):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+
+                    if not self.call_plugin(check_exit_standby_plugins[repository], repository):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+
             if not self.call_plugin(drop_tenant_plugins[repository], repository, cursor=cursor):
                 return False
+        delete_standby_info_plugins = self.search_py_script_plugin(repositories, 'delete_standby_info', no_found_act='ignore')
+        for repository in delete_standby_info_plugins:
+            ret = self.call_plugin(delete_standby_info_plugins[repository], repository)
+            if not ret:
+                self._call_stdio('warn', 'Delete relation of standby tenant failed')
         return True
 
     def list_tenant(self, name):
@@ -1822,11 +2007,21 @@ class ObdHome(object):
         self.search_param_plugin_and_apply(repositories, deploy_config)
         connect_plugins = self.search_py_script_plugin(repositories, 'connect')
         list_tenant_plugins = self.search_py_script_plugin(repositories, 'list_tenant', no_found_act='ignore')
-        self._call_stdio('stop_loading', 'succeed')
-
+        print_standby_graph_plugins = self.search_py_script_plugin(repositories, 'print_standby_graph', no_found_act='ignore')
+        get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
+        get_relation_tenants_plugins = self.search_py_script_plugin(repositories, 'get_relation_tenants', no_found_act='ignore')
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
+        
+        for repository in get_relation_tenants_plugins:
+            if repository in get_deployment_connections_plugins:
+                if not self.call_plugin(get_relation_tenants_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config):
+                    return False
+                if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository]):
+                    return False
 
+        self._call_stdio('stop_loading', 'succeed')
+        
         for repository in list_tenant_plugins:
             cluster_config = deploy_config.components[repository.name]
             db = None
@@ -1837,8 +2032,12 @@ class ObdHome(object):
                 cursor = ret.get_return('cursor')
             if not db:
                 return False
-
-            if not self.call_plugin(list_tenant_plugins[repository], repository, cursor=cursor):
+            if not self.call_plugin(list_tenant_plugins[repository], repository, cursor=cursor, name=name):
+                return False
+            
+        for repository in print_standby_graph_plugins:
+            if not self.call_plugin(print_standby_graph_plugins[repository], repository):
+                self._call_stdio('error', 'print standby tenant graph error.')
                 return False
         return True
 
@@ -2291,7 +2490,7 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+
         if need_confirm and not self._call_stdio('confirm', 'Are you sure to  destroy the "%s" cluster and rebuild it?' % name):
             return False
         deploy_info = deploy.deploy_info
@@ -2303,6 +2502,30 @@ class ObdHome(object):
         repositories = self.load_local_repositories(deploy_info)
         self.set_repositories(repositories)
         self._call_stdio('stop_loading', 'succeed')
+
+        get_relation_tenants_plugins = self.search_py_script_plugin(repositories, 'get_relation_tenants', no_found_act='ignore')
+        for repository in get_relation_tenants_plugins:
+            if not self.call_plugin(get_relation_tenants_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config):
+                self._call_stdio('error', err.EC_UNEXPECTED_EXCEPTION)
+                return False
+        if not getattr(self.options, 'ignore_standby', False):
+            # check if the current cluster's tenant has a standby tenant in other cluster
+            self._call_stdio('start_loading', 'check is exit standby tenant')
+            connect_plugins = self.search_py_script_plugin(repositories, 'connect')
+            get_standbys_plugins = self.search_py_script_plugin(repositories, 'get_standbys', no_found_act='ignore')
+            get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
+            check_exit_standby_plugins = self.search_py_script_plugin(repositories, 'check_exit_standby', no_found_act='ignore')
+            for repository in get_relation_tenants_plugins:
+                if repository in get_deployment_connections_plugins and repository in get_standbys_plugins and repository in check_exit_standby_plugins:
+                    if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository]):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+                    if not self.call_plugin(get_standbys_plugins[repository], repository, primary_deploy_name=name, skip_no_primary_cursor=True):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+                    if not self.call_plugin(check_exit_standby_plugins[repository], repository):
+                        return False
+            self._call_stdio('stop_loading', 'succeed')
 
         self._call_stdio('verbose', 'Check deploy status')
         if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
@@ -2351,6 +2574,31 @@ class ObdHome(object):
         self.set_repositories(repositories)
         self._call_stdio('stop_loading', 'succeed')
 
+        get_relation_tenants_plugins = self.search_py_script_plugin(repositories, 'get_relation_tenants', no_found_act='ignore')
+        for repository in get_relation_tenants_plugins:
+            if not self.call_plugin(get_relation_tenants_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config):
+                self._call_stdio('error', err.EC_UNEXPECTED_EXCEPTION)
+                return False
+        if not getattr(self.options, 'ignore_standby', False):
+            self._call_stdio('verbose', 'Check exit standby tenant')
+            # check if the current cluster's tenant has a standby tenant in other cluster
+            self._call_stdio('start_loading', 'check is exit standby tenant')
+            connect_plugins = self.search_py_script_plugin(repositories, 'connect')
+            get_standbys_plugins = self.search_py_script_plugin(repositories, 'get_standbys', no_found_act='ignore')
+            get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
+            check_exit_standby_plugins = self.search_py_script_plugin(repositories, 'check_exit_standby', no_found_act='ignore')
+            for repository in get_relation_tenants_plugins:
+                if repository in get_deployment_connections_plugins and repository in get_standbys_plugins and repository in check_exit_standby_plugins:
+                    if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository]):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+                    if not self.call_plugin(get_standbys_plugins[repository], repository, primary_deploy_name=name, skip_no_primary_cursor=True):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+                    if not self.call_plugin(check_exit_standby_plugins[repository], repository):
+                        return False
+            self._call_stdio('stop_loading', 'succeed')
+
         self._call_stdio('verbose', 'Check deploy status')
         if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
             obd = self.fork(options=Values({'force': True}))
@@ -2397,6 +2645,12 @@ class ObdHome(object):
 
         for repository in repositories:
             self.call_plugin(destroy_plugins[repository], repository)
+
+        delete_standby_info_plugins = self.search_py_script_plugin(repositories, 'delete_standby_info', no_found_act='ignore')
+        for repository in delete_standby_info_plugins:
+            ret = self.call_plugin(delete_standby_info_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config)
+            if not ret:
+                self._call_stdio('warn', 'Delete relation of standby tenant failed')
 
         self._call_stdio('verbose', 'Set %s deploy status to destroyed' % deploy.name)
         if deploy.update_deploy_status(DeployStatus.STATUS_DESTROYED):
@@ -2541,6 +2795,23 @@ class ObdHome(object):
         self.search_param_plugin_and_apply(repositories, deploy_config)
 
         self._call_stdio('stop_loading', 'succeed')
+
+        get_standbys_plugins = self.search_py_script_plugin(repositories, 'get_standbys', no_found_act='ignore')
+        get_relation_tenants_plugins = self.search_py_script_plugin(repositories, 'get_relation_tenants', no_found_act='ignore')
+        get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
+        connect_plugins = self.search_py_script_plugin(repositories, 'connect', no_found_act='ignore')
+        if not getattr(self.options, 'ignore_standby', False):
+            for repository in get_relation_tenants_plugins:
+                if repository in get_deployment_connections_plugins and repository in get_standbys_plugins:
+                    if not self.call_plugin(get_relation_tenants_plugins[repository], repository, get_deploy=self.deploy_manager.get_deploy_config):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+                    if not self.call_plugin(get_deployment_connections_plugins[repository], repository, connect_plugin=connect_plugins[repository]):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
+                    if not self.call_plugin(get_standbys_plugins[repository], repository, primary_deploy_name=name):
+                        self._call_stdio('error', err.EC_CHECK_STANDBY)
+                        return False
 
         if deploy_info.status == DeployStatus.STATUS_RUNNING:
             component = getattr(self.options, 'component')

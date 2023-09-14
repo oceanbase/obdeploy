@@ -20,8 +20,11 @@
 
 from __future__ import absolute_import, division, print_function
 
+import json
 import time
 import requests
+
+from tool import NetUtil
 
 
 def config_url(ocp_config_server, appname, cid):
@@ -73,11 +76,9 @@ def stop(plugin_context, *args, **kwargs):
             stdio.verbose('post %s' % cleanup_config_url_content)
             response = requests.post(cleanup_config_url_content)
             if response.status_code != 200:
-                raise Exception('%s status code %s' % (cleanup_config_url_content, response.status_code))
+                stdio.warn('%s status code %s' % (cleanup_config_url_content, response.status_code))
         except:
-            stdio.stop_loading('fail')
-            stdio.exception('failed to clean up the configuration url content')
-            return
+            stdio.warn('failed to clean up the configuration url content')
     servers = {}
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)

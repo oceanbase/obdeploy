@@ -1,0 +1,27 @@
+test:
+  system_config:
+  - name: enable_sql_audit
+    value: false
+  - name: syslog_level
+    value: PERF
+  - name: enable_perf_event
+    value: false
+  - name: enable_record_trace_log
+    value: 'false'
+  variables:
+  - name: ob_sql_work_area_percentage
+    value: 80
+  - name: ob_query_timeout
+    value: 36000000000
+  - name: ob_trx_timeout
+    value: 36000000000
+  - name: max_allowed_packet
+    value: 67108864
+  - name: secure_file_priv
+    value: '/'
+  - name: parallel_servers_target
+    value: int(max_cpu * server_num * 8)
+    expression: true
+  exec_sql:
+  - name: clean_cache
+    optimizer: clean_cache

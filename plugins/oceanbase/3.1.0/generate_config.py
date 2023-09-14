@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 
 
 import re, os
+import time
 
 from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED
 from tool import ConfigUtil
@@ -81,6 +82,9 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         return plugin_context.return_true(generate_keys=generate_keys)
 
     cluster_config = plugin_context.cluster_config
+    original_global_conf = cluster_config.get_original_global_conf()
+    if original_global_conf.get('cluster_id') is None:
+        cluster_config.update_global_conf('cluster_id', round(time.time()) % 4294901759)
     if generate_password:
         generate_random_password(plugin_context, cluster_config)
     if only_generate_password:

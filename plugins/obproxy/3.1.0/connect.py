@@ -77,12 +77,14 @@ class Cursor(SafeStdio):
                                     cursorclass=mysql.cursors.DictCursor)
             self.cursor = self.db.cursor()
 
-    def new_cursor(self, tenant='sys', user='root', password=''):
+    def new_cursor(self, tenant='sys', user='root', password='', ip='', port='', print_exception=True):
         try:
-            return Cursor(ip=self.ip, port=self.port, user=user, tenant=tenant, password=password, stdio=self.stdio)
+            ip = ip if ip else self.ip
+            port = port if port else self.port
+            return Cursor(ip=ip, port=port, user=user, tenant=tenant, password=password, stdio=self.stdio)
         except:
-            self.stdio.exception('')
-            self.stdio.verbose('fail to connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            print_exception and self.stdio.exception('')
+            self.stdio.verbose('fail to connect %s -P%s -u%s@%s  -p%s' % (self.ip, self.port, user, tenant, password))
             return None
 
     def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):

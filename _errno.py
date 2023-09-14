@@ -127,6 +127,7 @@ EC_NO_SUCH_NET_DEVICE = OBDErrorCodeTemplate(1010, '{server} No such net interfa
 EC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) Insufficient AIO remaining (Avail: {avail}, Need: {need}), The recommended value of fs.aio-max-nr is 1048576')
 EC_PARAM_CHECK = OBDErrorCodeTemplate(1012, '{errors}')
 EC_SSH_CONNECT = OBDErrorCodeTemplate(1013, '{user}@{ip} connect failed: {message}')
+EC_CHECK_STANDBY = OBDErrorCodeTemplate(1015, 'Unable to confirm the primary-standby relationship, rerun with "--ignore-standby" option if you want to proceed despite the risks.')
 
 # error code for observer
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
@@ -175,8 +176,18 @@ EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE = OBDErrorCodeTemplate(4305
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant.')
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM = OBDErrorCodeTemplate(4305, 'There is not enough memory for ocp meta tenant')
 EC_OCP_EXPRESS_ADMIN_PASSWD_ERROR = OBDErrorCodeTemplate(4306, '({ip}) ocp-express admin_passwd invalid.(Current :{current})')
-
 # 4350-4399 had been used by ocp
+
+#ob-configserver
+EC_OBC_PROGRAM_START_ERROR = OBDErrorCodeTemplate(4401, 'Failed to start {server} ob-configserver.')
+EC_OBC_VIP_SET_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: vip_address and vip_port must be set together')
+EC_OBC_CONNECTION_URL_EMPTY = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: connection_url is empty')
+EC_OBC_CONNECTION_URL_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: connection_url must be an absolute path')
+EC_OBC_DATABASE_TYPE_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: database_type can only be set to `mysql` or `sqlite3`, and must be in lowercase. ')
+EC_OBC_SQLITE_PERMISSION_DENIED = OBDErrorCodeTemplate(4403, '{ip}: {path}: permission denied.')
+EC_OBC_DATABASE_CONNECT_ERROR = OBDErrorCodeTemplate(4404, '{server}: failed to connect to database: {url}')
+
+
 
 # sql
 EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
@@ -185,6 +196,9 @@ EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
 EC_OBDIAG_NOT_FOUND = OBDErrorCodeTemplate(6000, 'Failed to executable obdiag command, you may not have obdiag installed')
 EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT = OBDErrorCodeTemplate(6001, 'obdiag must contain depend components {components}')
 EC_OBDIAG_OPTIONS_FORMAT_ERROR = OBDErrorCodeTemplate(6002, 'obdiag options {option} format error, please check the value : {value}')
+
+# Unexpected exceptions code
+EC_UNEXPECTED_EXCEPTION = OBDErrorCodeTemplate(9999, 'Unexpected exception: need to be posted on "https://ask.oceanbase.com", and we will help you resolve them.')
 
 # WARN CODE 
 WC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) The recommended number of {key} is {need} (Current value: {now})')

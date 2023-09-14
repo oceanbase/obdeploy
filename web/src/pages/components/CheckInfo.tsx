@@ -353,7 +353,6 @@ export default function CheckInfo() {
       content,
       more,
     });
-    console.log('clusterConfigInfo', clusterConfigInfo);
   }
 
   return (

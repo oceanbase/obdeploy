@@ -1,0 +1,98 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: STRING
+  need_redeploy: true
+  description_en: working directory for obagent
+  description_local: Obagent工作目录
+- name: listen_port
+  name_local: 监听端口
+  require: true
+  essential: true
+  type: STRING
+  default: 8080
+  need_redeploy: true
+  description_en: The port of ob-configserver web
+  description_local: ob-configserver服务监听端口
+- name: server_ip
+  name_local: 监听的ip
+  require: true
+  essential: true
+  type: STRING
+  default: 0.0.0.0
+  need_restart: true
+  description_en: Listen to the ob-configserver server IP
+  description_local: ob-configserver服务监听的ip
+- name: log_level
+  require: true
+  essential: true
+  type: STRING
+  default: info
+  need_restart: true
+  description_en: The level of manager ob-configserver
+  description_local: ob-configserver 日志级别
+- name: log_maxsize
+  require: true
+  essential: true
+  type: INT
+  default: 30
+  need_restart: true
+  description_en: The total size of manager ob-configserver.Log size is measured in Megabytes.
+  description_local: ob_mgragent 日志文件大小（单位：mb）
+- name: log_maxage
+  require: true
+  essential: true
+  type: INT
+  default: 7
+  need_restart: true
+  description_en: The days of manager expired ob-configserver.Log retention days
+  description_local: 保留过期日志的最大间隔天数
+- name: log_maxbackups
+  require: true
+  essential: true
+  type: INT
+  default: 10
+  need_restart: true
+  description_en: The number of manager expired ob-configserver.Log
+  description_local:  保留过期日志的最大个数
+- name: log_localtime
+  require: true
+  essential: true
+  type: BOOL
+  default: True
+  need_restart: true
+  description_en: Switch of ob-configserver.Log naming with localtime
+  description_local: 使用本地时间命令日志文件开关
+- name: log_compress
+  require: true
+  essential: true
+  type: BOOL
+  default: True
+  need_restart: true
+  description_en: Compress ob-configserver.Log switch
+  description_local: 压缩日志开关
+- name: vip_address
+  name_local: 负载均衡访问地址
+  require: false
+  essential: true
+  type: STRING
+  need_restart: true
+  description_en: Load Balance host ip
+  description_local: 负载均衡访问ip地址
+- name: vip_port
+  name_local: 负载均衡监听端口
+  require: false
+  essential: true
+  type: int
+  need_restart: true
+  description_en: The port of Load Balance port
+  description_local: 负载均衡服务监听端口
+- name: storage
+  require: true
+  type: DICT
+  default:
+    database_type: sqlite3
+  need_restart: true
+  description_en: The database config of ob-configserver
+  description_local: ob-configserver 使用的数据库

@@ -19,6 +19,7 @@
 
 
 from __future__ import absolute_import, division, print_function
+from collections.abc import Iterable, Iterator
 
 import os
 import re
@@ -111,15 +112,90 @@ class InnerConfigItem(str):
     pass
 
 
+class InnerConfigKey(object):
+
+    keyword_symbol = "$_"
+
+    @classmethod
+    def is_keyword(cls, s):
+        return s.startswith(cls.keyword_symbol)
+
+    @classmethod
+    def to_keyword(cls, key):
+        return "{}{}".format(cls.keyword_symbol, key)
+
+    @classmethod
+    def keyword_to_str(cls, _keyword):
+        return str(_keyword.replace(cls.keyword_symbol, '', 1))
+
+
+class ComponentInnerConfig(dict):
+
+    COMPONENT_GLOBAL_ATTRS = InnerConfigKey.to_keyword('component_global_attrs')
+
+    def __init__(self, component_name, config):
+        super(ComponentInnerConfig, self).__init__()
+        self.component_name = component_name
+        c_config = {}
+        for server in config:
+            i_config = {}
+            s_config = config[server]
+            for key in s_config:
+                i_config[InnerConfigItem(key)] = s_config[key]
+            c_config[server] = i_config
+        self.update(c_config)
+
+    def __iter__(self):
+        keys = self.keys()
+        servers = []
+        for key in keys:
+            if key != self.COMPONENT_GLOBAL_ATTRS:
+                servers.append(key)
+        return iter(servers)
+
+    def update_server_config(self, server, key, value):
+        self._update_config(server, key, value)
+
+    def update_attr(self, key, value):
+        self._update_config(self.COMPONENT_GLOBAL_ATTRS, key, value)
+
+    def del_server_config(self, server, key):
+        self._del_config(server, key)
+
+    def del_attr(self, key):
+        self._del_config(self.COMPONENT_GLOBAL_ATTRS, key)
+
+    def get_attr(self, key):
+        return self._get_config(self.COMPONENT_GLOBAL_ATTRS, key)
+
+    def _update_config(self, item, key, value):
+        if not self.__contains__(item):
+            self[item] = {}
+        if not InnerConfigKey.is_keyword(key):
+            key = InnerConfigKey.to_keyword(key)
+        self[item][key] = value
+
+    def _del_config(self, item, key):
+        if not self.__contains__(item):
+            return
+        if not InnerConfigKey.is_keyword(key):
+            key = InnerConfigKey.to_keyword(key)
+        if key in self[item]:
+            del self[item][key]
+
+    def _get_config(self, item, key):
+        if not self.__contains__(item):
+            return
+        if not InnerConfigKey.is_keyword(key):
+            key = InnerConfigKey.to_keyword(key)
+        return self[item].get(key)
+
 class InnerConfigKeywords(object):
 
     DEPLOY_INSTALL_MODE = 'deploy_install_mode'
     DEPLOY_BASE_DIR = 'deploy_base_dir'
 
-
 class InnerConfig(object):
-
-    keyword_symbol = "$_"
 
     def __init__(self, path, yaml_loader):
         self.path = path
@@ -127,32 +203,16 @@ class InnerConfig(object):
         self.config = {}
         self._load()
 
-    def is_keyword(self, s):
-        return s.startswith(self.keyword_symbol)
-
-    def to_keyword(self, key):
-        return "{}{}".format(self.keyword_symbol, key)
-
-    def keyword_to_str(self, _keyword):
-        return str(_keyword.replace(self.keyword_symbol, '', 1))
-
     def _load(self):
         self.config = {}
         try:
             with FileUtil.open(self.path, 'rb') as f:
                 config = self.yaml_loader.load(f)
                 for component_name in config:
-                    if self.is_keyword(component_name):
+                    if InnerConfigKey.is_keyword(component_name):
                         self.config[InnerConfigItem(component_name)] = config[component_name]
-                        continue
-                    self.config[component_name] = {}
-                    c_config = config[component_name]
-                    for server in c_config:
-                        i_config = {}
-                        s_config = c_config[server]
-                        for key in s_config:
-                            i_config[InnerConfigItem(key)] = s_config[key]
-                        self.config[component_name][server] = i_config
+                    else:
+                        self.config[component_name] = ComponentInnerConfig(component_name, config[component_name])
         except:
             pass
 
@@ -176,11 +236,11 @@ class InnerConfig(object):
         return self.get_component_config(component_name).get(server, {})
 
     def get_global_config(self, key, default=None):
-        key = self.to_keyword(key)
+        key = InnerConfigKey.to_keyword(key)
         return self.config.get(key, default)
 
     def update_global_config(self, key, value):
-        self.config[self.to_keyword(key)] = value
+        self.config[InnerConfigKey.to_keyword(key)] = value
 
     def update_component_config(self, component_name, config):
         self.config[component_name] = {}
@@ -192,6 +252,8 @@ class InnerConfig(object):
                     key = InnerConfigItem(key)
                 c_config[key] = data[key]
             self.config[component_name][server] = c_config
+        if ComponentInnerConfig.COMPONENT_GLOBAL_ATTRS in config:
+            self.config[component_name][ComponentInnerConfig.COMPONENT_GLOBAL_ATTRS] = config[ComponentInnerConfig.COMPONENT_GLOBAL_ATTRS]
 
 
 class ConfigParser(object):
@@ -450,6 +512,10 @@ class ClusterConfig(object):
             self._global_conf = None
 
     @property
+    def deploy_name(self):
+        return self._deploy_config.name
+
+    @property
     def original_servers(self):
         return self._original_servers
 
@@ -465,7 +531,14 @@ class ClusterConfig(object):
 
     def get_inner_config(self):
         return self._inner_config
-
+    
+    def update_component_attr(self, key, value, save=True):
+        self._inner_config.update_attr(key, value)
+        return self._deploy_config.dump() if save else True
+    
+    def get_component_attr(self, key):
+        return self._inner_config.get_attr(key)
+    
     def is_cp_install_mode(self):
         return self._deploy_config.is_cp_install_mode()
 
@@ -889,6 +962,7 @@ class DeployConfig(SafeStdio):
         self._inner_config = inner_config
         self.components = OrderedDict()
         self._src_data = None
+        self.name = os.path.split(os.path.split(yaml_path)[0])[-1]
         self.yaml_path = yaml_path
         self.yaml_loader = yaml_loader
         self.config_parser_manager = config_parser_manager if config_parser_manager else DEFAULT_CONFIG_PARSER_MANAGER
