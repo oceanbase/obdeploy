@@ -29,8 +29,10 @@ import json
 from uuid import uuid1 as uuid, UUID
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
+from colorama import Fore
+
 from core import ObdHome
-from _stdio import IO
+from _stdio import IO, FormtatText
 from _lock import LockMode
 from tool import DirectoryUtil, FileUtil, NetUtil, COMMAND_ENV
 from _errno import DOC_LINK_MSG, LockError
@@ -780,6 +782,8 @@ class ClusterDeployCommand(ClusterMirrorCommand):
                 obd.set_options(self.opts)
             res = obd.deploy_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
+            if res:
+                obd.stdio.print(FormtatText('Please execute ` obd cluster start %s ` to start' % self.cmds[0], Fore.GREEN))
             return res
         else:
             return self._show_help()
@@ -826,6 +830,7 @@ class ClusterDestroyCommand(ClusterMirrorCommand):
     def __init__(self):
         super(ClusterDestroyCommand, self).__init__('destroy', 'Destroy a deployed cluster.')
         self.parser.add_option('-f', '--force-kill', action='store_true', help="Force kill the running observer process in the working directory.")
+        self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force kill the observer while standby tenant in others cluster exists.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -873,6 +878,7 @@ class ClusterRedeployCommand(ClusterMirrorCommand):
         super(ClusterRedeployCommand, self).__init__('redeploy', 'Redeploy a started cluster.')
         self.parser.add_option('-f', '--force-kill', action='store_true', help="Force kill the running observer process in the working directory.")
         self.parser.add_option('--confirm', action='store_true', help='Confirm to redeploy.')
+        self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force kill the observer while standby tenant in others cluster exists.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -951,6 +957,7 @@ class CLusterUpgradeCommand(ClusterMirrorCommand):
         self.parser.add_option('--disable', type='string', help="Hash list for disabled mirrors, separated with `,`.", default='')
         self.parser.add_option('-e', '--executer-path', type='string', help="Executer path.", default=os.path.join(ObdCommand.OBD_INSTALL_PATH, 'lib/executer'))
         self.parser.add_option('-t', '--script-query-timeout', type='string', help="The timeout(s) for executing sql in upgrade scripts. Supported since version 4.1.0", default='')
+        self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force upgrade, before upgrade standby tenant`s cluster.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -996,11 +1003,100 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterTenantCreateStandByCommand(ClusterTenantCreateCommand):
+
+    def __init__(self):
+        super(ClusterTenantCreateStandByCommand, self).__init__()
+        self.name = 'create-standby'
+        self.summary = 'Create a standby tenant.'
+        self.parser.remove_option('-t')
+        self.parser.remove_option('--max-memory')
+        self.parser.remove_option('--min-memory')
+        self.parser.remove_option('--max-disk-size')
+        self.parser.remove_option('--max-session-num')
+        self.parser.remove_option('--mode')
+        self.parser.remove_option('--charset')
+        self.parser.remove_option('--collate')
+        self.parser.remove_option('--logonly-replica-num')
+        self.parser.remove_option('--tablegroup')
+        self.parser.remove_option('-s')
+        self.parser.add_option('-t', '-n', '--tenant-name', type='string', help="The standby tenant name. The default tenant name is consistent with the primary tenant name.", default='')
+        self.parser.add_option('--standbyro-password', type='string', help="standbyro user password.")
+        self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password,for crate standby user.")
+
+
+    def init(self, cmd, args):
+        super(ClusterTenantCreateStandByCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name> <primary deploy name> <primary tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 3:
+            return obd.create_standby_tenant(self.cmds[0], self.cmds[1], self.cmds[2])
+        else:
+            return self._show_help()
+
+
+class ClusterTenantSwitchoverCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantSwitchoverCommand, self).__init__('switchover', 'Switchover primary-standby tenant.')
+        self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password")
+        self.parser.add_option('--standbyro-password', type='string', help="standbyro user password.")
+
+    def init(self, cmd, args):
+        super(ClusterTenantSwitchoverCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name> <standby tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.switchover_tenant(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+
+class ClusterTenantFailoverCommand(ClusterMirrorCommand):
+    def __init__(self):
+        super(ClusterTenantFailoverCommand, self).__init__('failover', 'failover standby tenant.')
+        self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password")
+
+    def init(self, cmd, args):
+        super(ClusterTenantFailoverCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name> <standby tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.failover_decouple_tenant(self.cmds[0], self.cmds[1], 'failover')
+        else:
+            return self._show_help()
+
+
+class ClusterTenantDecoupleCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantDecoupleCommand, self).__init__('decouple', 'decouple standby tenant.')
+        self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password")
+
+    def init(self, cmd, args):
+        super(ClusterTenantDecoupleCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name> <standby tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.failover_decouple_tenant(self.cmds[0], self.cmds[1], 'decouple')
+        else:
+            return self._show_help()
+
+
 class ClusterTenantDropCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterTenantDropCommand, self).__init__('drop', 'Drop a tenant.')
         self.parser.add_option('-t', '-n', '--tenant-name', type='string', help="Tenant name.")
+        self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force drop tenant when it has standby tenant, the standby tenants will become unavailable.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1013,6 +1109,8 @@ class ClusterTenantListCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterTenantListCommand, self).__init__('show', 'Show the list of tenant.')
+        self.parser.add_option('-t', '--tenant', type='string', help='Tenant name', default='')
+        self.parser.add_option('-g', '--graph', action='store_true', help='view standby by graph')
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1028,6 +1126,10 @@ class ClusterTenantCommand(MajorCommand):
         self.register_command(ClusterTenantCreateCommand())
         self.register_command(ClusterTenantDropCommand())
         self.register_command(ClusterTenantListCommand())
+        self.register_command(ClusterTenantCreateStandByCommand())
+        self.register_command(ClusterTenantSwitchoverCommand())
+        self.register_command(ClusterTenantFailoverCommand())
+        self.register_command(ClusterTenantDecoupleCommand())
 
 
 class ClusterMajorCommand(MajorCommand):

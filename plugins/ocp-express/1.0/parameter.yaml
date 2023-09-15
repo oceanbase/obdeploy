@@ -43,7 +43,7 @@
   description_en: When logging_file_name is configured, specify the log file size through this configuration
 - name: logging_file_total_size_cap
   name_local: 日志总大小
-  type: STRING
+  type: CAPACITY_MB
   require: true
   essential: true
   default: 1GB

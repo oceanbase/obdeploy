@@ -41,6 +41,23 @@ function _obd_reply_tool_commands() {
     COMPREPLY=( $(compgen -o filenames -W "${res}" -- ${cur}) )
 }
 
+function _obd_reply_primary_standby_tenant_names() {
+    input=`cat $HOME/.obd/cluster/$1/inner_config.yaml|grep standby_relation`
+    quotes_rx='^[^"]*"([^"]*)"(.*)$'
+
+    quoted_strings=""
+    while [[ $input =~ $quotes_rx ]]; do
+      tmpvalue=${BASH_REMATCH[1]}
+      if (( ! $(echo $tmpvalue | grep -c ":") ))
+      then
+          quoted_strings="$quoted_strings $tmpvalue"
+      fi
+        input=${BASH_REMATCH[2]}
+    done
+    COMPREPLY=($quoted_strings)
+
+}
+
 function _obd_complete_func
 {
 
@@ -50,13 +67,21 @@ function _obd_complete_func
   obd_home=${OBD_HOME:-~}
   env_file=${obd_home}/.obd/.obd_environ
   cur="${COMP_WORDS[COMP_CWORD]}"
-  prev="${COMP_WORDS[COMP_CWORD-1]}"
+  prev=${!#}
 
   all_cmds["obd"]="mirror cluster test update repo demo web obdiag display-trace"
   all_cmds["obd cluster"]="autodeploy tenant start deploy redeploy restart reload destroy stop edit-config list display upgrade chst check4ocp reinstall"
   all_cmds["obd cluster *"]="_obd_reply_deploy_names"
-  all_cmds["obd cluster tenant"]="create drop show"
+  all_cmds["obd cluster tenant"]="create drop show create-standby switchover failover decouple"
   all_cmds["obd cluster tenant *"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant create-standby *"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant switchover *"]="_obd_reply_primary_standby_tenant_names $prev"
+  all_cmds["obd cluster tenant failover *"]="_obd_reply_primary_standby_tenant_names $prev"
+  all_cmds["obd cluster tenant decouple *"]="_obd_reply_primary_standby_tenant_names $prev"
+  all_cmds["obd cluster tenant create-standby"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant switchover"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant failover"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant decouple"]="_obd_reply_deploy_names"
   all_cmds["obd mirror"]="clone create list update enable disable"
   all_cmds["obd mirror clone"]="_obd_reply_current_files"
   all_cmds["obd repo"]="list"

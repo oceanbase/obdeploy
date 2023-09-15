@@ -109,11 +109,11 @@ obagent:
     # Username for HTTP authentication. The default value is admin.
     # http_basic_auth_user: admin
     # Password for HTTP authentication. The default value is root.
-    # http_basic_auth_password: root
+    # http_basic_auth_password: xxxxxx
     # Username for debug service. The default value is admin.
     # pprof_basic_auth_user: admin
     # Password for debug service. The default value is root.
-    # pprof_basic_auth_password: root
+    # pprof_basic_auth_password: xxxxxxx
     # Monitor username for OceanBase Database. The user must have read access to OceanBase Database as a system tenant. The default value is root.
     # monitor_user: root
     # Monitor password for OceanBase Database. The default value is empty. When a depends exists, OBD gets this value from the oceanbase-ce of the depends. The value is the same as the root_password in oceanbase-ce.
@@ -168,7 +168,7 @@ prometheus:
     #   - job_name: node
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: xxxxxxx
     #     metrics_path: /metrics/node/host
     #     scheme: http
     #     file_sd_configs:  # Set the targets to be collected by reading local files. The example is to collect targets corresponding to all yaml files in the 'targets' directory under $home_path.
@@ -177,7 +177,7 @@ prometheus:
     #   - job_name: ob_basic
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: xxxxxxx
     #     metrics_path: /metrics/ob/basic
     #     scheme: http
     #     file_sd_configs:
@@ -186,7 +186,7 @@ prometheus:
     #   - job_name: ob_extra
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: xxxxxxx
     #     metrics_path: /metrics/ob/extra
     #     scheme: http
     #     file_sd_configs:
@@ -195,7 +195,7 @@ prometheus:
     #   - job_name: agent
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: xxxxxx
     #     metrics_path: /metrics/stat
     #     scheme: http
     #     file_sd_configs:

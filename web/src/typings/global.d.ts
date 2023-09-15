@@ -26,6 +26,7 @@ declare namespace API {
   interface MoreParameter extends API.Parameter {
     description: string;
     auto: boolean;
+    
   }
 
   interface ParameterValue {
@@ -33,6 +34,7 @@ declare namespace API {
     value?: string;
     auto?: boolean;
     require?: boolean;
+    type?: string;
   }
 
   interface NewConfigParameter extends API.ConfigParameter {

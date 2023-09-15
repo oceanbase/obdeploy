@@ -28,6 +28,7 @@ from copy import deepcopy
 import re
 
 from _errno import EC_CONFLICT_PORT
+from tool import NetUtil
 
 stdio = None
 
@@ -120,6 +121,7 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
     clusters_cmd = {}
     real_cmd = {}
     pid_path = {}
+    obproxy_config_server_url = ''
 
     for comp in ['oceanbase', 'oceanbase-ce']:
         if comp in cluster_config.depends:
@@ -146,10 +148,23 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
                     cluster_config.update_global_conf(key, ob_config.get(ob_key), save=False)
             break
 
+    obc_cluster_config = cluster_config.get_depend_config('ob-configserver')
+    if obc_cluster_config:
+        vip_address = obc_cluster_config.get('vip_address')
+        if vip_address:
+            obc_ip = vip_address
+            obc_port = obc_cluster_config.get('vip_port')
+        else:
+            server = cluster_config.get_depend_servers('ob-configserver')[0]
+            client = clients[server]
+            obc_ip = NetUtil.get_host_ip() if client.is_localhost() else server.ip
+            obc_port = obc_cluster_config.get('listen_port')
+        obproxy_config_server_url = "http://{0}:{1}/services?Action=GetObProxyConfig".format(obc_ip, obc_port)
+
     error = False
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
-        if 'rs_list' not in server_config and 'obproxy_config_server_url' not in server_config:
+        if 'rs_list' not in server_config and 'obproxy_config_server_url' not in server_config and not obproxy_config_server_url:
             error = True
             stdio.error('%s need config "rs_list" or "obproxy_config_server_url"' % server)
     if error:
@@ -176,6 +191,8 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
+        if not server_config.get('obproxy_config_server_url') and obproxy_config_server_url:
+            server_config['obproxy_config_server_url'] = obproxy_config_server_url
 
         pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (home_path, server.ip, server_config["listen_port"])
 

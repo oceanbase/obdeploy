@@ -7,7 +7,6 @@ export default defineConfig({
   routes: [{ path: '/', component: 'index' }],
   title: 'OceanBase Deployer',
   fastRefresh: {},
-  mfsu: {},
   favicon: '/assets/logo.png',
   locale: {
     default: 'zh-CN',
