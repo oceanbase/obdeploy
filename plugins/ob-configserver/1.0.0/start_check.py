@@ -276,12 +276,12 @@ def start_check(plugin_context, init_check_status=False,  work_dir_check=False, 
                 stdio.verbose(msg)
                 critical('database', err.EC_OBC_DATABASE_CONNECT_ERROR.format(server=server, url=url))
         elif database_type == 'sqlite3':
-            if not url.startswith('/'):
-                critical('parameter', err.EC_OBC_CONNECTION_URL_ERROR.format(server=server))
-            sqlite_path = os.path.split(url)[0]
-            has_write_permission = client.execute_command('[ -w {} ]'.format(sqlite_path))
-            if not has_write_permission:
-                critical('database', err.EC_OBC_SQLITE_PERMISSION_DENIED.format(ip=ip, path=sqlite_path))
+            if url:
+                if not url.startswith('/'):
+                    critical('parameter', err.EC_OBC_CONNECTION_URL_ERROR.format(server=server))
+                sqlite_path = os.path.split(url)[0]
+                if not client.execute_command('[ -w {} ]'.format(sqlite_path)):
+                    critical('database', err.EC_OBC_SQLITE_PERMISSION_DENIED.format(ip=ip, path=sqlite_path))
         else:
             critical('parameter', err.EC_OBC_DATABASE_TYPE_ERROR.format(server=server))
         check_pass('database')

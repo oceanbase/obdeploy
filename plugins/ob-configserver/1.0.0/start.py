@@ -50,7 +50,7 @@ def get_config_dict(home_path, server_config, ip):
         vip_port = int(server_config['listen_port'])
 
     # connect_url
-    if not server_config['storage']['connection_url']:
+    if not server_config['storage'].get('connection_url'):
         connection_url = os.path.join(home_path, '.data.db?cache=shared&_fk=1')
     else:
         connection_url = server_config['storage']['connection_url']
