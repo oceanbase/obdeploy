@@ -19,12 +19,16 @@
 
 
 from __future__ import absolute_import, division, print_function
-from ssh import LocalClient
-import datetime
-from tool import TimeUtils
-from subprocess import call, Popen, PIPE
-import _errno as err
+
 import os
+import datetime
+
+from subprocess import call, Popen, PIPE
+
+from ssh import LocalClient
+from tool import TimeUtils
+from _rpm import Version
+import _errno as err
 
 
 def gather_slog(plugin_context, *args, **kwargs):
@@ -72,7 +76,6 @@ def gather_slog(plugin_context, *args, **kwargs):
     options = plugin_context.options
     obdiag_bin = "obdiag"
     cluster_config = plugin_context.cluster_config
-    cluster_name = cluster_config.name
     stdio = plugin_context.stdio
     global_conf = cluster_config.get_global_conf()
     from_option = get_option('from')
@@ -91,7 +94,8 @@ def gather_slog(plugin_context, *args, **kwargs):
         if not server_config.get('redo_dir'):
             server_config['redo_dir'] = server_config['data_dir']
         if not server_config.get('slog_dir'):
-            server_config['slog_dir'] = '%s/slog' % server_config['redo_dir']
+            mount_key = 'redo_dir' if Version('4.0') > cluster_config.version else 'data_dir'
+            server_config['slog_dir'] = '%s/slog' % server_config[mount_key]
         data_dir = server_config['slog_dir']
 
     try:

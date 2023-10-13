@@ -299,7 +299,7 @@ class ConfigParser(object):
         if cluster_config.origin_tag:
             conf['tag'] = cluster_config.origin_tag
         if cluster_config.depends:
-            conf['depends'] = cluster_config.depends
+            conf['depends'] = list(cluster_config.depends)
         conf = cls._from_cluster_config(conf, cluster_config)
         inner_config = cls.extract_inner_config(cluster_config, conf)
         return {
@@ -546,6 +546,8 @@ class ClusterConfig(object):
         return self._deploy_config.is_ln_install_mode()
 
     def apply_inner_config(self, config):
+        if not isinstance(config, ComponentInnerConfig):
+            config = ComponentInnerConfig(self.name, {} if config is None else config)
         self._inner_config = config
         self._clear_cache_server()
 
@@ -987,7 +989,7 @@ class DeployConfig(SafeStdio):
                 return inner_config.get_component_config(component_name)
         else:
             def get_inner_config(component_name):
-                return {}
+                return ComponentInnerConfig(component_name, {})
 
         self._inner_config = inner_config
         base_dir = self.get_base_dir()

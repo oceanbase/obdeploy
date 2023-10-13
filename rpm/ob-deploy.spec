@@ -10,6 +10,7 @@ Url: git@github.com:oceanbase/obdeploy.git
 # BuildRoot:  %_topdir/BUILDROOT
 %define debug_package %{nil}
 %define __os_install_post %{nil}
+%define _build_id_links none
 
 
 # uncomment below, if your building depend on other packages

@@ -264,7 +264,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             if not server_config.get('ilog_dir'):
                 server_config['ilog_dir'] = '%s/ilog' % server_config['redo_dir']
             if not server_config.get('slog_dir'):
-                server_config['slog_dir'] = '%s/slog' % server_config['redo_dir']
+                server_config['slog_dir'] = '%s/slog' % server_config['data_dir']
             if server_config['redo_dir'] == server_config['data_dir']:
                 keys = ['home_path', 'data_dir', 'clog_dir', 'ilog_dir', 'slog_dir']
             else:
