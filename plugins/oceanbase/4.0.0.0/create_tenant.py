@@ -23,10 +23,11 @@ from __future__ import absolute_import, division, print_function
 
 import re
 import time
+from collections import defaultdict
 
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 
-tenant_cursor = None
+tenant_cursor_cache = defaultdict(dict)
 
 
 def parse_size(size):
@@ -57,16 +58,29 @@ def format_size(size, precision=1):
     return format % (size, units[idx])
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, retries=10):
-    global tenant_cursor
-    if not tenant_cursor:
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20):
+    if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
-        tenant_cursor = cursor.new_cursor(tenant=tenant, user=user)
-        if not tenant_cursor and retries:
-            retries -= 1
-            time.sleep(2)
-            return exec_sql_in_tenant(sql, cursor, tenant, mode, retries)
-    return tenant_cursor.execute(sql)
+    # find tenant ip, port
+    tenant_cursor = None
+    if cursor in tenant_cursor_cache and tenant in tenant_cursor_cache[cursor] and user in tenant_cursor_cache[cursor][tenant]:
+        tenant_cursor = tenant_cursor_cache[cursor][tenant][user]
+    else:
+        query_sql = "select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
+        tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
+        for tenant_server_port in tenant_server_ports:
+            tenant_ip = tenant_server_port['SVR_IP']
+            tenant_port = tenant_server_port['SQL_PORT']
+            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, print_exception=print_exception)
+            if tenant_cursor:
+                if tenant not in tenant_cursor_cache[cursor]:
+                    tenant_cursor_cache[cursor][tenant] = {}
+                tenant_cursor_cache[cursor][tenant][user] = tenant_cursor
+                break
+    if not tenant_cursor and retries:
+        time.sleep(1)
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1)
+    return tenant_cursor.execute(sql, raise_exception=False, exc_level='verbose') if tenant_cursor else False
 
 
 def create_tenant(plugin_context, cursor, create_tenant_options=None, *args, **kwargs):

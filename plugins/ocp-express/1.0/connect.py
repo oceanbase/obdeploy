@@ -27,6 +27,11 @@ from requests.auth import HTTPBasicAuth
 import _errno as err
 
 
+class ConnectCursor(dict):
+    def close(self):
+        pass
+
+
 class OcpExpressCursor(object):
 
     class Response(object):
@@ -93,7 +98,7 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
     else:
         servers = cluster_config.servers
         stdio.start_loading('Connect to ocp-express')
-    cursors = {}
+    cursors = ConnectCursor()
     for server in servers:
         config = cluster_config.get_server_conf(server)
         username = 'system'

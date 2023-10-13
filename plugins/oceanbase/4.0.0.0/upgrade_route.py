@@ -106,6 +106,8 @@ class ObVersionGraph(object):
 
     def findShortestUpgradePath(self, current_repository, dest_repository, stdio):
         start_node = self.get_node(current_repository)
+        if not start_node:
+            return
         queue = [start_node]
         visited = set([start_node])
         finalNode = None

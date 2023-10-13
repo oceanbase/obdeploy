@@ -23,9 +23,8 @@ from __future__ import absolute_import, division, print_function
 import os
 
 
-def upgrade_check(plugin_context, current_repository, route, cursor, *args, **kwargs):
+def upgrade_check(plugin_context, current_repository, upgrade_repositories, route, cursor, *args, **kwargs):
 
-    repositories = plugin_context.repositories
     options = plugin_context.options
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
@@ -56,7 +55,7 @@ def upgrade_check(plugin_context, current_repository, route, cursor, *args, **kw
     while i < n:
         cant_use = False
         node = route[i]
-        repository = repositories[i]
+        repository = upgrade_repositories[i]
         stdio.verbose('route %s-%s use %s. file check begin.' % (node.get('version'), node.get('release'), repository))
         script_dir = os.path.join(repository.repository_dir, 'etc/direct_upgrade') if node.get('direct_upgrade') else os.path.join(repository.repository_dir, 'etc')
         if skip_check is False:

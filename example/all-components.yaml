@@ -7,7 +7,7 @@
 #   timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
   depends:
-    ob-configserver
+    - ob-configserver
   servers:
     - name: server1
       # Please don't use hostname, only IP can be supported
@@ -80,6 +80,7 @@ obproxy-ce:
   # When the associated configurations are not done, OBD will automatically get the these configurations from the dependent components.
   depends:
     - oceanbase-ce
+    - ob-configserver
   servers:
     - 172.19.33.6
   global:

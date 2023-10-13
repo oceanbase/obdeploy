@@ -23,9 +23,8 @@ from __future__ import absolute_import, division, print_function
 import os
 
 
-def upgrade_check(plugin_context, current_repository, route, cursor, *args, **kwargs):
+def upgrade_check(plugin_context, current_repository, upgrade_repositories, route, cursor, *args, **kwargs):
 
-    repositories = plugin_context.repositories
     options = plugin_context.options
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
@@ -41,14 +40,14 @@ def upgrade_check(plugin_context, current_repository, route, cursor, *args, **kw
         zones.add(zone)
     
     if len(zones) > 2:
-        tenants = cursor.fetchall("""select a.tenant_name, a.tenant_id, zone_list from oceanbase.DBA_OB_TENANTS as a left join (
+        tenants = cursor.fetchall("""select a.tenant_name, a.tenant_id, group_concat(zone_list separator ';') as zone_list from oceanbase.DBA_OB_TENANTS as a left join (
                                   select zone_list, tenant_id from oceanbase.DBA_OB_RESOURCE_POOLS ) as b 
-                                  on a.tenant_id = b.tenant_id where a.tenant_name not like 'META$%'""")
+                                  on a.tenant_id = b.tenant_id where a.tenant_name not like 'META$%' group by tenant_id""")
         if tenants is False:
             return
         for tenant in tenants:
             zone_list = tenant.get('zone_list', '').split(';')
-            if len(zone_list) < 3:
+            if len(set(zone_list)) < 3:
                 stdio.error('Tenant %s does not meet rolling upgrade conditions (zone number greater than 2).' % tenant.get('tenant_name'))
                 return
 
@@ -57,7 +56,7 @@ def upgrade_check(plugin_context, current_repository, route, cursor, *args, **kw
     while i < n:
         cant_use = False
         node = route[i]
-        repository = repositories[i]
+        repository = upgrade_repositories[i]
         stdio.verbose('route %s-%s use %s. file check begin.' % (node.get('version'), node.get('release'), repository))
         script_dir = os.path.join(repository.repository_dir, 'etc/direct_upgrade') if node.get('direct_upgrade') else os.path.join(repository.repository_dir, 'etc')
         if skip_check is False:

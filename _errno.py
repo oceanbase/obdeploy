@@ -184,8 +184,8 @@ EC_OBC_VIP_SET_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserver conf
 EC_OBC_CONNECTION_URL_EMPTY = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: connection_url is empty')
 EC_OBC_CONNECTION_URL_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: connection_url must be an absolute path')
 EC_OBC_DATABASE_TYPE_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: database_type can only be set to `mysql` or `sqlite3`, and must be in lowercase. ')
-EC_OBC_SQLITE_PERMISSION_DENIED = OBDErrorCodeTemplate(4403, '{ip}: {path}: permission denied.')
-EC_OBC_DATABASE_CONNECT_ERROR = OBDErrorCodeTemplate(4404, '{server}: failed to connect to database: {url}')
+EC_OBC_SQLITE_PERMISSION_DENIED = OBDErrorCodeTemplate(4403, 'ob-configserver connect to sqlite failed: {ip}: {path}: permission denied.')
+EC_OBC_DATABASE_CONNECT_ERROR = OBDErrorCodeTemplate(4404, 'ob-configserver connect to mysql failed: {server}: failed url to connect to database: {url}')
 
 
 

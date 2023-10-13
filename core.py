@@ -2510,7 +2510,7 @@ class ObdHome(object):
                 return False
         if not getattr(self.options, 'ignore_standby', False):
             # check if the current cluster's tenant has a standby tenant in other cluster
-            self._call_stdio('start_loading', 'check is exit standby tenant')
+            self._call_stdio('start_loading', 'Check for standby tenant')
             connect_plugins = self.search_py_script_plugin(repositories, 'connect')
             get_standbys_plugins = self.search_py_script_plugin(repositories, 'get_standbys', no_found_act='ignore')
             get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
@@ -2580,9 +2580,9 @@ class ObdHome(object):
                 self._call_stdio('error', err.EC_UNEXPECTED_EXCEPTION)
                 return False
         if not getattr(self.options, 'ignore_standby', False):
-            self._call_stdio('verbose', 'Check exit standby tenant')
+            self._call_stdio('verbose', 'Check for standby tenant')
             # check if the current cluster's tenant has a standby tenant in other cluster
-            self._call_stdio('start_loading', 'check is exit standby tenant')
+            self._call_stdio('start_loading', 'Check for standby tenant')
             connect_plugins = self.search_py_script_plugin(repositories, 'connect')
             get_standbys_plugins = self.search_py_script_plugin(repositories, 'get_standbys', no_found_act='ignore')
             get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
@@ -2954,7 +2954,6 @@ class ObdHome(object):
                             return False
             upgrade_repositories.append(dest_repository)
 
-            self.set_repositories(upgrade_repositories)
             upgrade_check_plugins = self.search_py_script_plugin(upgrade_repositories, 'upgrade_check', no_found_act='warn')
             if current_repository in upgrade_check_plugins:
                 connect_plugin = self.search_py_script_plugin(upgrade_repositories, 'connect')[current_repository]
@@ -2969,6 +2968,7 @@ class ObdHome(object):
                 if not self.call_plugin(
                     upgrade_check_plugins[current_repository], current_repository,
                     current_repository=current_repository,
+                    upgrade_repositories=upgrade_repositories,
                     route=route,
                     cursor=cursor
                 ):
