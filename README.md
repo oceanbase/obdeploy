@@ -72,7 +72,7 @@ After you deploy OceanBase Deployer (OBD), you can run the `obd demo` command to
 
 > **Note**
 >
-> If the foregoing prerequisites are not met, see [Use OBD to start an OceanBase cluster](../3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md).
+> If the foregoing prerequisites are not met, see [Use OBD to start an OceanBase cluster](./docs/en-US/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md).
 
 ```shell
 # Deploy and start OceanBase Database.
@@ -83,15 +83,15 @@ obclient -h127.0.0.1 -uroot -P2881
 
 ## Use OBD to start an OceanBase cluster
 
-If you want to know how to use OBD to start an OceanBase cluster, please see [Use OBD to start an OceanBase cluster](./docs/en-US/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md).
+If you want to know how to use OBD to start an OceanBase cluster, please see [Use OBD to start an OceanBase cluster](./docs/en-US/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md).
 
 ## Other OBD commands
 
 OBD provides multiple-level commands. You can use the`-h/--help` option to view the help information of sub-commands.
 
-- [Mirror and repository commands](./docs/en-US/3.user-guide/3.obd-command/2.command-group-for-mirroring-and-warehousing.md)
-- [Cluster commands](./docs/en-US/3.user-guide/3.obd-command/1.cluster-command-groups.md)
-- [Testing commands](./docs/en-US/3.user-guide/3.obd-command/3.test-command-group.md)
+- [Mirror and repository commands](./docs/en-US/300.obd-command/200.command-group-for-mirroring-and-warehousing.md)
+- [Cluster commands](./docs/en-US/300.obd-command/100.cluster-command-groups.md)
+- [Testing commands](./docs/en-US/300.obd-command/300.test-command-group.md)
 
 ## Q&A
 
