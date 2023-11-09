@@ -80,7 +80,7 @@ source /etc/profile.d/obd.sh
 
 > **说明**
 >
-> 如果以上条件不满足，您可参考文档 [使用 OBD 启动 OceanBase 数据库集群](../3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md)。
+> 如果以上条件不满足，您可参考文档 [使用 OBD 启动 OceanBase 数据库集群](../3.user-guide/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md)。
 
 ```shell
 # 部署并启动 OceanBase 数据库
@@ -91,15 +91,15 @@ obclient -h127.0.0.1 -uroot -P2881
 
 ## 使用 OBD 启动 OceanBase 数据库集群
 
-如何使用 OBD 启动 OceanBase 数据库集群，请参考文档[使用 OBD 启动 OceanBase 数据库集群](./docs/zh-CN/3.user-guide/2.start-the-oceanbase-cluster-by-using-obd.md)
+如何使用 OBD 启动 OceanBase 数据库集群，请参考文档[使用 OBD 启动 OceanBase 数据库集群](./docs/zh-CN/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md)。
 
 ## 其他 OBD 命令
 
 OBD 有多级命令，您可以在每个层级中使用 `-h/--help` 选项查看子命令的帮助信息。
 
-- [镜像和仓库命令组](./docs/zh-CN/3.user-guide/3.obd-command/2.command-group-for-mirroring-and-warehousing.md)
-- [集群命令组](./docs/zh-CN/3.user-guide/3.obd-command/1.cluster-command-groups.md)
-- [测试命令组](./docs/zh-CN/3.user-guide/3.obd-command/3.test-command-group.md)
+- [镜像和仓库命令组](./docs/zh-CN/300.obd-command/200.command-group-for-mirroring-and-warehousing.md)
+- [集群命令组](./docs/zh-CN/300.obd-command/100.cluster-command-groups.md)
+- [测试命令组](./docs/zh-CN/300.obd-command/300.test-command-group.md)
 
 ## Q&A
 
