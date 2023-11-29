@@ -68,6 +68,14 @@
   need_restart: true
   description_en: name of network adapter
   description_local: 服务进程绑定的网卡设备名
+- name: local_ip
+  name_local: 本机ip
+  type: STRING
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: local ip address
+  description_local: 本机ip地址
 - name: rpc_port
   name_local: 内部通信端口
   require: true

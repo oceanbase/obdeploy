@@ -45,3 +45,9 @@ TELEMETRY_LOG_MODE = "TELEMETRY_LOG_MODE"
 
 # ROOT IO DEFAULT CONFIRM. 0 - disable, 1 - enable.
 ENV_DEFAULT_CONFIRM = "IO_DEFAULT_CONFIRM"
+
+# Disable ssh ALGORITHMS.  1 - disable algorithms,  0 - enable algorithms.
+ENV_DISABLE_RSA_ALGORITHMS = 'OBD_DISABLE_RSA_ALGORITHMS'
+
+# set local connection when using host ip. {0/1} 0 - no local connection. 1 - local connection.
+ENV_HOST_IP_MODE = "HOST_IP_MODE"

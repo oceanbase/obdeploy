@@ -54,7 +54,7 @@ def display(plugin_context, cursor, *args, **kwargs):
                  lambda x: [x['server'], x['port'], x['vip_address'], x['vip_port'], x['status'], x['pid']],
                  title='ob-configserver')
     if result:
-        cmd = "curl -s 'http://{0}:{1}/services?Action=GetObProxyConfig' |jq .".format(result[0]['server'], result[0]['port'])
+        cmd = "curl -s 'http://{0}:{1}/services?Action=GetObProxyConfig'".format(result[0]['server'], result[0]['port'])
         stdio.print(cmd)
     plugin_context.return_true()
 

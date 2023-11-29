@@ -95,6 +95,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
 \cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
 cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && \cp -rf obproxy/3.1.0 obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
+cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -sf ocp-server ocp-server-ce
 mv obproxy/3.1.0 obproxy/3.2.1
 cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce
 cd ${RPM_BUILD_ROOT}/usr/obd/optimize && ln -s obproxy obproxy-ce
@@ -131,6 +132,38 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Fri Nov 24 2023 obd 2.4.0
+ - new features: support for graphical deployment of OCP-CE V4.2.1
+ - new features: support for graphical deployment of OCP-CE V4.2.1 along with its MetaDB
+ - new features: support for command-line deployment of OCP-CE V4.2.1 along with its MetaDB
+ - new features: support for upgrading previous versions to OCP-CE V4.2.1
+ - new features: compatibility updates for OBDiag V1.4.0 and V1.3.0
+ - new features: compatibility with kylin OS
+ - enhancements: improved pre-launch checks for OceanBase databases
+ - improvements: enhanced error messaging during SQL execution and provide SQL execution Trace
+ - bug fixes: fixed an issue where deploying OceanBase V4.2.0 and above with local_ip would still perform NIC checks
+ - bug fixes: resolved a RuntimeError that could occur when destroying clusters deployed with OBD versions prior to V2.3.0
+ - bug fixes: fixed an issue where edit-config could not exit after enabling IO_DEFAULT_CONFIRM
+* Fri Oct 13 2023 obd 2.3.1
+ - new features: adapt to OCP Express V4.2.1
+ - bug fixes: fix checks during rolling upgrade that did not behave as expected under special circumstances
+ - bug fixes: resolve self-upgrade extraction failure of obd on el8 operating systems
+ - bug fixes: unexpected exceptions in obd cluster chst with ob-configserver component
+ - bug fixes: unexpected exceptions in ob-configserver when connection_url is not configured
+* Fri Sep 15 2023 obd 2.3.0
+ - new features: support for OceanBase 4.2 network-based primary/standby solution
+ - new features: support for ConfigServer
+ - new features: support for selecting units for capacity type parameters during web-based graphical deployment
+* Wed Aug 02 2023 obd 2.2.0
+ - new features: adapt to OceanBase-CE V4.2
+ - new features: introduce 19G storage option for small-scale deployment with OceanBase-CE V4.2
+ - new features: adapt to OCP Express V4.2
+ - new features: web-based graphical deployment now allows for custom component selection
+ - optimization: improved OBProxy startup performance on machines with low specs
+ - change: redeploy now requires confirmation, can be bypassed with --confirm option
+ - change: automatic confirmation for all commands can be enabled with obd env set IO_DEFAULT_CONFIRM 1
+ - fix bug: fixed the issue where OCP Express ocp_meta_tenant setting was not effective
+ - fix bug: fixed incorrect recognition of custom capacity type parameters in obd demo
 * Mon Jun 12 2023 obd 2.1.1
  - new features: support upgrade keyword 'when_come_from' and 'deprecated'
  - fix bug: start server failed when other servers downtime #171

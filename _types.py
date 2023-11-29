@@ -18,9 +18,12 @@
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import, division, print_function
+
 import re
 
+
 __all__ = ("Moment", "Time", "Capacity", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String")
+
 
 class Null(object):
 
@@ -143,8 +146,8 @@ class Capacity(ConfigItemType):
                 n = self._origin
                 unit = self.UNITS['M']
             else:
-                r = re.match('^(\d+)(\w)B?$', self._origin.upper())
-                n, u = r.groups()
+                r = re.match('^(\d+)(\w)(I?B)?$', self._origin.upper())
+                n, u, _ = r.groups()
                 unit = self.UNITS.get(u.upper())
             if unit:
                 self._value = int(n) * unit

@@ -51,6 +51,7 @@ def new_not_found_exception(ex):
 
 def new_internal_server_error_exception(ex):
     log.get_logger().error("got internal server error exception: {0}".format(traceback.format_exc()))
+    log.get_logger().error("Runing Exception: {}".format(ex))
     raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, detail="internal server error, exception: {0}".format(ex))
 
 

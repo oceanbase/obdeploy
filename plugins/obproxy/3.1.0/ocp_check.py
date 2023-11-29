@@ -33,19 +33,16 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
     only_one = True
     
     min_version = Version('3.1.1')
-    max_version = min_version
+    ocp_version_420 = Version("4.2.0")
     ocp_version = Version(ocp_version)
 
     if ocp_version < min_version:
         stdio.error('The current plugin version does not support OCP V%s' % ocp_version)
         return
 
-    if ocp_version > max_version:
-        stdio.warn('The plugin library does not support OCP V%s. The takeover requirements are not applicable to the current check.' % ocp_version)
-
     for server in cluster_config.servers:
         client = clients[server]
-        if is_admin and client.config.username != 'admin':
+        if is_admin and client.config.username != 'admin' and ocp_version < ocp_version_420:
             is_admin = False
             stdio.error('The current user must be the admin user. Run the edit-config command to modify the user.username field')
         if can_sudo and not client.execute_command('sudo whoami'):
@@ -55,6 +52,6 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
             only_one = False
             stdio.error('%s Multiple OBProxies exist.' % server)
 
-    if is_admin and can_sudo and only_one:
+    if (is_admin or ocp_version >= ocp_version_420) and can_sudo and only_one:
         stdio.print('Configurations of the OBProxy can be taken over by OCP after they take effect.' if new_cluster_config else 'Configurations of the OBProxy can be taken over by OCP.')
         return plugin_context.return_true()

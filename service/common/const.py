@@ -39,12 +39,15 @@ OBPROXY_CE = 'obproxy-ce'
 OBPROXY = 'obproxy'
 
 OCP_EXPRESS = 'ocpexpress'
+OCP_SERVER_CE = 'ocp-server-ce'
+OCP_SERVER = 'ocp-server'
 
 OBAGENT = 'obagent'
 
 DESTROY_PLUGIN = "destroy"
 INIT_PLUGINS = ("init",)
 START_PLUGINS = ("start_check", "start", "connect", "bootstrap", "display")
+UPGRADE_PLUGINS = ("upgrade")
 # filter component of oceanbase and obproxy version above 4.0
 VERSION_FILTER = {
     OCEANBASE: "4.0.0.0",

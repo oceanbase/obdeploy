@@ -15,10 +15,11 @@ oceanbase-ce:
     - name: server3
       ip: 172.19.33.4
   global:
-    # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
-    # if set severs as "127.0.0.1", please set devname as "lo"
-    # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
-    devname: eth0
+    # Starting from observer version 4.2, the network selection for the observer is based on the 'local_ip' parameter, and the 'devname' parameter is no longer mandatory.
+    # If the 'local_ip' parameter is set, the observer will first use this parameter for the configuration, regardless of the 'devname' parameter.
+    # If only the 'devname' parameter is set, the observer will use the 'devname' parameter for the configuration.
+    # If neither the 'devname' nor the 'local_ip' parameters are set, the 'local_ip' parameter will be automatically assigned the IP address configured above.
+    # devname: eth0
     # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
     memory_limit: 64G # The maximum running memory for an observer
     # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.

@@ -83,7 +83,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         generate_keys = []
         if not only_generate_password:
             generate_keys += [
-                'memory_limit', 'datafile_size', 'log_disk_size', 'devname', 'system_memory', 'cpu_count', 'production_mode',
+                'memory_limit', 'datafile_size', 'log_disk_size', 'system_memory', 'cpu_count', 'production_mode',
                 'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size',
                 'datafile_next', 'datafile_maxsize'
             ]
@@ -155,19 +155,6 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
         client = clients[server]
         server_config = cluster_config.get_server_conf_with_default(server)
         user_server_config = cluster_config.get_original_server_conf_with_global(server, format_conf=True)
-
-        if user_server_config.get('devname') is None:
-            if client.is_localhost():
-                update_server_conf(server, 'devname', 'lo')
-            else:
-                devinfo = client.execute_command('cat /proc/net/dev').stdout
-                interfaces = re.findall('\n\s+(\w+):', devinfo)
-                for interface in interfaces:
-                    if interface == 'lo':
-                        continue
-                    if client.execute_command('ping -W 1 -c 1 -I %s %s' % (interface, ip)):
-                        update_server_conf(server, 'devname', interface)
-                        break
 
         dirs = {"home_path": server_config['home_path']}
         dirs["data_dir"] = server_config['data_dir'] if server_config.get('data_dir') else os.path.join(server_config['home_path'], 'store')

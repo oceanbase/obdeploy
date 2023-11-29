@@ -36,7 +36,7 @@ OBAG_BASE_DEFAULT_CONFIG = {
       "log_filename": "obdiag.log",
       "log_level": "INFO",
       "mode": "obdiag",
-      "stdout_handler_log_level": "DEBUG"
+      "stdout_handler_log_level": "INFO"
     }
   }
 }
@@ -81,6 +81,7 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             nodeItem["user"] = parse_empty(user_config.username)
             nodeItem["password"] = parse_empty(user_config.password)
             nodeItem["private_key"] = parse_empty(user_config.key_file)
+            nodeItem["home_path"] = cluster_config.get_server_conf(server).get("home_path")
             nodes.append(nodeItem)
         nodes_config = nodes
 
@@ -114,11 +115,22 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 obcluster_config["password"] = global_conf.get('root_password')
             if global_conf.get('mysql_port') is not None:
                 obcluster_config["port"] = global_conf.get('mysql_port')
+        checker_config = {}
+        checker_config["ignore_obversion"]=False
+        checker_config["report"] = {}
+        if "report_path" in checker_config["report"]:
+            checker_config["report"]["report_path"] = get_option('report_path')
+        else:
+            checker_config["report"]["report_path"]= "./check_report/"
+        checker_config["report"]["export_type"] = "table"
+        checker_config["package_file"] = obdiag_install_dir+"/check_package.yaml"
+        checker_config["tasks_base_path"] = obdiag_install_dir+"/handler/checker/tasks/"
         config={
             "OBDIAG": base_config,
             "OCP": ocp_config,
             "OBCLUSTER": obcluster_config,
-            "NODES":nodes_config
+            "NODES":nodes_config,
+            "CHECK": checker_config
         }
         return config
 

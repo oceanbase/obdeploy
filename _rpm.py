@@ -78,6 +78,9 @@ class Release(Version):
         m = re.search('(\d+)', self.__str__())
         return int(m.group(0)) if m else -1
 
+    def simple(self):
+        m = re.search('(\d+)', self.__str__())
+        return m.group(0) if m else ""
 
 class PackageInfo(object):
 

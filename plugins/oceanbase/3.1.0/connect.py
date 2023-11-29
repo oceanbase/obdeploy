@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 
 import sys
 import time
+import re
 from copy import copy
 if sys.version_info.major == 2:
     import MySQLdb as mysql
@@ -96,6 +97,10 @@ class Cursor(SafeStdio):
             return getattr(self.cursor, execute_func)()
         except Exception as e:
             getattr(stdio, exc_level)(EC_SQL_EXECUTE_FAILED.format(sql=sql))
+            pattern = r'\n\[(.*?)\]\s+\[(.*?)\]\s+\[(.*?)\]$'
+            error_matches = re.findall(pattern, str(e.args[-1]))
+            if len(error_matches) > 0 and len(error_matches[-1]) == 3:
+                getattr(stdio, exc_level)("observer error trace [%s] from [%s]" % (error_matches[-1][2], error_matches[-1][0]))
             if raise_exception is None:
                 raise_exception = self._raise_exception
             if raise_exception:

@@ -1,0 +1,16 @@
+@smallSpace: 8px;
+.checkInfoSpace {
+  width: 100%;
+  :global {
+    .ant-col {
+      padding-right: 0 !important;
+      padding-left: 0 !important;
+    }
+    .ant-col.ant-col-12:nth-child(2n + 1) {
+      padding-right: @smallSpace !important;
+    }
+    .ant-col.ant-col-12:nth-child(2n) {
+      padding-left: @smallSpace !important;
+    }
+  }
+}

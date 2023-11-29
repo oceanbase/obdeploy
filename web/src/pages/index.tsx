@@ -1,309 +1,108 @@
+import { getLocale,history } from 'umi';
 import { intl } from '@/utils/intl';
-import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
-import { Space, ConfigProvider, notification, Dropdown, Modal } from 'antd';
-import {
-  HomeOutlined,
-  ReadOutlined,
-  ProfileOutlined,
-  GlobalOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons';
-import useRequest from '@/utils/useRequest';
-import { getErrorInfo, getRandomPassword } from '@/utils';
-import { getDeployment } from '@/services/ob-deploy-web/Deployments';
-import { validateOrSetKeepAliveToken } from '@/services/ob-deploy-web/Common';
-import Welcome from './components/Welcome';
-import InstallConfig from './components/InstallConfig';
-import NodeConfig from './components/NodeConfig';
-import ClusterConfig from './components/ClusterConfig';
-import PreCheck from './components/PreCheck';
-import InstallProcess from './components/InstallProcess';
-import InstallFinished from './components/InstallFinished';
-import ExitPage from './components/ExitPage';
-import ProgressQuit from './components/ProgressQuit';
-import Steps from './components/Steps';
-import { localeList, localeText } from '@/constants';
-import type { Locale } from 'antd/es/locale';
-import { setLocale, getLocale } from 'umi';
-import enUS from 'antd/es/locale/en_US';
-import zhCN from 'antd/es/locale/zh_CN';
-import theme from './theme';
-import styles from './index.less';
+import NP from 'number-precision';
+import videojs from 'video.js';
+import 'video.js/dist/video-js.css';
+import { useEffect } from 'react';
+import { Button } from 'antd';
 
-export default function IndexPage() {
-  const uuid = window.localStorage.getItem('uuid');
-  const locale = getLocale();
-  const {
-    setCurrentStep,
-    setConfigData,
-    currentStep,
-    errorVisible,
-    errorsList,
-    setErrorVisible,
-    setErrorsList,
-  } = useModel('global');
-  const [lastError, setLastError] = useState<API.ErrorInfo>({});
-  const [first, setFirst] = useState(true);
-  const [token, setToken] = useState('');
-  const [isInstall, setIsInstall] = useState(false);
-  const [localeConfig, setLocalConfig] = useState<Locale>(
-    locale === 'zh-CN' ? zhCN : enUS,
-  );
+import EnStyles from './Obdeploy/indexEn.less';
+import ZhStyles from './Obdeploy/indexZh.less';
 
-  const { run: fetchDeploymentInfo } = useRequest(getDeployment, {
-    onError: (e: any) => {
-      const errorInfo = getErrorInfo(e);
-      setErrorVisible(true);
-      setErrorsList([...errorsList, errorInfo]);
-    },
-  });
+const locale = getLocale();
+const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
+export default function IndexPage(){
+    let Video: any;
 
-  const { run: handleValidateOrSetKeepAliveToken } = useRequest(
-    validateOrSetKeepAliveToken,
-    {
-      onSuccess: ({ success, data }: API.OBResponse) => {
-        if (success) {
-          if (!data) {
-            if (first) {
-              Modal.confirm({
-                className: 'new-page-confirm',
-                title: intl.formatMessage({
-                  id: 'OBD.src.pages.ItIsDetectedThatYou',
-                  defaultMessage:
-                    '检测到您打开了一个新的部署流程页面，请确认是否使用新页面继续部署工作？',
-                }),
-                width: 424,
-                icon: <InfoCircleOutlined />,
-                content: intl.formatMessage({
-                  id: 'OBD.src.pages.UseTheNewPageTo',
-                  defaultMessage:
-                    '使用新的页面部署，原部署页面将无法再提交任何部署请求',
-                }),
-                onOk: () => {
-                  handleValidateOrSetKeepAliveToken({ token, overwrite: true });
-                },
-                onCancel: () => {
-                  setCurrentStep(8);
-                },
-              });
-              setTimeout(() => {
-                document.activeElement.blur();
-              }, 100);
-            } else {
-              setCurrentStep(8);
-            }
-          } else if (currentStep > 4) {
-            if (!isInstall) {
-              handleValidateOrSetKeepAliveToken({
-                token: token,
-                is_clear: true,
-              });
-              setIsInstall(true);
-            }
-          } else {
-            setTimeout(() => {
-              handleValidateOrSetKeepAliveToken({ token });
-            }, 1000);
-          }
-          setFirst(false);
-        }
-      },
-      onError: () => {
-        if (currentStep > 4) {
-          handleValidateOrSetKeepAliveToken({ token: token, is_clear: true });
-        } else {
-          setTimeout(() => {
-            handleValidateOrSetKeepAliveToken({ token });
-          }, 1000);
-        }
-      },
-    },
-  );
+  const aspectRatio = NP.divide(2498, 3940).toFixed(10);
 
-  const setCurrentLocale = (key: string) => {
-    if (key !== locale) {
-      setLocale(key);
-      window.localStorage.setItem('uuid', token);
-    }
-    setLocalConfig(key === 'zh-CN' ? zhCN : enUS);
-  };
+  const screenWidth = window.innerWidth * 1.3;
+  let videoWidth = 0;
+  let videoHeight = 0;
 
-  const getLocaleItems = () => {
-    return localeList.map((item) => ({
-      ...item,
-      label: <a onClick={() => setCurrentLocale(item.key)}>{item.label}</a>,
-    }));
-  };
+  if (screenWidth < 1040) {
+    videoWidth = 1040;
+  } else {
+    videoWidth = screenWidth;
+  }
 
-  const contentConfig = {
-    1: <InstallConfig />,
-    2: <NodeConfig />,
-    3: <ClusterConfig />,
-    4: <PreCheck />,
-    5: <InstallProcess />,
-    6: <InstallFinished />,
-    7: <ExitPage />,
-    8: <ProgressQuit />,
-  };
-
+  videoHeight = Math.ceil(NP.times(videoWidth, aspectRatio));
   useEffect(() => {
-    let token = '';
-
-    fetchDeploymentInfo({ task_status: 'INSTALLING' }).then(
-      ({ success, data }: API.OBResponse) => {
-        if (success && data?.items?.length) {
-          setCurrentStep(5);
-          setConfigData({
-            components: { oceanbase: { appname: data?.items[0]?.name } },
-          });
-        } else {
-          if (uuid) {
-            token = uuid;
-          } else {
-            token = `${Date.now()}${getRandomPassword(true)}`;
-          }
-          setToken(token);
-          handleValidateOrSetKeepAliveToken({ token });
-          window.localStorage.setItem('uuid', '');
-        }
-      },
-    );
-    const sendBeacon = () => {
-      const url =
-        window.location.origin +
-        '/api/v1/connect/keep_alive?token=' +
-        token +
-        '&is_clear=true';
-      navigator.sendBeacon(url);
+    const welcomeVideo = document.querySelector('.welcome-video');
+    if (welcomeVideo) {
+      Video = videojs(welcomeVideo, {
+        controls: false,
+        autoplay: true,
+        loop: true,
+        preload: 'auto',
+      });
+    }
+    return () => {
+      Video.dispose();
     };
-    window.addEventListener('beforeunload', function (e) {
-      sendBeacon();
-    });
   }, []);
-
-  useEffect(() => {
-    const newLastError = errorsList?.[errorsList?.length - 1] || null;
-    if (errorVisible) {
-      if (newLastError?.desc !== lastError?.desc) {
-        notification.error({
-          description: newLastError?.desc,
-          message: newLastError?.title,
-          duration: null,
-        });
-      }
-    } else {
-      notification.destroy();
-    }
-    setLastError(newLastError);
-  }, [errorVisible, errorsList, lastError]);
-
-  const containerStyle = {
-    minHeight: `${currentStep < 6 ? 'calc(100% - 240px)' : 'calc(100% - 140px)'
-      }`,
-    paddingTop: `${currentStep < 6 ? '170px' : '70px'}`,
-  };
-
-  return (
-    <ConfigProvider theme={theme} locale={localeConfig}>
-      <div
-        className={`${styles.container} ${locale !== 'zh-CN' ? styles.englishContainer : ''
-          }`}
-      >
-        <header className={styles.pageHeader}>
-          <img src="/assets/oceanbase.png" className={styles.logo} alt="logo" />
-          <span className={styles.logoText}>
-            {intl.formatMessage({
-              id: 'OBD.src.pages.DeploymentWizard',
-              defaultMessage: '部署向导',
-            })}
-          </span>
-          <Space className={styles.actionContent} size={25}>
-            <Dropdown menu={{ items: getLocaleItems() }}>
-              <a
-                className={styles.action}
-                onClick={(e) => e.preventDefault()}
-                data-aspm-click="c307509.d326700"
+    return(
+        <div className={styles.videoContainer}>
+        <div className={styles.videoContent} style={{ width: videoWidth }}>
+          <div className={styles.videoActions}>
+            <h1 className={styles.h1}>
+              {intl.formatMessage({
+                id: 'OBD.pages.components.Welcome.WelcomeToDeploy',
+                defaultMessage: '欢迎您部署',
+              })}
+            </h1>
+            {locale === 'zh-CN' ? (
+              <h2 className={styles.h2}>
+                <span className={styles.letter}>OceanBase</span>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.Welcome.DistributedDatabase',
+                  defaultMessage: '分布式数据库',
+                })}
+              </h2>
+            ) : (
+              <h2 className={styles.h2}>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.Welcome.DistributedDatabase',
+                  defaultMessage: '分布式数据库',
+                })}
+              </h2>
+            )}
+             <p className={styles.desc}>OceanBase comprehensive database</p>
+            <div className={styles.startButtonContainer}>
+              <Button
+                className={styles.startButton}
+                type="primary"
+                data-aspm-click="c307505.d317276"
                 data-aspm-desc={intl.formatMessage({
-                  id: 'OBD.src.pages.TopNavigationSwitchBetweenChinese',
-                  defaultMessage: '顶部导航-中英文切换',
+                  id: 'OBD.pages.components.Welcome.WelcomeStartTheExperienceTour',
+                  defaultMessage: '欢迎-开启体验之旅',
                 })}
                 data-aspm-param={``}
                 data-aspm-expo
+                onClick={() => {
+                    history.push('guide')
+                //   setCurrentStep(1);
+                //   setErrorVisible(false);
+                //   setErrorsList([]);
+                }}
               >
-                <GlobalOutlined className={styles.actionIcon} />
-                {localeText[locale]}
-              </a>
-            </Dropdown>
-            <a
-              className={styles.action}
-              href="https://www.oceanbase.com/"
-              target="_blank"
-              data-aspm-click="c307509.d317285"
-              data-aspm-desc={intl.formatMessage({
-                id: 'OBD.src.pages.TopNavigationVisitTheOfficial',
-                defaultMessage: '顶部导航-访问官网',
-              })}
-              data-aspm-param={``}
-              data-aspm-expo
-            >
-              <HomeOutlined className={styles.actionIcon} />
-              {intl.formatMessage({
-                id: 'OBD.src.pages.VisitTheOfficialWebsite',
-                defaultMessage: '访问官网',
-              })}
-            </a>
-            <a
-              className={styles.action}
-              href="https://ask.oceanbase.com/"
-              target="_blank"
-              data-aspm-click="c307509.d317284"
-              data-aspm-desc={intl.formatMessage({
-                id: 'OBD.src.pages.TopNavigationAccessForum',
-                defaultMessage: '顶部导航-访问论坛',
-              })}
-              data-aspm-param={``}
-              data-aspm-expo
-            >
-              <ProfileOutlined className={styles.actionIcon} />
-              {intl.formatMessage({
-                id: 'OBD.src.pages.VisitTheForum',
-                defaultMessage: '访问论坛',
-              })}
-            </a>
-            <a
-              className={styles.action}
-              href="https://www.oceanbase.com/docs/obd-cn"
-              target="_blank"
-              data-aspm-click="c307509.d317286"
-              data-aspm-desc={intl.formatMessage({
-                id: 'OBD.src.pages.TopNavigationHelpCenter',
-                defaultMessage: '顶部导航-帮助中心',
-              })}
-              data-aspm-param={``}
-              data-aspm-expo
-            >
-              <ReadOutlined className={styles.actionIcon} />
-              {intl.formatMessage({
-                id: 'OBD.src.pages.HelpCenter',
-                defaultMessage: '帮助中心',
-              })}
-            </a>
-          </Space>
-        </header>
-        <Steps />
-        {currentStep === 0 ? (
-          <Welcome />
-        ) : (
-          <div className={styles.pageContainer} style={containerStyle}>
-            <main className={styles.pageMain}>
-              <div className={styles.pageContent}>
-                {contentConfig[currentStep]}
-              </div>
-            </main>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.Welcome.StartAnExperienceTour',
+                  defaultMessage: '开启体验之旅',
+                })}
+              </Button>
+            </div>
           </div>
-        )}
+          <video
+            className={`${styles.video} welcome-video video-js`}
+            width={videoWidth}
+            height={videoHeight}
+            muted
+            poster="/assets/welcome/cover.jpg"
+          >
+            <source src="/assets/welcome/data.mp4" type="video/mp4"></source>
+          </video>
+        </div>
       </div>
-    </ConfigProvider>
-  );
+    )
 }

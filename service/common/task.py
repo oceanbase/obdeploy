@@ -137,10 +137,14 @@ class Serial(object):
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            ret = None
             self.lock.acquire()
             try:
-                func(*args, **kwargs)
+                ret = func(*args, **kwargs)
+            except Exception as ex:
+                ret = False, ex
             finally:
                 self.lock.release()
+                return ret
         return wrapper
 

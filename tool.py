@@ -34,14 +34,18 @@ import re
 import json
 import hashlib
 import socket
+import datetime
 from io import BytesIO
+from copy import copy
 
 import string
 from ruamel.yaml import YAML, YAMLContextManager, representer
 
+from _errno import EC_SQL_EXECUTE_FAILED
 from _stdio import SafeStdio
 _open = open
 if sys.version_info.major == 2:
+    import MySQLdb as mysql
     from collections import OrderedDict
     from backports import lzma
     from io import open as _open
@@ -60,13 +64,14 @@ if sys.version_info.major == 2:
 
 else:
     import lzma
+    import pymysql as mysql
     encoding_open = open
 
     class OrderedDict(dict):
         pass
 
 
-__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict", "COMMAND_ENV")
+__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict", "COMMAND_ENV", "TimeUtils")
 
 _WINDOWS = os.name == 'nt'
 
@@ -677,7 +682,8 @@ COMMAND_ENV=CommandEnv()
 
 class TimeUtils(SafeStdio):
 
-    def parse_time_sec(time_str, stdio=None):
+    @staticmethod
+    def parse_time_sec(time_str):
         unit = time_str[-1]
         value = int(time_str[:-1])
         if unit == "s":
@@ -689,5 +695,140 @@ class TimeUtils(SafeStdio):
         elif unit == "d":
             value *= 3600 * 24
         else:
-            stdio.error('%s parse time to second fialed:' % (time_str))
-        return int(value)
+            raise Exception('%s parse time to second fialed:' % (time_str))
+        return value
+
+    @staticmethod
+    def get_format_time(time_str, stdio=None):
+        try:
+            return datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+        except Exception as e:
+            stdio.exception('%s parse time fialed, error:\n%s, time format need to be %s' % (time_str, e, '%Y-%m-%d %H:%M:%S'))
+
+
+    @staticmethod
+    def sub_minutes(t, delta, stdio=None):
+        try:
+            return (t - datetime.timedelta(minutes=delta)).strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            stdio.exception('%s get time fialed, error:\n%s' % (t, e))
+
+
+    @staticmethod
+    def add_minutes(t, delta, stdio=None):
+        try:
+            return (t + datetime.timedelta(minutes=delta)).strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            stdio.exception('%s get time fialed, error:\n%s' % (t, e))
+
+    @staticmethod
+    def parse_time_from_to(from_time=None, to_time=None, stdio=None):
+        format_from_time = None
+        format_to_time = None
+        sucess = False
+        if from_time:
+            format_from_time = TimeUtils.get_format_time(from_time, stdio)
+            format_to_time = TimeUtils.get_format_time(to_time, stdio) if to_time else TimeUtils.add_minutes(format_from_time, 30)
+        else:
+            if to_time:
+                format_to_time = TimeUtils.get_format_time(to_time, stdio)
+                format_from_time = TimeUtils.sub_minutes(format_to_time, 30)
+        if format_from_time and format_to_time:
+            sucess = True
+        return format_from_time, format_to_time, sucess
+
+    @staticmethod
+    def parse_time_since(since=None, stdio=None):
+        now_time = datetime.datetime.now()
+        format_to_time = (now_time + datetime.timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            format_from_time = (now_time - datetime.timedelta(seconds=TimeUtils.parse_time_sec(since))).strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            stdio.exception('%s parse time fialed, error:\n%s' % (since, e))
+            format_from_time = TimeUtils.sub_minutes(format_to_time, 30)
+        return format_from_time, format_to_time
+
+class Cursor(SafeStdio):
+
+    def __init__(self, ip, port, user='root', tenant='sys', password='', stdio=None):
+        self.stdio = stdio
+        self.ip = ip
+        self.port = port
+        self._user = user
+        self.tenant = tenant
+        self.password = password
+        self.cursor = None
+        self.db = None
+        self._connect()
+        self._raise_exception = False
+        self._raise_cursor = None
+
+    @property
+    def user(self):
+        if "@" in self._user:
+            return self._user
+        if self.tenant:
+            return "{}@{}".format(self._user, self.tenant)
+        else:
+            return self._user
+
+    @property
+    def raise_cursor(self):
+        if self._raise_cursor:
+            return self._raise_cursor
+        raise_cursor = copy(self)
+        raise_cursor._raise_exception = True
+        self._raise_cursor = raise_cursor
+        return raise_cursor
+
+    if sys.version_info.major == 2:
+        def _connect(self):
+            self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), passwd=str(self.password))
+            self.cursor = self.db.cursor(cursorclass=mysql.cursors.DictCursor)
+    else:
+        def _connect(self):
+            self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password),
+                                    cursorclass=mysql.cursors.DictCursor)
+            self.cursor = self.db.cursor()
+
+    def new_cursor(self, tenant='sys', user='root', password=''):
+        try:
+            self.stdio.verbose('fail to connect %s -P%s -u%s@%s -p%s' % (self.ip, self.port, user, tenant, password))
+            return Cursor(ip=self.ip, port=self.port, user=user, tenant=tenant, password=str(password), stdio=self.stdio)
+        except:
+            self.stdio.exception('')
+            self.stdio.verbose('fail to connect %s -P%s -u%s -p%s' % (self.ip, self.port, user, password))
+            return None
+
+    def execute(self, sql, args=None, execute_func=None, raise_exception=None, exc_level='error', stdio=None):
+
+        try:
+            stdio.verbose('execute sql: %s. args: %s' % (sql, args))
+            self.cursor.execute(sql, args)
+            if not execute_func:
+                return self.cursor
+            return getattr(self.cursor, execute_func)()
+        except Exception as e:
+            getattr(stdio, exc_level)(EC_SQL_EXECUTE_FAILED.format(sql=sql))
+            if raise_exception is None:
+                raise_exception = self._raise_exception
+            if raise_exception:
+                stdio.exception('')
+                raise e
+            return False
+
+    def fetchone(self, sql, args=None, raise_exception=None, exc_level='error', stdio=None):
+        return self.execute(sql, args=args, execute_func='fetchone', raise_exception=raise_exception, exc_level=exc_level, stdio=stdio)
+
+    def fetchall(self, sql, args=None, raise_exception=None, exc_level='error', stdio=None):
+        return self.execute(sql, args=args, execute_func='fetchall', raise_exception=raise_exception, exc_level=exc_level, stdio=stdio)
+
+    def close(self):
+        if self.cursor:
+            self.cursor.close()
+            self.cursor = None
+        if self.db:
+            self.db.close()
+            self.db = None

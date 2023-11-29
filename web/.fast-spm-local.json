@@ -1,0 +1,102 @@
+{
+  "src/component/AobException": [],
+  "src/component/Banner": [],
+  "src/component/CheckBadge": [],
+  "src/component/ConnectConfig": [],
+  "src/component/ConnectionInfo": [],
+  "src/component/ContentWithInfo": [],
+  "src/component/ContentWithIcon": [],
+  "src/component/ContentWithQuestion": [],
+  "src/component/DeployConfig": [
+    {
+      "name": "部署配置-上一步",
+      "spm": "ca54435.da43437"
+    },
+    {
+      "name": "部署配置-下一步",
+      "spm": "ca54435.da43438"
+    }
+  ],
+  "src/component/CustomFooter": [],
+  "src/component/Empty": [],
+  "src/component/EnvPreCheck": [],
+  "src/component/FooterToolbar": [],
+  "src/component/Icon": [],
+  "src/component/InsstallResult": [],
+  "src/component/InstallProcess": [],
+  "src/component/InstallProcessNew": [],
+  "src/component/InstallResult": [],
+  "src/component/MetaDBConfig": [],
+  "src/component/ModifyOCPResourcePoolModal": [],
+  "src/component/MyCard": [],
+  "src/component/MyDrawer": [],
+  "src/component/NoAuth": [],
+  "src/component/OCPConfig": [
+    {
+      "name": "ocp配置-上一步",
+      "spm": "ca54436.da43439"
+    },
+    {
+      "name": "ocp配置-下一步",
+      "spm": "ca54436.da43440"
+    }
+  ],
+  "src/component/OCPPreCheck": [
+    {
+      "name": "预检查-上一步",
+      "spm": "ca54437.da43442"
+    },
+    {
+      "name": "预检查-预检查",
+      "spm": "ca54437.da43443"
+    },
+    {
+      "name": "预检查结果-重新检查",
+      "spm": "ca54438.da43444"
+    },
+    {
+      "name": "预检查结果-重新检查",
+      "spm": "ca54438.da43444"
+    },
+    {
+      "name": "预检查结果-自动修复",
+      "spm": "ca54438.da43445"
+    },
+    {
+      "name": "预检查结果-自动修复",
+      "spm": "ca54438.da43445"
+    },
+    {
+      "name": "预检查结果-上一步",
+      "spm": "ca54438.da43446"
+    },
+    {
+      "name": "预检查失败-部署置灰",
+      "spm": "ca54439.da43447"
+    },
+    {
+      "name": "预检查成功-部署",
+      "spm": "ca54440.da43441"
+    }
+  ],
+  "src/component/OCPConfigNew": [
+    {
+      "name": "ocp配置-上一步",
+      "spm": "ca54436.da43439"
+    },
+    {
+      "name": "ocp配置-下一步",
+      "spm": "ca54436.da43440"
+    }
+  ],
+  "src/component/PageCard": [],
+  "src/component/PageLoading": [],
+  "src/component/Result": [],
+  "src/component/SliderAndInputNumber": [],
+  "src/component/Steps": [],
+  "src/pages/Guide": [],
+  "src/pages/Layout": [],
+  "src/pages/Obdeploy": [],
+  "src/pages/OcpInstaller": [],
+  "src/pages/constants": []
+}

@@ -649,6 +649,7 @@ class InstallPlugin(Plugin):
             'name': package_info.name,
             'version': package_info.version,
             'release': package_info.release,
+            'release_simple': package_info.release.simple(),
             'arch': package_info.arch,
             'md5': package_info.md5,
         }

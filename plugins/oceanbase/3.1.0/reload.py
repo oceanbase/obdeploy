@@ -31,6 +31,7 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
     inner_config = {
         InnerConfigItem('$_zone_idc'): 'idc'
     }
+    not_paramters = ['production_mode']
     inner_keys = inner_config.keys()
     zones_config = {}
     cluster_server = {}
@@ -47,6 +48,9 @@ def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
         cluster_server[server] = '%s:%s' % (server.ip, config['rpc_port'])
         stdio.verbose('compare configuration of %s' % (server))
         for key in new_config:
+            if key in not_paramters:
+                stdio.verbose('%s is not a oceanbase parameter. skip' % key)
+                continue
             n_value = new_config[key]
             if key not in config or config[key] != n_value:
                 if isinstance(key, InnerConfigItem) and key in inner_keys:

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100px" height="100px" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>椭圆形 2</title>
+    <defs>
+        <circle id="path-1" cx="50" cy="50" r="50"></circle>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="2.2-OCP-OCP部署向导备份" transform="translate(-336.000000, -392.000000)">
+            <g id="椭圆形-2" transform="translate(336.000000, 392.000000)">
+                <mask id="mask-2" fill="white">
+                    <use xlink:href="#path-1"></use>
+                </mask>
+                <use id="椭圆形" fill="#F5F8FE" xlink:href="#path-1"></use>
+                <g id="wrench-filledd-3" mask="url(#mask-2)">
+                    <g transform="translate(-14.000000, 14.000000)" id="wrench-filledd" fill-rule="nonzero">
+                        <rect id="矩形" fill="#000000" opacity="0" x="0" y="0" width="100" height="100"></rect>
+                        <path d="M88.5019531,20.8964844 C88.4726563,20.8671875 82.5351563,26.7363281 70.71875,38.5332031 L62.4277344,30.2421875 L80.09375,12.5761719 C70.796875,6.98046875 58.8535156,8.41601562 51.109375,16.1601562 C45.0253906,22.2441406 42.75,31.0234375 44.9179688,39.1875 L45.09375,39.8417969 L17.4082031,67.5175781 C16.8027344,68.1230469 16.8027344,69.1191406 17.4082031,69.7246094 L31.2167969,83.5332031 C31.8222656,84.1386719 32.8183594,84.1386719 33.4238281,83.5332031 L61.0898438,55.8671875 L61.7441406,56.0429687 C69.9179688,58.2207031 78.6972656,55.9550781 84.7910156,49.8613281 C92.5449219,42.1171875 93.9804688,30.1738281 88.5019531,20.8964844 Z" id="路径" fill="#E2E8F3"></path>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -10,9 +10,6 @@ oceanbase-ce:
     # data_dir: /data
     # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
     # redo_dir: /redo
-    # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
-    # if set severs as "127.0.0.1", please set devname as "lo"
-    # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: lo
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.

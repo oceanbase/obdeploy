@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 from collections import defaultdict
-
 from singleton_decorator import singleton
 
 from _stdio import BufferIO

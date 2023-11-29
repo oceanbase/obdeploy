@@ -40,7 +40,7 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
-        base_commond=r"cd {install_dir} && sh obdiag gather obproxy_log".format(install_dir=obdiag_install_dir)
+        base_commond=r"cd {install_dir} && ./obdiag gather obproxy_log".format(install_dir=obdiag_install_dir)
         cmd = r"{base} --from {from_option} --to {to_option} --scope {scope_option} --encrypt {encrypt_option}".format(
             base = base_commond,
             from_option = from_option,
@@ -59,17 +59,7 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
     def run():
         obdiag_cmd = get_obdiag_cmd()
         stdio.verbose('execute cmd: {}'.format(obdiag_cmd))
-        p = None
-        return_code = 255
-        try:
-            p = Popen(obdiag_cmd, shell=True)
-            return_code = p.wait()
-        except:
-            stdio.exception("")
-            if p:
-                p.kill()
-        stdio.verbose('exit code: {}'.format(return_code))
-        return return_code == 0
+        return LocalClient.run_command(obdiag_cmd, env=None, stdio=stdio)
 
     options = plugin_context.options
     obdiag_bin = "obdiag"
@@ -86,14 +76,9 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
     obproxy_install_dir_option=global_conf.get('home_path')
     obdiag_install_dir = get_option('obdiag_dir')
 
-    try:
-        if (not from_option) and (not to_option) and since_option:
-            now_time = datetime.datetime.now()
-            to_option = (now_time + datetime.timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')
-            from_option = (now_time - datetime.timedelta(seconds=TimeUtils.parse_time_sec(since_option))).strftime('%Y-%m-%d %H:%M:%S')
-    except:
-        stdio.error(err.EC_OBDIAG_OPTIONS_FORMAT_ERROR.format(option="since", value=since_option))
-        return plugin_context.return_false()
+    from_option, to_option, ok = TimeUtils.parse_time_from_to(from_time=from_option, to_time=to_option, stdio=stdio)
+    if not ok:
+        from_option, to_option = TimeUtils.parse_time_since(since=since_option)
 
     ret = local_execute_command('%s --help' % obdiag_bin)
     if not ret:
