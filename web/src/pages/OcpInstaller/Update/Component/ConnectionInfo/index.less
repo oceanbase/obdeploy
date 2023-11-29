@@ -1,0 +1,33 @@
+@cardBackgroundColor: #f8fafe;
+
+.componentTable {
+  :global {
+    .ant-table-thead > tr > th {
+      background-color: #f5f8fe !important;
+    }
+  }
+}
+
+.componentCard {
+  margin-bottom: 16px !important;
+  background-color: @cardBackgroundColor !important;
+  :global {
+    .ant-pro-card-body {
+      padding: 0 !important;
+    }
+  }
+  &.disabledCard {
+    opacity: 0.4;
+  }
+  &:last-child {
+    margin-bottom: 0 !important;
+  }
+}
+
+.cardContainer {
+  :global {
+    .ant-pro-card-header,.ant-pro-card-body{
+      padding: 0;
+    }
+  }
+}

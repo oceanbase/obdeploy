@@ -29,7 +29,7 @@ import _errno as err
 
 stdio = None
 success = True
-
+production_mode = False
 
 def get_port_socket_inode(client, port):
     port = hex(port)[2:].zfill(4).upper()
@@ -105,7 +105,7 @@ def get_disk_info(all_paths, client, stdio):
         return disk_info
 
 
-def start_check(plugin_context, init_check_status=False, strict_check=False, work_dir_check=False, work_dir_empty_check=True, generate_configs={}, precheck=False, *args, **kwargs):
+def start_check(plugin_context, init_check_status=False, strict_check=False, work_dir_check=False, work_dir_empty_check=True, generate_configs={}, precheck=False, source_option='start', *args, **kwargs):
     def check_pass(item):
         status = check_status[server]
         if status[item].status == err.CheckStatus.WAIT:
@@ -125,9 +125,19 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         if strict_check:
             success = False
             check_fail(item, error, suggests)
-            stdio.error(error)
+            print_with_suggests(error, suggests)
         else:
             stdio.warn(error)
+
+    def alert_strict(item, error, suggests=[]):
+        global success
+        if strict_check or production_mode:
+            success = False
+            check_fail(item, error, suggests)
+            print_with_suggests(error, suggests)
+        else:
+            stdio.warn(error)
+
     def error(item, _error, suggests=[]):
         global success
         if plugin_context.dev_mode:
@@ -135,12 +145,16 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         else:
             success = False
             check_fail(item, _error, suggests)
-            stdio.error(_error)
+            print_with_suggests(_error, suggests)
+
     def critical(item, error, suggests=[]):
         global success
         success = False
         check_fail(item, error, suggests)
-        stdio.error(error)
+        print_with_suggests(error, suggests)
+
+    def print_with_suggests(error, suggests=[]):
+        stdio.error('{}, {}'.format(error, suggests[0].msg if suggests else ''))
 
     def system_memory_check():
         server_memory_config = server_memory_stat['servers']
@@ -162,7 +176,21 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
     success = True
     check_status = {}
     cluster_config = plugin_context.cluster_config
+    INF = float('inf')
     plugin_context.set_variable('start_check_status', check_status)
+
+    kernel_check_items = [
+        {'check_item': 'vm.max_map_count', 'need': [327600, 1310720], 'recommend': 655360},
+        {'check_item': 'vm.min_free_kbytes', 'need': [32768, 2097152], 'recommend': 2097152},
+        {'check_item': 'vm.overcommit_memory', 'need': 0, 'recommend': 0},
+        {'check_item': 'fs.file-max', 'need': [6573688, INF], 'recommend': 6573688},
+    ]
+
+    kernel_check_status = {}
+    for kernel_param in kernel_check_items:
+        check_item = kernel_param['check_item']
+        kernel_check_status[check_item] = err.CheckStatus()
+
     for server in cluster_config.servers:
         check_status[server] = {
             'port': err.CheckStatus(),
@@ -173,6 +201,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             'net': err.CheckStatus(),
             'ntp': err.CheckStatus(),
         }
+        check_status[server].update(kernel_check_status)
         if work_dir_check:
              check_status[server]['dir'] = err.CheckStatus()
              
@@ -181,18 +210,22 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
 
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-    stdio.start_loading('Check before start observer')
     servers_clients = {}
     servers_port = {}
     servers_memory = {}
     servers_disk = {}
     servers_clog_mount = {}
-    servers_net_inferface = {} 
+    servers_net_interface = {}
     servers_dirs = {}
     servers_check_dirs = {}
     START_NEED_MEMORY = 3 << 30
     global_generate_config = generate_configs.get('global', {})
-    stdio.start_loading('Check before start observer')
+    stdio.start_loading('Check before {} observer'.format(source_option))
+
+    parameter_check = True
+    port_check = True
+    kernel_check = True
+    is_running_opt = source_option in ['restart', 'upgrade']
     for server in cluster_config.servers:
         ip = server.ip
         client = clients[server]
@@ -200,6 +233,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         servers_clients[ip] = client
         server_config = cluster_config.get_server_conf_with_default(server)
         home_path = server_config['home_path']
+        production_mode = server_config.get('production_mode', False)
         if not precheck:
             remote_pid_path = '%s/run/observer.pid' % home_path
             remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
@@ -207,7 +241,10 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 if client.execute_command('ls /proc/%s' % remote_pid):
                     stdio.verbose('%s is runnning, skip' % server)
                     wait_2_pass()
-                    continue
+                    work_dir_check = False
+                    port_check = False
+                    parameter_check = False
+                    kernel_check = is_running_opt
 
         if work_dir_check:
             stdio.verbose('%s dir check' % server)
@@ -276,77 +313,79 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             servers_disk[ip] = {}
             servers_port[ip] = {}
             servers_clog_mount[ip] = {}
-            servers_net_inferface[ip] = {}
+            servers_net_interface[ip] = {}
             servers_memory[ip] = {'num': 0, 'percentage': 0, 'servers': {}}
         memory = servers_memory[ip]
         ports = servers_port[ip]
         disk = servers_disk[ip]
         clog_mount = servers_clog_mount[ip]
-        inferfaces = servers_net_inferface[ip]
-        stdio.verbose('%s port check' % server)
-        for key in ['mysql_port', 'rpc_port']:
-            port = int(server_config[key])
-            if port in ports:
-                critical(
-                    'port', 
-                    err.EC_CONFIG_CONFLICT_PORT.format(server1=server, port=port, server2=ports[port]['server'], key=ports[port]['key']),
-                    [err.SUG_PORT_CONFLICTS.format()]
-                )
-                continue
-            ports[port] = {
-                'server': server,
-                'key': key
-            }
-            if get_port_socket_inode(client, port):
-                critical(
-                    'port', 
-                    err.EC_CONFLICT_PORT.format(server=ip, port=port),
-                    [err.SUG_USE_OTHER_PORT.format()]
-                )
+        interfaces = servers_net_interface[ip]
+        if port_check:
+            stdio.verbose('%s port check' % server)
+            for key in ['mysql_port', 'rpc_port']:
+                port = int(server_config[key])
+                if port in ports:
+                    critical(
+                        'port',
+                        err.EC_CONFIG_CONFLICT_PORT.format(server1=server, port=port, server2=ports[port]['server'], key=ports[port]['key']),
+                        [err.SUG_PORT_CONFLICTS.format()]
+                    )
+                    continue
+                ports[port] = {
+                    'server': server,
+                    'key': key
+                }
+                if get_port_socket_inode(client, port):
+                    critical(
+                        'port',
+                        err.EC_CONFLICT_PORT.format(server=ip, port=port),
+                        [err.SUG_USE_OTHER_PORT.format()]
+                    )
 
-        memory_limit = 0
-        percentage = 0
-        if server_config.get('memory_limit'):
-            memory_limit = parse_size(server_config['memory_limit'])
-            memory['num'] += memory_limit
-        elif 'memory_limit_percentage' in server_config:
-            percentage = int(parse_size(server_config['memory_limit_percentage']))
-            memory['percentage'] += percentage
-        else:
-            percentage = 80
-            memory['percentage'] += percentage
-        memory['servers'][server] = {
-            'num': memory_limit,
-            'percentage': percentage,
-            'system_memory': parse_size(server_config.get('system_memory', 0))
-        }
-        
-        data_path = server_config['data_dir'] if server_config.get('data_dir') else  os.path.join(server_config['home_path'], 'store')
-        redo_dir = server_config['redo_dir'] if server_config.get('redo_dir') else  data_path
-        clog_dir = server_config['clog_dir'] if server_config.get('clog_dir') else  os.path.join(redo_dir, 'clog')
-        if not client.execute_command('ls %s/sstable/block_file' % data_path):
-            disk[data_path] = {
-                'need': 90,
-                'server': server
+        if parameter_check:
+            memory_limit = 0
+            percentage = 0
+            if server_config.get('memory_limit'):
+                memory_limit = parse_size(server_config['memory_limit'])
+                memory['num'] += memory_limit
+            elif 'memory_limit_percentage' in server_config:
+                percentage = int(parse_size(server_config['memory_limit_percentage']))
+                memory['percentage'] += percentage
+            else:
+                percentage = 80
+                memory['percentage'] += percentage
+            memory['servers'][server] = {
+                'num': memory_limit,
+                'percentage': percentage,
+                'system_memory': parse_size(server_config.get('system_memory', 0))
             }
-            clog_mount[clog_dir] = {
-                'threshold': server_config.get('clog_disk_utilization_threshold', 80) / 100.0,
-                'server': server
-            }
-            if 'datafile_size' in server_config and server_config['datafile_size']:
-                disk[data_path]['need'] = server_config['datafile_size']
-            elif 'datafile_disk_percentage' in server_config and server_config['datafile_disk_percentage']:
-                disk[data_path]['need'] = int(server_config['datafile_disk_percentage'])
-            
-            devname = server_config.get('devname')
-            if devname:
-                if not client.execute_command("grep -e '^ *%s:' /proc/net/dev" % devname):
-                    suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
-                    suggest.auto_fix = 'devname' not in global_generate_config and 'devname' not in server_generate_config
-                    critical('net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])
-            if devname not in inferfaces:
-                inferfaces[devname] = []
-            inferfaces[devname].append(ip)
+
+            data_path = server_config['data_dir'] if server_config.get('data_dir') else  os.path.join(server_config['home_path'], 'store')
+            redo_dir = server_config['redo_dir'] if server_config.get('redo_dir') else  data_path
+            clog_dir = server_config['clog_dir'] if server_config.get('clog_dir') else  os.path.join(redo_dir, 'clog')
+            if not client.execute_command('ls %s/sstable/block_file' % data_path):
+                disk[data_path] = {
+                    'need': 90,
+                    'server': server
+                }
+                clog_mount[clog_dir] = {
+                    'threshold': server_config.get('clog_disk_utilization_threshold', 80) / 100.0,
+                    'server': server
+                }
+                if 'datafile_size' in server_config and server_config['datafile_size']:
+                    disk[data_path]['need'] = server_config['datafile_size']
+                elif 'datafile_disk_percentage' in server_config and server_config['datafile_disk_percentage']:
+                    disk[data_path]['need'] = int(server_config['datafile_disk_percentage'])
+
+                devname = server_config.get('devname')
+                if devname:
+                    if not client.execute_command("grep -e '^ *%s:' /proc/net/dev" % devname):
+                        suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
+                        suggest.auto_fix = 'devname' not in global_generate_config and 'devname' not in server_generate_config
+                        critical('net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])
+                if devname not in interfaces:
+                    interfaces[devname] = []
+                interfaces[devname].append(ip)
 
     for ip in servers_disk:
         client = servers_clients[ip]
@@ -386,6 +425,19 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 'recd': lambda x: 4096 * x,
                 'name': 'nproc'
             },
+            'core file size': {
+                'need': lambda x: 0,
+                'recd': lambda x: INF,
+                'below_need_error': False,
+                'below_recd_error_strict': False,
+                'name': 'core'
+            },
+            'stack size': {
+                'need': lambda x: 1024,
+                'recd': lambda x: INF,
+                'below_recd_error_strict': False,
+                'name': 'stack'
+            },
         }
         ulimits = {}
         src_data = re.findall('\s?([a-zA-Z\s]+[a-zA-Z])\s+\([a-zA-Z\-,\s]+\)\s+([\d[a-zA-Z]+)', ret.stdout) if ret else []
@@ -397,18 +449,68 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 continue
             if not value or not (value.strip().isdigit()):
                 for server in ip_servers:
-                    alert('ulimit', '(%s) failed to get %s' % (ip, key), [err.SUG_UNSUPPORT_OS.format()])
+                    alert('ulimit', '(%s) failed to get %s' % (ip, key), suggests=[err.SUG_UNSUPPORT_OS.format()])
             else:
                 value = int(value)
                 need = ulimits_min[key]['need'](server_num)
                 if need > value:
+                    if (strict_check or production_mode) and ulimits_min[key].get('below_recd_error_strict', True) and value < ulimits_min[key]['recd'](server_num):
+                        need = ulimits_min[key]['recd'](server_num)
+                    need = need if need != INF else 'unlimited'
                     for server in ip_servers:
-                        critical('ulimit', err.EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), [err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                        if ulimits_min[key].get('below_need_error', True):
+                            critical('ulimit', err.EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), [err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                        else:
+                            alert('ulimit', err.EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), suggests=[err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
                 else:
                     need = ulimits_min[key]['recd'](server_num)
                     if need > value:
+                        need = need if need != INF else 'unlimited'
                         for server in ip_servers:
-                            alert('ulimit', err.WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), [err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                            if ulimits_min[key].get('below_recd_error_strict', True):
+                                alert('ulimit', err.WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), suggests=[err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                            else:
+                                stdio.warn(err.WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value))
+
+        if kernel_check:
+            # check kernel params
+            try:
+                cmd = 'sysctl -a'
+                ret = client.execute_command(cmd)
+                if not ret:
+                    alert_strict('kernel', err.EC_FAILED_TO_GET_PARAM.format(key='kernel parameter ', cmd=cmd), [err.SUG_CONNECT_EXCEPT.format(ip=ip)])
+                    continue
+                kernel_params = {}
+                kernel_param_src = ret.stdout.split('\n')
+                for kernel in kernel_param_src:
+                    if not kernel:
+                        continue
+                    kernel = kernel.split('=')
+                    kernel_params[kernel[0].strip()] = re.findall(r"[-+]?\d+", kernel[1])
+
+                for kernel_param in kernel_check_items:
+                    check_item = kernel_param['check_item']
+                    if check_item not in kernel_params:
+                        continue
+                    values = kernel_params[check_item]
+                    needs = kernel_param['need']
+                    recommends = kernel_param['recommend']
+                    for i in range(len(values)):
+                        # This case is not handling the value of 'default'. Additional handling is required for 'default' in the future.
+                        item_value = int(values[i])
+                        need = needs[i] if isinstance(needs, tuple) else needs
+                        recommend = recommends[i] if isinstance(recommends, tuple) else recommends
+                        if isinstance(need, list):
+                            if item_value < need[0] or item_value > need[1]:
+                                suggest = [err.SUG_SYSCTL.format(var=check_item, value=' '.join(str(i) for i in recommend) if isinstance(recommend, list) else recommend, ip=ip)]
+                                need = 'within {}'.format(needs) if needs[-1] != INF else 'greater than {}'.format(needs[0])
+                                now = '[{}]'.format(', '.join(values)) if len(values) > 1 else item_value
+                                alert_strict(check_item, err.EC_PARAM_NOT_IN_NEED.format(ip=ip, check_item=check_item, need=need, now=now, recommend=recommends), suggest)
+                                break
+                        elif item_value != need:
+                            alert_strict(check_item, err.EC_PARAM_NOT_IN_NEED.format(ip=ip, check_item=check_item, need=needs, recommend=recommend, now=item_value), [err.SUG_SYSCTL.format(var=check_item, value=recommend, ip=ip)])
+            except:
+                stdio.exception('')
 
         # memory
         ret = client.execute_command('cat /proc/meminfo')
@@ -427,7 +529,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 if k in memory_key_map:
                     key = memory_key_map[k]
                     server_memory_stats[key] = parse_size(str(v))
-            
+
             server_memory_stat = servers_memory[ip]
             min_start_need = server_num * START_NEED_MEMORY
             total_use = server_memory_stat['percentage'] * server_memory_stats['total'] / 100 + server_memory_stat['num']
@@ -474,7 +576,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                     if len(p) > len(kp):
                         kp = p
             disk[kp]['threshold'] = min(disk[kp]['threshold'], servers_clog_mount[ip][path]['threshold'])
-            
+
         for p in disk:
             total = disk[p]['total']
             avail = disk[p]['avail']
@@ -510,8 +612,8 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 critical('disk', err.EC_OBSERVER_NOT_ENOUGH_DISK_4_CLOG.format(ip=ip, path=p), [suggest] + suggests)
 
     if success:
-        for ip in servers_net_inferface:
-            if servers_net_inferface[ip].get(None):
+        for ip in servers_net_interface:
+            if servers_net_interface[ip].get(None):
                 devinfo = client.execute_command('cat /proc/net/dev').stdout
                 interfaces = []
                 for interface in re.findall('\n\s+(\w+):', devinfo):
@@ -520,17 +622,17 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 if not interfaces:
                     interfaces = ['lo']
                 if len(interfaces) > 1:
-                    servers = ','.join(str(server) for server in servers_net_inferface[ip][None])
+                    servers = ','.join(str(server) for server in servers_net_interface[ip][None])
                     suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                     for server in ip_servers:
                         critical('net', err.EC_OBSERVER_MULTI_NET_DEVICE.format(ip=ip, server=servers), [suggest])
                 else:
-                    servers_net_inferface[ip][interfaces[0]] = servers_net_inferface[ip][None]
-                    del servers_net_inferface[ip][None]
+                    servers_net_interface[ip][interfaces[0]] = servers_net_interface[ip][None]
+                    del servers_net_interface[ip][None]
     if success:
-        for ip in servers_net_inferface:
+        for ip in servers_net_interface:
             client = servers_clients[ip]
-            for devname in servers_net_inferface[ip]:
+            for devname in servers_net_interface[ip]:
                 if client.is_localhost() and devname != 'lo' or (not client.is_localhost() and devname == 'lo'):
                     suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                     suggest.auto_fix = client.is_localhost() and 'devname' not in global_generate_config and 'devname' not in server_generate_config

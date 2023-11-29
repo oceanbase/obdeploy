@@ -22,6 +22,8 @@ from service.handler.deployment_handler import DeploymentHandler
 from service.handler.service_info_handler import ServiceInfoHandler
 from service.handler.comment_handler import CommonHandler
 from service.handler.mirror_handler import MirrorHandler
+from service.handler.ocp_handler import OcpHandler
+from service.handler.metadb_handler import MetadbHandler
 
 
 def new_component_handler():
@@ -42,3 +44,15 @@ def new_service_info_handler():
 
 def new_mirror_handler():
     return MirrorHandler()
+
+
+def new_ocp_handler():
+    return OcpHandler()
+
+
+def new_metadb_handler():
+    return MetadbHandler()
+
+
+def new_server_info_handler():
+    return ServiceInfoHandler()

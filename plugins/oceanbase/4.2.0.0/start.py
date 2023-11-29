@@ -29,14 +29,22 @@ from _errno import EC_OBSERVER_FAIL_TO_START, EC_OBSERVER_FAIL_TO_START_WITH_ERR
 
 from collections import OrderedDict
 
+from tool import NetUtil
+
 
 def config_url(ocp_config_server, appname, cid):
-    cfg_url = '%s&Action=ObRootServiceInfo&ObCluster=%s' % (ocp_config_server, appname)
-    proxy_cfg_url = '%s&Action=GetObProxyConfig&ObRegionGroup=%s' % (ocp_config_server, appname)
+    if ocp_config_server[-1] == '?':
+        link_char = ''
+    elif ocp_config_server.find('?') == -1:
+        link_char = '?'
+    else:
+        link_char = '&'
+    cfg_url = '%s%sAction=ObRootServiceInfo&ObCluster=%s' % (ocp_config_server, link_char, appname)
+    proxy_cfg_url = '%s%sAction=GetObProxyConfig&ObRegionGroup=%s' % (ocp_config_server, link_char, appname)
     # Command that clears the URL content for the cluster
-    cleanup_config_url_content = '%s&Action=DeleteObRootServiceInfoByClusterName&ClusterName=%s' % (ocp_config_server, appname)
+    cleanup_config_url_content = '%s%sAction=DeleteObRootServiceInfoByClusterName&ClusterName=%s' % (ocp_config_server, link_char, appname)
     # Command that register the cluster information to the Config URL
-    register_to_config_url = '%s&Action=ObRootServiceRegister&ObCluster=%s&ObClusterId=%s' % (ocp_config_server, appname, cid)
+    register_to_config_url = '%s%sAction=ObRootServiceRegister&ObCluster=%s&ObClusterId=%s' % (ocp_config_server, link_char, appname, cid)
     return cfg_url, cleanup_config_url_content, register_to_config_url
 
 
@@ -100,11 +108,21 @@ def start(plugin_context, *args, **kwargs):
         try:
             cfg_url = init_config_server(obconfig_url, appname, cluster_id, getattr(options, 'force_delete', False), stdio)
             if not cfg_url:
-                stdio.error(EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS.format(appname, obconfig_url))
-                return
+                stdio.warn(EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS.format(appname, obconfig_url))
         except:
-            stdio.exception(EC_OBSERVER_FAILED_TO_REGISTER.format())
-            return
+            stdio.warn(EC_OBSERVER_FAILED_TO_REGISTER.format())
+    elif 'ob-configserver' in cluster_config.depends and appname:
+        obc_cluster_config = cluster_config.get_depend_config('ob-configserver')
+        vip_address = obc_cluster_config.get('vip_address')
+        if vip_address:
+            obc_ip = vip_address
+            obc_port = obc_cluster_config.get('vip_port')
+        else:
+            server = cluster_config.get_depend_servers('ob-configserver')[0]
+            client = clients[server]
+            obc_ip = NetUtil.get_host_ip() if client.is_localhost() else server.ip
+            obc_port = obc_cluster_config.get('listen_port')
+        cfg_url = "http://{0}:{1}/services?Action=ObRootServiceInfo&ObCluster={2}".format(obc_ip, obc_port, appname)
 
     stdio.start_loading('Start observer')
     for server in cluster_config.original_servers:
@@ -121,6 +139,9 @@ def start(plugin_context, *args, **kwargs):
 
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
+            
+        if not server_config.get('local_ip') and not server_config.get('devname'):
+            server_config['local_ip'] = server.ip
 
         if client.execute_command('ls %s/clog/tenant_1/' % server_config['data_dir']).stdout.strip():
             need_bootstrap = False
@@ -147,10 +168,12 @@ def start(plugin_context, *args, **kwargs):
                 'appname': '-n',
                 'cluster_id': '-c',
                 'data_dir': '-d',
+                'devname': '-i',
                 'syslog_level': '-l',
                 'ipv6': '-6',
                 'mode': '-m',
-                'scn': '-f'
+                'scn': '-f',
+                'local_ip': '-I'
             })
             not_cmd_opt = [
                 'home_path', 'obconfig_url', 'root_password', 'proxyro_password',
@@ -171,7 +194,6 @@ def start(plugin_context, *args, **kwargs):
                 if key in server_config:
                     value = get_value(key)
                     cmd.append('%s %s' % (not_opt_str[key], value))
-            cmd.append('-I %s' % server.ip)
             cmd.append('-o %s' % ','.join(opt_str))
         else:
             cmd.append('-p %s' % server_config['mysql_port'])

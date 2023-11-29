@@ -942,10 +942,10 @@ class  DeployInstallMode(object):
 
 class DeployInfo(object):
 
-    def __init__(self, name, status, components=OrderedDict(), config_status=DeployConfigStatus.UNCHNAGE):
+    def __init__(self, name, status, components=None, config_status=DeployConfigStatus.UNCHNAGE):
         self.status = status
         self.name = name
-        self.components = components
+        self.components = components if components else {}
         self.config_status = config_status
 
     def __str__(self):
@@ -1012,24 +1012,28 @@ class DeployConfig(SafeStdio):
             return self._dump()
         return True
 
-    def update_component_package_hash(self, component, package_hash, version=None):
+    def update_component_info(self, repository):
+        component = repository.name
         if component not in self.components:
             return False
         ori_data = self._src_data[component]
         src_data = deepcopy(ori_data)
-        src_data['package_hash'] = package_hash
-        if version:
-            src_data['version'] = version
-        elif 'version' in src_data:
-            del src_data['version']
+
+        if 'package_hash' in src_data:
+            src_data['package_hash'] = repository.hash
+        if 'version' in src_data:
+            src_data['version'] = repository.version
+        if 'release' in src_data:
+            src_data['release'] = repository.release
         if 'tag' in src_data:
             del src_data['tag']
 
         self._src_data[component] = src_data
         if self._dump():
             cluster_config = self.components[component]
-            cluster_config.package_hash = src_data.get('package_hash')
-            cluster_config.version = src_data.get('version')
+            cluster_config.package_hash = repository.hash
+            cluster_config.version = repository.version
+            cluster_config.release = repository.release
             cluster_config.tag = None
             return True
         self._src_data[component] = ori_data
@@ -1446,7 +1450,7 @@ class Deploy(object):
         return False
 
     def update_component_repository(self, repository):
-        if not self.deploy_config.update_component_package_hash(repository.name, repository.hash, repository.version):
+        if not self.deploy_config.update_component_info(repository):
             return False
         self.use_model(repository.name, repository)
         return True

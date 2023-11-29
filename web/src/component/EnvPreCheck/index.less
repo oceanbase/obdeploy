@@ -1,0 +1,61 @@
+.precheck {
+  :global {
+    .ant-card-head {
+      border-bottom: none;
+    }
+  }
+  .checkItem {
+    min-height: 656px;
+    background-color: #f8fafe;
+    border-radius: 8px;
+
+    .checkItemTitle {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 2px solid #e2e8f3;
+    }
+
+    .checnProgress {
+      position: relative;
+      top: -14px;
+      :global {
+        .ant-progress-inner {
+          background-color: #e2e8f3;
+        }
+        .ant-progress-outer {
+          height: 2px !important;
+        }
+        .ant-progress-bg {
+          height: 2px !important;
+        }
+      }
+    }
+
+    .checkSteps {
+      margin-left: 16px;
+      :global {
+        .ant-steps-item:first-child {
+          .ant-steps-item-icon {
+            display: none;
+          }
+        }
+        .ant-steps-item > .ant-steps-item-container > .ant-steps-item-tail {
+          padding: 0 !important;
+        }
+      }
+    }
+
+    .checkFailuredContent {
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      border-bottom: 1px solid #e2e8f3;
+
+      .checkFailuredItem {
+        display: flex;
+        white-space: nowrap;
+      }
+    }
+  }
+}

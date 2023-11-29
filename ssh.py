@@ -40,10 +40,10 @@ from multiprocessing.queues import Empty
 from multiprocessing import Queue, Process
 from multiprocessing.pool import ThreadPool
 
-from tool import COMMAND_ENV, DirectoryUtil, FileUtil
+from tool import COMMAND_ENV, DirectoryUtil, FileUtil, NetUtil, Timeout
 from _stdio import SafeStdio
 from _errno import EC_SSH_CONNECT
-from _environ import ENV_DISABLE_RSYNC
+from _environ import ENV_DISABLE_RSYNC, ENV_DISABLE_RSA_ALGORITHMS, ENV_HOST_IP_MODE
 
 
 __all__ = ("SshClient", "SshConfig", "LocalClient", "ConcurrentExecutor")
@@ -261,6 +261,44 @@ class LocalClient(SafeStdio):
     def get_dir(local_path, remote_path, stdio=None):
         return LocalClient.put_dir(remote_path, local_path, stdio=stdio)
 
+    @staticmethod
+    def run_command(command, env=None, timeout=None, print_stderr=True, elimit=0, olimit=0, stdio=None):
+        stdio.verbose('local execute: %s ' % command)
+        stdout = ""
+        process = None
+        try:
+            with Timeout(timeout):
+                process = Popen(command, env=LocalClient.init_env(env), shell=True, stdout=PIPE, stderr=PIPE)
+                while process.poll() is None:
+                    lines = process.stdout.readline()
+                    line = lines.strip()
+                    if line:
+                        stdio.print(line.decode("utf8", 'ignore'))
+                stderr = process.stderr.read().decode("utf8", 'ignore')
+                code = process.returncode
+                verbose_msg = 'exit code {}'.format(code)
+                if code != 0 and stderr:
+                    verbose_msg += ', error output:\n'
+                stdio.verbose(verbose_msg)
+                if print_stderr:
+                    stdio.print(stderr)
+                if elimit == 0:
+                    stderr = ""
+                elif elimit > 0:
+                    stderr = stderr[-elimit:]
+        except Exception as e:
+            if process:
+                process.terminate()
+            stdout = ''
+            stderr = str(e)
+            code = 255
+            verbose_msg = 'exited code 255, error output:\n%s' % stderr
+            stdio.verbose(verbose_msg)
+            stdio.exception('')
+        finally:
+            if process:
+                process.terminate()
+        return SshReturn(code, stdout, stderr)
 
 class RemoteTransporter(enum.Enum):
     CLIENT = 0
@@ -277,6 +315,7 @@ class SshClient(SafeStdio):
 
     DEFAULT_PATH = '/sbin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:'
     LOCAL_HOST = ['127.0.0.1', 'localhost', '127.1', '127.0.1']
+    DISABLED_ALGORITHMS = dict(pubkeys=["rsa-sha2-512", "rsa-sha2-256"])
 
     def __init__(self, config, stdio=None):
         self.config = config
@@ -288,13 +327,16 @@ class SshClient(SafeStdio):
         self._remote_transporter = None
         self.task_queue = None
         self.result_queue = None
-        self._is_local = self.is_localhost() and self.config.username ==  getpass.getuser()
-
+        self._is_local = self.is_local()
         if self._is_local:
             self.env = {}
         else:
             self.env = {'PATH': self.DEFAULT_PATH}
             self._update_env()
+
+        self._disabled_rsa_algorithms = None
+        if COMMAND_ENV.get(ENV_DISABLE_RSA_ALGORITHMS) == '1':
+            self._disabled_rsa_algorithms = self.DISABLED_ALGORITHMS
         super(SshClient, self).__init__()
 
     def _init_queue(self):
@@ -346,19 +388,21 @@ class SshClient(SafeStdio):
     def is_localhost(self, stdio=None):
         return self.config.host in self.LOCAL_HOST
 
-    def _login(self, stdio=None):
+    def _login(self, stdio=None, exit=True):
         if self.is_connected:
             return True
         err = None
         try:
             self.ssh_client.set_missing_host_key_policy(AutoAddPolicy())
+            stdio.verbose('host: %s, port: %s, user: %s, password: %s' % (self.config.host, self.config.port, self.config.username, self.config.password))
             self.ssh_client.connect(
                 self.config.host,
                 port=self.config.port,
                 username=self.config.username,
                 password=self.config.password,
                 key_filename=self.config.key_filename,
-                timeout=self.config.timeout
+                timeout=self.config.timeout,
+                disabled_algorithms=self._disabled_rsa_algorithms
             )
             self.is_connected = True
         except AuthenticationException:
@@ -371,7 +415,10 @@ class SshClient(SafeStdio):
             stdio.exception('')
             err = EC_SSH_CONNECT.format(user=self.config.username, ip=self.config.host, message=e)
         if err:
-            stdio.critical(err)
+            if exit:
+                stdio.critical(err)
+                return err
+            stdio.error(err)
             return err
         return self.is_connected
 
@@ -384,10 +431,14 @@ class SshClient(SafeStdio):
             return True
         return False
 
-    def connect(self, stdio=None):
+    def is_local(self):
+        return self.is_localhost() and self.config.username == getpass.getuser() or \
+            (COMMAND_ENV.get(ENV_HOST_IP_MODE, '0') == '1' and self.config.host == NetUtil.get_host_ip())
+
+    def connect(self, stdio=None, exit=True):
         if self._is_local:
             return True
-        return self._login(stdio=stdio)
+        return self._login(stdio=stdio, exit=exit)
 
     def reconnect(self, stdio=None):
         self.close(stdio=stdio)
@@ -441,12 +492,13 @@ class SshClient(SafeStdio):
             timeout = self.config.timeout
         elif timeout <= 0:
             timeout = None
+
         if self._is_local:
             return LocalClient.execute_command(command, self.env if self.env else None, timeout, stdio=stdio)
 
         verbose_msg = '%s execute: %s ' % (self.config, command)
         stdio.verbose(verbose_msg, end='')
-        command = '%s %s;echo -e "\n$?\c"' % (self.env_str, command.strip(';').lstrip('\n'))
+        command = '(%s %s);echo -e "\n$?\c"' % (self.env_str, command.strip(';').lstrip('\n'))
         return self._execute_command(command, retry=3, timeout=timeout, stdio=stdio)
 
     @property
@@ -503,7 +555,7 @@ class SshClient(SafeStdio):
     def _client_put_file(self, local_path, remote_path, stdio=None):
         if self.execute_command('mkdir -p %s && rm -fr %s' % (os.path.dirname(remote_path), remote_path), stdio=stdio):
             stdio.verbose('send %s to %s' % (local_path, remote_path))
-            if self.sftp.put(local_path, remote_path):
+            if self.sftp.put(local_path.replace('~', os.getenv('HOME')), remote_path.replace('~', os.getenv('HOME'))):
                 return self.execute_command('chmod %s %s' % (oct(os.stat(local_path).st_mode)[-3:], remote_path))
         return False
 

@@ -17,12 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 
-from collections import defaultdict
-
-from _plugin import PluginContextNamespace
 from service.common import core
 
 SPACENAME = "API"
+
+
 class BaseHandler(object):
     def __init__(self):
         self._obd = core.CoreManager().get_obd()

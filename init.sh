@@ -65,6 +65,8 @@ for DIR in plugins config_parser; do
     fi
 done
 
+echo '<VERSION>' >> ${OBD_HOME}/version
+
 echo "============update .bashrc============"
 
 ALIAS_OBD_EXIST=$(grep "alias obd=" ~/.bashrc | head -n 1)

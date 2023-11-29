@@ -109,6 +109,10 @@ class ComponentHandler(BaseHandler):
             componentInfo.version_type = const.CE
         for componentInfo in component_dict[const.OBPROXY]:
             componentInfo.version_type = const.BUSINESS
+        for componentInfo in component_dict[const.OCP_SERVER_CE]:
+            componentInfo.version_type = const.CE
+        for componentInfo in component_dict[const.OCP_SERVER]:
+            componentInfo.version_type = const.BUSINESS
 
         if const.OCEANBASE in component_dict.keys() and const.OCEANBASE_CE in component_dict.keys():
             component_dict[const.OCEANBASE].extend(component_dict[const.OCEANBASE_CE])
@@ -124,6 +128,13 @@ class ComponentHandler(BaseHandler):
         elif const.OBPROXY_CE in component_dict.keys():
             component_dict[const.OBPROXY] = component_dict[const.OBPROXY_CE]
             component_dict.pop(const.OBPROXY_CE)
+        if const.OCP_SERVER in component_dict.keys() and const.OCP_SERVER_CE in component_dict.keys():
+            component_dict[const.OCP_SERVER].extend(component_dict[const.OCP_SERVER_CE])
+            component_dict.pop(const.OCP_SERVER_CE)
+            component_dict[const.OCP_SERVER].sort(key=lambda x: x.version, reverse=True)
+        elif const.OCP_SERVER_CE in component_dict.keys():
+            component_dict[const.OCP_SERVER] = component_dict[const.OCP_SERVER_CE]
+            component_dict.pop(const.OCP_SERVER_CE)
         for name, info in component_dict.items():
             component_list.append(Component(name=name, info=info))
         return component_list

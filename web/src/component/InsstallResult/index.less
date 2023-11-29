@@ -1,0 +1,58 @@
+@cardBackgroundColor: #f8fafe;
+
+.versionContainer{
+  margin-bottom: 16px;
+
+  .ocpVersion {
+    float: left;
+    width: calc(50% - 66px);
+    padding: 21px 0;
+    color: #5c6b8a;
+    font-size: 16px;
+    text-align: center;
+    background-color: #fff;
+    border: 1px solid #cdd5e4;
+    border-radius: 8px;
+    span {
+      padding-right: 8px;
+      color: #132039;
+      font-weight: 500;
+      position: relative;
+      .newVersionIcon{
+        position: absolute;
+        right: -34px;
+        top: -20px;
+      }
+    }
+  }
+}
+
+.componentTable {
+  :global {
+    .ant-table-thead > tr > th {
+      background-color: #f5f8fe !important;
+    }
+  }
+}
+.componentCard {
+  margin-bottom: 16px !important;
+  background-color: @cardBackgroundColor !important;
+  :global {
+    .ant-pro-card-body {
+      padding: 0 !important;
+    }
+  }
+  &.disabledCard {
+    opacity: 0.4;
+  }
+  &:last-child {
+    margin-bottom: 0 !important;
+  }
+}
+.upgradeReport {
+  :global {
+    .ant-card-head {
+      border-bottom: none;
+    }
+  }
+}

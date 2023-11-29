@@ -25,12 +25,18 @@ from pydantic import BaseModel
 from fastapi_utils.enums import StrEnum
 
 from service.common.task import TaskStatus, TaskResult
+from service.model.tenant import TenantConfig
+from service.model.database import DatabaseConnection
 
 
 class Auth(BaseModel):
     user: str = Body('', description='ssh user')
     password: str = Body(None, description='ssh password')
     port: int = Body(22, description='ssh port')
+
+
+class UserCheck(Auth):
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
 
 
 class PrecheckTaskResult(StrEnum):
@@ -57,6 +63,7 @@ class Resource(BaseModel):
 class OceanbaseServers(BaseModel):
     ip: str = Body(..., description='server ip')
     parameters: dict = None
+
 
 class Zone(BaseModel):
     name: str = Body(..., description='zone name')
@@ -230,6 +237,51 @@ class DeployConfig(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class OCPDeploymentStatus(StrEnum):
+    INIT = auto()
+    DEPLOYING = auto()
+    FINISHED = auto()
+
+
+class ClusterManageInfo(BaseModel):
+    machine: Optional[int] = Body(None, description='manage machine num')
+
+
+class OcpServer(BaseModel):
+    component: str = Body('ocp-server', description='ocp-server component name')
+    version: str = Body('', description='version')
+    package_hash: str = Body('', description='ocp-server package md5')
+    release: str = Body('', description='ocp-server release no')
+    home_path: str = Body('', description='install ocp-server home path')
+    soft_dir: str = Body('', description='software path')
+    log_dir: str = Body('', description='log dir')
+    ocp_site_url: str = Body('', description='ocp server url')
+    port: int = Body(..., description='server port')
+    admin_password: str = Body(..., description='admin password')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    memory_size: str = Body('2G', description='ocp server memory size')
+    ocp_cpu: int = Body(0, description='ocp server cpu num')
+    meta_tenant: Optional[TenantConfig] = Body(None, description="meta tenant config")
+    monitor_tenant: Optional[TenantConfig] = Body(None, description="monitor tenant config")
+    manage_info: Optional[ClusterManageInfo] = Body(None, description='manage cluster info')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
+    metadb: Optional[DatabaseConnection] = Body(None, description="connection info of metadb")
+
+
+class OcpComponentConfig(BaseModel):
+    oceanbase: Optional[OceanBase]
+    obproxy: Optional[ObProxy]
+    ocpserver: OcpServer
+
+
+class OCPDeploymnetConfig(BaseModel):
+    auth: Auth
+    components: OcpComponentConfig
+    home_path: str = Body('', description='global home path')
+    launch_user: Optional[str] = Body(None, description='process user')
+
 
 
 

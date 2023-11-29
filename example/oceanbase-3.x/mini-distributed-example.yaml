@@ -16,9 +16,6 @@ oceanbase-ce:
     - name: server3
       ip: 172.19.33.4
   global:
-    # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
-    # if set severs as "127.0.0.1", please set devname as "lo"
-    # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: eth0
     cluster_id: 1
     # please set memory limit to a suitable value which is matching resource. 

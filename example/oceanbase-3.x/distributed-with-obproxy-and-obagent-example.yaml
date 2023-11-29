@@ -16,9 +16,6 @@ oceanbase-ce:
     - name: server3
       ip: 172.19.33.4
   global:
-    # Please set devname as the network adaptor's name whose ip is  in the setting of severs.
-    # if set severs as "127.0.0.1", please set devname as "lo"
-    # if current ip is 192.168.1.10, and the ip's network adaptor's name is "eth0", please use "eth0"
     devname: eth0
     # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
     memory_limit: 64G # The maximum running memory for an observer

@@ -38,7 +38,7 @@ def gather_stack(plugin_context, *args, **kwargs):
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
-        base_commond = r"cd {install_dir} && sh obdiag gather stack".format(install_dir=obdiag_install_dir)
+        base_commond = r"cd {install_dir} && ./obdiag gather stack".format(install_dir=obdiag_install_dir)
         cmd = r"{base} ".format(
             base = base_commond
         )
@@ -51,17 +51,7 @@ def gather_stack(plugin_context, *args, **kwargs):
     def run():
         obdiag_cmd = get_obdiag_cmd()
         stdio.verbose('execute cmd: {}'.format(obdiag_cmd))
-        p = None
-        return_code = 255
-        try:
-            p = Popen(obdiag_cmd, shell=True)
-            return_code = p.wait()
-        except:
-            stdio.exception("")
-            if p:
-                p.kill()
-        stdio.verbose('exit code: {}'.format(return_code))
-        return return_code == 0
+        return LocalClient.run_command(obdiag_cmd, env=None, stdio=stdio)
 
     options = plugin_context.options
     obdiag_bin = "obdiag"

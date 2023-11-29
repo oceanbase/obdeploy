@@ -41,7 +41,7 @@ except:
     from configparser import ConfigParser
 
 from _arch import getArchList, getBaseArch
-from _rpm import Package, PackageInfo
+from _rpm import Version, Package, PackageInfo
 from tool import ConfigUtil, FileUtil, var_replace
 from _manager import Manager
 from tool import timeout
@@ -50,14 +50,15 @@ from tool import timeout
 _ARCH = getArchList()
 _RELEASE = None
 SUP_MAP = {
-    'ubuntu': (([16], 7), ),
-    'debian': (([9], 7), ),
-    'opensuse-leap': (([15], 7), ),
-    'sles': (([15, 2], 7), ),
-    'fedora': (([33], 7), ),
-    'uos': (([20], 8), ),
-    'anolis': (([23], 7), ),
-    'openEuler': (([22, 3], 7), ),
+    'ubuntu': {'16': 7},
+    'debian': {'9': 7},
+    'opensuse-leap': {'15': 7},
+    'sles': {'15.2': 7},
+    'fedora': {'33': 7},
+    'uos': {'20': 8},
+    'anolis': {'23': 7},
+    'openEuler': {'22.03': 7},
+    'kylin': {'V10': 8},
 }
 _SERVER_VARS = {
     'basearch': getBaseArch(),
@@ -938,12 +939,14 @@ class MirrorRepositoryManager(Manager):
         server_vars = deepcopy(_SERVER_VARS)
         linux_id = server_vars.get('ID')
         if linux_id in SUP_MAP:
-            version = [int(vnum) for vnum in server_vars.get('VERSION_ID', '').split('.')]
-            for vid, elvid in SUP_MAP[linux_id]:
-                if version < vid:
+            version_id = server_vars.get('VERSION_ID', '')
+            sorted_versions = sorted([Version(key) for key in SUP_MAP[linux_id]], reverse=True)
+            for version in sorted_versions:
+               if Version(version_id) >= version:
+                    server_vars['releasever'] = SUP_MAP[linux_id][str(version)]
                     break
-                server_vars['releasever'] = elvid
-            server_vars['releasever'] = str(elvid)
+            else:
+                server_vars['releasever'] = SUP_MAP[linux_id][str(version)]
             self.stdio and getattr(self.stdio, 'warn', print)('Use centos %s remote mirror repository for %s %s' % (
             server_vars['releasever'], linux_id, server_vars.get('VERSION_ID')))
         for mirror_section in self._get_sections():

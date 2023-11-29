@@ -1,0 +1,363 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: STRING
+  need_redeploy: true
+  description_en: the directory for the work data
+  description_local: OCP server server工作目录
+- name: port
+  name_local: 端口
+  require: true
+  essential: true
+  type: INT
+  default: 8180
+  need_restart: true
+  description_en: the port of ocp server.
+  description_local: OCP server使用的端口
+- name: log_dir
+  name_local: 日志目录
+  type: STRING
+  require: false
+  essential: true
+  need_redeploy: true
+  description_en: The directory for logging file. The default value is $home_path/log.
+  description_local: OCP server server日志目录， 默认为工作目录下的log
+- name: soft_dir
+  name_local: 软件包目录
+  type: STRING
+  require: false
+  need_redeploy: true
+  description_en: The directory for software. The default value is ~/ocp-server/lib.
+  description_local: OCP server 软件包安装目录， ~/ocp-server/lib
+- name: java_bin
+  name_local: java路径
+  type: STRING
+  require: true
+  essential: true
+  default: java
+  need_restart: true
+  description_en: The path of java binary
+  description_local: OCP server 使用的java可执行文件的路径
+- name: memory_size
+  name_local: 进程内存
+  require: false
+  essential: true
+  type: CAPACITY
+  min_value: 512M
+  need_restart: true
+  description_en: the memroy size of ocp server server. Please enter an capacity, such as 2G
+  description_local: OCP server server进程内存大小。请输入带容量带单位的整数，如2G
+- name: admin_password
+  name_local: ocp login password
+  type: STRING
+  require: true
+  essential: true
+  default: aaAA11__
+  need_restart: true
+  description_local: ocp 登录密码
+  description_en: When logining ocp, use it
+- name: logging_file_max_size
+  name_local: 单个日志文件大小
+  type: STRING
+  require: false
+  essential: true
+  default: 100MB
+  need_restart: true
+  description_local: 单个日志文件大小
+  description_en: When logging_file_name is configured, specify the log file size through this configuration
+- name: logging_file_total_size_cap
+  name_local: 日志总大小
+  type: STRING
+  require: true
+  essential: true
+  default: 1GB
+  need_restart: true
+  description_local: 日志文件总大小
+  description_en: When logging_file_name is configured, specify the total log file size through this configuration
+- name: jdbc_url
+  require: false
+  type: STRING
+  need_redeploy: true
+  description_en: The jdbc connection url for ocp meta db
+  description_local: OCP使用的元数据库的jdbc连接串
+- name: jdbc_username
+  require: false
+  type: STRING
+  need_redeploy: true
+  description_en: The username name for ocp meta dbx
+  description_local: OCP使用的元数据库的用户名
+- name: jdbc_password
+  require: false
+  type: STRING
+  default:
+  need_redeploy: true
+  description_en: The password name for ocp meta db
+  description_local: OCP使用的元数据库的密码
+- name: system_password
+  require: true
+  type: STRING
+  default: oceanbase
+  need_restart: true
+  description_en: The password name for ocp server
+  description_local: OCP server中system用户的密码
+- name: launch_user
+  require: false
+  type: STRING
+  default: ''
+  need_redeploy: true
+  description_en: Start user of OCP process
+  description_local: OCP进程的启动用户
+- name: 'session_timeout'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '登陆会话/Session超时的时间，默认是30m，最少60s。如果不加后缀单位，则默认是秒。重启生效。'
+  description_en: 'Session timeout interval, default is 30m, at least 60s. If the suffix unit is not added, the default is seconds. Restart OCP to take effect.'
+- name: 'login_encrypt_enabled'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '登录信息是否开启加密传输，默认开启，重启生效'
+  description_en: 'Switch to enable encrypted transmission of login information, enabled by default. Restart OCP to take effect.'
+- name: 'login_encrypt_public_key'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '加密登录信息的公钥，建议部署后修改此配置，修改后重启生效'
+  description_en: 'The public key for login encryption, It is recommended to modify this configuration after deployment. Restart OCP to take effect.'
+- name: 'login_encrypt_private_key'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '加密登录信息的私钥，建议部署后修改此配置，修改后重启生效'
+  description_en: 'The private key for encryption. It is recommended to modify this configuration after deployment. Restart OCP to take effect.'
+- name: 'enable_basic_auth'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '是否启用Basic Auth登陆模式，通常供程序和SDK等客户端场景使用，默认true。本配置与ocp.iam.auth可同时开启。重启生效。'
+  description_en: 'Whether to enable Basic Authentication, usually for client programs and SDKs to call server APIs. The default is true. This configuration and ocp.iam.auth can be enabled together. Restart OCP to take effect.'
+- name: 'enable_csrf'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '是否启用CSRF跨站点请求伪造安全保护，通常基于网页登陆的方式都推荐要启用，默认true。重启生效。'
+  description_en: 'Whether to enable CSRF cross-site request forgery security protection. It is recommended to enable it, the default is true. Restart OCP to take effect.'
+- name: 'vault_key'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '密码箱加密密钥'
+  description_en: 'vault secret key'
+- name: 'druid_name'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'metadb的druid连接池名称。重启生效'
+  description_en: 'metadb druid connection pool name. Restart to take effect'
+- name: 'druid_init_size'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '初始化时建立物理连接的个数。重启生效'
+  description_en: 'The number of physical connections established during initialization. Restart to take effect'
+- name: 'druid_min_idle'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '最小连接池数量。重启生效'
+  description_en: 'Minimum number of connections. Restart to take effect'
+- name: 'druid_max_active'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '最大连接池数量。重启生效'
+  description_en: 'The maximum number of connections. Restart to take effect'
+- name: 'druid_test_while_idle'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '建议配置为true，不影响性能，并且保证安全性。申请连接的时候检测。重启生效'
+  description_en: 'It is recommended to set it to true, which will not affect performance and ensure safety. Detect when applying for connection. Restart to take effect'
+- name: 'druid_validation_query'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '用来检测连接是否有效的sql。重启生效'
+  description_en: 'SQL used to detect whether the connection is valid. Restart to take effect'
+- name: 'druid_max_wait'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '获取连接时最大等待时间，单位毫秒。重启生效'
+  description_en: 'Maximum waiting time when getting a connection, in milliseconds. Restart to take effect'
+- name: 'druid_keep_alive'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '连接池中的minIdle数量以内的连接，空闲时间超过minEvictableIdleTimeMillis（缺省值1800秒），则会执行keepAlive操作。重启生效'
+  description_en: 'For connections within the number of minIdle in the connection pool, if the idle time exceeds minEvictableIdleTimeMillis (the default value is 1800 seconds), the keepAlive operation will be performed. Restart to take effect'
+- name: 'logging_pattern_console'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '用于控制台输出的日志格式'
+  description_en: 'Log format for console output'
+- name: 'logging_pattern_file'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '用于文件输出的日志格式'
+  description_en: 'Log format used for file output'
+- name: 'logging_file_clean_when_start'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '启动时删除压缩的日志文件'
+  description_en: 'Clean the archive log files on startup'
+- name: 'logging_file_max_history'
+  name_local: 日志保留天数
+  type: INT
+  require: false
+  essential: true
+  need_restart: true
+  min_value: 1
+  max_value: 2147483647
+  description_local: '最多保留的归档日志文件的天数，默认不限制'
+  description_en: 'When logging.file is configured, set the maximum of retention days the log archive log files to keep. The default value is unlimited'
+- name: 'default_timezone'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '系统默认时区，若不设置则使用 system default time zone，重启生效'
+  description_en: 'System default time zone, if not set, use system default time zone, restart to take effect'
+- name: 'default_lang'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '系统默认语言（非前端语言设置），若不设置则使用 zh-CN，重启生效'
+  description_en: 'System default language (non-front-end language setting), if not set, use zh-CN, restart to take effect'
+- name: 'ocp.idempotent.client-token.expire.time'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '幂等请求token的缓存过期时间，默认14d'
+  description_en: 'Expire time of idempotent client token, the default is 14d'
+- name: 'exporter_inactive_threshold'
+  type: 'INT'
+  require: false
+  need_restart: true
+  description_local: 'exporter地址判定为失效的连续不可用时间（秒）'
+  description_en: 'consecutive failure time of exporter address that is regarded as inactive (seconds)'
+- name: 'ocp.monitor.host.exporters'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '主机监控exporter'
+  description_en: 'exporters of ocp host'
+- name: 'ocp.monitor.ob.exporters'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: 'OB监控exporter'
+  description_en: 'exporters of ob'
+- name: 'monitor_collect_interval'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '秒级别监控采集间隔，默认 1s，支持配置选项是 1s, 5s, 10s, 15s'
+  description_en: 'The parameter determines the second-level monitoring and collection interval. The supported configuration options are 1s, 5s, 10s, 15s. Default value is 1s'
+- name: 'montior_retention_days'
+  type: 'STRING'
+  require: false
+  need_restart: true
+  description_local: '监控数据保存天数，key 是监控数据的表名，value 是保存的天数，修改后重启生效.'
+  description_en: 'Retention days for monitor data, key is table name for monitor data, value is the retention days. Restart to take effect.'
+- name: ocp_meta_tenant
+  require: true
+  type: DICT
+  default:
+    tenant_name: meta_tenant
+    max_cpu: 1
+    memory_size: 2147483648
+  need_redeploy: true
+  description_en: The tenant specifications for ocp meta db
+  description_local: ocp server的元数据库使用的租户规格
+- name: ocp_monitor_tenant
+  require: false
+  type: DICT
+  default:
+    tenant_name: monitor_tenant
+    max_cpu: 1
+    memory_size: 2147483648
+  need_redeploy: true
+  description_en: The tenant specifications for ocp monitor
+  description_local: ocp server的监控租户使用的租户规格
+- name: ocp_meta_tenant_log_disk_size
+  name_local: OCP server元数据库租户日志磁盘大小
+  essential: true
+  require: false
+  type: CAPACITY_MB
+  default: 2048M
+  need_redeploy: true
+  description_en: The tenant log disk size for ocp meta db
+  description_local: ocp server的元数据库使用的租户日志磁盘大小
+- name: ocp_monitor_tenant_log_disk_size
+  name_local: OCP server监控租户日志磁盘大小
+  essential: true
+  require: false
+  type: CAPACITY_MB
+  default: 2048M
+  need_redeploy: true
+  description_en: The tenant log disk size for ocp monitor db
+  description_local: ocp server的监控租户使用的租户日志磁盘大小
+- name: ocp_meta_username
+  require: false
+  type: STRING
+  default: meta
+  need_redeploy: true
+  description_en: The user name for ocp meta db
+  description_local: ocp server的元数据库使用的用户名
+- name: ocp_meta_password
+  require: true
+  type: STRING
+  default: oceanbase
+  need_redeploy: true
+  description_en: The password for ocp meta db
+  description_local: ocp server的元数据库使用的密码
+- name: ocp_meta_db
+  require: false
+  type: STRING
+  default: meta_database
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp server的元数据库使用的数据库名
+- name: ocp_monitor_username
+  require: false
+  type: STRING
+  default: monitor_user
+  description_en: The username for obagent monitor user
+  description_local: obagent 监控用户的用户名
+- name: ocp_monitor_password
+  require: false
+  type: STRING
+  default: oceanbase
+  need_redeploy: true
+  description_en: The password for obagent monitor password
+  description_local: obagent 监控用户的密码
+- name: ocp_monitor_db
+  require: false
+  type: STRING
+  default: monitor_database
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp server的监控数据库使用的数据库名
+- name: ocp_site_url
+  require: false
+  type: STRING
+  default: ''
+  need_restart: true
+  need_redeploy: true
+  description_en: The url for ocp server
+  description_local: ocp server的连接串

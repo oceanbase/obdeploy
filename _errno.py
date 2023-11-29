@@ -120,7 +120,7 @@ EC_CLEAN_PATH_FAILED = OBDErrorCodeTemplate(1003, 'Fail to clean {server}:{path}
 EC_CONFIG_CONFLICT_DIR = OBDErrorCodeTemplate(1004, 'Configuration conflict {server1}: {path} is used for {server2}\'s {key}')
 EC_SOME_SERVER_STOPED = OBDErrorCodeTemplate(1005, 'Some of the servers in the cluster have been stopped')
 EC_FAIL_TO_CONNECT = OBDErrorCodeTemplate(1006, 'Failed to connect to {component}')
-EC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) {key} must not be less than {need} (Current value: {now})')
+EC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) The value of the ulimit parameter "{key}" must not be less than {need} (Current value: {now})')
 EC_FAILED_TO_GET_AIO_NR = OBDErrorCodeTemplate(1008, '({ip}) failed to get fs.aio-max-nr and fs.aio-nr')
 EC_NEED_CONFIG = OBDErrorCodeTemplate(1009, '{server} {component} need config: {miss_keys}')
 EC_NO_SUCH_NET_DEVICE = OBDErrorCodeTemplate(1010, '{server} No such net interface: {devname}')
@@ -128,6 +128,8 @@ EC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) Insufficient AIO remainin
 EC_PARAM_CHECK = OBDErrorCodeTemplate(1012, '{errors}')
 EC_SSH_CONNECT = OBDErrorCodeTemplate(1013, '{user}@{ip} connect failed: {message}')
 EC_CHECK_STANDBY = OBDErrorCodeTemplate(1015, 'Unable to confirm the primary-standby relationship, rerun with "--ignore-standby" option if you want to proceed despite the risks.')
+EC_FAILED_TO_GET_PARAM = OBDErrorCodeTemplate(1016, '({ip}) failed to get {key} using command "{cmd}"')
+EC_PARAM_NOT_IN_NEED = OBDErrorCodeTemplate(1017, '({ip}) The value of the "{check_item}" must be {need} (Current value: {now}, Recommended value: {recommend})')
 
 # error code for observer
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
@@ -143,6 +145,7 @@ EC_OBSERVER_FAILED_TO_REGISTER = OBDErrorCodeTemplate(2005, 'Failed to register 
 EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS = OBDErrorCodeTemplate(2005, 'Failed to register cluster. {appname} may have been registered in {obconfig_url}.')
 EC_OBSERVER_MULTI_NET_DEVICE = OBDErrorCodeTemplate(2006, '{ip} has more than one network interface. Please set `devname` for ({server})')
 EC_OBSERVER_PING_FAILED = OBDErrorCodeTemplate(2007, '{ip1} {devname} fail to ping {ip2}. Please check configuration `devname`')
+EC_OBSERVER_PING_FAILED_WITH_NO_DEVNAME = OBDErrorCodeTemplate(2007, '{ip1} fail to ping {ip2}. Please check your network')
 EC_OBSERVER_TIME_OUT_OF_SYNC = OBDErrorCodeTemplate(2008, 'Cluster clocks are out of sync')
 EC_OBSERVER_PRODUCTION_MODE_LIMIT = OBDErrorCodeTemplate(2009, '({server}): when production_mode is True, {key} can not be less then {limit}')
 EC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory must be less than memory_limit/memory_limit_percentage.')
@@ -176,7 +179,23 @@ EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE = OBDErrorCodeTemplate(4305
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant.')
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM = OBDErrorCodeTemplate(4305, 'There is not enough memory for ocp meta tenant')
 EC_OCP_EXPRESS_ADMIN_PASSWD_ERROR = OBDErrorCodeTemplate(4306, '({ip}) ocp-express admin_passwd invalid.(Current :{current})')
-# 4350-4399 had been used by ocp
+
+
+# ocp-server
+EC_OCP_SERVER_RUNNING_TASK = OBDErrorCodeTemplate(4350, 'The Server have running task')
+EC_OCP_SERVER_MACHINE_STATUS = OBDErrorCodeTemplate(4351, 'The Server have gone')
+EC_OCP_SERVER_METADB_VERSION = OBDErrorCodeTemplate(4352, 'Metadb version not fewer than V2.2.50')
+EC_OCP_SERVER_TIME_SHIFT = OBDErrorCodeTemplate(4353, '{server}: Excessive deviation between machine time and ob time')
+EC_OCP_SERVER_LAUNCH_USER_NOT_EXIST = OBDErrorCodeTemplate(4354, '{user}@{server}: Not exist')
+EC_SUDO_NOPASSWD = OBDErrorCodeTemplate(4355, '{user}@{ip}: user {user} not in sudoers or sudoers file not exist')
+EC_CONNECT_METADB = OBDErrorCodeTemplate(4356, 'failed to connect meta db')
+EC_DB_NOT_IN_JDBC_URL = OBDErrorCodeTemplate(4357, 'database in jdbc_url is not exist')
+EC_ERROR_JDBC_URL = OBDErrorCodeTemplate(4358, 'unmatched jdbc url, skip meta db connection check')
+EC_OCP_SERVER_JAVA_VERSION_ERROR = OBDErrorCodeTemplate(4359, "{server}: ocp-server need java with version {version} and update release must greater than 161")
+EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS = OBDErrorCodeTemplate(4360, "{server}: clockdiff not exists. Please install clockdiff manually")
+EC_OCP_SERVER_TENANT_ALREADY_EXISTS = OBDErrorCodeTemplate(4361, "tenant({tenant_name}) alread exist")
+EC_OCP_SERVER_DIR_ACCESS_FORBIDE = OBDErrorCodeTemplate(4362, "{server}:{path} access failed for current user, {server}:{cur_path} access succeed, please run `chmod -R 755 {cur_path}` ")
+
 
 #ob-configserver
 EC_OBC_PROGRAM_START_ERROR = OBDErrorCodeTemplate(4401, 'Failed to start {server} ob-configserver.')
@@ -188,7 +207,6 @@ EC_OBC_SQLITE_PERMISSION_DENIED = OBDErrorCodeTemplate(4403, 'ob-configserver co
 EC_OBC_DATABASE_CONNECT_ERROR = OBDErrorCodeTemplate(4404, 'ob-configserver connect to mysql failed: {server}: failed url to connect to database: {url}')
 
 
-
 # sql
 EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
 
@@ -196,6 +214,7 @@ EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
 EC_OBDIAG_NOT_FOUND = OBDErrorCodeTemplate(6000, 'Failed to executable obdiag command, you may not have obdiag installed')
 EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT = OBDErrorCodeTemplate(6001, 'obdiag must contain depend components {components}')
 EC_OBDIAG_OPTIONS_FORMAT_ERROR = OBDErrorCodeTemplate(6002, 'obdiag options {option} format error, please check the value : {value}')
+EC_OBDIAG_FUCYION_FAILED = OBDErrorCodeTemplate(6003, 'Failed to excute obdiag function {fuction}')
 
 # Unexpected exceptions code
 EC_UNEXPECTED_EXCEPTION = OBDErrorCodeTemplate(9999, 'Unexpected exception: need to be posted on "https://ask.oceanbase.com", and we will help you resolve them.')
@@ -226,7 +245,7 @@ SUG_USE_RS_LIST = OBDErrorSuggestionTemplate('Instead of using ob config service
 SUG_GRAFANA_PWD = OBDErrorSuggestionTemplate('Grafana password length must be greater than 4 and not "admin"', True, [FixEval(FixEval.DEL, 'login_password', is_global=True)])
 SUG_PARAM_CHECK = OBDErrorSuggestionTemplate('Please check your config')
 SUG_SSH_FAILED = OBDErrorSuggestionTemplate('Please check user config and network')
-SUG_SYSCTL = OBDErrorSuggestionTemplate('Please execute `echo ‘{var}={value}’ >> /etc/sysctl.conf; sysctl -p` as root in {ip}.')
+SUG_SYSCTL = OBDErrorSuggestionTemplate('Please execute `echo "{var}={value}" >> /etc/sysctl.conf; sysctl -p` as root in {ip}.')
 SUG_ULIMIT = OBDErrorSuggestionTemplate('Please execute `echo -e "* soft {name} {value}\\n* hard {name} {value}" >> /etc/security/limits.d/{name}.conf` as root in {ip}. if it dosen\'t work, please check whether UsePAM is yes in /etc/ssh/sshd_config.')
 SUG_CONNECT_EXCEPT = OBDErrorSuggestionTemplate('Connection exception or unsupported OS. Please retry or contact us.')
 SUG_UNSUPPORT_OS = OBDErrorSuggestionTemplate('It may be an unsupported OS, please contact us for assistance')
@@ -246,3 +265,5 @@ SUG_OCP_EXPRESS_COMP_VERSION = OBDErrorSuggestionTemplate('Please use {comp} wit
 SUG_OCP_EXPRESS_REDUCE_META_DB_MEM = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_memory_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_memory_size')])
 SUG_OCP_EXPRESS_REDUCE_META_DB_LOG_DISK = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_log_disk_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_log_disk_size')])
 SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD_ERROR = OBDErrorSuggestionTemplate('Please edit the `admin_passwd`, must be 8 to 32 characters in length, and must contain at least two digits, two uppercase letters, two lowercase letters, and two of the following special characters:~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_passwd')], auto_fix=True)
+SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR = OBDErrorSuggestionTemplate('Please ensure that the `jdbc_url` in the `config.yaml` configuration file is set correctly to establish a successful connection with your database')
+SUG_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.')

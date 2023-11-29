@@ -32,7 +32,7 @@ from subprocess import call as subprocess_call
 
 from ssh import SshClient, SshConfig
 from tool import FileUtil, DirectoryUtil, YamlLoader, timeout, COMMAND_ENV, OrderedDict
-from _stdio import MsgLevel
+from _stdio import MsgLevel, FormtatText
 from _rpm import Version
 from _mirror import MirrorRepositoryManager, PackageInfo
 from _plugin import PluginManager, PluginType, InstallPlugin, PluginContextNamespace
@@ -1081,6 +1081,77 @@ class ObdHome(object):
         self.deploy_manager.remove_deploy_config(name)
         return False
 
+    def export_to_ocp(self, name):
+        # extract ocp info from options
+        ocp_address = getattr(self.options, 'address', '')
+        ocp_user = getattr(self.options, 'user', '')
+        ocp_password = getattr(self.options, 'password', '')
+        if ocp_address is None or ocp_address == '':
+            self._call_stdio('error', 'address is required, pass it using -a or --address')
+            return False
+        if ocp_user is None or ocp_user == '':
+            self._call_stdio('error', 'user is required, pass it using -u or --user')
+            return False
+        if ocp_password is None or ocp_password == '':
+            self._call_stdio('error', 'password is required, pass it using -p or --password')
+            return False
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        self._call_stdio('verbose', 'Deploy status judge')
+        if deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" not RUNNING' % (name))
+            return False
+
+        deploy_config = deploy.deploy_config
+        if "oceanbase-ce" not in deploy_config.components:
+            self._call_stdio("error", "no oceanbase-ce in deployment %s" % name)
+        cluster_config = deploy_config.components["oceanbase-ce"]
+        repositories = self.load_local_repositories(deploy_info)
+        self.set_repositories(repositories)
+        ssh_clients = self.get_clients(deploy_config, repositories)
+
+        self._call_stdio('verbose', 'get plugins by mocking an ocp repository.')
+        # search and get all related plugins using a mock ocp repository
+        mock_ocp_repository = Repository("ocp-server-ce", "/")
+        mock_ocp_repository.version = "4.2.1"
+        repositories = [mock_ocp_repository]
+        takeover_precheck_plugins = self.search_py_script_plugin(repositories, "takeover_precheck")
+        self._call_stdio('verbose', 'successfully get takeover precheck plugin.')
+        takeover_plugins = self.search_py_script_plugin(repositories, "takeover")
+        self._call_stdio('verbose', 'successfully get takeover plugin.')
+
+        # do take over cluster by  call takeover precheck plugins
+        self._call_stdio('print', 'precheck for export obcluster to ocp.')
+        precheck_ret = self.call_plugin(takeover_precheck_plugins[mock_ocp_repository], mock_ocp_repository, cluster_config=cluster_config,  clients=ssh_clients)
+        if not precheck_ret:
+            self._call_stdio("error", precheck_ret.get_return('exception'))
+            return False
+        else:
+            # set version and component option
+            ocp_version = precheck_ret.get_return("ocp_version")
+            self.options._update_loose({"version": ocp_version, "components": "oceanbase-ce"})
+        self._call_stdio('verbose', 'do takeover precheck by calling ocp finished')
+        # check obcluster can be takeover by ocp
+        check_ocp_result = self.check_for_ocp(name)
+        if not check_ocp_result:
+            self._call_stdio("error", "check obcluster to ocp takeover failed")
+            return False
+        self.set_deploy(None)
+        self.set_repositories(None)
+        takeover_ret = self.call_plugin(takeover_plugins[mock_ocp_repository], mock_ocp_repository, cluster_config=cluster_config, deploy_config = deploy_config, clients=ssh_clients)
+        if not takeover_ret:
+            self._call_stdio('error', 'export obcluster to ocp failed')
+            return False
+        else:
+            task_id = takeover_ret.get_return("task_id")
+            self._call_stdio("print", "takeover task successfully submitted to ocp, you can check task at %s/task/%d" % (ocp_address, task_id))
+            return True
+
     def check_for_ocp(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
@@ -1143,6 +1214,7 @@ class ObdHome(object):
         component_num = len(repositories)
         for repository in repositories:
             if repository.name not in components:
+                component_num -= 1
                 continue
             if repository not in ocp_check:
                 component_num -= 1
@@ -1163,7 +1235,13 @@ class ObdHome(object):
             if self.call_plugin(ocp_check[repository], repository, cursor=cursor, ocp_version=version, new_cluster_config=new_cluster_config, new_clients=new_ssh_clients):
                 component_num -= 1
                 self._call_stdio('print', '%s Check passed.' % repository.name)
-
+        # search and install oceanbase-ce-utils, just log warning when failed since it can be installed after takeover
+        repositories_utils_map = self.get_repositories_utils(repositories)
+        if not repositories_utils_map:
+            self._call_stdio('warn', 'Failed to get utils package')
+        else:
+            if not self.install_utils_to_servers(repositories, repositories_utils_map):
+                self._call_stdio('warn', 'Failed to install utils to servers')
         return component_num == 0
 
     def sort_repository_by_depend(self, repositories, deploy_config):
@@ -1268,6 +1346,9 @@ class ObdHome(object):
                 self._call_stdio('error', 'Deploy "%s" is %s. You could not deploy an %s cluster.' % (name, deploy_info.status.value, deploy_info.status.value))
                 return False
 
+        if 'ocp-server' in getattr(self.options, 'components', ''):
+            self._call_stdio('error', 'Not support ocp-server.')
+            return
         components = set()
         for component_name in getattr(self.options, 'components', '').split(','):
             if component_name:
@@ -2391,7 +2472,7 @@ class ObdHome(object):
             sub_io = None
             if getattr(self.stdio, 'sub_io'):
                 sub_io = self.stdio.sub_io(msg_lv=MsgLevel.ERROR)
-            obd = self.fork(options=Values({'without_parameter': True}), stdio=sub_io)
+            obd = self.fork(options=Values({'without_parameter': True, 'skip_create_tenant': 'True'}), stdio=sub_io)
             if not obd._start_cluster(deploy, repositories):
                 if self.stdio:
                     self._call_stdio('error', err.EC_SOME_SERVER_STOPED.format())
@@ -2421,6 +2502,11 @@ class ObdHome(object):
                 start_all = cluster_servers == cluster_config.servers
                 update_deploy_status = update_deploy_status and start_all
 
+            ret = self.call_plugin(start_check_plugins[repository], repository, source_option='restart')
+            if not ret:
+                return False
+
+            setattr(self.options, "skip_create_tenant", True)
             if self.call_plugin(
                     restart_plugins[repository],
                     repository,
@@ -2491,7 +2577,7 @@ class ObdHome(object):
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
 
-        if need_confirm and not self._call_stdio('confirm', 'Are you sure to  destroy the "%s" cluster and rebuild it?' % name):
+        if need_confirm and not self._call_stdio('confirm', FormtatText.warning('Are you sure to  destroy the "%s" cluster and rebuild it?' % name)):
             return False
         deploy_info = deploy.deploy_info
 
@@ -2551,6 +2637,7 @@ class ObdHome(object):
             if not repositories or not install_plugins:
                 return False
             self.set_repositories(repositories)
+            setattr(self.options, "skip_create_tenant", True)
         return self._deploy_cluster(deploy, repositories) and self._start_cluster(deploy, repositories)
 
     def destroy_cluster(self, name):
@@ -2900,6 +2987,11 @@ class ObdHome(object):
                         for server in cluster_status:
                             if cluster_status[server] == 0:
                                 self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
+                return False
+
+            start_check_plugins = self.search_py_script_plugin(repositories, 'start_check')
+            ret = self.call_plugin(start_check_plugins[dest_repository], dest_repository, source_option='upgrade')
+            if not ret:
                 return False
 
             route = []
@@ -4244,7 +4336,7 @@ class ObdHome(object):
         return self.call_plugin(telemetry_post_plugin, repository, spacename='telemetry')
 
 
-    def obdiag_gather(self, name, gather_type, opts):
+    def obdiag_online_func(self, name, fuction_type, opts):
         self._global_ex_lock()
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name, read_only=True)
@@ -4261,7 +4353,7 @@ class ObdHome(object):
             return False
 
         allow_components = []
-        if gather_type.startswith("gather_obproxy"):
+        if fuction_type.startswith("gather_obproxy") or fuction_type.startswith("analyze_obproxy"):
             allow_components = ['obproxy-ce', 'obproxy']
         else:
             allow_components = ['oceanbase-ce', 'oceanbase']
@@ -4289,48 +4381,44 @@ class ObdHome(object):
             if repository.name == component_name:
                 target_repository = repository
                 break
-        if gather_type in ['gather_plan_monitor']:
+        if fuction_type in ['gather_plan_monitor']:
             setattr(opts, 'connect_cluster', True)          
-        obdiag_path = getattr(opts, 'obdiag_dir', None) 
 
         diagnostic_component_name = 'oceanbase-diagnostic-tool'
-        obdiag_version = '1.0'
-        pre_check_plugin = self.plugin_manager.get_best_py_script_plugin('pre_check', diagnostic_component_name, obdiag_version)    
-        check_pass = self.call_plugin(pre_check_plugin,
-            target_repository,
-            gather_type = gather_type,
-            obdiag_path = obdiag_path, 
-            version_check = True,
-            utils_work_dir_check = True)
-        if not check_pass:
-            # obdiag checker return False
-            if not check_pass.get_return('obdiag_found'):
-                if not self._call_stdio('confirm', 'Could not find the obdiag, please confirm whether to install it' ):
-                    return False
-                self.obdiag_deploy(auto_deploy=True, install_prefix=obdiag_path)
-            # utils checker return False
-            if not check_pass.get_return('utils_status'):
-                repositories_utils_map = self.get_repositories_utils(repositories)
-                if repositories_utils_map is False:
-                    self._call_stdio('error', 'Failed to get utils package')
-                else:
-                    if not self._call_stdio('confirm', 'obdiag gather clog/slog need to install ob_admin\nDo you want to install ob_admin?'):
-                        if not check_pass.get_return('skip'):
-                            return False
-                        else:
-                            self._call_stdio('warn', 'Just skip gather clog/slog')
-                    else:
-                        if not self.install_utils_to_servers(repositories, repositories_utils_map):
-                            self._call_stdio('error', 'Failed to install utils to servers')
-        obdiag_version = check_pass.get_return('obdiag_version')
-        generate_config_plugin = self.plugin_manager.get_best_py_script_plugin('generate_config', diagnostic_component_name, obdiag_version)
-        self.call_plugin(generate_config_plugin, target_repository, deploy_config=deploy_config)
-        self._call_stdio('generate_config', 'succeed')
-        obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(gather_type, diagnostic_component_name, obdiag_version)
-        return self.call_plugin(obdiag_plugin, target_repository)
+        diagnostic_component_version = '1.0'
+        if fuction_type in ['analyze_log']:
+            diagnostic_component_version = '1.3'
+        elif fuction_type in ['checker']:
+            diagnostic_component_version = '1.4'
+        deployed = self.obdiag_deploy(auto_deploy=True, version=diagnostic_component_version)
+        if deployed:
+            generate_config_plugin = self.plugin_manager.get_best_py_script_plugin('generate_config', diagnostic_component_name, diagnostic_component_version)
+            self.call_plugin(generate_config_plugin, target_repository, deploy_config=deploy_config)
+            self._call_stdio('generate_config', 'succeed')
+            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, diagnostic_component_name, diagnostic_component_version)
+            return self.call_plugin(obdiag_plugin, target_repository)
+        else:
+            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
+            return False
 
 
-    def obdiag_deploy(self, auto_deploy=False, install_prefix=None):
+    def obdiag_offline_func(self, fuction_type, opts):
+        component_name = 'oceanbase-diagnostic-tool'
+        pkg = self.mirror_manager.get_best_pkg(name=component_name)
+        if not pkg:
+            self._call_stdio('critical', '%s package not found' % component_name)
+            return False
+        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
+        deployed = self.obdiag_deploy(auto_deploy=True, version='1.3')
+        if deployed:
+            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, component_name, )
+            return self.call_plugin(obdiag_plugin, repository, clients={})
+        else:
+            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
+            return False
+
+
+    def obdiag_deploy(self, auto_deploy=False, install_prefix=None, version='1.3'):
         self._global_ex_lock()
         component_name = 'oceanbase-diagnostic-tool'
         if install_prefix is None:
@@ -4341,29 +4429,29 @@ class ObdHome(object):
             return False
         plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, component_name, pkg.version)
         self._call_stdio('print', 'obdiag plugin : %s' % plugin)
-
         repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
-        check_plugin = self.plugin_manager.get_best_py_script_plugin('pre_check', component_name, pkg.version)
-        if not auto_deploy:
-            ret = self.call_plugin(check_plugin,
-                repository,
-                clients={},
-                obdiag_path = install_prefix,
-                obdiag_new_version = pkg.version, 
-                version_check = True)
-            if not ret and ret.get_return('obdiag_found'):
+        check_plugin = self.plugin_manager.get_best_py_script_plugin('pre_check', component_name, version)
+        obd = self.fork()
+        obd.set_deploy(deploy=None)
+        ret = obd.call_plugin(check_plugin, repository, clients={}, obdiag_path = install_prefix, obdiag_new_version = version, version_check = True)
+        if ret.get_return('obdiag_found'):
+            if ret.get_return('version_status'):
                 self._call_stdio('print', 'No updates detected. obdiag is already up to date.')
-                return False
-            if not self._call_stdio('confirm', 'Found a higher version\n%s\nDo you want to use it?' % pkg):
-                return False
+                return True
+            else:
+                if not auto_deploy:
+                    if not self._call_stdio('confirm', 'Found a higher version\n%s\nDo you want to use it?' % pkg):
+                        return False
         self._call_stdio('start_loading', 'Get local repositories and plugins')
+        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
+        plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, component_name, pkg.version)
         repository.load_pkg(pkg, plugin)
         src_path = os.path.join(repository.repository_dir, component_name)
         if FileUtil.symlink(src_path, install_prefix, self.stdio):
             self._call_stdio('stop_loading', 'succeed')
             self._call_stdio('print', 'Deploy obdiag successful.\nCurrent version : %s. \nPath of obdiag : %s' % (pkg.version, install_prefix))
-        return True
-
+            return True
+        return False
 
     def get_repositories_utils(self, repositories):
         all_data = []

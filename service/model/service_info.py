@@ -19,7 +19,12 @@
 
 from fastapi import Body
 from pydantic import BaseModel
+from typing import List
 
 
 class ServiceInfo(BaseModel):
     user: str = Body(..., description='user name')
+
+
+class DeployName(BaseModel):
+    name: List[str] = Body([], description="deploy name list")

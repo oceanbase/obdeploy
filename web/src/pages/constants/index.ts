@@ -1,8 +1,11 @@
 import { intl } from '@/utils/intl';
 export const commonStyle = { width: 216 };
+export const TIME_REFRESH = 5000;
+export const STABLE_OCP_VERSION = '421';
 export const oceanbaseComponent = 'oceanbase';
 export const obproxyComponent = 'obproxy';
 export const ocpexpressComponent = 'ocp-express';
+export const ocpComponent = 'ocpserver';
 export const obagentComponent = 'obagent';
 
 export const ocpexpressComponentKey = 'ocpexpress';
@@ -101,6 +104,19 @@ export const componentsConfig = {
       defaultMessage: 'OCP Express 参数名称',
     }),
   },
+  [ocpComponent]: {
+    name: 'OCP',
+    showComponentName: 'OCP',
+    type: intl.formatMessage({
+      id: 'OBD.pages.constants.Tools',
+      defaultMessage: '工具',
+    }),
+    componentKey: ocpexpressComponentKey,
+    labelName: intl.formatMessage({
+      id: 'OBD.pages.constants.OcpParameterName',
+      defaultMessage: 'OCP 参数名称',
+    }),
+  },
 };
 
 export const modeConfig = {
@@ -123,4 +139,88 @@ export const pathRule = {
     defaultMessage:
       '以 “/” 开头的绝对路径，只能包含字母、数字和特殊字符（~@%^_+=(){}[]:,./）',
   }),
+};
+//https://www.oceanbase.com/docs/community-ocp-cn-1000000000261244
+export const resourceMap = {
+  metaDB: [
+    {
+      hosts: 10,
+      cpu: 2,
+      memory: 4,
+    },
+    {
+      hosts: 50,
+      cpu: 4,
+      memory: 8,
+    },
+    {
+      hosts: 100,
+      cpu: 8,
+      memory: 16,
+    },
+    {
+      hosts: 200,
+      cpu: 16,
+      memory: 32,
+    },
+    {
+      hosts: 400,
+      cpu: 32,
+      memory: 64,
+    },
+  ],
+  monitorDB: [
+    {
+      hosts: 10,
+      cpu: 2,
+      memory: 8,
+    },
+    {
+      hosts: 50,
+      cpu: 4,
+      memory: 32,
+    },
+    {
+      hosts: 100,
+      cpu: 8,
+      memory: 64,
+    },
+    {
+      hosts: 200,
+      cpu: 16,
+      memory: 128,
+    },
+    {
+      hosts: 400,
+      cpu: 32,
+      memory: 256,
+    },
+  ],
+  OCP: [
+    {
+      hosts: 10,
+      cpu: 2,
+      memory: 4,
+    },
+    {
+      hosts: 50,
+      cpu: 4,
+      memory: 8,
+    },
+    {
+      hosts: 100,
+      cpu: 8,
+      memory: 16,
+    },
+    {
+      hosts: 200,
+      cpu: 16,
+      memory: 32,
+    },
+    {
+      hosts: 400,
+      cpu: 32,
+      memory: 64,
+    },
+  ],
 };

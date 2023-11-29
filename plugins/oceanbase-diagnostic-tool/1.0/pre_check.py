@@ -52,7 +52,7 @@ def pre_check(plugin_context, gather_type=None, obdiag_path='', obdiag_new_versi
     def version_checker():
         client = LocalClient
         check_status = {}
-        ret = client.execute_command('cd {} && sh obdiag version'.format(obdiag_path))
+        ret = client.execute_command('cd {} && ./obdiag version'.format(obdiag_path))
         if not ret:
             check_status = {'version_checker_status': False, 'obdiag_version': obdiag_new_version, 'obdiag_found': False}
             return check_status
@@ -63,7 +63,7 @@ def pre_check(plugin_context, gather_type=None, obdiag_path='', obdiag_new_versi
             return check_status
         else:
             major_version = found.group(1)
-            if Version(major_version) < Version(obdiag_new_version):
+            if Version(major_version) > Version(obdiag_new_version):
                 check_status = {'version_checker_status': True, 'obdiag_version': major_version, 'obdiag_found': True}
                 return check_status
             else:

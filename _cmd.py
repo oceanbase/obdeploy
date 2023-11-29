@@ -258,6 +258,15 @@ class ObdCommand(BaseCommand):
     def _do_command(self, obd):
         raise NotImplementedError
 
+    def get_white_ip_list(self):
+        if self.opts.white:
+            return self.opts.white.split(',')
+        ROOT_IO.warn("Security Risk: the whitelist is empty and anyone can request this program!")
+        if ROOT_IO.confirm("Do you want to continue?"):
+            return []
+        wthite_ip_list = ROOT_IO.read("Please enter the whitelist, eq: '192.168.1.1'")
+        raise wthite_ip_list.split(',')
+
 
 class MajorCommand(BaseCommand):
 
@@ -690,6 +699,22 @@ class ClusterCheckForOCPChange(ClusterMirrorCommand):
         else:
             return self._show_help()
 
+class ClusterExportToOCPCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterExportToOCPCommand, self).__init__('export-to-ocp', 'Export obcluster to OCP')
+        self.parser.add_option('-a', '--address', type='string', help="OCP address, example http://127.0.0.1:8080, you can find it in OCP system parameters with Key='ocp.site.url'")
+        self.parser.add_option('-u', '--user', type='string', help="OCP user, this user should have create cluster privilege.")
+        self.parser.add_option('-p', '--password', type='string', help="OCP user password.")
+        self.parser.add_option('--host_type', type='string', help="Host type of observer, a host type will be created when there's no host type exists in ocp, the first host type will be used if this parameter is empty.", default="")
+        self.parser.add_option('--credential_name', type='string', help="Credential used to connect hosts, a credential will be created if credential_name is empty or no credential with this name exists in ocp.", default="")
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.export_to_ocp(self.cmds[0])
+        else:
+            return self._show_help()
+
 
 class DemoCommand(ClusterMirrorCommand):
 
@@ -718,14 +743,18 @@ class WebCommand(ObdCommand):
     def __init__(self):
         super(WebCommand, self).__init__('web', 'Start obd deploy application as web.')
         self.parser.add_option('-p', '--port', type='int', help="web server listen port", default=8680)
+        self.parser.add_option('-w', '--white', type='str', help="ip white list, eq: '127.0.0.1, 192.168.1.1'.", default='')
 
     def _do_command(self, obd):
         from service.app import OBDWeb
+        # white_ip_list = self.get_white_ip_list()
+        url = '/#/updateWelcome' if self.cmds and self.cmds[0] in ('upgrade', 'update') else ''
+
         ROOT_IO.print('start OBD WEB in 0.0.0.0:%s' % self.opts.port)
-        ROOT_IO.print('please open http://{0}:{1}'.format(NetUtil.get_host_ip(),  self.opts.port))
+        ROOT_IO.print('please open http://{0}:{1}{2}'.format(NetUtil.get_host_ip(),  self.opts.port, url))
         try:
             COMMAND_ENV.set(ENV.ENV_DISABLE_PARALLER_EXTRACT, True, stdio=obd.stdio)
-            OBDWeb(obd, self.OBD_INSTALL_PATH).start(self.opts.port)
+            OBDWeb(obd, None, self.OBD_INSTALL_PATH).start(self.opts.port)
         except KeyboardInterrupt:
             ROOT_IO.print('Keyboard Interrupt')
         except BaseException as e:
@@ -926,6 +955,7 @@ class ClusterEditConfigCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
+            ROOT_IO.default_confirm = False
             return obd.edit_deploy_config(self.cmds[0])
         else:
             return self._show_help()
@@ -1137,6 +1167,7 @@ class ClusterMajorCommand(MajorCommand):
     def __init__(self):
         super(ClusterMajorCommand, self).__init__('cluster', 'Deploy and manage a cluster.')
         self.register_command(ClusterCheckForOCPChange())
+        self.register_command(ClusterExportToOCPCommand())
         self.register_command(ClusterConfigStyleChange())
         self.register_command(ClusterAutoDeployCommand())
         self.register_command(ClusterDeployCommand())
@@ -1525,6 +1556,8 @@ class ObdiagCommand(MajorCommand):
         super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
         self.register_command(ObdiagDeployCommand())
         self.register_command(ObdiagGatherCommand())
+        self.register_command(ObdiagAnalyzeCommand())
+        self.register_command(ObdiagCheckCommand())
 
 
 class ObdiagDeployCommand(ObdCommand):
@@ -1549,7 +1582,7 @@ class ObdiagGatherMirrorCommand(ObdCommand):
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.obdiag_gather(self.cmds[0], "gather_%s" % self.name, self.opts)
+            return obd.obdiag_online_func(self.cmds[0], "gather_%s" % self.name, self.opts)
         else:
             return self._show_help()
 
@@ -1740,6 +1773,72 @@ class ObdiagGatherObproxyLogCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
         self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+class ObdiagAnalyzeMirrorCommand(ObdCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagAnalyzeMirrorCommand, self).init(cmd, args)
+        self.parser.set_usage('%s [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        offline_args_sign = '--files'
+        if self.args and (offline_args_sign in self.args):
+            return obd.obdiag_offline_func("analyze_%s" % self.name, self.opts)
+        if self.cmds:
+            return obd.obdiag_online_func(self.cmds[0], "analyze_%s" % self.name, self.opts)
+        else:
+            return self._show_help()
+
+
+class ObdiagAnalyzeCommand(MajorCommand):
+    
+    def __init__(self):
+        super(ObdiagAnalyzeCommand, self).__init__('analyze', 'Analyze oceanbase diagnostic info')
+        self.register_command(ObdiagAnalyzeLogCommand())
+
+class ObdiagAnalyzeLogCommand(ObdiagAnalyzeMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagAnalyzeLogCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagAnalyzeLogCommand, self).__init__('log', 'Analyze oceanbase log from online observer machines or offline oceanbase log files')
+        self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
+        self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
+        self.parser.add_option('--grep', type='string', help="specify keywords constrain")
+        self.parser.add_option('--log_level', type='string', help="oceanbase logs greater than or equal to this level will be analyze, choices=[DEBUG, TRACE, INFO, WDIAG, WARN, EDIAG, ERROR]")
+        self.parser.add_option('--files', type='string', help="specify files")
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagCheckCommand(ObdCommand):
+    
+    def __init__(self):
+        super(ObdiagCheckCommand, self).__init__('check', 'check oceanbase cluster')
+        self.parser.add_option('--cases', type='string', help="The name of the check task set that needs to be executed")
+        self.parser.add_option('--report_path', type='string', help='ouput report path', default='./check_report/')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
+    
+    def init(self, cmd, args):
+        super(ObdiagCheckCommand, self).init(cmd, args)
+        self.parser.set_usage(
+            '%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) > 0:
+            return obd.obdiag_online_func(self.cmds[0], "checker", self.opts)
+        else:
+            return self._show_help()
 
 
 class MainCommand(MajorCommand):

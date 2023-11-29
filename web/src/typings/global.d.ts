@@ -21,12 +21,12 @@ declare namespace API {
     obproxy?: any;
     ocpexpress?: any;
     obagent?: any;
+    ocpserver?: any;
   }
 
   interface MoreParameter extends API.Parameter {
     description: string;
     auto: boolean;
-    
   }
 
   interface ParameterValue {
@@ -57,5 +57,10 @@ declare namespace API {
   interface ErrorInfo {
     title: string;
     desc?: string;
+  }
+
+  interface StepProp {
+    setCurrent: React.Dispatch<React.SetStateAction<number>>;
+    current: number;
   }
 }
