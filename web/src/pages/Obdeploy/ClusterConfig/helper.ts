@@ -1,5 +1,21 @@
 //与UI无关的逻辑处理
 
+//单位
+const UNITS = [
+  'gb',
+  'GB',
+  'MB',
+  'mb',
+  'kb',
+  'KB',
+  'g',
+  'G',
+  'm',
+  'M',
+  'k',
+  'K',
+];
+
 /**
  * 将容量单位转换为约定格式 KB、MB、GB,统一输出为大写
  */
@@ -28,6 +44,18 @@ const isTakeUnit = (val: string | undefined): boolean => {
   return false;
 };
 
+//获取不携带单位的值
+const getNoUnitValue = (val: string | undefined): string => {
+  if (!val) return'';
+  if (!isTakeUnit(val)) return val;
+  for (let unit of UNITS) {
+    if (val.includes(unit)) {
+      return val.replace(unit, '');
+    }
+  }
+  return '';
+};
+
 //换新单位
 const takeNewUnit = (target: string, unit: string): string => {
   if (!isTakeUnit(target)) {
@@ -47,4 +75,4 @@ const takeNewUnit = (target: string, unit: string): string => {
   }
 };
 
-export { getUnit, isTakeUnit, takeNewUnit };
+export { getUnit, isTakeUnit, takeNewUnit, getNoUnitValue };

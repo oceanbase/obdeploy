@@ -13,12 +13,15 @@ interface ParameterProps {
   value?: API.ParameterValue;
   onChange?: (value?: API.ParameterValue) => void;
   onBlur?: () => void;
+  defaultValue?:string
 }
 
 interface AdaptiveInputProps {
   parameterValue: API.ParameterValue;
   onBlur?: () => void;
   setParameterValue: (prop: API.ParameterValue) => void;
+  unit: string;
+  setUnit: React.Dispatch<React.SetStateAction<string>>;
 }
 
 type OptionsType = {
@@ -73,13 +76,10 @@ const AdaptiveInput = ({
   parameterValue,
   onBlur,
   setParameterValue,
+  unit,
+  setUnit,
 }: AdaptiveInputProps) => {
   const { type } = parameterValue;
-  const defaultUnit =
-    type === 'CapacityMB' || type === 'Capacity'
-      ? getUnit(parameterValue.value)
-      : null;
-  const unit = useRef(defaultUnit);
   if (type === 'int' || type === 'Integer') {
     return (
       <InputNumber
@@ -95,12 +95,13 @@ const AdaptiveInput = ({
         onChange={(value) =>
           value !== null && setParameterValue({ ...parameterValue, value })
         }
+        value={parameterValue.value}
       />
     );
   }
   if (type === 'CapacityMB' || type === 'Capacity') {
     return (
-      <div style={{maxWidth:126}}>
+      <div style={{ maxWidth: 126 }}>
         <InputNumber
           placeholder={intl.formatMessage({
             id: 'OBD.pages.components.Parameter.PleaseEnter',
@@ -112,20 +113,22 @@ const AdaptiveInput = ({
           min="0"
           disabled={parameterValue?.adaptive}
           onBlur={onBlur}
+          value={
+            parameterValue?.value?.match(/\d+/g)?.[0] || parameterValue?.value
+          }
           onChange={(value) => {
             if (value !== null) {
               setParameterValue({
                 ...parameterValue,
-                value: String(value) + unit.current,
+                value: String(value) + unit,
               });
             }
           }}
           addonAfter={
             <Select
-              defaultValue={getUnit(parameterValue.value)}
-              // className={styles.paramterSelect}
+              value={unit}
               onChange={(value) => {
-                unit.current = value;
+                setUnit(value);
                 if (parameterValue.value) {
                   if (!isTakeUnit(parameterValue.value)) {
                     setParameterValue({
@@ -168,6 +171,7 @@ const AdaptiveInput = ({
             value,
           })
         }
+        value={parameterValue.value}
         dropdownMatchSelectWidth={false}
         disabled={parameterValue?.adaptive}
       >
@@ -186,6 +190,7 @@ const AdaptiveInput = ({
         id: 'OBD.pages.components.Parameter.PleaseEnter',
         defaultMessage: '请输入',
       })}
+      value={parameterValue.value}
       defaultValue={parameterValue?.value}
       className={styles.paramterInput}
       disabled={parameterValue?.adaptive}
@@ -201,10 +206,18 @@ export default function Parameter({
   value: itemValue,
   onChange,
   onBlur,
+  defaultValue,
 }: ParameterProps) {
   const [parameterValue, setParameterValue] = useState<API.ParameterValue>(
     itemValue || {},
   );
+  const { type } = parameterValue;
+  const defaultUnit = useRef<string>(
+    type === 'CapacityMB' || type === 'Capacity'
+      ? getUnit(parameterValue.value)
+      : null,
+  );
+  const [unit, setUnit] = useState<string>(defaultUnit.current);
   useEffect(() => {
     if (onChange) {
       if (
@@ -221,9 +234,18 @@ export default function Parameter({
       <Select
         defaultValue={parameterValue?.adaptive}
         // className={styles.paramterSelect}
-        onChange={(value) =>
-          setParameterValue({ ...parameterValue, adaptive: value })
-        }
+        onChange={(isAuto) => {
+          if (isAuto) {
+            setParameterValue({
+              ...parameterValue,
+              adaptive: isAuto,
+              value: defaultValue,
+            });
+            setUnit(defaultUnit.current);
+          } else {
+            setParameterValue({ ...parameterValue, adaptive: isAuto });
+          }
+        }}
         disabled={!parameterValue?.auto}
         dropdownMatchSelectWidth={false}
         style={locale === 'zh-CN' ? { width: 100 } : { width: 180 }}
@@ -238,6 +260,8 @@ export default function Parameter({
         parameterValue={parameterValue}
         onBlur={onBlur}
         setParameterValue={setParameterValue}
+        unit={unit}
+        setUnit={setUnit}
       />
     </Space>
   );

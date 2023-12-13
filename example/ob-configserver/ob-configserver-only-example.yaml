@@ -15,7 +15,7 @@ ob-configserver:
     ## log config
     # log_level: info # Log printing level of ob-configserver。The default value is `info`
     # log_maxsize: 30 # The total size of manager ob-configserver.Log size is measured in Megabytes.The default value is 30
-    # log_maxage：7 # The days of manager expired ob-configserver.Log retention days. The default value is 7
+    # log_maxage: 7 # The days of manager expired ob-configserver.Log retention days. The default value is 7
     # log_maxbackups: 10  #The number of manager expired ob-configserver.Log. The default value is 10
     # log_localtime: true #  Switch of ob-configserver.Log naming with localtime. The default value is true
     # log_compress: true # Compress ob-configserver.Log switch. The default value is true
@@ -23,14 +23,10 @@ ob-configserver:
     ## vip config, configserver will generate url with vip_address and port and return it to the client
     ## do not use some random value that can't be connected
     # vip_address: "10.10.10.1"
-    # vip_port：8080
+    # vip_port: 8080
     ## storage config
     # storage:
-      ## database type, support sqlite3 or mysql
-      ## sqlite3 Usage:
-      # database_type: sqlite3
-      # connection_url: "/home/admin/ob-configserver/.data.db?cache=shared&_fk=1" # connection_url can be empty When database_type used sqlite3
+    #   database_type: sqlite3 # sqlite3 or mysql. Default sqlite3
+    #   connection_url: "" # When database_type is set to sqlite3, the connection_url parameter can be left empty. If it is empty, the default value $home_path/.data.db?cache=shared&_fk=1 will be used. When database_type is set to mysql, the connection_url parameter must be configured, with a sample value of user:password@tcp(10.10.10.1:2883)/test?parseTime=true.
 
-      ## mysql Usage:
-      # database_type: mysql
-      # connection_url: "user:password@tcp(10.10.10.1:2883)/test?parseTime=true"
+

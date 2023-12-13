@@ -298,7 +298,9 @@ export default function ConfigInfo({
                   defaultMessage: '用户名',
                 })}
               >
-                {userConfig.user}
+                <Tooltip title={userConfig.user}>
+                  <div className="ellipsis"> {userConfig.user}</div>
+                </Tooltip>
               </ProCard>
               <PasswordCard password={userConfig.password} />
               <ProCard
@@ -343,7 +345,7 @@ export default function ConfigInfo({
           })}
         >
           <Table
-            rowKey='id'
+            rowKey="id"
             className={styles.dbTable}
             pagination={false}
             columns={dbNodeColums}

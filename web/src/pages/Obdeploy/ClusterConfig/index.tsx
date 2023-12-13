@@ -12,8 +12,8 @@ import {
 } from '@ant-design/pro-components';
 import { getErrorInfo, getRandomPassword } from '@/utils';
 import useRequest from '@/utils/useRequest';
+import { formatMoreConfig } from '@/utils/helper';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import { showConfigKeys } from '@/constant/configuration';
 import TooltipInput from '../TooltipInput';
 import ConfigTable from './ConfigTable';
 import Parameter from './Parameter';
@@ -22,8 +22,6 @@ import {
   commonStyle,
   pathRule,
   onlyComponentsKeys,
-  componentsConfig,
-  componentVersionTypeToComponent,
 } from '../../constants';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
@@ -177,45 +175,6 @@ export default function ClusterConfig() {
     }
   };
 
-  const formatMoreConfig = (dataSource: API.ParameterMeta[]) => {
-    return dataSource.map((item) => {
-      const component = componentVersionTypeToComponent[item.component]
-        ? componentVersionTypeToComponent[item.component]
-        : item.component;
-      const componentConfig = componentsConfig[component];
-      // filter out existing parameters
-      let configParameter = item?.config_parameters.filter((parameter) => {
-        return !showConfigKeys?.[componentConfig.componentKey]?.includes(
-          parameter.name,
-        );
-      });
-      const newConfigParameter: API.NewConfigParameter[] = configParameter.map(
-        (parameterItem) => {
-          return {
-            ...parameterItem,
-            parameterValue: {
-              value: parameterItem.default,
-              adaptive: parameterItem.auto,
-              auto: parameterItem.auto,
-              require: parameterItem.require,
-            },
-          };
-        },
-      );
-
-      const result: API.NewParameterMeta = {
-        ...item,
-        componentKey: componentConfig.componentKey,
-        label: componentConfig.labelName,
-        configParameter: newConfigParameter,
-      };
-      result.configParameter.forEach((item) => {
-        Object.assign(item.parameterValue, { type: item.type });
-      });
-      return result;
-    });
-  };
-
   const getInitialParameters = (
     currentComponent: string,
     dataSource: API.MoreParameter[],
@@ -282,7 +241,8 @@ export default function ClusterConfig() {
         },
       );
       if (success) {
-        const newClusterMoreConfig = formatMoreConfig(data?.items);
+        const isSelectOcpexpress = selectedConfig.includes('ocp-express')
+        const newClusterMoreConfig = formatMoreConfig(data?.items,isSelectOcpexpress);
         setClusterMoreConfig(newClusterMoreConfig);
         form.setFieldsValue({
           oceanbase: {

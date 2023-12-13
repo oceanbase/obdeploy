@@ -9,14 +9,11 @@ import { useModel } from 'umi';
 import useRequest from '@/utils/useRequest';
 import styles from './indexZh.less';
 import { getErrorInfo } from '@/utils';
-import Parameter from '@/pages/Obdeploy/ClusterConfig/Parameter';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import InputPort from '../InputPort';
-import { componentsConfig } from '@/pages/constants';
 import { ocpServersValidator } from '@/utils';
-import { showConfigKeys } from '@/constant/configuration';
-import { componentVersionTypeToComponent } from '@/pages/constants';
+import { formatMoreConfig } from '@/utils/helper';
 import { obproxyAddonAfter } from '@/constant/configuration';
 export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
   const {
@@ -83,44 +80,6 @@ export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
     }
   };
 
-  const formatMoreConfig = (dataSource: API.ParameterMeta[]) => {
-    return dataSource.map((item) => {
-      const component = componentVersionTypeToComponent[item.component]
-        ? componentVersionTypeToComponent[item.component]
-        : item.component;
-      const componentConfig = componentsConfig[component];
-      // filter out existing parameters
-      let configParameter = item?.config_parameters.filter((parameter) => {
-        return !showConfigKeys?.[componentConfig.componentKey]?.includes(
-          parameter.name,
-        );
-      });
-      const newConfigParameter: API.NewConfigParameter[] = configParameter.map(
-        (parameterItem) => {
-          return {
-            ...parameterItem,
-            parameterValue: {
-              value: parameterItem.default,
-              adaptive: parameterItem.auto,
-              auto: parameterItem.auto,
-              require: parameterItem.require,
-            },
-          };
-        },
-      );
-
-      const result: API.NewParameterMeta = {
-        ...item,
-        componentKey: componentConfig.componentKey,
-        label: componentConfig.labelName,
-        configParameter: newConfigParameter,
-      };
-      result.configParameter.forEach((item) => {
-        Object.assign(item.parameterValue, { type: item.type });
-      });
-      return result;
-    });
-  };
   const getProxyMoreParamsters = async () => {
     setProxyMoreLoading(true);
     try {
@@ -150,7 +109,6 @@ export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
         });
       }
     } catch (e: any) {
-      // aaa TypeError: Cannot read properties of undefined (reading 'setFieldsValue')
       setIsShowMoreConfig(false);
       const errorInfo = getErrorInfo(e);
       setErrorVisible(true);
@@ -252,7 +210,6 @@ export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
       </div>
       <ConfigTable
         dataSource={proxyMoreConfig}
-        customParameter={<Parameter />}
         showVisible={isShowMoreConfig}
         loading={proxyMoreLoading}
       />

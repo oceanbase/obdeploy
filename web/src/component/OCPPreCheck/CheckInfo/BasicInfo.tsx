@@ -1,5 +1,5 @@
 import { intl } from '@/utils/intl';
-import { Row, Col, Tag } from 'antd';
+import { Row, Col, Tag, Tooltip } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import { getLocale } from 'umi';
 
@@ -31,7 +31,9 @@ export default function BasicInfo({ basicInfoProp }: BasicInfoProps) {
                   defaultMessage: '集群名称',
                 })}
               >
-                {basicInfoProp.appname}
+                <Tooltip title={basicInfoProp.appname}>
+                  <div className="ellipsis"> {basicInfoProp.appname}</div>
+                </Tooltip>
               </ProCard>
               <ProCard
                 title={intl.formatMessage({

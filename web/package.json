@@ -25,16 +25,16 @@
     "@ant-design/pro-components": "2.3.34",
     "@ant-design/pro-layout": "6.5.0",
     "@antv/g6": "^4.8.22",
-    "@oceanbase/design": "^0.2.2",
+    "@oceanbase/design": "0.2.16",
     "@oceanbase/icons": "^0.2.0",
-    "@oceanbase/ui": "^0.2.2",
+    "@oceanbase/ui": "0.2.17",
     "@oceanbase/util": "^0.2.1",
     "@umijs/plugin-openapi": "1.3.3",
     "antd": "5.0.7",
     "classnames": "^2.3.2",
     "copy-to-clipboard": "3.3.3",
     "cross-env": "7.0.3",
-    "i18next": "^23.7.6",
+    "i18next": "^23.7.8",
     "lodash": "^4.17.21",
     "lottie-web": "5.10.2",
     "moment": "^2.29.4",
@@ -60,6 +60,9 @@
     "prettier": "2.7.1",
     "typescript": "4.9.3",
     "yorkie": "2.0.0"
+  },
+  "resolutions": {
+    "@types/react": "17.0.44"
   },
   "gitHooks": {
     "pre-commit": "lint-staged"
