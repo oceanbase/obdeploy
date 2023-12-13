@@ -73,6 +73,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
 
   const [dbConfigData, setDBConfigData] =
     useState<API.DBConfig[]>(initDBConfigData);
+  const finalValidate = useRef<boolean>(false)
   const tableFormRef = useRef<EditableFormInstance<API.DBConfig>>();
   const formatParameters = (dataSource: any) => {
     if (dataSource) {
@@ -131,6 +132,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
 
   const nextStep = () => {
     const tableFormRefValidate = () => {
+      finalValidate.current = true
       return tableFormRef?.current?.validateFields().then((values) => {
         return values;
       });
@@ -144,6 +146,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
    
     Promise.allSettled([formValidate(), tableFormRefValidate()])
       .then((result) => {
+        finalValidate.current = false
         if (
           result[0].status === 'rejected' ||
           result[1].status === 'rejected'
@@ -263,6 +266,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
           <DataBaseNodeConfig
             tableFormRef={tableFormRef}
             dbConfigData={dbConfigData}
+            finalValidate={finalValidate}
             setDBConfigData={setDBConfigData}
           />
 

@@ -136,6 +136,7 @@ export default ({
       overlayClassName={`server-tooltip-overlay-${name}`}
     >
       <Select
+        id={`server-${name}`}
         className={`server-${name}`}
         mode="tags"
         value={currentValues}

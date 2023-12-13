@@ -315,10 +315,10 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                         monitor_memory_size = server_config['ocp_monitor_tenant'].get('memory_size', '4G')
                         res = cursor.fetchone(sql, [monitor_tenant])
                         if res:
-                            error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format({"tenant_name":monitor_tenant}))
+                            error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=monitor_tenant))
                     res = cursor.fetchone(sql, [meta_tenant])
                     if res:
-                        error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format({"tenant_name":meta_tenant}))
+                        error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=meta_tenant))
                     break
 
     stdio.verbose('oceanbase version check')

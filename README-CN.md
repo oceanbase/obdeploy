@@ -68,7 +68,7 @@ source /etc/profile.d/obd.sh
 
 ## 快速启动 OceanBase 数据库
 
-安装 OBD 后，您可执行 `obd demo` 命令快速启动本地单节点 OceanBase 数据库。在此之前您需要确认以下信息：
+[安装 OBD](./docs/zh-CN/200.quick-start/100.install-obd.md) 后，您可执行 `obd demo` 命令快速启动本地单节点 OceanBase 数据库。在此之前您需要确认以下信息：
 
 * `2881` 和 `2882` 端口没有被占用。
 
@@ -77,10 +77,6 @@ source /etc/profile.d/obd.sh
 * 机器 CPU 数目不低于 `2`。
 
 * 机器可用磁盘空间不小于 `54 G`。
-
-> **说明**
->
-> 如果以上条件不满足，您可参考文档 [使用 OBD 启动 OceanBase 数据库集群](../3.user-guide/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md)。
 
 ```shell
 # 部署并启动 OceanBase 数据库
@@ -91,7 +87,7 @@ obclient -h127.0.0.1 -uroot -P2881
 
 ## 使用 OBD 启动 OceanBase 数据库集群
 
-如何使用 OBD 启动 OceanBase 数据库集群，请参考文档[使用 OBD 启动 OceanBase 数据库集群](./docs/zh-CN/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md)。
+如何使用 OBD 启动 OceanBase 数据库集群，请参考文档[使用 OBD 启动 OceanBase 数据库集群](./docs/zh-CN/400.user-guide/300.command-line-operations/200.start-the-oceanbase-cluster-by-using-obd.md)。
 
 ## 其他 OBD 命令
 

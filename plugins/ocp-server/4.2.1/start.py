@@ -589,7 +589,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
                 client.write_file(execute_cmd, cmd_file)
                 execute_cmd = "chmod +x {0};sudo chown -R {1} {0};sudo su - {1} -c '{0}' &".format(cmd_file, server_config['launch_user'])
             client.execute_command(execute_cmd, timeout=3600)
-            time.sleep(10)
+            time.sleep(60)
             ret = client.execute_command(
                 "ps -aux | grep -F '%s' | grep -v grep | awk '{print $2}' " % jar_cmd)
             if ret:
@@ -659,7 +659,6 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
             return True
 
     def stop_cluster():
-        success = True
         for server in cluster_config.servers:
             server_config = cluster_config.get_server_conf(server)
             client = clients[server]
@@ -668,7 +667,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
             launch_user = server_config.get('launch_user', None)
             cmd = 'cat {}'.format(pid_path) 
             pids = client.execute_command('sudo ' + cmd if launch_user else cmd).stdout.strip().split('\n')
-            success = False
+            success = True
             for pid in pids:
                 cmd = 'ls /proc/{}'.format(pid)
                 if pid and client.execute_command('sudo ' + cmd if launch_user else cmd):

@@ -1,6 +1,6 @@
 import { intl } from '@/utils/intl';
 import { EditableProTable, ProForm, ProCard } from '@ant-design/pro-components';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   ProColumns,
   EditableFormInstance,
@@ -9,6 +9,8 @@ import { useModel } from 'umi';
 import { Tooltip, Popconfirm, message, Select } from 'antd';
 import { QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 
+import { getAllServers } from '@/utils/helper';
+import { serversValidator } from '@/utils';
 import ServerTags from '@/pages/Obdeploy/ServerTags';
 import styles from './indexZh.less';
 
@@ -18,12 +20,14 @@ interface DataBaseNodeConfigProps {
   >;
   dbConfigData: API.DBConfig[];
   setDBConfigData: React.Dispatch<React.SetStateAction<API.DBConfig[]>>;
+  finalValidate:React.MutableRefObject<boolean>
 }
 
 export default function DataBaseNodeConfig({
   tableFormRef,
   dbConfigData,
   setDBConfigData,
+  finalValidate
 }: DataBaseNodeConfigProps) {
   const { ocpConfigData, ocpNameIndex, setOcpNameIndex } = useModel('global');
   const { components = {} } = ocpConfigData || {};
@@ -76,37 +80,6 @@ export default function DataBaseNodeConfig({
         }),
       ),
     );
-  };
-  const serversValidator = (_: any, value: string[], type: string) => {
-    let validtor = true;
-    if (value && value.length) {
-      value.some((item) => {
-        validtor = serverReg.test(item.trim());
-        return !serverReg.test(item.trim());
-      });
-    }
-    if (validtor) {
-      return Promise.resolve();
-    }
-    if (type === 'OBServer') {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.EnterTheCorrectIpAddress',
-            defaultMessage: '请输入正确的 IP 地址',
-          }),
-        ),
-      );
-    } else {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.SelectTheCorrectObproxyNode',
-            defaultMessage: '请选择正确的 OBProxy 节点',
-          }),
-        ),
-      );
-    }
   };
 
   const columns: ProColumns<API.DBConfig>[] = [
@@ -178,7 +151,7 @@ export default function DataBaseNodeConfig({
           },
           {
             validator: (_: any, value: string[]) =>
-              serversValidator(_, value, 'OBServer'),
+              serversValidator(_, value, allOBServer, 'OBServer',allZoneOBServer,finalValidate),
           },
         ],
       },
@@ -255,6 +228,17 @@ export default function DataBaseNodeConfig({
   const handleDelete = (id: string) => {
     setDBConfigData(dbConfigData.filter((item) => item.id !== id));
   };
+
+  useEffect(() => {
+    const allServers = getAllServers(dbConfigData);
+    const allZoneServers: any = {};
+    dbConfigData.forEach((item) => {
+      allZoneServers[`${item.id}`] = item.servers;
+    });
+    setAllOBServer(allServers);
+    setAllZoneOBServer(allZoneServers);
+  }, [dbConfigData, lastDeleteServer]);
+
   return (
     <div>
       <p className={styles.titleText}>
@@ -334,7 +318,6 @@ export default function DataBaseNodeConfig({
               editableItem?.id,
               'servers',
             ]);
-
             if (editorServers.length) {
               if (!rootService || !editorServers.includes(rootService)) {
                 newRootService = editorServers[0];
@@ -375,33 +358,15 @@ export default function DataBaseNodeConfig({
               editorServers.length &&
               editorServers.length > beforeChangeServersLength
             ) {
-              if (
-                allOBServer.includes(editorServers[editorServers.length - 1])
-              ) {
-                message.warning(
-                  intl.formatMessage({
-                    id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.DoNotEnterDuplicateNodes',
-                    defaultMessage: '禁止输入重复节点',
-                  }),
-                );
-                const rawData = editorServers.slice(
-                  0,
-                  editorServers.length - 1,
-                );
-
-                editableForm.setFieldsValue({
-                  [editableItem?.id]: {
-                    servers: rawData?.length ? rawData : undefined,
-                  },
-                });
-                return;
-              }
               const errors = editableForm.getFieldError([
                 editableItem?.id,
                 'servers',
               ]);
-
               if (errors?.length) {
+                let errordom = document.getElementById(
+                  `server-${editableItem.id}`,
+                );
+                errordom?.focus();
                 tableFormRef?.current?.setFields([
                   {
                     name: [editableItem.id, 'servers'],

@@ -886,5 +886,8 @@
   "OBD.component.DeployConfig.GoToDownloadOfflineInstallation": "Go to download offline installation",
   "OBD.component.DeployConfig.HowToEnableOnlineImage": "How to enable online image repository",
   "OBD.component.OCPConfigNew.ResourcePlan.OcpApplicationMemory": "OCP application memory",
-  "OBD.OCPPreCheck.CheckInfo.ResourceInfo.OcpApplicationMemory": "OCP application memory"
+  "OBD.OCPPreCheck.CheckInfo.ResourceInfo.OcpApplicationMemory": "OCP application memory",
+  "OBD.src.utils.EnterTheCorrectIpAddress": "Enter the correct IP address.",
+  "OBD.src.utils.SelectTheCorrectObproxyNode": "Select the correct OBProxy node",
+  "OBD.src.utils.DoNotEnterDuplicateNodes": "Do not enter duplicate nodes"
 }

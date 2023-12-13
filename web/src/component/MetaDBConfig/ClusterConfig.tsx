@@ -1,22 +1,15 @@
 import { intl } from '@/utils/intl';
-import { Space, Input, Button, Row } from 'antd';
-import { ProFormText, ProForm, ProFormDigit } from '@ant-design/pro-components';
+import { Space, Button, Row } from 'antd';
+import { ProFormText } from '@ant-design/pro-components';
 import { RightOutlined, DownOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { FormInstance } from 'antd/lib/form';
 import { useModel } from 'umi';
-
-import {
-  commonStyle,
-  componentsConfig,
-  componentVersionTypeToComponent,
-} from '@/pages/constants';
 import useRequest from '@/utils/useRequest';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
-import { showConfigKeys } from '@/constant/configuration';
-import Parameter from '@/pages/Obdeploy/ClusterConfig/Parameter';
 import InputPort from '../InputPort';
+import { formatMoreConfig } from '@/utils/helper';
 import {
   generateRandomPassword as generatePassword,
   passwordRules,
@@ -26,7 +19,6 @@ import styles from './indexZh.less';
 import { oceanbaseAddonAfter } from '@/constant/configuration';
 
 export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
-  const [isShowMoreConfig, setIsShowMoreConfig] = useState<boolean>(false);
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
   const {
     ocpClusterMore,
@@ -39,7 +31,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
     setErrorsList,
     errorsList,
   } = useModel('global');
-  const { components = {}, home_path } = ocpConfigData || {};
+  const { components = {} } = ocpConfigData || {};
   const { oceanbase = {} } = components;
   const [rootPassword, setRootPassword] = useState<string>(
     oceanbase.root_password || '',
@@ -96,45 +88,6 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
     }
   };
 
-  const formatMoreConfig = (dataSource: API.ParameterMeta[]) => {
-    return dataSource.map((item) => {
-      const component = componentVersionTypeToComponent[item.component]
-        ? componentVersionTypeToComponent[item.component]
-        : item.component;
-      const componentConfig = componentsConfig[component];
-      // filter out existing parameters
-      let configParameter = item?.config_parameters.filter((parameter) => {
-        return !showConfigKeys?.[componentConfig.componentKey]?.includes(
-          parameter.name,
-        );
-      });
-      const newConfigParameter: API.NewConfigParameter[] = configParameter.map(
-        (parameterItem) => {
-          if(parameterItem.name === "cluster_id")parameterItem.default = '0'
-          return {
-            ...parameterItem,
-            parameterValue: {
-              value: parameterItem.default,
-              adaptive: parameterItem.auto,
-              auto: parameterItem.auto,
-              require: parameterItem.require,
-            },
-          };
-        },
-      );
-
-      const result: API.NewParameterMeta = {
-        ...item,
-        componentKey: componentConfig.componentKey,
-        label: componentConfig.labelName,
-        configParameter: newConfigParameter,
-      };
-      result.configParameter.forEach((item) => {
-        Object.assign(item.parameterValue, { type: item.type });
-      });
-      return result;
-    });
-  };
   const getClusterMoreParamsters = async () => {
     setClusterMoreLoading(true);
     try {
@@ -189,11 +142,6 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
     const password = generatePassword();
     setPassword(password);
   };
-
-  useEffect(() => {
-    if (isShowMoreConfig) {
-    }
-  }, [isShowMoreConfig]);
 
   return (
     <div className={styles.clusterContainer}>
@@ -330,7 +278,6 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
         showVisible={ocpClusterMore}
         dataSource={ocpClusterMoreConfig}
         loading={clusterMoreLoading}
-        customParameter={<Parameter />}
       />
     </div>
   );

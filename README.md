@@ -60,7 +60,7 @@ source /etc/profile.d/obd.sh
 
 ## Start an OceanBase cluster
 
-After you deploy OceanBase Deployer (OBD), you can run the `obd demo` command to deploy and start OceanBase Database on a single local server. Make sure the following prerequisites are met:
+After you [deploy OceanBase Deployer (OBD)](./docs/en-US/200.quick-start/100.install-obd.md), you can run the `obd demo` command to deploy and start OceanBase Database on a single local server. Make sure the following prerequisites are met:
 
 - Ports `2881` and `2882` are not occupied.
 
@@ -69,10 +69,6 @@ After you deploy OceanBase Deployer (OBD), you can run the `obd demo` command to
 - At least two CPU cores are available on the server.
 
 - At least 54 GB of disk space is available on the server.
-
-> **Note**
->
-> If the foregoing prerequisites are not met, see [Use OBD to start an OceanBase cluster](./docs/en-US/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md).
 
 ```shell
 # Deploy and start OceanBase Database.
@@ -83,7 +79,7 @@ obclient -h127.0.0.1 -uroot -P2881
 
 ## Use OBD to start an OceanBase cluster
 
-If you want to know how to use OBD to start an OceanBase cluster, please see [Use OBD to start an OceanBase cluster](./docs/en-US/400.user-guide/200.start-the-oceanbase-cluster-by-using-obd.md).
+If you want to know how to use OBD to start an OceanBase cluster, please see [Use OBD to start an OceanBase cluster](./docs/en-US/400.user-guide/300.command-line-operations/200.start-the-oceanbase-cluster-by-using-obd.md).
 
 ## Other OBD commands
 

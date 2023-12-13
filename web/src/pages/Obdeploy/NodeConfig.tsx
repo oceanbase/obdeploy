@@ -25,8 +25,9 @@ import type {
 } from '@ant-design/pro-components';
 import { getObdInfo } from '@/services/ob-deploy-web/Info';
 import useRequest from '@/utils/useRequest';
-import { handleQuit, getErrorInfo } from '@/utils';
+import { handleQuit, getErrorInfo, serverReg, serversValidator,validateErrors } from '@/utils';
 import { commonStyle, pathRule } from '../constants';
+import { getAllServers } from '@/utils/helper';
 import ServerTags from './ServerTags';
 import TooltipInput from './TooltipInput';
 import { getLocale } from 'umi';
@@ -63,6 +64,7 @@ export default function NodeConfig() {
   const { oceanbase = {}, ocpexpress = {}, obproxy = {} } = components;
   const [form] = ProForm.useForm();
   const [editableForm] = ProForm.useForm();
+  const finalValidate = useRef<boolean>(false);
   const tableFormRef = useRef<EditableFormInstance<API.DBConfig>>();
 
   const initDBConfigData = oceanbase?.topology?.length
@@ -111,9 +113,6 @@ export default function NodeConfig() {
   const [lastDeleteServer, setLastDeleteServer] = useState<string>('');
   const [ocpServerDropdownVisible, setOcpServerDropdownVisible] =
     useState<boolean>(false);
-
-  const serverReg =
-    /^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.){3}(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])?$/;
 
   const { run: getUserInfo } = useRequest(getObdInfo, {
     onSuccess: ({ success, data }: API.OBResponseServiceInfo_) => {
@@ -187,40 +186,33 @@ export default function NodeConfig() {
 
   const nextStep = () => {
     const tableFormRefValidate = () => {
+      finalValidate.current = true;
       return tableFormRef?.current?.validateFields().then((values) => {
         return values;
       });
     };
-
     const formValidate = () => {
       return form.validateFields().then((values) => {
         return values;
       });
     };
 
-    Promise.all([tableFormRefValidate(), formValidate()]).then((result) => {
-      const formValues = result?.[1];
-      setData(formValues);
-      setCurrentStep(3);
-      setErrorVisible(false);
-      setErrorsList([]);
-      window.scrollTo(0, 0);
-    });
+    Promise.all([tableFormRefValidate(), formValidate()])
+      .then((result) => {
+        const formValues = result?.[1];
+        setData(formValues);
+        setCurrentStep(3);
+        setErrorVisible(false);
+        setErrorsList([]);
+        window.scrollTo(0, 0);
+      })
+      .finally(() => {
+        finalValidate.current = false;
+      });
   };
 
   const formatOptions = (data: string[]) =>
     data?.map((item) => ({ label: item, value: item }));
-
-  const getAllServers = (dataSource: API.DBConfig[]) => {
-    const allServersList = dataSource.map((item) => item.servers);
-    let newAllOBServer: string[] = [];
-    allServersList.forEach((item) => {
-      if (item && item.length) {
-        newAllOBServer = [...newAllOBServer, ...item];
-      }
-    });
-    return newAllOBServer;
-  };
 
   const onValuesChange = (values: FormValues) => {
     if (values?.auth?.user) {
@@ -420,38 +412,6 @@ export default function NodeConfig() {
     );
   };
 
-  const serversValidator = (_: any, value: string[], type: string) => {
-    let validtor = true;
-    if (value && value.length) {
-      value.some((item) => {
-        validtor = serverReg.test(item.trim());
-        return !serverReg.test(item.trim());
-      });
-    }
-    if (validtor) {
-      return Promise.resolve();
-    }
-    if (type === 'OBServer') {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.EnterTheCorrectIpAddress',
-            defaultMessage: '请输入正确的 IP 地址',
-          }),
-        ),
-      );
-    } else {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
-            defaultMessage: '请选择正确的 OBProxy 节点',
-          }),
-        ),
-      );
-    }
-  };
-
   const columns: ProColumns<API.DBConfig>[] = [
     {
       title: (
@@ -511,6 +471,7 @@ export default function NodeConfig() {
 
       dataIndex: 'servers',
       formItemProps: {
+        validateFirst:true,
         rules: [
           {
             required: true,
@@ -521,7 +482,14 @@ export default function NodeConfig() {
           },
           {
             validator: (_: any, value: string[]) =>
-              serversValidator(_, value, 'OBServer'),
+              serversValidator(
+                _,
+                value,
+                allOBServer,
+                'OBServer',
+                allZoneOBServer,
+                finalValidate
+              ),
           },
         ],
       },
@@ -737,7 +705,6 @@ export default function NodeConfig() {
                     },
                   ]);
                 }
-
                 const beforeChangeServersLength =
                   allZoneOBServer[`${editableItem?.id}`]?.length || 0;
                 if (
@@ -745,35 +712,15 @@ export default function NodeConfig() {
                   editorServers.length &&
                   editorServers.length > beforeChangeServersLength
                 ) {
-                  if (
-                    allOBServer.includes(
-                      editorServers[editorServers.length - 1],
-                    )
-                  ) {
-                    message.warning(
-                      intl.formatMessage({
-                        id: 'OBD.pages.components.NodeConfig.DoNotEnterDuplicateNodes',
-                        defaultMessage: '禁止输入重复节点',
-                      }),
-                    );
-                    const rawData = editorServers.slice(
-                      0,
-                      editorServers.length - 1,
-                    );
-
-                    editableForm.setFieldsValue({
-                      [editableItem?.id]: {
-                        servers: rawData?.length ? rawData : undefined,
-                      },
-                    });
-                    return;
-                  }
                   const errors = editableForm.getFieldError([
                     editableItem?.id,
                     'servers',
                   ]);
-
                   if (errors?.length) {
+                    let errordom = document.getElementById(
+                      `server-${editableItem.id}`,
+                    );
+                    errordom?.focus();
                     tableFormRef?.current?.setFields([
                       {
                         name: [editableItem.id, 'servers'],
@@ -885,7 +832,7 @@ export default function NodeConfig() {
                     },
                     {
                       validator: (_: any, value: string[]) =>
-                        serversValidator(_, value, 'OBProxy'),
+                        serversValidator(_, value, allOBServer, 'OBProxy'),
                     },
                   ]}
                   options={formatOptions(allOBServer)}

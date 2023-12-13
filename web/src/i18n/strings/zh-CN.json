@@ -886,5 +886,8 @@
   "OBD.component.DeployConfig.GoToDownloadOfflineInstallation": "前往下载离线安装",
   "OBD.component.DeployConfig.HowToEnableOnlineImage": "如何启用在线镜像仓库",
   "OBD.component.OCPConfigNew.ResourcePlan.OcpApplicationMemory": "OCP 应用内存",
-  "OBD.OCPPreCheck.CheckInfo.ResourceInfo.OcpApplicationMemory": "OCP 应用内存"
+  "OBD.OCPPreCheck.CheckInfo.ResourceInfo.OcpApplicationMemory": "OCP 应用内存",
+  "OBD.src.utils.EnterTheCorrectIpAddress": "请输入正确的 IP 地址",
+  "OBD.src.utils.SelectTheCorrectObproxyNode": "请选择正确的 OBProxy 节点",
+  "OBD.src.utils.DoNotEnterDuplicateNodes": "禁止输入重复节点"
 }

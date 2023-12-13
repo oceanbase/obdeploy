@@ -57,5 +57,5 @@ export default defineConfig({
     // 静态资源的文件限制调整为 1GB，避免视频等大文件资源阻塞项目启动
     config.performance.maxAssetSize(1000000000);
     return config;
-  },
+  }
 });

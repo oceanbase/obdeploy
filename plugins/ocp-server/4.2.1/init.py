@@ -67,6 +67,10 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
     clean = getattr(plugin_context.options, 'clean', False)
     if upgrade:
         for server in cluster_config.servers:
+            client = clients[server]
+            server_config = cluster_config.get_server_conf(server)
+            home_path = server_config['home_path']
+            soft_dir = server_config.get('soft_dir', '')
             _ocp_lib(client, home_path, soft_dir, stdio)
         plugin_context.return_true()
         return

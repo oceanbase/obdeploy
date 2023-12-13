@@ -115,6 +115,13 @@ export const CONFIG_KEYS = {
   // obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
   // ocpexpress: ['home_path', 'port'],
 };
+
+export const selectOcpexpressConfig = [
+  'ocp_meta_tenant_max_cpu',
+  'ocp_meta_tenant_memory_size',
+  'ocp_meta_tenant_log_disk_size',
+]
+
 export const showConfigKeys = {
   oceanbase: [
     'home_path',

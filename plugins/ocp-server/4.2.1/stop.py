@@ -59,11 +59,10 @@ def stop(plugin_context, *args, **kwargs):
         launch_user = server_config.get('launch_user', None)
         cmd = 'cat {}'.format(pid_path)
         pids = client.execute_command('sudo ' + cmd if launch_user else cmd).stdout.strip().split('\n')
-        success = False
         for pid in pids:
-            cmd = 'ls /proc/{}'.format(pid) 
+            cmd = 'ls /proc/{}'.format(pid)
             if pid and client.execute_command('sudo ' + cmd if launch_user else cmd):
-                cmd = 'ls /proc/{}/fd'.format(pid) 
+                cmd = 'ls /proc/{}/fd'.format(pid)
                 if client.execute_command('sudo ' + cmd if launch_user else cmd):
                     stdio.verbose('{} ocp-server[pid: {}] stopping...'.format(server, pid))
                     cmd = 'kill -9 {}'.format(pid)

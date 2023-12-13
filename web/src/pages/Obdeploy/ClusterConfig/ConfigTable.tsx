@@ -7,7 +7,6 @@ import { intl } from '@/utils/intl';
 import Parameter from './Parameter';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
-import { ReactElement } from 'react';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
@@ -37,7 +36,6 @@ const parameterValidator = (_: any, value?: API.ParameterValue) => {
 const getMoreColumns = (
   label: string,
   componentKey: string,
-  customParameter?: JSX.Element,
 ) => {
   const columns: ColumnsType<API.NewConfigParameter> = [
     {
@@ -54,13 +52,19 @@ const getMoreColumns = (
       width: locale === 'zh-CN' ? 280 : 360,
       dataIndex: 'parameterValue',
       render: (parameterValue, record) => {
+        const {defaultValue,defaultUnit} = record.parameterValue
+        const param = {
+          defaultValue
+        }
+        if(defaultUnit)param.defaultUnit = defaultUnit
         return (
           <ProForm.Item
             className={styles.inlineFormItem}
             name={[componentKey, 'parameters', record.name || '', 'params']}
+            
             // rules={[{ validator: parameterValidator }]}
           >
-            <Parameter />
+            <Parameter {...param}/>
           </ProForm.Item>
         );
       },
@@ -99,7 +103,6 @@ export default function ConfigTable({
   showVisible,
   dataSource,
   loading,
-  customParameter,
 }: ConfigTableProps) {
   return (
     <>
@@ -124,7 +127,6 @@ export default function ConfigTable({
                     columns={getMoreColumns(
                       moreItem.label,
                       moreItem.componentKey,
-                      customParameter,
                     )}
                     rowKey="name"
                     dataSource={moreItem.configParameter}

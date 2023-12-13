@@ -18,6 +18,7 @@
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 import copy
 import os
+import time
 from optparse import Values
 from singleton_decorator import singleton
 import tempfile
@@ -79,7 +80,7 @@ class OcpHandler(BaseHandler):
             else OCPDeploymentStatus.INIT
 
         self.context['ocp_path'] = cluster_config_yaml_path
-        self.context['ocp_deployment_info'][self.context['id']] = {'status': status, 'config': config}
+        self.context['ocp_deployment_info'][self.context['id']] = {'status': status, 'config': config, 'ocp_start_success_time': time.time()}
         return cluster_config_yaml_path
 
     def generate_auth_config(self, cluster_config, auth):
@@ -813,6 +814,7 @@ class OcpHandler(BaseHandler):
                 task_info.finished += f'{component}-{plugin} '
 
         if self.obd.deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and self.context['process_installed'] == 'done':
+            self.context['ocp_deployment_info'][id]['ocp_start_success_time'] = time.time()
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
 
@@ -991,6 +993,7 @@ class OcpHandler(BaseHandler):
                 task_info.finished += f'{component}-{plugin} '
 
         if self.obd.deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and self.context['process_installed'] == 'done':
+            self.context['ocp_deployment_info'][id]['ocp_start_success_time'] = time.time()
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
 
@@ -1606,6 +1609,8 @@ class OcpHandler(BaseHandler):
         return task_info
 
     def get_installed_ocp_info(self, id):
+        if time.time() - self.context['ocp_deployment_info'][id]['ocp_start_success_time'] >= 600:
+            return OcpInstalledInfo(url=[], password='')
         config = self.context['ocp_deployment_info'][id]['config']
         servers = config.components.ocpserver.servers
         port = config.components.ocpserver.port

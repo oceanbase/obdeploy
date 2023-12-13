@@ -132,6 +132,12 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Tue Dec 12 2023 obd 2.4.1
+ - bug fixes: restrict query of OCP credential info, only valid within 10 minutes after successfully deployed
+ - bug fixes: fix ocp-express misconfigured when it's not selected as a component
+ - bug fixes: fix only stop one instance of OCP when there's multiple OCP instances
+ - bug fixes: fix OCP upgrade failure when it's previously deployed using obd
+ - enhancements: optimize ob-configserver example config
 * Fri Nov 24 2023 obd 2.4.0
  - new features: support for graphical deployment of OCP-CE V4.2.1
  - new features: support for graphical deployment of OCP-CE V4.2.1 along with its MetaDB
