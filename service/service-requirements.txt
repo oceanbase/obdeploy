@@ -1,5 +1,5 @@
 argparse==1.4.0
-pyyaml==6.0
+pyyaml==5.4.1
 pymongo==4.2.0
 fastapi==0.87.0
 uvicorn==0.20.0
