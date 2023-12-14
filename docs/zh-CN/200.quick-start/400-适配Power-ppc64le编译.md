@@ -1,0 +1,128 @@
+# 下载obdeploy源码
+ git clone -b master https://mirror.ghproxy.com/https://github.com/oceanbase/obdeploy
+ cd obdeploy
+ 
+# 安装配置Anaconda
+编译obdeploy需要python2.7和python3.8两个版本，安装配置anaconda用来管理python环境。在CentOS 8.5 ppc64le上建议安装：Anaconda3-2022.10-Linux-ppc64le.sh。
+
+\# wget -c https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-ppc64le.sh
+
+\# chmod +x Anaconda3-2022.10-Linux-ppc64le.sh
+
+\# ./Anaconda3-2022.10-Linux-ppc64le.sh -p /root/anaconda3 -u
+ 
+\# export PATH=/root/anaconda3/bin:$PATH
+
+\# conda --version
+
+conda 22.9.0
+
+\# conda init bash
+
+# 准备obdeploy相关依赖包
+
+\# curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo
+
+\# rpm --import https://dl.yarnpkg.com/rpm/pubkey.gpg
+
+\# dnf install yarn
+
+\# yarn config delete registry  ## yarn配置阿里的源
+
+\# yarn config set registry https://registry.npmmirror.com/
+
+临时挂载更新的Redhat 8.6镜像，安装rust 1.58, cargo 1.58, nodejs 18.2.0, nodejs-full-i18n, npm 8.9.0
+\# mkdir /mntrhel86; 
+\# mount /home/iso/rhel-8.6-ppc64le-dvd.iso /mntrhel86/
+
+\# cat >/etc/yum.repos.d/rhel86.repo <<- EOF
+
+[AppStream86]
+
+name=AppStream86
+
+baseurl=file:///mntrhel86/AppStream
+
+enabled=0
+
+gpgcheck=0
+
+EOF
+
+\# dnf install rust, cargo --repo=AppStream86
+ 
+\# rustc -V
+
+rustc 1.58.1 (Red Hat 1.58.1-1.module+el8.6.0+14021+586eff1a)
+
+\# cargo -V
+
+cargo 1.58.0
+ 
+\# dnf install nodejs nodejs-full-i18n npm --repo=AppStream86
+
+# conda python27环境下依赖安装
+\# conda create -n python27 python=2.7
+
+\# conda activate python27
+
+\# cd obdepoly ## 进到git clone obdepoly的目录
+ 
+\# touch /usr/include/mysql/my_config.h ##缺my_config.h文件
+ 
+python27环境安装相关依赖：
+\# pip install -r requirements.txt
+
+\# conda deactivate
+
+# conda python38环境下依赖安装
+
+\# conda create -n python38 python=3.8
+
+\# conda activate python38
+ 
+\# cd obdepoly ## 进到git clone obdepoly的目录
+
+## Python38环境下手工安装cython 和PyYaml 5.4.1：
+\# pip install "cython<3.0.0" wheel
+\# pip install "pyyaml==5.4.1" --no-build-isolation
+
+## 修改python38环境下相关依赖：
+    1.    在requirements3.txt增加idna并指定2.10版本，anaconda缺省安装的是idna 3.3版本，与python38编译环境不兼容
+       # echo "idna==2.10" >> requirements3.txt
+ 
+    2.       在service/service-requirements.txt删除pyyaml==6.0，与python38编译环境不兼容
+       # sed -i 's/pyyaml==6.0.*//g' service/service-requirements.txt
+
+python38环境安装相关依赖：
+
+\# pip install -r requirements3.txt
+ 
+\# conda deactivate
+
+# conda python27环境下编译打包
+
+\# conda activate python27
+
+\# cd obdepoly ## 进到git clone obdepoly的目录
+
+\# sh rpm/build.sh executer
+
+生成rpm/executer27/bin/executer ，rpm/executer27/site-packages 子目录
+ 
+\# conda deactivate
+
+# conda python38环境下编译打包
+
+\# conda activate python38
+
+\# cd obdepoly ## 进到git clone obdepoly的目录
+
+\# sh rpm/build.sh rpm_obd
+
+生成rpm文件：ob-deploy-1.3.3-1.el8.ppc64le.rpm
+ 
+\# conda deactivate
+
+    
+
