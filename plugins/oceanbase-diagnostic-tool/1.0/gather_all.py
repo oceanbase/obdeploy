@@ -21,13 +21,8 @@
 from __future__ import absolute_import, division, print_function
 
 import os
-import datetime
-
-from subprocess import call, Popen, PIPE
-
 from ssh import LocalClient
 from tool import TimeUtils
-from _rpm import Version
 import _errno as err
 
 
@@ -40,14 +35,13 @@ def gather_all(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && sh ".format(install_dir=obdiag_install_dir) + command
+        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
         base_commond=r"cd {install_dir} && ./obdiag gather all".format(install_dir=obdiag_install_dir)
-        cmd = r"{base} --cluster_name {cluster_name} --from {from_option} --to {to_option} --scope {scope_option} --encrypt {encrypt_option}".format(
+        cmd = r"{base} --from {from_option} --to {to_option} --scope {scope_option} --encrypt {encrypt_option}".format(
             base=base_commond,
-            cluster_name=cluster_name,
             from_option=from_option,
             to_option=to_option,
             scope_option=scope_option,
@@ -55,14 +49,8 @@ def gather_all(plugin_context, *args, **kwargs):
         )
         if grep_option:
             cmd = cmd + r" --grep {grep_option}".format(grep_option=grep_option)
-        if ob_install_dir_option:
-            cmd = cmd + r" --ob_install_dir {ob_install_dir_option}".format(ob_install_dir_option=ob_install_dir_option)
         if store_dir_option:
             cmd = cmd + r" --store_dir {store_dir_option}".format(store_dir_option=store_dir_option)
-        if clog_dir:
-            cmd = cmd + r" --clog_dir {clog_dir}".format(clog_dir=clog_dir)
-        if slog_dir:
-            cmd = cmd + r" --slog_dir {slog_dir}".format(slog_dir=slog_dir)
         return cmd
 
     def run():
@@ -72,10 +60,7 @@ def gather_all(plugin_context, *args, **kwargs):
 
     options = plugin_context.options
     obdiag_bin = "obdiag"
-    cluster_config = plugin_context.cluster_config
-    cluster_name = cluster_config.name
     stdio = plugin_context.stdio
-    global_conf = cluster_config.get_global_conf()
     from_option = get_option('from')
     to_option = get_option('to')
     scope_option = get_option('scope')
@@ -83,25 +68,7 @@ def gather_all(plugin_context, *args, **kwargs):
     grep_option = get_option('grep')
     encrypt_option = get_option('encrypt')
     store_dir_option = os.path.abspath(get_option('store_dir'))
-    ob_install_dir_option = global_conf.get('home_path')
     obdiag_install_dir = get_option('obdiag_dir')
-    clog_dir = ob_install_dir_option + "/store"
-    slog_dir = ob_install_dir_option + "/store"
-
-    if len(cluster_config.servers) > 0:
-        server_config = cluster_config.get_server_conf(cluster_config.servers[0])
-        if not server_config.get('data_dir'):
-            server_config['data_dir'] = '%s/store' % ob_install_dir_option
-        if not server_config.get('redo_dir'):
-            server_config['redo_dir'] = server_config['data_dir']
-        if not server_config.get('slog_dir'):
-            mount_key = 'redo_dir' if Version('4.0') > cluster_config.version else 'data_dir'
-            server_config['slog_dir'] = '%s/slog' % server_config[mount_key]
-        if not server_config.get('clog_dir'):
-            server_config['clog_dir'] = '%s/clog' % server_config['redo_dir']
-        clog_dir = server_config['clog_dir']
-        slog_dir = server_config['slog_dir']
-
     from_option, to_option, ok = TimeUtils.parse_time_from_to(from_time=from_option, to_time=to_option, stdio=stdio)
     if not ok:
         from_option, to_option = TimeUtils.parse_time_since(since=since_option)
@@ -114,5 +81,5 @@ def gather_all(plugin_context, *args, **kwargs):
         if run():
             plugin_context.return_true()
     except KeyboardInterrupt:
-        stdio.exception("obdiag gather all failded")
+        stdio.exception("obdiag gather all failed")
         return plugin_context.return_false()

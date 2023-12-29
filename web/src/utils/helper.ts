@@ -27,9 +27,11 @@ export function getTailPath() {
 }
 
 /**
- * 格式化更多配置源数据
+ * 
+ * @param dataSource 需要格式化的源数据
+ * @param isSelectOcpexpress 是否选中/包含ocpexpress组件
+ * @returns 
  */
-
 export const formatMoreConfig = (
   dataSource: API.ParameterMeta[],
   isSelectOcpexpress = true

@@ -2,14 +2,14 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   need_restart: true
   need_redeploy: true
   description_en: working directory for obagent
   description_local: Obagent工作目录
 - name: log_path
   require: true
-  type: STRING
+  type: PATH
   default: log/monagent.log
   need_restart: true
   need_redeploy: true
@@ -19,7 +19,7 @@
   name_local: 用户名
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: admin
   need_restart: true
   description_en: username for HTTP authentication
@@ -46,7 +46,7 @@
   description_local: OBAgent 管理服务端口
 - name: mgragent_log_level
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   need_redeploy: false
   description_en: The log level of manager agent.
@@ -92,7 +92,7 @@
   description_local: OBAgent 监控服务端口
 - name: monagent_host_ip
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   need_redeploy: false
   description_en: ob_monagent host ip
@@ -127,7 +127,7 @@
   description_local: observer 的 RPC 端口
 - name: cluster_name
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   need_redeploy: false
   description_en: cluster name for OceanBase Database
@@ -145,7 +145,7 @@
   description_local: OceanBase 集群 ID
 - name: zone_name
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   need_redeploy: false
   description_en: zone name for your observer
@@ -155,35 +155,35 @@
   description_local: observer 所在的 zone 名字
 - name: ob_log_path
   require: false
-  type: STRING
+  type: PATH
   need_restart: true
   need_redeploy: false
   description_en: observer log path
   description_local: observer 日志盘路径
 - name: ob_data_path
   require: false
-  type: STRING
+  type: PATH
   need_restart: true
   need_redeploy: false
   description_en: observer data path
   description_local: observer 数据盘路径
 - name: ob_install_path
   require: false
-  type: STRING
+  type: PATH
   need_restart: true
   need_redeploy: false
   description_en: observer install path
   description_local: observer 安装目录
 - name: observer_log_path
   require: false
-  type: STRING
+  type: PATH
   need_restart: true
   need_redeploy: false
   description_en: observer install path log
   description_local: observer 安装目录下日志路径
 - name: monagent_log_level
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: info
   need_restart: true
   need_redeploy: false
@@ -221,7 +221,7 @@
   name_local: OceanBase 指标监控采集
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: active
   need_restart: true
   need_redeploy: false

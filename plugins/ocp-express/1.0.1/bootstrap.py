@@ -17,5 +17,18 @@
 # You should have received a copy of the GNU General Public License
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 
-def bootstrap(plugin_context, *args, **kwargs):
+
+from __future__ import absolute_import, division, print_function
+
+import os
+
+
+def bootstrap(plugin_context, cursor = None, start_env=None, *args, **kwargs):
+    clients = plugin_context.clients
+    for server in start_env:
+        client = clients[server]
+        server_config = start_env[server]
+        bootstrap_flag = os.path.join(server_config['home_path'], '.bootstrapped')
+        client.execute_command('touch %s' % bootstrap_flag)
     return plugin_context.return_true()
+

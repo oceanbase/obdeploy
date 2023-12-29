@@ -20,10 +20,8 @@
 
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
-import datetime
 import os
 from tool import TimeUtils
-from subprocess import call, Popen, PIPE
 import _errno as err
 
 
@@ -36,7 +34,7 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && sh ".format(install_dir=obdiag_install_dir) + command
+        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
@@ -48,8 +46,6 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
             scope_option = scope_option,
             encrypt_option = encrypt_option,
         )
-        if obproxy_install_dir_option:
-            cmd = cmd + r" --obproxy_install_dir {obproxy_install_dir_option}".format(obproxy_install_dir_option=obproxy_install_dir_option)
         if store_dir_option:
             cmd = cmd + r" --store_dir {store_dir_option}".format(store_dir_option=store_dir_option)
         if grep_option:
@@ -63,9 +59,7 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
 
     options = plugin_context.options
     obdiag_bin = "obdiag"
-    cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-    global_conf = cluster_config.get_global_conf()
     from_option = get_option('from')
     to_option = get_option('to')
     scope_option = get_option('scope')
@@ -73,7 +67,6 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
     grep_option = get_option('grep')
     encrypt_option = get_option('encrypt')
     store_dir_option = os.path.abspath(get_option('store_dir'))
-    obproxy_install_dir_option=global_conf.get('home_path')
     obdiag_install_dir = get_option('obdiag_dir')
 
     from_option, to_option, ok = TimeUtils.parse_time_from_to(from_time=from_option, to_time=to_option, stdio=stdio)
@@ -88,5 +81,5 @@ def gather_obproxy_log(plugin_context, *args, **kwargs):
         if run():
             plugin_context.return_true()
     except KeyboardInterrupt:
-        stdio.exception("obdiag gather obproxy_log failded")
+        stdio.exception("obdiag gather obproxy_log failed")
         return plugin_context.return_false()

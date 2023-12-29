@@ -23,8 +23,11 @@ from __future__ import absolute_import, division, print_function
 from _deploy import InnerConfigItem
 
 
-def bootstrap(plugin_context, cursor, *args, **kwargs):
+def bootstrap(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
+    cursor = plugin_context.get_return('connect').get_return('cursor')
+    added_components = cluster_config.get_deploy_added_components()
+    be_depend = cluster_config.be_depends
     stdio = plugin_context.stdio
     bootstrap = []
     floor_servers = {}
@@ -34,7 +37,7 @@ def bootstrap(plugin_context, cursor, *args, **kwargs):
     }
     has_obproxy = False
     for componet_name in ['obproxy', 'obproxy-ce']:
-        if componet_name in plugin_context.components:
+        if componet_name in added_components and componet_name in be_depend:
             has_obproxy = True
             break
     for server in cluster_config.servers:

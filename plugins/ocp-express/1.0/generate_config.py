@@ -50,7 +50,7 @@ def generate_config(plugin_context, auto_depend=False,  generate_config_mini=Fal
     global_config = cluster_config.get_global_conf()
     if generate_config_mini:
         if 'memory_size' not in global_config:
-            cluster_config.update_global_conf('memory_size', min_memory_size)
+            cluster_config.update_global_conf('memory_size', min_memory_size, False)
 
     auto_set_memory = False
     if 'memory_size' not in global_config:
@@ -65,15 +65,16 @@ def generate_config(plugin_context, auto_depend=False,  generate_config_mini=Fal
                 observer_num = len(cluster_config.get_depend_servers(comp))
         if not observer_num:
             stdio.warn('The component oceanbase/oceanbase-ce is not in the depends, the memory size cannot be calculated, and a fixed value of {} is used'.format(min_memory_size))
-            cluster_config.update_global_conf('memory_size', min_memory_size)
+            cluster_config.update_global_conf('memory_size', min_memory_size, False)
         else:
-            cluster_config.update_global_conf('memory_size', '%dM' % (512 + (observer_num + 3) * 60))
+            cluster_config.update_global_conf('memory_size', '%dM' % (512 + (observer_num + 3) * 60), False)
 
     stdio.stop_loading('succeed')
     plugin_context.return_true()
 
 
 def generate_random_password(cluster_config):
+    add_components = cluster_config.get_deploy_added_components()
     global_config = cluster_config.get_original_global_conf()
-    if 'system_password' not in global_config:
-        cluster_config.update_global_conf('system_password', ConfigUtil.get_random_pwd_by_total_length())
+    if cluster_config.name in add_components and 'system_password' not in global_config:
+        cluster_config.update_global_conf('system_password', ConfigUtil.get_random_pwd_by_total_length(), False)

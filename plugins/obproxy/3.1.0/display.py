@@ -66,7 +66,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             with_observer = True
             info_dict['user'] = user
             info_dict['password'] = password
-            cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A' % (server.ip, server_config['listen_port'], user, '-p%s ' % passwd_format(password) if password else '')
+            cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % passwd_format(password) if password else '')
             break
 
     if not with_observer:
@@ -74,7 +74,7 @@ def display(plugin_context, cursor, *args, **kwargs):
         password = server_config.get('obproxy_sys_password', '')
         info_dict['user'] = user
         info_dict['password'] = password
-        cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A' % (server.ip, server_config['listen_port'], user, '-p%s ' % passwd_format(password) if password else '')
+        cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % passwd_format(password) if password else '')
 
     stdio.print(cmd)
     info_dict['cmd'] = cmd

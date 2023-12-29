@@ -174,7 +174,7 @@ def start(plugin_context, *args, **kwargs):
             not_cmd_opt = [
                 'home_path', 'obconfig_url', 'root_password', 'proxyro_password',
                 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc',
-                'ocp_meta_tenant', 'ocp_meta_username', 'ocp_meta_password', 'ocp_meta_db', 'ocp_agent_monitor_password'
+                'ocp_meta_tenant', 'ocp_meta_username', 'ocp_meta_password', 'ocp_meta_db', 'ocp_agent_monitor_password', 'ocp_root_password'
             ]
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
             opt_str = []
@@ -182,14 +182,14 @@ def start(plugin_context, *args, **kwargs):
                 if key not in not_cmd_opt and key not in not_opt_str:
                     value = get_value(key)
                     opt_str.append('%s=%s' % (key, value))
-            if cfg_url:
-                opt_str.append('obconfig_url=\'%s\'' % cfg_url)
-            else:
-                cmd.append(rs_list_opt)
             for key in not_opt_str:
                 if key in server_config:
                     value = get_value(key)
                     cmd.append('%s %s' % (not_opt_str[key], value))
+            if cfg_url:
+                opt_str.append('obconfig_url=\'%s\'' % cfg_url)
+            else:
+                cmd.append(rs_list_opt)
             cmd.append('-o %s' % ','.join(opt_str))
         else:
             cmd.append('-p %s' % server_config['mysql_port'])

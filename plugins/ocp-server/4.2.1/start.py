@@ -27,8 +27,11 @@ import time
 from glob import glob
 from copy import deepcopy
 from const import CONST_OBD_HOME
+from optparse import Values
 
 from tool import Cursor, FileUtil, YamlLoader
+from _rpm import Version
+from _plugin import PluginManager
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 
 
@@ -142,7 +145,7 @@ def confirm_port(client, pid, port, stdio, launch_user=None):
     if not socket_inodes:
         return False
     if launch_user:
-        ret = client.execute_command("""su - %s -c 'ls -l /proc/%s/fd/ |grep -E "socket:\[(%s)\]"'""" % (launch_user, pid, '|'.join(socket_inodes)))
+        ret = client.execute_command("""sudo su - %s -c 'ls -l /proc/%s/fd/ |grep -E "socket:\[(%s)\]"'""" % (launch_user, pid, '|'.join(socket_inodes)))
     else:
         ret = client.execute_command("ls -l /proc/%s/fd/ |grep -E 'socket:\[(%s)\]'" % (pid, '|'.join(socket_inodes)))
     if ret and ret.stdout.strip():
@@ -176,6 +179,7 @@ def get_ocp_depend_config(cluster_config, stdio):
                 if 'server_ip' not in depend_info:
                     depend_info['server_ip'] = ob_server.ip
                     depend_info['mysql_port'] = ob_server_conf['mysql_port']
+                    depend_info['root_password'] = ob_server_conf['root_password']
                 zone = ob_server_conf['zone']
                 if zone not in ob_zones:
                     ob_zones[zone] = ob_server
@@ -206,7 +210,7 @@ def get_ocp_depend_config(cluster_config, stdio):
     return env
 
 
-def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp_parameter=False, *args, **kwargs):
+def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_parameter=False, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -228,224 +232,6 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
 
-    def create_tenant(cursor, name, max_cpu, memory_size, db_username, tenant_password, database, stdio):
-        mode = get_option('mode', 'mysql').lower()
-        if not mode in ['mysql', 'oracle']:
-            error('No such tenant mode: %s.\n--mode must be `mysql` or `oracle`' % mode)
-            return plugin_context.return_false()
-
-        unit_name = '%s_unit' % name
-        sql = 'select * from oceanbase.DBA_OB_UNIT_CONFIGS order by name'
-        res = cursor.fetchall(sql)
-        if res is False:
-            return plugin_context.return_false()
-        for row in res:
-            if str(row['NAME']) == unit_name:
-                unit_name += '1'
-
-        pool_name = '%s_pool' % name
-
-        sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
-        tenant_exists = False
-        res = cursor.fetchone(sql, [name])
-        if res:
-            if create_if_not_exists:
-                tenant_exists = True
-            else:
-                error('Tenant %s already exists' % name)
-                return plugin_context.return_false()
-        elif res is False:
-            return plugin_context.return_false()
-        if not tenant_exists:
-            stdio.start_loading('Create tenant %s' % name)
-            zone_list = get_option('zone_list', set())
-            MIN_CPU = 1
-            MIN_MEMORY = 1073741824
-            MIN_LOG_DISK_SIZE = 2147483648
-            MIN_IOPS = 1024
-            zone_obs_num = {}
-            sql = "select zone, count(*) num from oceanbase.__all_server where status = 'active' group by zone"
-            res = cursor.fetchall(sql, raise_exception=True)
-
-            for row in res:
-                zone_obs_num[str(row['zone'])] = row['num']
-
-            if not zone_list:
-                zone_list = zone_obs_num.keys()
-            if isinstance(zone_list, str):
-                zones = zone_list.replace(';', ',').split(',')
-            else:
-                zones = zone_list
-            zone_list = "('%s')" % "','".join(zones)
-
-            min_unit_num = min(zone_obs_num.items(), key=lambda x: x[1])[1]
-            unit_num = get_option('unit_num', min_unit_num)
-            if unit_num > min_unit_num:
-                error('resource pool unit num is bigger than zone server count')
-                return plugin_context.return_false()
-
-            sql = "select count(*) num from oceanbase.__all_server where status = 'active' and start_service_time > 0"
-            count = 30
-            while count:
-                num = cursor.fetchone(sql)
-                if num is False:
-                    error('%s : execute failed' % sql)
-                    return plugin_context.return_false()
-                num = num['num']
-                if num >= unit_num:
-                    break
-                count -= 1
-                time.sleep(1)
-            if count == 0:
-                stdio.error(EC_OBSERVER_CAN_NOT_MIGRATE_IN)
-                return plugin_context.return_false()
-
-            sql = "SELECT * FROM oceanbase.GV$OB_SERVERS where zone in %s" % zone_list
-            servers_stats = cursor.fetchall(sql, raise_exception=True)
-            cpu_available = servers_stats[0]['CPU_CAPACITY_MAX'] - servers_stats[0]['CPU_ASSIGNED_MAX']
-            mem_available = servers_stats[0]['MEM_CAPACITY'] - servers_stats[0]['MEM_ASSIGNED']
-            disk_available = servers_stats[0]['DATA_DISK_CAPACITY'] - servers_stats[0]['DATA_DISK_IN_USE']
-            log_disk_available = servers_stats[0]['LOG_DISK_CAPACITY'] - servers_stats[0]['LOG_DISK_ASSIGNED']
-            for servers_stat in servers_stats[1:]:
-                cpu_available = min(servers_stat['CPU_CAPACITY_MAX'] - servers_stat['CPU_ASSIGNED_MAX'], cpu_available)
-                mem_available = min(servers_stat['MEM_CAPACITY'] - servers_stat['MEM_ASSIGNED'], mem_available)
-                disk_available = min(servers_stat['DATA_DISK_CAPACITY'] - servers_stat['DATA_DISK_IN_USE'],
-                                     disk_available)
-                log_disk_available = min(servers_stat['LOG_DISK_CAPACITY'] - servers_stat['LOG_DISK_ASSIGNED'],
-                                         log_disk_available)
-
-            if cpu_available < MIN_CPU:
-                error('%s: resource not enough: cpu count less than %s' % (zone_list, MIN_CPU))
-                return plugin_context.return_false()
-            if mem_available < MIN_MEMORY:
-                error('%s: resource not enough: memory less than %s' % (zone_list, format_size(MIN_MEMORY)))
-                return plugin_context.return_false()
-            if log_disk_available < MIN_LOG_DISK_SIZE:
-                error(
-                    '%s: resource not enough: log disk size less than %s' % (zone_list, format_size(MIN_MEMORY)))
-                return plugin_context.return_false()
-
-            # cpu options
-            min_cpu = get_option('min_cpu', max_cpu)
-            if cpu_available < max_cpu:
-                error('resource not enough: cpu (Avail: %s, Need: %s)' % (cpu_available, max_cpu))
-                return plugin_context.return_false()
-            if max_cpu < min_cpu:
-                error('min_cpu must less then max_cpu')
-                return plugin_context.return_false()
-
-            # memory options
-            log_disk_size = get_parsed_option('log_disk_size', None)
-
-            if memory_size is None:
-                memory_size = mem_available
-                if log_disk_size is None:
-                    log_disk_size = log_disk_available
-
-            if mem_available < memory_size:
-                error('resource not enough: memory (Avail: %s, Need: %s)' % (
-                    format_size(mem_available), format_size(memory_size)))
-                return plugin_context.return_false()
-
-            # log disk size options
-            if log_disk_size is not None and log_disk_available < log_disk_size:
-                error('resource not enough: log disk space (Avail: %s, Need: %s)' % (
-                    format_size(disk_available), format_size(log_disk_size)))
-                return plugin_context.return_false()
-
-            # iops options
-            max_iops = get_option('max_iops', None)
-            min_iops = get_option('min_iops', None)
-            iops_weight = get_option('iops_weight', None)
-            if max_iops is not None and max_iops < MIN_IOPS:
-                error('max_iops must greater than %d' % MIN_IOPS)
-                return plugin_context.return_false()
-            if max_iops is not None and min_iops is not None and max_iops < min_iops:
-                error('min_iops must less then max_iops')
-                return plugin_context.return_false()
-
-            zone_num = len(zones)
-            charset = get_option('charset', '')
-            collate = get_option('collate', '')
-            replica_num = get_option('replica_num', zone_num)
-            logonly_replica_num = get_option('logonly_replica_num', 0)
-            tablegroup = get_option('tablegroup', '')
-            primary_zone = get_option('primary_zone', 'RANDOM')
-            locality = get_option('locality', '')
-            variables = get_option('variables', "ob_tcp_invited_nodes='%'")
-
-            if replica_num == 0:
-                replica_num = zone_num
-            elif replica_num > zone_num:
-                error('replica_num cannot be greater than zone num (%s)' % zone_num)
-                return plugin_context.return_false()
-            if not primary_zone:
-                primary_zone = 'RANDOM'
-            if logonly_replica_num > replica_num:
-                error('logonly_replica_num cannot be greater than replica_num (%s)' % replica_num)
-                return plugin_context.return_false()
-
-            # create resource unit
-            sql = "create resource unit %s max_cpu %.1f, memory_size %d" % (unit_name, max_cpu, memory_size)
-            if min_cpu is not None:
-                sql += ', min_cpu %.1f' % min_cpu
-            if max_iops is not None:
-                sql += ', max_iops %d' % max_iops
-            if min_iops is not None:
-                sql += ', min_iops %d' % min_iops
-            if iops_weight is not None:
-                sql += ', iops_weight %d' % iops_weight
-            if log_disk_size is not None:
-                sql += ', log_disk_size %d' % log_disk_size
-
-            res = cursor.execute(sql, raise_exception=True)
-
-            # create resource pool
-            sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (
-                pool_name, unit_name, unit_num, zone_list)
-            res = cursor.execute(sql, raise_exception=True)
-
-            # create tenant
-            sql = "create tenant %s replica_num=%d,zone_list=%s,primary_zone='%s',resource_pool_list=('%s')"
-            sql = sql % (name, replica_num, zone_list, primary_zone, pool_name)
-            if charset:
-                sql += ", charset = '%s'" % charset
-            if collate:
-                sql += ", collate = '%s'" % collate
-            if logonly_replica_num:
-                sql += ", logonly_replica_num = %d" % logonly_replica_num
-            if tablegroup:
-                sql += ", default tablegroup ='%s'" % tablegroup
-            if locality:
-                sql += ", locality = '%s'" % locality
-
-            set_mode = "ob_compatibility_mode = '%s'" % mode
-            if variables:
-                sql += "set %s, %s" % (variables, set_mode)
-            else:
-                sql += "set %s" % set_mode
-            res = cursor.execute(sql, raise_exception=True)
-        stdio.stop_loading('succeed')
-        if database:
-            sql = 'create database if not exists {}'.format(database)
-            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, password=tenant_password if tenant_exists else '', mode=mode) and not create_if_not_exists:
-                stdio.error('failed to create database {}'.format(database))
-                return plugin_context.return_false()
-
-        db_password = tenant_password
-        if db_username:
-            sql = "create user if not exists '{username}' IDENTIFIED BY %s".format(username=db_username)
-            sargs = [db_password]
-            if exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, password=tenant_password if tenant_exists else '', mode=mode, args=sargs):
-                sql = "grant all on *.* to '{username}' WITH GRANT OPTION".format(username=db_username)
-                if exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, password=tenant_password if tenant_exists else '', mode=mode):
-                    sql = 'alter user root IDENTIFIED BY %s'
-                    if exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, password=tenant_password if tenant_exists else '', mode=mode, args=sargs):
-                        return True
-            stdio.error('failed to create user {}'.format(db_username))
-            return plugin_context.return_false()
-        return True
-
     def _ocp_lib(client, home_path, soft_dir='', stdio=None):
         stdio.verbose('cp rpm & pos')
         OBD_HOME = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
@@ -456,7 +242,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
                 client.put_file(rpm, os.path.join(soft_dir, name))
 
     def start_cluster(times=0):
-        jdbc_host = jdbc_port = jdbc_url = jdbc_username = jdbc_password = jdbc_public_key = cursor = monitor_user = monitor_tenant = monitor_memory_size = monitor_max_cpu = monitor_password = monitor_db = meta_password = ''
+        jdbc_host = jdbc_port = jdbc_url = jdbc_username = jdbc_password = jdbc_public_key = cursor = monitor_user = monitor_tenant = monitor_memory_size = monitor_max_cpu = monitor_password = monitor_db = tenant_plugin = ''
         for server in cluster_config.servers:
             server_config = start_env[server]
             # check meta db connect before start
@@ -474,7 +260,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
                 jdbc_database = matched.group(3)
                 password = root_password if root_password else jdbc_password
                 retries = 10
-                while not cursor and retries and get_option("skip_create_tenant", 'False') == 'False':
+                while not cursor and retries and not cluster_config.get_component_attr("meta_tenant"):
                     try:
                         retries -= 1
                         time.sleep(2)
@@ -485,33 +271,67 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
         global_config = cluster_config.get_global_conf()
         site_url = global_config.get('ocp_site_url', '')
         soft_dir = global_config.get('soft_dir', '')
-        meta_user = global_config.get('ocp_meta_username', 'meta_user')
+        meta_user = global_config.get('ocp_meta_username', 'root')
         meta_tenant = global_config.get('ocp_meta_tenant')['tenant_name']
         meta_max_cpu = global_config['ocp_meta_tenant'].get('max_cpu', 2)
         meta_memory_size = global_config['ocp_meta_tenant'].get('memory_size', '2G')
         meta_password = global_config.get('ocp_meta_password', '')
         meta_db = global_config.get('ocp_meta_db', 'meta_database')
         if global_config.get('ocp_monitor_tenant'):
-            monitor_user = global_config.get('ocp_monitor_username', 'monitor_user')
+            monitor_user = global_config.get('ocp_monitor_username', 'root')
             monitor_tenant = global_config['ocp_monitor_tenant']['tenant_name']
             monitor_max_cpu = global_config['ocp_monitor_tenant'].get('max_cpu', 2)
             monitor_memory_size = global_config['ocp_monitor_tenant'].get('memory_size', '4G')
             monitor_password = global_config.get('ocp_monitor_password', '')
             monitor_db = global_config.get('ocp_monitor_db', 'monitor_database')
-        if get_option("skip_create_tenant", 'False') == 'False':
-            if not times:
-                if not create_tenant(cursor, meta_tenant, meta_max_cpu, parse_size(meta_memory_size), meta_user,
-                                     meta_password,
-                                     meta_db, stdio):
-                    return plugin_context.return_false()
-            meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, meta_password, stdio)
+        if not times and not cluster_config.get_component_attr("meta_tenant"):
+            setattr(options, 'tenant_name', meta_tenant)
+            setattr(options, 'max_cpu', meta_max_cpu)
+            setattr(options, 'memory_size', parse_size(meta_memory_size))
+            setattr(options, 'database', meta_db)
+            setattr(options, 'db_username', meta_user)
+            setattr(options, 'db_password', '')
+            setattr(options, 'create_if_not_exists', True)
+            setattr(options, "variables", "ob_tcp_invited_nodes='%'")
+            sql = 'select ob_version() as ob_version;'
+            res = cursor.fetchone(sql)
+            if not res:
+                error('fail to get ob version')
+            version = Version(res['ob_version'])
+            stdio.verbose('meta version: %s' % version)
+            stdio.verbose('Search create_tenant plugin for oceanbase-ce-%s' % version)
+            tenant_plugin = PluginManager(kwargs.get('local_home_path')).get_best_py_script_plugin('create_tenant', 'oceanbase-ce', version)
+            stdio.verbose('Found for %s oceanbase-ce-%s' % (tenant_plugin, version))
+            if not tenant_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
+                return plugin_context.return_false()
+            cluster_config.update_component_attr("meta_tenant", meta_tenant, save=True)
+            meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, '', stdio)
+            if meta_user != 'root':
+                sql = f"""ALTER USER root IDENTIFIED BY %s"""
+                meta_cursor.execute(sql, args=[meta_password], raise_exception=False, exc_level='verbose')
+            sql = f"""ALTER USER {meta_user} IDENTIFIED BY %s"""
+            meta_cursor.execute(sql, args=[meta_password], raise_exception=False, exc_level='verbose')
+            meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, str(meta_password), stdio)
             plugin_context.set_variable('meta_cursor', meta_cursor)
 
-            if not times:
-                if not create_tenant(cursor, monitor_tenant, monitor_max_cpu, parse_size(monitor_memory_size),
-                                     monitor_user,
-                                     monitor_password, monitor_db, stdio):
-                    return plugin_context.return_false()
+        if not times and not cluster_config.get_component_attr("monitor_tenant"):
+            setattr(options, 'tenant_name', monitor_tenant)
+            setattr(options, 'max_cpu', monitor_max_cpu)
+            setattr(options, 'memory_size', parse_size(monitor_memory_size))
+            setattr(options, 'database', monitor_db)
+            setattr(options, 'db_username', monitor_user)
+            setattr(options, 'db_password', '')
+            setattr(options, "variables", "ob_tcp_invited_nodes='%'")
+            if not tenant_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
+                return plugin_context.return_false()
+            cluster_config.update_component_attr("monitor_tenant", monitor_tenant, save=True)
+            monitor_cursor = Cursor(jdbc_host, jdbc_port, monitor_user, monitor_tenant, '', stdio)
+            if monitor_user != 'root':
+                sql = f"""ALTER USER root IDENTIFIED BY %s"""
+                monitor_cursor.execute(sql, args=[monitor_password], raise_exception=False, exc_level='verbose')
+            sql = f"""ALTER USER {monitor_user} IDENTIFIED BY %s"""
+            monitor_cursor.execute(sql, args=[monitor_password], raise_exception=False, exc_level='verbose')
+
         if meta_tenant not in jdbc_username:
             jdbc_username = meta_user + '@' + meta_tenant
             jdbc_url = jdbc_url.rsplit('/', 1)[0] + '/' + meta_db
@@ -519,6 +339,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
 
         server_pid = {}
         success = True
+        node_num = 1
         stdio.start_loading("Start ocp-server")
         for server in cluster_config.servers:
             client = clients[server]
@@ -528,8 +349,6 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
             _ocp_lib(client, home_path, soft_dir, stdio)
             system_password = server_config["system_password"]
             port = server_config['port']
-            if not site_url:
-                site_url = 'http://{}:{}'.format(server.ip, port)
             pid_path = os.path.join(home_path, 'run/ocp-server.pid')
             pids = client.execute_command("cat %s" % pid_path).stdout.strip()
             if not times and pids and all([client.execute_command('ls /proc/%s' % pid) for pid in pids.split('\n')]):
@@ -573,7 +392,8 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
                                f' --with-property=ocp.monitordb.database:{monitor_db}'
                     if key not in EXCLUDE_KEYS and key in CONFIG_MAPPER:
                         cmd += ' --with-property={}:{}'.format(CONFIG_MAPPER[key], server_config[key])
-                cmd += ' --with-property=ocp.site.url:{}'.format(site_url)
+                if site_url:
+                    cmd += ' --with-property=ocp.site.url:{}'.format(site_url)
                 # set connection mode to direct to avoid obclient issue
                 cmd += ' --with-property=obsdk.ob.connection.mode:direct'
             if server_config['admin_password'] != '********':
@@ -589,7 +409,6 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
                 client.write_file(execute_cmd, cmd_file)
                 execute_cmd = "chmod +x {0};sudo chown -R {1} {0};sudo su - {1} -c '{0}' &".format(cmd_file, server_config['launch_user'])
             client.execute_command(execute_cmd, timeout=3600)
-            time.sleep(60)
             ret = client.execute_command(
                 "ps -aux | grep -F '%s' | grep -v grep | awk '{print $2}' " % jar_cmd)
             if ret:
@@ -601,6 +420,9 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
                 client.write_file(server_pid[server], os.path.join(home_path, 'run/ocp-server.pid'))
                 if times == 0 and len(cluster_config.servers) > 1:
                     break
+                if len(cluster_config.servers) > 1 and node_num == 1:
+                    time.sleep(60)
+                    node_num += 1
 
         if success:
             stdio.stop_loading('succeed')
@@ -690,6 +512,19 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    namespace = plugin_context.namespace
+    namespaces = plugin_context.namespaces
+    deploy_name = plugin_context.deploy_name
+    repositories = plugin_context.repositories
+    plugin_name = plugin_context.plugin_name
+
+    components = plugin_context.components
+    clients = plugin_context.clients
+    cluster_config = plugin_context.cluster_config
+    cmds = plugin_context.cmds
+    options = plugin_context.options
+    dev_mode = plugin_context.dev_mode
+    stdio = plugin_context.stdio
     create_if_not_exists = get_option('create_if_not_exists', True)
     sys_cursor = kwargs.get('sys_cursor')
     global tenant_cursor
@@ -700,7 +535,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
         if not start_env:
             return plugin_context.return_false()
 
-    if not without_ocp_parameter and not get_option('without_ocp_parameter', ''):
+    if not without_parameter and not get_option('without_parameter', ''):
         if not start_cluster():
             stdio.error('start ocp-server failed')
             return plugin_context.return_false()
@@ -710,5 +545,5 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_ocp
     if not start_cluster(1):
         stdio.error('start ocp-server failed')
         return plugin_context.return_false()
-    time.sleep(10)
+    time.sleep(20)
     return plugin_context.return_true()

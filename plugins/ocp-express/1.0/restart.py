@@ -131,7 +131,7 @@ class Restart(object):
         if self.connect(cluster_config):
             if self.bootstrap_plugin:
                 self.call_plugin(self.bootstrap_plugin, cursor=self.cursors)
-            return self.call_plugin(self.display_plugin, cursor=self.cursors)
+            return self.call_plugin(self.display_plugin, cursor=self.cursors) if self.display_plugin else True
         return False
 
     def rollback(self):

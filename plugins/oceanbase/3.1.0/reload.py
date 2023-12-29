@@ -24,14 +24,16 @@ from _deploy import InnerConfigItem
 from _errno import EC_OBSERVER_INVALID_MODFILY_GLOBAL_KEY
 
 
-def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
+def reload(plugin_context, new_cluster_config, *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
+    cursor = plugin_context.get_return('connect').get_return('cursor')
+    
     inner_config = {
         InnerConfigItem('$_zone_idc'): 'idc'
     }
-    not_paramters = ['production_mode']
+    not_paramters = ['production_mode', 'local_ip']
     inner_keys = inner_config.keys()
     zones_config = {}
     cluster_server = {}

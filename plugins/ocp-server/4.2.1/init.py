@@ -43,11 +43,11 @@ def _clean(server, client, path, stdio=None):
 def _ocp_lib(client, home_path, soft_dir='', stdio=None):
     stdio.verbose('cp rpm & pos')
     if soft_dir:
-        client.execute_command('mkdir -p -m 755  %s' % soft_dir, timeout=-1)
+        client.execute_command('mkdir -p -m 775  %s' % soft_dir, timeout=-1)
     else:
-        client.execute_command('mkdir -p -m 755  %s/data/files/' % home_path, timeout=-1)
-    client.execute_command('mkdir -p -m 755  %s/ocp-server/lib/' % home_path, timeout=-1)
-    client.execute_command('mkdir -p -m 755  %s/logs/ocp/' % home_path, timeout=-1)
+        client.execute_command('mkdir -p -m 775  %s/data/files/' % home_path, timeout=-1)
+    client.execute_command('mkdir -p -m 775  %s/ocp-server/lib/' % home_path, timeout=-1)
+    client.execute_command('mkdir -p -m 775  %s/logs/ocp/' % home_path, timeout=-1)
 
     OBD_HOME = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
     for rpm in glob(os.path.join(OBD_HOME, 'mirror/local/*ocp-agent-*.rpm')):
@@ -117,7 +117,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
             if not _clean(server, client, home_path, stdio=stdio):
                 global_ret = False
                 continue
-        if client.execute_command('mkdir -p -m 755 %s' % home_path):
+        if client.execute_command('mkdir -p -m 775 %s' % home_path):
             ret = client.execute_command('ls %s' % (home_path))
             if not ret or ret.stdout.strip():
                 global_ret = False
@@ -127,12 +127,12 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
             global_ret = False
             stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err.InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
             continue
-        if not client.execute_command("bash -c 'mkdir -p -m 755 %s/{run,bin,lib}'" % home_path):
+        if not client.execute_command("bash -c 'mkdir -p -m 775 %s/{run,bin,lib}'" % home_path):
             global_ret = False
             stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err.InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=home_path)))
         if 'log_dir' in server_config:
             log_dir = server_config['log_dir']
-            if client.execute_command('mkdir -p -m 755 %s' % log_dir):
+            if client.execute_command('mkdir -p -m 775 %s' % log_dir):
                 ret = client.execute_command('ls %s' % log_dir)
                 if not ret or ret.stdout.strip():
                     global_ret = False
@@ -144,7 +144,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
                 continue
         else:
             log_dir = os.path.join(home_path, 'log')
-            if not client.execute_command('mkdir -p -m 755  %s' % log_dir):
+            if not client.execute_command('mkdir -p -m 775  %s' % log_dir):
                 global_ret = False
                 stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='log dir', msg=err.InitDirFailedErrorMessage.NOT_EMPTY.format(path=log_dir)))
                 continue

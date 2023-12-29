@@ -93,9 +93,9 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
     cluster_config = plugin_context.cluster_config
     original_global_conf = cluster_config.get_original_global_conf()
     if original_global_conf.get('cluster_id') is None:
-        cluster_config.update_global_conf('cluster_id', round(time.time()) % 4294901759)
+        cluster_config.update_global_conf('cluster_id', round(time.time()) % 4294901759, False)
     if generate_password:
-        generate_random_password(plugin_context, cluster_config)
+        generate_random_password(cluster_config)
     if only_generate_password:
         return plugin_context.return_true()
 
@@ -498,7 +498,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
             update_global_conf('ocp_meta_tenant_memory_size', '1536M')
 
     if generate_password:
-        generate_random_password(plugin_context, cluster_config)
+        generate_random_password(cluster_config)
 
     if generate_consistent_config:
         generate_global_config = generate_configs['global']
@@ -572,14 +572,19 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
     stdio.stop_loading('fail')
 
 
-def generate_random_password(plugin_context, cluster_config):
+def generate_random_password(cluster_config):
+    add_components = cluster_config.get_deploy_added_components()
+    be_depend = cluster_config.be_depends
     global_config = cluster_config.get_original_global_conf()
-    if 'root_password' not in global_config:
-        cluster_config.update_global_conf('root_password', ConfigUtil.get_random_pwd_by_total_length(20))
-    components_name_list = [repo.name for repo in plugin_context.repositories]
-    if 'obagent' in components_name_list and 'ocp_agent_monitor_password' not in global_config:
-        cluster_config.update_global_conf('ocp_agent_monitor_password', ConfigUtil.get_random_pwd_by_total_length())
-    if 'obproxy' in components_name_list or 'obproxy-ce' in components_name_list and 'proxyro_password' not in global_config:
-        cluster_config.update_global_conf('proxyro_password', ConfigUtil.get_random_pwd_by_total_length())
-    if 'ocp-express' in components_name_list and 'ocp_meta_password' not in global_config:
-        cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length())
+    if cluster_config.name in add_components and 'root_password' not in global_config:
+        cluster_config.update_global_conf('root_password', ConfigUtil.get_random_pwd_by_total_length(20), False)
+    if 'obagent' in add_components and 'obagent' in be_depend and 'ocp_agent_monitor_password' not in global_config:
+        cluster_config.update_global_conf('ocp_agent_monitor_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+    
+    if 'proxyro_password' not in global_config:
+        for component_name in ['obproxy', 'obproxy-ce']:
+            if component_name in add_components and component_name in be_depend:
+                cluster_config.update_global_conf('proxyro_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+
+    if 'ocp-express' in add_components and 'ocp-express' in be_depend and 'ocp_meta_password' not in global_config:
+        cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length(), False)

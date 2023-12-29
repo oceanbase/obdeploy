@@ -23,9 +23,11 @@ from __future__ import absolute_import, division, print_function
 import os
 
 
-def bootstrap(plugin_context, cursor, start_env=None, *args, **kwargs):
+def bootstrap(plugin_context, cursor = None, start_env=None, *args, **kwargs):
     stdio = plugin_context.stdio
     clients = plugin_context.clients
+    if not cursor:
+        cursor = plugin_context.get_return('connect').get_return('cursor')
 
     if not start_env:
         raise Exception("start env is needed")

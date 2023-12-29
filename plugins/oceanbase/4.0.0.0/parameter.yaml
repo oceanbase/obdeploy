@@ -2,7 +2,7 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
@@ -23,7 +23,7 @@
 - name: data_dir
   name_local: 数据目录
   essential: true
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
@@ -32,28 +32,28 @@
 - name: redo_dir
   name_local: 日志目录
   essential: true
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: the directory for the redo file
   description_local: 存储clog, iclog, slog数据的目录
 - name: clog_dir
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: the directory for the clog file
   description_local: 存储clog数据的目录, clog 应该与 ilog 同盘
 - name: slog_dir
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: the directory for the slog file
   description_local: 存储slog数据的目录. 4.0版本开始不支持配置该项
 - name: ilog_dir
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
@@ -62,7 +62,7 @@
 - name: devname
   name_local: 网卡名
   essential: true
-  type: STRING
+  type: SAFE_STRING
   min_value: NULL
   max_value: NULL
   need_restart: true
@@ -94,7 +94,7 @@
   description_local: SQL服务协议端口号
 - name: zone
   require: true
-  type: STRING
+  type: SAFE_STRING
   default: zone1
   min_value: NULL
   max_value: NULL
@@ -145,7 +145,7 @@
   description_local: 副本迁移失败时最多重试次数
 - name: tableapi_transport_compress_func
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: none
   min_value: NULL
   max_value: NULL
@@ -234,7 +234,7 @@
   description_local: 多少次小合并触发一次全局合并。值为0时，表示关闭小合并
 - name: default_compress
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: archive
   min_value: NULL
   max_value: NULL
@@ -425,7 +425,7 @@
   description_local: 打开debug sync调试开关，并设置其超时时间；值为0时，则关闭。
 - name: syslog_level
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: INFO
   min_value: NULL
   max_value: NULL
@@ -445,7 +445,7 @@
   description_local: CPU和内存等资源进行分配的时候，资源总量是实际数量乘以该百分比的值
 - name: leak_mod_to_check
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: NONE
   min_value: NULL
   max_value: NULL
@@ -624,7 +624,7 @@
   description_local: 是否记录应用端设置的追踪ID
 - name: config_additional_dir
   require: false
-  type: STRING_LIST
+  type: PATH_LIST
   default: etc2;etc3
   min_value: NULL
   max_value: NULL
@@ -736,7 +736,7 @@
   description_local: 弱一致性读允许读到多旧的数据
 - name: backup_log_archive_option
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: OPTIONAL
   min_value: NULL
   max_value: NULL
@@ -887,7 +887,7 @@
   description_local: 副本迁移时变更Paxos成员组操作的超时时间
 - name: rootservice_list
   require: false
-  type: STRING_LIST
+  type: SAFE_STRING_LIST
   default:
   min_value: NULL
   max_value: NULL
@@ -977,7 +977,7 @@
   description_local: 租户每个CPU配额允许的最大并发数
 - name: zone_merge_order
   require: false
-  type: STRING
+  type: SAFE_STRING
   default:
   min_value: NULL
   max_value: NULL
@@ -997,7 +997,7 @@
   description_local: 恢复窗口大小
 - name: default_row_format
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: compact
   min_value: NULL
   max_value: NULL
@@ -1080,7 +1080,7 @@
   description_local: 虚拟表的位置信息缓存过期时间
 - name: ssl_external_kms_info
   require: false
-  type: STRING
+  type: SAFE_STRING
   default:
   min_value: NULL
   max_value: NULL
@@ -1170,7 +1170,7 @@
   description_local: 控制内部数据迁移的并发度
 - name: redundancy_level
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: NORMAL
   min_value: NULL
   max_value: NULL
@@ -1232,7 +1232,7 @@
   description_local: 系统CPU总数，如果设置为0，将自动检测
 - name: appname
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: obcluster
   min_value: NULL
   max_value: NULL
@@ -1242,7 +1242,7 @@
   description_local: 本OceanBase集群名
 - name: use_large_pages
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: false
   min_value: NULL
   max_value: NULL
@@ -1442,7 +1442,7 @@
   description_local: 自动刷新自增列值的时间间隔
 - name: all_server_list
   require: false
-  type: STRING
+  type: SAFE_STRING_LIST
   default:
   min_value: NULL
   max_value: NULL
@@ -1512,7 +1512,7 @@
   description_local: data_dir所在磁盘将被OceanBase系统初始化用于存储数据，本配置项表示占用该磁盘总空间的百分比
 - name: default_compress_func
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: zstd_1.3.8
   min_value: NULL
   max_value: NULL
@@ -1879,14 +1879,14 @@
   description_local: ocp express的元数据库使用的租户日志磁盘大小
 - name: ocp_meta_db
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: ocp_express
   need_redeploy: true
   description_en: The database name for ocp meta db
   description_local: ocp express的元数据库使用的数据库名
 - name: ocp_meta_username
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: meta
   need_redeploy: true
   description_en: The database name for ocp meta db

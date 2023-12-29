@@ -103,7 +103,7 @@ class Restart(object):
             self.rollback()
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
-        return self.call_plugin(self.display_plugin, clients=clients, cluster_config=cluster_config, cursor=None)
+        return self.call_plugin(self.display_plugin, clients=clients, cluster_config=cluster_config, cursor=None) if self.display_plugin else True
     
     def rollback(self):
         if self.new_clients:

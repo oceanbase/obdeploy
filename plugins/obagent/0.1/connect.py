@@ -21,8 +21,12 @@
 from __future__ import absolute_import, division, print_function
 
 
-def connect(plugin_context, target_server=None, *args, **kwargs):
-    stdio = plugin_context.stdio
+def connect(plugin_context, *args, **kwargs):
+    def return_true(**kwargs):
+        for key, value in kwargs.items():
+            plugin_context.set_variable(key, value)
+        return plugin_context.return_true(**kwargs)
+    
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
     result = {}
@@ -34,4 +38,5 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
             auth = '--user %s:%s' % (config['http_basic_auth_user'], config['http_basic_auth_password'])
         cmd = '''curl %s -H "Content-Type:application/json" -L "http://%s:%s/metrics/stat"''' % (auth, server.ip, config['server_port'])
         result[server] = cmd
-    return plugin_context.return_true(connect=result, cursor=result)
+    
+    return return_true(connect=result, cursor=result)

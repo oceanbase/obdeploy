@@ -2,7 +2,7 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   need_redeploy: true
   description_en: working directory for obagent
   description_local: Obagent工作目录
@@ -30,7 +30,7 @@
   description_local: pprof 调试端口
 - name: log_level
   require: true
-  type: STRING
+  type: SAFE_STRING
   default: INFO
   min_value: NULL
   max_value: NULL
@@ -39,7 +39,7 @@
   description_local: 日志等级
 - name: log_path
   require: true
-  type: STRING
+  type: PATH
   default: log/monagent.log
   min_value: NULL
   max_value: NULL
@@ -50,7 +50,7 @@
   name_local: 加密方式
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: plain
   min_value: NULL
   max_value: NULL
@@ -61,7 +61,7 @@
   require: true
   name_local: 秘钥路径
   essential: true
-  type: STRING
+  type: PATH
   default: conf/.config_secret.key
   min_value: NULL
   max_value: NULL
@@ -117,7 +117,7 @@
   name_local: 用户名
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: admin
   min_value: NULL
   max_value: NULL
@@ -139,7 +139,7 @@
   name_local: 调试用户名
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: admin
   min_value: NULL
   max_value: NULL
@@ -159,7 +159,7 @@
   description_local: debug 接口认证密码
 - name: monitor_user
   require: true
-  type: STRING
+  type: SAFE_STRING
   default: root
   min_value: NULL
   max_value: NULL
@@ -195,7 +195,7 @@
   description_local: observer 的 RPC 端口
 - name: cluster_name
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: obcluster
   min_value: NULL
   max_value: NULL
@@ -213,7 +213,7 @@
   description_local: OceanBase 集群 ID
 - name: zone_name
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: zone1
   min_value: NULL
   max_value: NULL
@@ -224,7 +224,7 @@
   name_local: OceanBase 指标监控采集
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: active
   min_value: NULL
   max_value: NULL
@@ -235,7 +235,7 @@
   name_local: 主机指标监控采集
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: active
   min_value: NULL
   max_value: NULL

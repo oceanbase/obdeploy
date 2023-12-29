@@ -2,7 +2,7 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
@@ -12,7 +12,7 @@
   name_local: 数据目录
   require: false
   essential: true
-  type: STRING
+  type: PATH
   need_redeploy: true
   description_en: Base path for metrics storage.
   description_local:
@@ -35,7 +35,7 @@
 - name: address
   require: true
   default: 0.0.0.0
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   description_en: the listen address for prometheus
   description_local: Prometheus监听地址

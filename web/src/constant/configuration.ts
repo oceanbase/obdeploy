@@ -141,3 +141,12 @@ export const showConfigKeys = {
 export const ocpAddonAfter = '/ocp';
 export const obproxyAddonAfter = '/obproxy';
 export const oceanbaseAddonAfter = '/oceanbase';
+
+// 参数类型
+export const PARAMETER_TYPE = {
+  number:'Integer',
+  string:'String',
+  capacity:'Capacity',
+  capacityMB:'CapacityMB',
+  boolean:'Boolean'
+}

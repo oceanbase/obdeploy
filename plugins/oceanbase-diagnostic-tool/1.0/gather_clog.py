@@ -20,10 +20,8 @@
 
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
-import datetime
 import os
 from tool import TimeUtils
-from subprocess import call, Popen, PIPE
 import _errno as err
 
 
@@ -36,20 +34,17 @@ def gather_clog(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && sh ".format(install_dir=obdiag_install_dir) + command
+        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
         base_commond = r"cd {install_dir} && ./obdiag gather clog".format(install_dir=obdiag_install_dir)
         cmd = r"{base} --clog_dir {data_dir} --from {from_option} --to {to_option} --encrypt {encrypt_option}".format(
             base = base_commond,
-            data_dir = data_dir,
             from_option = from_option,
             to_option = to_option,
             encrypt_option = encrypt_option
         )
-        if ob_install_dir_option:
-            cmd = cmd + r" --ob_install_dir {ob_install_dir_option}".format(ob_install_dir_option=ob_install_dir_option)
         if store_dir_option:
             cmd = cmd + r" --store_dir {store_dir_option}".format(store_dir_option=store_dir_option)
         return cmd
@@ -61,27 +56,13 @@ def gather_clog(plugin_context, *args, **kwargs):
 
     options = plugin_context.options
     obdiag_bin = "obdiag"
-    cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-    global_conf = cluster_config.get_global_conf()
     from_option = get_option('from')
     to_option = get_option('to')
     since_option = get_option('since')
     encrypt_option = get_option('encrypt')
     store_dir_option = os.path.abspath(get_option('store_dir'))
-    ob_install_dir_option = global_conf.get('home_path')
-    data_dir = ob_install_dir_option + "/store"
     obdiag_install_dir = get_option('obdiag_dir')
-
-    if len(cluster_config.servers) > 0:
-        server_config = cluster_config.get_server_conf(cluster_config.servers[0])
-        if not server_config.get('data_dir'):
-            server_config['data_dir'] = '%s/store' % ob_install_dir_option
-        if not server_config.get('redo_dir'):
-            server_config['redo_dir'] = server_config['data_dir']
-        if not server_config.get('clog_dir'):
-            server_config['clog_dir'] = '%s/clog' % server_config['redo_dir']
-        data_dir = server_config['clog_dir']
 
     from_option, to_option, ok = TimeUtils.parse_time_from_to(from_time=from_option, to_time=to_option, stdio=stdio)
     if not ok:
@@ -96,5 +77,5 @@ def gather_clog(plugin_context, *args, **kwargs):
         if run():
             plugin_context.return_true()
     except KeyboardInterrupt:
-        stdio.exception("obdiag gather clog failded")
+        stdio.exception("obdiag gather clog failed")
         return plugin_context.return_false()

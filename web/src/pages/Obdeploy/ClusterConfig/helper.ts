@@ -46,7 +46,7 @@ const isTakeUnit = (val: string | undefined): boolean => {
 
 //获取不携带单位的值
 const getNoUnitValue = (val: string | undefined): string => {
-  if (!val) return'';
+  if (!val) return '';
   if (!isTakeUnit(val)) return val;
   for (let unit of UNITS) {
     if (val.includes(unit)) {
@@ -75,4 +75,25 @@ const takeNewUnit = (target: string, unit: string): string => {
   }
 };
 
-export { getUnit, isTakeUnit, takeNewUnit, getNoUnitValue };
+//获取参数
+const getParamstersHandler = async (run: any, oceanbase: any, errorhandle: any) => {
+  try {
+    const { success, data } = await run(
+      {},
+      {
+        filters: [
+          {
+            component: oceanbase?.component,
+            version: oceanbase?.version,
+            is_essential_only: true,
+          },
+        ],
+      },
+    );
+    return { success, data };
+  } catch (e: any) {
+    errorhandle(e);
+  }
+};
+
+export { getUnit, isTakeUnit, takeNewUnit, getNoUnitValue,getParamstersHandler };

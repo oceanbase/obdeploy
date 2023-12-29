@@ -91,33 +91,50 @@ class OcpCursor(object):
         if resp.code == 200:
             return resp.content
         else:
-            raise Exception("failed to query host types from ocp")
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to query host types: %s" % msg)
 
     def create_host_type(self, data, stdio=None):
         resp = self._request('POST', '/api/v2/compute/hostTypes', data=data, stdio=stdio)
         if resp.code == 200:
             return resp.content
         else:
-            raise Exception("failed to create host types in ocp")
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to create host type: %s" % msg)
 
     def list_credentials(self, stdio=None):
         resp = self._request('GET', '/api/v2/profiles/me/credentials', stdio=stdio)
         if resp.code == 200:
             return resp.content
         else:
-            raise Exception("failed to query credentials from ocp")
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to query credentials: %s" % msg)
 
     def create_credential(self, data, stdio=None):
         resp = self._request('POST', '/api/v2/profiles/me/credentials', data=data, stdio=stdio)
         if resp.code == 200:
             return resp.content
         else:
-            raise Exception("failed to create credentials in ocp")
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to create credential: %s" % msg)
 
     def take_over(self, data, stdio=None):
         resp = self._request('POST', '/api/v2/ob/clusters/takeOver', data=data, stdio=stdio)
         if resp.code == 200:
             return resp.content
+        else:
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to do take over: %s" % msg)
 
     def _request(self, method, api, data=None, retry=5, stdio=None):
         url = self.base_url + api
@@ -145,6 +162,14 @@ class OcpCursor(object):
         return self.Response(code=return_code, content=content)
 
 def takeover(plugin_context, *args, **kwargs):
+    stdio = plugin_context.stdio
+    try:
+        _do_takeover(plugin_context, *args, **kwargs)
+    except Exception as ex:
+        stdio.error("do takeover got exception:%s", ex)
+        return plugin_context.return_false()
+
+def _do_takeover(plugin_context, *args, **kwargs):
     # init variables, include get obcluster info from deploy config
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients

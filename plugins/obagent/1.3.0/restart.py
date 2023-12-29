@@ -107,7 +107,8 @@ class Restart(object):
             return False
         ret = self.call_plugin(self.connect_plugin, clients=clients, cluster_config=cluster_config)
         if ret:
-            return self.call_plugin(self.display_plugin, clients=clients, cluster_config=cluster_config, cursor=ret.get_return('cursor'))
+            return self.call_plugin(self.display_plugin, clients=clients, cluster_config=cluster_config, cursor=ret.get_return('cursor')) if self.display_plugin else True
+            
         return False
 
     def rollback(self):

@@ -64,6 +64,12 @@ class UserConfig(object):
         self.port = port if port else self.DEFAULT['port']
         self.timeout = timeout if timeout else self.DEFAULT['timeout']
 
+    def __str__(self):
+        return '%s' % self.username
+
+    def __repr__(self):
+        return '<UserConfig: %s>' % self.__str__()
+
 
 class ServerConfig(object):
 
@@ -77,6 +83,9 @@ class ServerConfig(object):
 
     def __str__(self):
         return '%s(%s)' % (self._name, self.ip) if self._name else self.ip
+
+    def __repr__(self):
+        return '<%s>' % self.__str__()
 
     def __hash__(self):
         return hash(self.__str__())
@@ -261,6 +270,7 @@ class ConfigParser(object):
     STYLE = ''
     INNER_CONFIG_MAP = {}
     PREFIX = '$_'
+    META_KEYS = ['version', 'tag', 'release', 'package_hash']
 
     @classmethod
     def _is_inner_item(cls, key):
@@ -270,13 +280,37 @@ class ConfigParser(object):
     def extract_inner_config(cls, cluster_config, config):
         return {}
 
+    @staticmethod
+    def _get_server(server_data):
+        if isinstance(server_data, dict):
+            ip = ConfigUtil.get_value_from_dict(server_data, 'ip', transform_func=str)
+            name = ConfigUtil.get_value_from_dict(server_data, 'name', transform_func=str)
+        else:
+            ip = server_data
+            name = None
+        if not re.match(r'^((25[0-5]|2[0-4]\d|[01]?\d{1,2})\.){3}(25[0-5]|2[0-4]\d|[01]?\d{1,2})$', ip) \
+                and not re.match(r'^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$', ip):
+            raise Exception('Invalid ip address {}'.format(ip))
+        return ServerConfigFlyweightFactory.get_instance(ip, name)
+
     @classmethod
-    def _to_cluster_config(cls, component_name, config):
+    def _get_servers(cls, servers_data):
+        servers = []
+        for server_data in servers_data:
+            servers.append(cls._get_server(server_data))
+        return servers
+
+    @classmethod
+    def _to_cluster_config(cls, component_name, config, added_servers=None):
         raise NotImplementedError
 
     @classmethod
-    def to_cluster_config(cls, component_name, config):
-        cluster_config = cls._to_cluster_config(component_name, config)
+    def merge_config(cls, component_name, config, new_config):
+        raise NotImplementedError
+
+    @classmethod
+    def to_cluster_config(cls, component_name, config, added_servers=None):
+        cluster_config = cls._to_cluster_config(component_name, config, added_servers)
         cluster_config.set_include_file(config.get('include', ''))
         cluster_config.parser = cls
         return cluster_config
@@ -298,6 +332,8 @@ class ConfigParser(object):
             conf['version'] = cluster_config.origin_version
         if cluster_config.origin_tag:
             conf['tag'] = cluster_config.origin_tag
+        if cluster_config.origin_release:
+            conf['release'] = cluster_config.origin_release
         if cluster_config.depends:
             conf['depends'] = list(cluster_config.depends)
         conf = cls._from_cluster_config(conf, cluster_config)
@@ -325,23 +361,8 @@ class DefaultConfigParser(ConfigParser):
     STYLE = 'default'
 
     @classmethod
-    def _to_cluster_config(cls, component_name, conf):
-        if 'servers' in conf and isinstance(conf['servers'], list):
-            servers = []
-            for server in conf['servers']:
-                if isinstance(server, dict):
-                    ip = ConfigUtil.get_value_from_dict(server, 'ip', transform_func=str)
-                    name = ConfigUtil.get_value_from_dict(server, 'name', transform_func=str)
-                else:
-                    ip = server
-                    name = None
-                if not re.match('^\d{1,3}(\\.\d{1,3}){3}$', ip):
-                    continue
-                server = ServerConfigFlyweightFactory.get_instance(ip, name)
-                if server not in servers:
-                    servers.append(server)
-        else:
-            servers = []
+    def _to_cluster_config(cls, component_name, conf, added_servers=None):
+        servers = cls._get_servers(conf.get('servers', []))
         cluster_config = ClusterConfig(
             servers,
             component_name,
@@ -350,6 +371,8 @@ class DefaultConfigParser(ConfigParser):
             ConfigUtil.get_value_from_dict(conf, 'release', None, str),
             ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str)
         )
+        if added_servers:
+            cluster_config.added_servers = added_servers
         if 'global' in conf:
             cluster_config.set_global_conf(conf['global'])
 
@@ -363,6 +386,21 @@ class DefaultConfigParser(ConfigParser):
             if server.name in conf:
                 cluster_config.add_server_conf(server, conf[server.name])
         return cluster_config
+
+    @classmethod
+    def merge_config(cls, component_name, config, new_config):
+        unmergeable_keys = cls.META_KEYS + ['global', RsyncConfig.RSYNC, ENV]
+        servers = cls._get_servers(config.get('servers', []))
+        merge_servers = cls._get_servers(new_config.get('servers', []))
+        for server in merge_servers:
+            assert server not in servers, Exception('{} is already in cluster'.format(server))
+        new_config['servers'] = config.get('servers', []) + new_config.get('servers', [])
+        merge_server_names = [server.name for server in merge_servers]
+        for key in new_config:
+            assert key not in unmergeable_keys, Exception('{} is not allowed to be set in additional conf'.format(key))
+            assert key in merge_server_names or key == 'servers', Exception('{} is not allowed to be set'.format(key))
+            config[key] = new_config[key]
+        return cls.to_cluster_config(component_name, config, merge_servers)
 
     @classmethod
     def extract_inner_config(cls, cluster_config, config):
@@ -447,9 +485,11 @@ class ClusterConfig(object):
             self._cache_server[server] = None
         self._deploy_config = None
         self._depends = {}
+        self._be_depends = {}
         self.parser = parser
         self._has_package_pattern = None
         self._object_hash = None
+        self.added_servers = []
 
     if sys.version_info.major == 2:
         def __hash__(self):
@@ -488,8 +528,8 @@ class ClusterConfig(object):
         return True
 
     def __deepcopy__(self, memo):
-        cluster_config = self.__class__(deepcopy(self.servers), self.name, self.version, self.tag, self.package_hash, self.parser)
-        copy_attrs = ['origin_tag', 'origin_version', 'origin_package_hash', 'parser']
+        cluster_config = self.__class__(deepcopy(self.servers), self.name, self.version, self.tag, self.release, self.package_hash, self.parser)
+        copy_attrs = ['origin_tag', 'origin_version', 'origin_package_hash', 'parser', 'added_servers']
         deepcopy_attrs = ['_temp_conf', '_default_conf', '_global_conf', '_server_conf', '_cache_server', '_original_global_conf', '_depends', '_original_servers', '_inner_config']
         for attr in copy_attrs:
             setattr(cluster_config, attr, getattr(self, attr))
@@ -522,6 +562,10 @@ class ClusterConfig(object):
     @property
     def depends(self):
         return self._depends.keys()
+    
+    @property
+    def be_depends(self):
+        return self._be_depends.keys()
 
     def _clear_cache_server(self):
         for server in self._cache_server:
@@ -557,6 +601,16 @@ class ClusterConfig(object):
         if self.name in cluster_conf.depends:
             raise Exception('Circular Dependency: %s and %s' % (self.name, name))
         self._depends[name] = cluster_conf
+        cluster_conf.add_be_depend(self.name, self)
+
+    def add_be_depend(self, name, cluster_conf):
+        if self.name == name:
+            raise Exception('Can not set %s as %s\'s dependency' % (name, name))
+        if self.name not in cluster_conf.depends:
+            raise Exception('%s is not %s\'s dependency' % (self.name, name))
+        if self.name in cluster_conf.be_depends:
+            raise Exception('Circular Dependency: %s and %s' % (self.name, name))
+        self._be_depends[name] = cluster_conf
 
     def add_depend_component(self, depend_component_name):
         return self._deploy_config.add_depend_for_component(self.name, depend_component_name, save=False)
@@ -570,6 +624,15 @@ class ClusterConfig(object):
             return None
         cluster_config = self._depends[name]
         return deepcopy(cluster_config.original_servers)
+        
+    def get_depend_added_servers(self, name):
+        if name not in self._depends:
+            return None
+        cluster_config = self._depends[name]
+        return deepcopy(cluster_config.added_servers)
+    
+    def get_deploy_added_components(self):
+        return self._deploy_config.added_components
         
     def get_depend_config(self, name, server=None, with_default=True):
         if name not in self._depends:
@@ -926,6 +989,11 @@ class DeployStatus(Enum):
     STATUS_UPRADEING = 'upgrading'
 
 
+class ClusterStatus(Enum):
+
+    STATUS_RUNNING = 1  # running
+    STATUS_STOPPED = 0   # stopped
+
 class DeployConfigStatus(Enum):
 
     UNCHNAGE = 'unchange'
@@ -973,6 +1041,16 @@ class DeployConfig(SafeStdio):
         if self.config_parser_manager is None:
             raise ParserError('ConfigParserManager Not Set')
         self._load()
+        self._added_components = []
+        self._changed_components = []
+        self._removed_components = []
+        self._do_not_dump = False
+
+    def set_undumpable(self):
+        self._do_not_dump = True
+
+    def set_dumpable(self):
+        self._do_not_dump = False
 
     @property
     def user(self):
@@ -997,6 +1075,26 @@ class DeployConfig(SafeStdio):
             cluster_config = self.components[component_name]
             cluster_config.apply_inner_config(get_inner_config(component_name))
             cluster_config.set_base_dir(base_dir)
+
+    @property
+    def added_components(self):
+        if self._added_components:
+            return self._added_components
+        else:
+            return self.components.keys()
+        
+    @property
+    def changed_components(self):
+        return self._changed_components
+
+    @property
+    def removed_components(self):
+        return self._removed_components
+
+    def get_added_servers(self, component_name):
+        if component_name not in self.components:
+            raise Exception('No such component {}'.format(component_name))
+        return self.components[component_name].added_servers
 
     def set_unuse_lib_repository(self, status):
         if self.unuse_lib_repository != status:
@@ -1066,11 +1164,94 @@ class DeployConfig(SafeStdio):
                         if name == comp:
                             continue
                         if name in self.components:
-                            conf.add_depend(name, self.components[name])
+                            conf.add_depend(name, self.components[name]) 
         except:
-            pass
+            self.stdio.exception()
         if not self.user:
             self.set_user_conf(UserConfig())
+
+    def scale_out(self, config_path):
+        ret = True
+        depends = {}
+        try:
+            with FileUtil.open(config_path, 'rb') as f:
+                source_data = self.yaml_loader.load(f)
+                for key in source_data:
+                    if key in ['user', 'unuse_lib_repository', 'auto_create_tenant']:
+                        self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(key))
+                        ret = False
+                    elif issubclass(type(source_data[key]), dict):
+                        if source_data[key].get('depends', []):
+                            self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(message='depends:{}'.format(key)))
+                        # temp _depends
+                        depends[key] = self.components[key].depends
+                    if not self._merge_component(key, source_data[key]):
+                            ret = False
+                            continue
+                for comp in depends:
+                    conf = self.components[comp]
+                    for name in depends[comp]:
+                        if name == comp:
+                            continue
+                        if name in self.components:
+                            conf.add_depend(name, self.components[name])     
+        except Exception as e:
+            self.stdio.exception(e)
+            ret = False
+        return ret
+
+    def add_components(self, config_path):
+        ret = True
+        depends = {}
+        try:
+            with FileUtil.open(config_path, 'rb') as f:
+                source_data = self.yaml_loader.load(f)
+                for key in source_data:
+                    if key in ['user', 'unuse_lib_repository', 'auto_create_tenant']:
+                        self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(message=key))
+                        ret = False
+                    elif issubclass(type(source_data[key]), dict):
+                        if key in self.components:
+                            self.stdio.error(err.EC_COMPONENT_EXISTS.format(component=key))
+                            ret = False
+                            continue
+                        self._add_component(key, source_data[key])
+                        if not self.update_component(self.components[key]):
+                            self.stdio.error(err.EC_COMPONENT_FAIL_TO_UPDATE_CONFIG.format(component=key))
+                            ret = False
+                        depends[key] = source_data[key].get('depends', [])
+                        self._added_components.append(key)
+        except Exception as e:
+            self.stdio.exception(e)
+            ret = False
+
+        for comp in depends:
+            for name in depends[comp]:
+                self.add_depend_for_component(comp, name, save=False)
+        return ret
+
+    def del_components(self, components, dryrun=False):
+        ret = True
+        src_data = deepcopy(self._src_data) if dryrun else self._src_data
+        component_map = deepcopy(self.components) if dryrun else self.components
+        removed_components = deepcopy(self._removed_components) if dryrun else self._removed_components
+        for del_comp in components:
+            if del_comp not in component_map:
+                self.stdio.error(err.EC_COMPONENT_NOT_EXISTS.format(component=del_comp))
+                ret = False
+                continue
+            del component_map[del_comp]
+            del src_data[del_comp]
+            removed_components.append(del_comp)
+        for comp_name in component_map:
+            for del_comp in components:
+                if del_comp in component_map[comp_name].depends:
+                    self.stdio.error(err.EC_COMPONENT_REMOVE_DEPENDS.format(component1=del_comp, component2=comp_name))
+                    ret = False
+        if not component_map:
+            self.stdio.error(err.EC_COMPONENT_NO_REMAINING_COMPS)
+            ret = False
+        return ret
 
     def allow_include_error(self):
         self.stdio.verbose("allow include file not exists")
@@ -1106,6 +1287,8 @@ class DeployConfig(SafeStdio):
             self.inner_config.dump()
 
     def _dump(self):
+        if self._do_not_dump:
+            raise Exception("Cannot dump because flag DO NOT DUMP exists.")
         try:
             with open(self.yaml_path, 'w') as f:
                 self._dump_inner_config()
@@ -1239,9 +1422,35 @@ class DeployConfig(SafeStdio):
         return True
 
     def _add_component(self, component_name, conf):
+        self._set_component(self._parse_cluster_config(component_name, conf))
+
+    def _parse_cluster_config(self, component_name, conf):
         parser = self.config_parser_manager.get_parser(component_name, conf.get('style'))
-        cluster_config = parser.to_cluster_config(component_name, conf)
-        self._set_component(cluster_config)
+        return parser.to_cluster_config(component_name, conf)
+
+    def _merge_component(self, component_name, conf):
+        if component_name not in self.components:
+            self.stdio.error('No such component {}'.format(component_name))
+            return False
+        parser = self.config_parser_manager.get_parser(component_name, conf.get('style'))
+        cluster_config = self.components[component_name]
+        if parser != cluster_config.parser:
+            self.stdio.error('The style of the added configuration do not match the style of the existing cluster')
+            return False
+        src_conf = parser.from_cluster_config(cluster_config)
+        try:
+            merged_cluster_config = parser.merge_config(component_name, src_conf['config'], conf)
+        except Exception as e:
+            self.stdio.exception(err.EC_COMPONENT_FAILED_TO_MERGE_CONFIG.format(message=str(e)))
+            return False
+        self.update_component(merged_cluster_config)
+        self._changed_components.append(component_name)
+        
+        # 更新depends config
+        for comp in self.components:
+            if component_name in self.components[comp].depends:
+                self.components[comp].add_depend(component_name, merged_cluster_config)
+        return True
 
     def change_component_config_style(self, component_name, style):
         if component_name not in self.components:
@@ -1280,7 +1489,11 @@ class Deploy(object):
             'hash': repository.hash,
             'version': repository.version,
         }
-        return self._dump_deploy_info() if dump else True
+        return self.dump_deploy_info() if dump else True
+
+    def unuse_model(self, name, dump=True):
+        del self.deploy_info.components[name]
+        return self.dump_deploy_info() if dump else True
 
     @staticmethod
     def get_deploy_file_path(path):
@@ -1380,7 +1593,7 @@ class Deploy(object):
             self.stdio and getattr(self.stdio, 'exception', print)('mv %s to %s failed, error: \n%s' % (src_yaml_path, target_src_path, e))
         return False
 
-    def _dump_deploy_info(self):
+    def dump_deploy_info(self):
         path = self.get_deploy_file_path(self.config_dir)
         self.stdio and getattr(self.stdio, 'verbose', print)('dump deploy info to %s' % path)
         try:
@@ -1400,7 +1613,7 @@ class Deploy(object):
     def _update_deploy_status(self, status):
         old = self.deploy_info.status
         self.deploy_info.status = status
-        if self._dump_deploy_info():
+        if self.dump_deploy_info():
             return True
         self.deploy_info.status = old
         return False
@@ -1408,7 +1621,7 @@ class Deploy(object):
     def _update_deploy_config_status(self, status):
         old = self.deploy_info.config_status
         self.deploy_info.config_status = status
-        if self._dump_deploy_info():
+        if self.dump_deploy_info():
             return True
         self.deploy_info.config_status = old
         return False
@@ -1469,7 +1682,7 @@ class Deploy(object):
             if self._update_deploy_status(status):
                 if DeployStatus.STATUS_DESTROYED == status:
                     self.deploy_info.components = {}
-                    self._dump_deploy_info()
+                    self.dump_deploy_info()
                 return True
         return False
 

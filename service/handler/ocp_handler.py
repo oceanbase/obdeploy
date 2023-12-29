@@ -19,11 +19,11 @@
 import copy
 import os
 import time
-from optparse import Values
-from singleton_decorator import singleton
 import tempfile
 import yaml
 import json
+from optparse import Values
+from singleton_decorator import singleton
 from collections import defaultdict
 
 from service.handler.base_handler import BaseHandler
@@ -717,6 +717,7 @@ class OcpHandler(BaseHandler):
                 log.get_logger().warn("deploy %s failed", name)
                 raise Exception('deploy failed')
         except:
+            self.obd._call_stdio('exception', '')
             self.context['deploy_status'] = 'failed'
             raise Exception('deploy failed')
         log.get_logger().info("deploy %s succeed", name)
@@ -758,8 +759,12 @@ class OcpHandler(BaseHandler):
         log.get_logger().info("finish do start %s", name)
         if not self.context['ocp_deployment_info'][id]['config'].components.ocpserver.metadb:
             log.get_logger().info("begin take_over metadb")
-            ocp_info = self.get_installed_ocp_info(id)
-            self.obd.options._update_loose({"address": ocp_info.url[0], "user": ocp_info.account, "password": ocp_info.password})
+            config = self.context['ocp_deployment_info'][id]['config']
+            servers = config.components.ocpserver.servers
+            port = config.components.ocpserver.port
+            password = config.components.ocpserver.admin_password
+            address = ['http://' + str(server) + ':' + str(port) for server in servers]
+            self.obd.options._update_loose({"address": address[0], "user": 'admin', "password": password})
             self.obd.export_to_ocp(name)
             log.get_logger().info("finish take_over metadb")
         deploy = self.obd.deploy_manager.get_deploy_config(name)
@@ -777,7 +782,6 @@ class OcpHandler(BaseHandler):
         task_info.info = []
         task_info.finished = ''
         failed = 0
-        self.context['ocp_deployment']['failed'] = 0 if not self.context['ocp_deployment']['failed'] else self.context['ocp_deployment']['failed']
         if not self.obd.deploy:
             return task_info
         for component in self.obd.deploy.deploy_config.components:
@@ -791,8 +795,6 @@ class OcpHandler(BaseHandler):
                             step_info.result = TaskResult.FAILED
                         else:
                             step_info.result = TaskResult.SUCCESSFUL
-                    else:
-                        self.context['ocp_deployment']['failed'] += 1
                     step_info.status = TaskStatus.FINISHED
                     task_info.info.append(step_info)
                     task_info.finished += f'{component}-{plugin} '
@@ -818,8 +820,7 @@ class OcpHandler(BaseHandler):
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
 
-        if failed or self.context['ocp_deployment']['failed'] >= 1500 or self.context['deploy_status'] == 'failed':
-            self.context['ocp_deployment']['failed'] = 0
+        if failed or self.context['deploy_status'] == 'failed':
             task_info.result = TaskResult.FAILED
             task_info.status = TaskStatus.FINISHED
         return task_info
@@ -941,7 +942,6 @@ class OcpHandler(BaseHandler):
         task_info.info = []
         task_info.finished = ''
         failed = 0
-        self.context['ocp_deployment']['failed'] = 0 if not self.context['ocp_deployment']['failed'] else self.context['ocp_deployment']['failed']
 
         for c in self.obd.deploy.deploy_config.components:
             step_info = TaskStepInfo(name=f'{c}-{const.DESTROY_PLUGIN}', status=TaskStatus.RUNNING,
@@ -970,8 +970,6 @@ class OcpHandler(BaseHandler):
                             step_info.result = TaskResult.FAILED
                         else:
                             step_info.result = TaskResult.SUCCESSFUL
-                    else:
-                        self.context['ocp_deployment']['failed'] += 1
                     step_info.status = TaskStatus.FINISHED
                     task_info.info.append(step_info)
                     task_info.finished += f'{component}-{plugin} '
@@ -997,8 +995,7 @@ class OcpHandler(BaseHandler):
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
 
-        if failed or self.context['ocp_deployment']['failed'] >= 1500:
-            self.context['ocp_deployment']['failed'] = 0
+        if failed:
             task_info.result = TaskResult.FAILED
             task_info.status = TaskStatus.FINISHED
         return task_info
@@ -1253,7 +1250,7 @@ class OcpHandler(BaseHandler):
             raise Exception(f"task {cluster_name} exists and not finished")
         task_manager.del_task_info(cluster_name, task_type="upgrade")
         self.obd.set_options(Values({"component": 'ocp-server', "version": version, "usable": usable}))
-        background_tasks.add_task(self._upgrade, 'id', cluster_name)
+        background_tasks.add_task(self._upgrade, 'id', cluster_name, self.context['meta']['tenant_name'], self.context['monitor']['tenant_name'])
         self.context['ocp_deployment']['task_id'] = self.context['ocp_deployment']['task_id'] + 1 if self.context['ocp_deployment']['task_id'] else 1
         task_status = TaskStatus.RUNNING.value
         task_res = TaskResult.RUNNING.value
@@ -1263,7 +1260,7 @@ class OcpHandler(BaseHandler):
         return ret
 
     @auto_register('upgrade')
-    def _upgrade(self, id, app_name):
+    def _upgrade(self, id, app_name, meta_tenant, monitor_tenant):
         self.context['upgrade']['succeed'] = None
         log.get_logger().info("clean io buffer before start install")
         self.buffer.clear()
@@ -1295,167 +1292,179 @@ class OcpHandler(BaseHandler):
 
         try:
             if deploy_info.status == DeployStatus.STATUS_RUNNING:
-                if self._ocp_upgrade_use_obd(repositories, deploy):
-                    log.get_logger().info("finish do upgrade %s", app_name)
-            else:
-                if not self._ocp_upgrade_from_new_deployment(repositories, deploy, pkgs, app_name):
+                if not self._ocp_upgrade_use_obd(repositories, deploy, meta_tenant, monitor_tenant):
                     self.context['upgrade']['succeed'] = False
                     return
-                log.get_logger().info("finish do upgrade %s", app_name)
+            else:
+                if not self._ocp_upgrade_from_new_deployment(repositories, deploy, pkgs, app_name, meta_tenant, monitor_tenant):
+                    self.context['upgrade']['succeed'] = False
+                    return
+            log.get_logger().info("finish do upgrade %s", app_name)
             self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
             self.context['upgrade']['succeed'] = True
-        except:
-            log.get_logger().info("upgrade %s failed", app_name)
+        except Exception as e:
+            self.obd._call_stdio('exception', '')
+            log.get_logger().error("upgrade %s failed, reason: %s" % (app_name, e))
+            self.obd.stdio.error("upgrade %s failed, reason: %s" % (app_name, e))
             self.context['upgrade']['succeed'] = False
 
-    def _ocp_upgrade_use_obd(self, repositories, deploy):
-        deploy_config = deploy.deploy_config
-        deploy_info = deploy.deploy_info
-        component = getattr(self.obd.options, 'component')
-        version = getattr(self.obd.options, 'version')
-        if component == const.OCP_SERVER and (version == '4.0.3' or version == '4.2.0' or version == '4.2.1'):
-            component = const.OCP_SERVER_CE
-            deploy_config.components[const.OCP_SERVER_CE] = deploy_config.components[const.OCP_SERVER]
-            deploy_config._src_data[const.OCP_SERVER_CE] = deploy_config._src_data[const.OCP_SERVER]
-        usable = getattr(self.obd.options, 'usable', '')
-        disable = getattr(self.obd.options, 'disable', '')
+    def _ocp_upgrade_use_obd(self, repositories, deploy, meta_tenant, monitor_tenant):
+        try:
+            log.get_logger().info('use obd upgrade ocp')
+            deploy_config = deploy.deploy_config
+            deploy_info = deploy.deploy_info
+            component = getattr(self.obd.options, 'component')
+            version = getattr(self.obd.options, 'version')
+            if component == const.OCP_SERVER and (version == '4.0.3' or version == '4.2.0' or version == '4.2.1'):
+                component = const.OCP_SERVER_CE
+                deploy_config.components[const.OCP_SERVER_CE] = deploy_config.components[const.OCP_SERVER]
+                deploy_config._src_data[const.OCP_SERVER_CE] = deploy_config._src_data[const.OCP_SERVER]
+            usable = getattr(self.obd.options, 'usable', '')
+            disable = getattr(self.obd.options, 'disable', '')
+            cluster_config = deploy_config.components[const.OCP_SERVER_CE]
+            cluster_config.update_component_attr("meta_tenant", meta_tenant, save=True)
+            cluster_config.update_component_attr("monitor_tenant", monitor_tenant, save=True)
 
-        opt = Values()
-        setattr(opt, "skip_create_tenant", True)
-        self.obd.set_options(opt)
+            opt = Values()
+            setattr(opt, "without_ocp_parameter", True)
+            self.obd.set_options(opt)
 
-        current_repository = None
-        for current_repository in repositories:
-            if current_repository.version == '4.0.3':
-                setattr(opt, "switch_monitor_tenant_flag", 'True')
-                self.obd.set_options(opt)
-            if current_repository.name == component:
-                break
+            current_repository = None
+            for current_repository in repositories:
+                if current_repository.version == '4.0.3':
+                    setattr(opt, "switch_monitor_tenant_flag", 'True')
+                    self.obd.set_options(opt)
+                if current_repository.name == component:
+                    break
 
-        if not version:
-            self.obd._call_stdio('error', 'Specify the target version.')
-            raise Exception('Specify the upgrade version.')
+            if not version:
+                self.obd._call_stdio('error', 'Specify the target version.')
+                raise Exception('Specify the upgrade version.')
 
-        if usable:
-            usable = usable.split(',')
-        if disable:
-            disable = disable.split(',')
+            if usable:
+                usable = usable.split(',')
+            if disable:
+                disable = disable.split(',')
 
-        self.obd._call_stdio('verbose', 'search target version')
-        images = self.obd.search_images(component, version=version, disable=disable, usable=usable)
-        if not images:
-            self.obd._call_stdio('error', 'No such package %s-%s' % (component, version))
-            raise Exception('No such package %s-%s' % (component, version))
-        if len(images) > 1:
+            self.obd._call_stdio('verbose', 'search target version')
+            images = self.obd.search_images(component, version=version, disable=disable, usable=usable)
+            if not images:
+                self.obd._call_stdio('error', 'No such package %s-%s' % (component, version))
+                raise Exception('No such package %s-%s' % (component, version))
+            if len(images) > 1:
+                self.obd._call_stdio(
+                    'print_list',
+                    images,
+                    ['name', 'version', 'release', 'arch', 'md5'],
+                    lambda x: [x.name, x.version, x.release, x.arch, x.md5],
+                    title='%s %s Candidates' % (component, version)
+                )
+                self.obd._call_stdio('error', 'Too many match')
+                raise Exception('Too many match')
+
+            if isinstance(images[0], Repository):
+                pkg = self.obd.mirror_manager.get_exact_pkg(name=images[0].name, md5=images[0].md5)
+                if pkg:
+                    repositories = []
+                    pkgs = [pkg]
+                else:
+                    repositories = [images[0]]
+                    pkgs = []
+            else:
+                repositories = []
+                pkg = self.obd.mirror_manager.get_exact_pkg(name=images[0].name, md5=images[0].md5)
+                pkgs = [pkg]
+
+            install_plugins = self.obd.get_install_plugin_and_install(repositories, pkgs)
+            if not install_plugins:
+                raise Exception('install plugin error')
+
+            dest_repository = repositories[0]
+            if dest_repository is None:
+                self.obd._call_stdio('error', 'Target version not found')
+                raise Exception('Target version not found')
+
+            if dest_repository == current_repository:
+                self.obd._call_stdio('print', 'The current version is already %s.\nNoting to do.' % current_repository)
+                raise Exception('The current version is already %s.\nNoting to do.' % current_repository)
+            ssh_clients = self.obd.get_clients(deploy_config, [current_repository])
+            cluster_config = deploy_config.components[current_repository.name]
+
+            upgrade_repositories = [current_repository]
+            upgrade_repositories.append(dest_repository)
+            self.obd.set_repositories(upgrade_repositories)
+
             self.obd._call_stdio(
                 'print_list',
-                images,
-                ['name', 'version', 'release', 'arch', 'md5'],
-                lambda x: [x.name, x.version, x.release, x.arch, x.md5],
-                title='%s %s Candidates' % (component, version)
+                upgrade_repositories,
+                ['name', 'version', 'release', 'arch', 'md5', 'mark'],
+                lambda x: [x.name, x.version, x.release, x.arch, x.md5,
+                           'start' if x == current_repository else 'dest' if x == dest_repository else ''],
+                title='Packages Will Be Used'
             )
-            self.obd._call_stdio('error', 'Too many match')
-            raise Exception('Too many match')
 
-        if isinstance(images[0], Repository):
-            pkg = self.obd.mirror_manager.get_exact_pkg(name=images[0].name, md5=images[0].md5)
-            if pkg:
-                repositories = []
-                pkgs = [pkg]
-            else:
-                repositories = [images[0]]
-                pkgs = []
-        else:
-            repositories = []
-            pkg = self.obd.mirror_manager.get_exact_pkg(name=images[0].name, md5=images[0].md5)
-            pkgs = [pkg]
+            index = 1
+            upgrade_ctx = {
+                'route': [],
+                'upgrade_repositories': [
+                    {
+                        'version': repository.version,
+                        'hash': repository.md5
+                    } for repository in upgrade_repositories
+                ],
+                'index': 1
+            }
+            deploy.start_upgrade(component, **upgrade_ctx)
 
-        install_plugins = self.obd.get_install_plugin_and_install(repositories, pkgs)
-        if not install_plugins:
-            raise Exception('install plugin error')
+            install_plugins = self.obd.get_install_plugin_and_install(upgrade_repositories, [])
+            if not install_plugins:
+                raise Exception('install upgrade plugin error')
 
-        dest_repository = repositories[0]
-        if dest_repository is None:
-            self.obd._call_stdio('error', 'Target version not found')
-            raise Exception('Target version not found')
+            if not self.obd.install_repositories_to_servers(deploy_config, upgrade_repositories[1:], install_plugins):
+                raise Exception('install upgrade plugin error to server')
 
-        if dest_repository == current_repository:
-            self.obd._call_stdio('print', 'The current version is already %s.\nNoting to do.' % current_repository)
-            raise Exception('The current version is already %s.\nNoting to do.' % current_repository)
-        ssh_clients = self.obd.get_clients(deploy_config, [current_repository])
-        cluster_config = deploy_config.components[current_repository.name]
+            repository = upgrade_repositories[upgrade_ctx['index']]
+            repositories = [repository]
+            upgrade_plugin = self.obd.search_py_script_plugin(repositories, 'upgrade')[repository]
+            self.obd.set_repositories(repositories)
+            ret = self.obd.call_plugin(
+                upgrade_plugin, repository,
+                search_py_script_plugin=self.obd.search_py_script_plugin,
+                local_home_path=self.obd.home_path,
+                current_repository=current_repository,
+                upgrade_repositories=upgrade_repositories,
+                apply_param_plugin=lambda repository: self.obd.search_param_plugin_and_apply([repository],
+                                                                                             deploy_config),
+                metadb_cursor=self.context['metadb_cursor'],
+                sys_cursor=self.context['sys_cursor']
+            )
+            deploy.update_upgrade_ctx(**upgrade_ctx)
+            if not ret:
+                self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
+                raise Exception('call upgrade plugin error')
+            deploy.stop_upgrade(dest_repository)
+            if version == '4.2.1':
+                if const.OCP_SERVER in deploy_config._src_data:
+                    del deploy_config._src_data[const.OCP_SERVER]
+                if const.OCP_SERVER in deploy_config.components:
+                    del deploy_config.components[const.OCP_SERVER]
+                if const.OCP_SERVER in deploy_info.components:
+                    del deploy_info.components[const.OCP_SERVER]
+                if const.OCEANBASE_CE in deploy_config.components:
+                    del deploy_config.components[const.OCEANBASE_CE]
+                if const.OCEANBASE_CE in deploy_config._src_data and const.OBPROXY_CE not in deploy_info.components:
+                    del deploy_config._src_data[const.OCEANBASE_CE]
+                if const.OCEANBASE_CE in deploy_info.components and const.OBPROXY_CE not in deploy_info.components:
+                    del deploy_info.components[const.OCEANBASE_CE]
+                deploy_config.dump()
+            return True
+        except Exception as e:
+            self.obd._call_stdio('exception', '')
+            log.get_logger().error("use obd upgrade failed, reason: %s" % e)
+            self.obd.stdio.error("use obd upgrade failed, reason: %s" % e)
+            return False
 
-        upgrade_repositories = [current_repository]
-        upgrade_repositories.append(dest_repository)
-        self.obd.set_repositories(upgrade_repositories)
-
-        self.obd._call_stdio(
-            'print_list',
-            upgrade_repositories,
-            ['name', 'version', 'release', 'arch', 'md5', 'mark'],
-            lambda x: [x.name, x.version, x.release, x.arch, x.md5,
-                       'start' if x == current_repository else 'dest' if x == dest_repository else ''],
-            title='Packages Will Be Used'
-        )
-
-        index = 1
-        upgrade_ctx = {
-            'route': [],
-            'upgrade_repositories': [
-                {
-                    'version': repository.version,
-                    'hash': repository.md5
-                } for repository in upgrade_repositories
-            ],
-            'index': 1
-        }
-        deploy.start_upgrade(component, **upgrade_ctx)
-
-        install_plugins = self.obd.get_install_plugin_and_install(upgrade_repositories, [])
-        if not install_plugins:
-            raise Exception('install upgrade plugin error')
-
-        if not self.obd.install_repositories_to_servers(deploy_config, upgrade_repositories[1:], install_plugins,
-                                                        ssh_clients, self.obd.options):
-            raise Exception('install upgrade plugin error to server')
-
-        repository = upgrade_repositories[upgrade_ctx['index']]
-        repositories = [repository]
-        upgrade_plugin = self.obd.search_py_script_plugin(repositories, 'upgrade')[repository]
-        self.obd.set_repositories(repositories)
-        ret = self.obd.call_plugin(
-            upgrade_plugin, repository,
-            search_py_script_plugin=self.obd.search_py_script_plugin,
-            local_home_path=self.obd.home_path,
-            current_repository=current_repository,
-            upgrade_repositories=upgrade_repositories,
-            apply_param_plugin=lambda repository: self.obd.search_param_plugin_and_apply([repository],
-                                                                                         deploy_config),
-            metadb_cursor=self.context['metadb_cursor'],
-            sys_cursor=self.context['sys_cursor']
-        )
-        deploy.update_upgrade_ctx(**upgrade_ctx)
-        if not ret:
-            self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
-            raise Exception('call upgrade plugin error')
-        deploy.stop_upgrade(dest_repository)
-        if version == '4.2.1':
-            if const.OCP_SERVER in deploy_config._src_data:
-                del deploy_config._src_data[const.OCP_SERVER]
-            if const.OCP_SERVER in deploy_config.components:
-                del deploy_config.components[const.OCP_SERVER]
-            if const.OCP_SERVER in deploy_info.components:
-                del deploy_info.components[const.OCP_SERVER]
-            if const.OCEANBASE_CE in deploy_config.components:
-                del deploy_config.components[const.OCEANBASE_CE]
-            if const.OCEANBASE_CE in deploy_config._src_data and const.OBPROXY_CE not in deploy_info.components:
-                del deploy_config._src_data[const.OCEANBASE_CE]
-            if const.OCEANBASE_CE in deploy_info.components and const.OBPROXY_CE not in deploy_info.components:
-                del deploy_info.components[const.OCEANBASE_CE]
-            deploy_config.dump()
-        return True
-
-    def _ocp_upgrade_from_new_deployment(self, repositories, deploy, pkgs, name):
+    def _ocp_upgrade_from_new_deployment(self, repositories, deploy, pkgs, name, meta_tenant, monitor_tenant):
         deploy_config = deploy.deploy_config
         try:
 
@@ -1466,6 +1475,14 @@ class OcpHandler(BaseHandler):
             if not version:
                 self.obd._call_stdio('error', 'Specify the target version.')
                 raise Exception('Specify the upgrade version.')
+
+            cluster_config = deploy_config.components[const.OCP_SERVER_CE]
+            cluster_config.update_component_attr("meta_tenant", meta_tenant, save=True)
+            cluster_config.update_component_attr("monitor_tenant", monitor_tenant, save=True)
+            deploy_config._src_data[const.OCP_SERVER_CE]['version'] = version
+            deploy_config._src_data[const.OCP_SERVER_CE]['package_hash'] = usable
+            deploy_config.dump()
+            self.obd.set_deploy(deploy)
 
             if usable:
                 usable = usable.split(',')
@@ -1514,11 +1531,11 @@ class OcpHandler(BaseHandler):
                 kill_process_res = ssh_client.execute_command("ps -ef | grep java | grep 'ocp-server.jar' | grep -v grep | awk '{print $2}' | xargs kill -9 ")
                 log.get_logger().info("stop ocp process get result {0} {1} {2}".format(kill_process_res.code, kill_process_res.stdout, kill_process_res.stderr))
 
+
             install_plugins = self.obd.get_install_plugin_and_install(repositories, pkgs)
             if not install_plugins:
                 return False
-            if not self.obd.install_repositories_to_servers(deploy_config, repositories[1:], install_plugins,
-                                                            ssh_clients, self.obd.options):
+            if not self.obd.install_repositories_to_servers(deploy_config, repositories, install_plugins):
                 return False
             start_success = True
             repositories = list(set(repositories))
@@ -1528,6 +1545,7 @@ class OcpHandler(BaseHandler):
                 setattr(opt, "strict_check", False)
                 setattr(opt, "clean", True)
                 setattr(opt, "force", True)
+                setattr(opt, "metadb_cursor", self.context['metadb_cursor'])
                 self.obd.set_options(opt)
                 log.get_logger().info('begin deploy')
                 ret = self.obd.deploy_cluster(name)
@@ -1536,8 +1554,7 @@ class OcpHandler(BaseHandler):
                     log.get_logger().error("failed to deploy component: %s", repository.name)
                     raise Exception("failed to deploy component: %s", repository.name)
                 opt = Values()
-                setattr(opt, "skip_create_tenant", True)
-                setattr(opt, "without_ocp_parameter", True)
+                setattr(opt, "without_parameter", True)
                 self.obd.set_options(opt)
                 log.get_logger().info('begin start ocp')
                 ret = self.obd.start_cluster(name)
@@ -1547,6 +1564,9 @@ class OcpHandler(BaseHandler):
                     raise Exception("failed to deploy component: %s", repository.name)
             return True
         except Exception as e:
+            self.obd._call_stdio('exception', '')
+            log.get_logger().error("use create new deployment upgrade failed, reason: %s" % e)
+            self.obd.stdio.error("use create new deployment upgrade failed, reason: %s" % e)
             return False
 
     def get_ocp_upgrade_task(self, cluster_name, task_id):
@@ -1558,7 +1578,6 @@ class OcpHandler(BaseHandler):
         task_info.info = []
         task_info.finished = ''
 
-        self.context['ocp_upgrade']['failed'] = 0 if not self.context['ocp_upgrade']['failed'] else self.context['ocp_upgrade']['failed']
         for component in self.obd.deploy.deploy_config.components:
             plugin = const.UPGRADE_PLUGINS
             step_info = TaskStepInfo(name=f'{component}-{plugin}', status=TaskStatus.RUNNING, result=TaskResult.RUNNING)
@@ -1572,8 +1591,6 @@ class OcpHandler(BaseHandler):
                 else:
                     step_info.result = TaskResult.SUCCESSFUL
                 step_info.status = TaskStatus.FINISHED
-            else:
-                self.context['ocp_upgrade']['failed'] += 1
 
             if self.obd.namespaces[component].get_return('start') is not None:
                 log.get_logger().info('start: %s' % self.obd.namespaces[component].get_return('start'))
@@ -1582,8 +1599,6 @@ class OcpHandler(BaseHandler):
                 else:
                     step_info.result = TaskResult.SUCCESSFUL
                 step_info.status = TaskStatus.FINISHED
-            else:
-                self.context['ocp_upgrade']['failed'] += 1
 
             if self.obd.namespaces[component].get_return('display') is not None:
                 log.get_logger().info('display: %s' % self.obd.namespaces[component].get_return('display'))
@@ -1592,14 +1607,12 @@ class OcpHandler(BaseHandler):
                 else:
                     step_info.result = TaskResult.SUCCESSFUL
                 step_info.status = TaskStatus.FINISHED
-            else:
-                self.context['ocp_upgrade']['failed'] += 1
 
             task_info.info.append(step_info)
             task_info.finished += f'{component}-{plugin} '
 
         status_flag = [i.result for i in task_info.info]
-        if TaskResult.FAILED in status_flag or self.context['ocp_upgrade']['failed'] >= 3000 or self.context['upgrade']['succeed'] is False:
+        if TaskResult.FAILED in status_flag or self.context['upgrade']['succeed'] is False:
             task_info.result = TaskResult.FAILED
             task_info.status = TaskStatus.FINISHED
 

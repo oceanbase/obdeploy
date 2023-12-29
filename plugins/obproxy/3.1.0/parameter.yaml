@@ -2,7 +2,7 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   need_redeploy: true
   description_en: the directory for the work data file
   description_local: ObProxy工作目录
@@ -30,13 +30,13 @@
   description_local: 提供prometheus服务端口号
 - name: appname
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   description_en: application name
   description_local: 应用名
 - name: cluster_name
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   description_en: observer cluster name
   description_local: 代理的observer集群名
@@ -244,7 +244,7 @@
   need_restart: false
   description_en: short async task timeout, [1s, 1h]
 - name: username_separator
-  type: STRING_LIST
+  type: SAFE_STRING_LIST
   default: :;-;.
   min_value: 
   max_value: 
@@ -385,7 +385,7 @@
   need_restart: true
   description_en: enable cpu topology, work threads bind to cpu
 - name: local_bound_ip
-  type: STRING
+  type: SAFE_STRING
   default: 0.0.0.0
   need_restart: true
   description_en: local bound ip(any)
@@ -395,7 +395,7 @@
   need_restart: true
   description_en: url of config info(rs list and so on)
 - name: proxy_service_mode
-  type: STRING
+  type: SAFE_STRING
   default: ''
   need_restart: true
   description_en: "proxy deploy and service mode: 1.client(default); 2.server"
@@ -407,7 +407,7 @@
   need_restart: true
   description_en: used to identify each obproxy, it can not be zero if proxy_service_mode is server
 - name: app_name
-  type: STRING
+  type: SAFE_STRING
   default: undefined
   need_restart: true
   description_en: current application name which proxy works for, need defined, only modified when restart
@@ -419,7 +419,7 @@
   need_restart: true
   description_en: use MetaDataBase when proxy run
 - name: rootservice_cluster_name
-  type: STRING
+  type: SAFE_STRING
   default: undefined
   need_restart: true
   description_en: default cluster name for rootservice_list

@@ -21,9 +21,10 @@
 from __future__ import absolute_import, division, print_function
 
 
-def bootstrap(plugin_context, cursor, *args, **kwargs):
+def bootstrap(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
+    cursor = plugin_context.get_return('connect').get_return('cursor')
     global_ret = True
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)

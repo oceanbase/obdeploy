@@ -157,10 +157,12 @@ class ServiceInfoHandler(BaseHandler):
         jdbc_username = self.context['connection_info'][cluster_name].user
         user_name = jdbc_username.split('@')[0]
         tenant_name = jdbc_username.split('@')[1].split('#')[0] if '#' in jdbc_username else jdbc_username.split('@')[1]
+        self.context['meta']['tenant_name'] = tenant_name
         tenant_user = TenantUser(tenant_name=tenant_name, user_name=user_name, user_database=self.context['connection_info'][cluster_name].database)
         meta_tenant = TenantConfig(name=tenant_user, password=self.context['connection_info'][cluster_name].password)
 
         monitor_tenant_name = monitor_user.split('@')[1].split('#')[0] if '#' in monitor_user else monitor_user.split('@')[1]
+        self.context['monitor']['tenant_name'] = monitor_tenant_name
         monitor_tenant_username = monitor_user.split('@')[0]
         monitor_tenant_user = TenantUser(tenant_name=monitor_tenant_name, user_name=monitor_tenant_username, user_database=monitor_database)
         monitor_tenant = TenantConfig(name=monitor_tenant_user, password=monitor_password)
@@ -281,6 +283,8 @@ class ServiceInfoHandler(BaseHandler):
             monitor_tenant_sql = "select `value` from %s.config_properties where `key` = 'ocp.monitordb.username'" % metadb.database
             monitor_tenant = self.context['metadb_cursor'].fetchone(monitor_tenant_sql, raise_exception=True)
             log.get_logger().info('monitor_tenant: %s' % monitor_tenant)
+            self.context['meta']['tenant_name'] = metadb.user.split('@')[1].split('#')[0] if '#' in metadb.user else metadb.user.split('@')[1]
+            self.context['monitor']['tenant_name'] = monitor_tenant['value'].split('@')[1].split('#')[0] if '#' in monitor_tenant['value'] else monitor_tenant['value'].split('@')[1]
             tips = False
             if monitor_tenant and monitor_tenant.get('value') in metadb.user:
                 tips = True

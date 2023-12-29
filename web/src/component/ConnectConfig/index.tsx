@@ -109,7 +109,7 @@ export default function ConnectConfig({ setCurrent, current }: API.StepProp) {
   const initialValues: FormValues = {
     metadb: {
       host: host || undefined,
-      port: port || undefined,
+      port: port || 2883,
       user: user || 'root@sys',
       password: password || undefined,
     },
@@ -132,71 +132,77 @@ export default function ConnectConfig({ setCurrent, current }: API.StepProp) {
           <ProForm.Item
             name={['metadb', 'host']}
             label={intl.formatMessage({
-              id: 'OBD.component.ConnectConfig.HostIp',
-              defaultMessage: '主机 IP',
+              id: 'OBD.component.ConnectConfig.MetadbAccessAddress',
+              defaultMessage: 'MetaDB 访问地址',
             })}
             style={InputWidthStyle}
             rules={[
               {
                 required: true,
                 message: intl.formatMessage({
-                  id: 'OBD.component.ConnectConfig.EnterTheHostIpAddress',
-                  defaultMessage: '请输入主机 IP',
+                  id: 'OBD.component.ConnectConfig.PleaseEnterMetadbAccessAddress',
+                  defaultMessage: '请输入 MetaDB 访问地址',
                 }),
               },
               {
                 pattern: /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/,
                 message: intl.formatMessage({
-                  id: 'OBD.component.ConnectConfig.TheHostIpAddressFormat',
-                  defaultMessage: '主机IP格式不正确',
+                  id: 'OBD.component.ConnectConfig.TheMetadbAccessAddressFormat',
+                  defaultMessage: 'MetaDB 访问地址格式不正确',
                 }),
               },
             ]}
           >
             <Input
               placeholder={intl.formatMessage({
-                id: 'OBD.component.ConnectConfig.EnterADatabaseAccessIp',
-                defaultMessage: '请输入数据库访问 IP 地址',
+                id: 'OBD.component.ConnectConfig.PleaseEnterMetadbAccessAddress',
+                defaultMessage: '请输入 MetaDB 访问地址',
               })}
             />
           </ProForm.Item>
           <InputPort
             name={['metadb', 'port']}
             label={intl.formatMessage({
-              id: 'OBD.component.ConnectConfig.AccessPort',
-              defaultMessage: '访问端口',
+              id: 'OBD.component.ConnectConfig.MetadbAccessPort',
+              defaultMessage: 'MetaDB 访问端口',
             })}
             message={intl.formatMessage({
-              id: 'OBD.component.ConnectConfig.EnterAnAccessPort',
-              defaultMessage: '请输入访问端口',
+              id: 'OBD.component.ConnectConfig.EnterTheMetadbAccessPort',
+              defaultMessage: '请输入 MetaDB 访问端口',
             })}
             fieldProps={{ style: InputWidthStyle }}
           />
+
           <ProForm.Item
             name={['metadb', 'user']}
             label={intl.formatMessage({
-              id: 'OBD.component.ConnectConfig.AccessAccount',
-              defaultMessage: '访问账号',
+              id: 'OBD.component.ConnectConfig.MetadbAccessAccount',
+              defaultMessage: 'MetaDB 访问账号',
             })}
             style={InputWidthStyle}
             rules={[
               {
                 required: true,
                 message: intl.formatMessage({
-                  id: 'OBD.component.ConnectConfig.EnterAnAccessAccount',
-                  defaultMessage: '请输入访问账号',
+                  id: 'OBD.component.ConnectConfig.EnterAMetadbAccessAccount',
+                  defaultMessage: '请输入 MetaDB 访问账号',
                 }),
               },
             ]}
           >
-            <Input placeholder="root@sys" />
+            <Input
+              placeholder={intl.formatMessage({
+                id: 'OBD.component.ConnectConfig.PleaseEnter',
+                defaultMessage: '请输入',
+              })}
+            />
           </ProForm.Item>
           <ProForm.Item
             label={
               <>
                 {intl.formatMessage({
-                  id: 'OBD.component.ConnectConfig.AccessPassword',
-                  defaultMessage: '访问密码',
+                  id: 'OBD.component.ConnectConfig.MetadbAccessPassword',
+                  defaultMessage: 'MetaDB 访问密码',
                 })}
 
                 <Tooltip
@@ -214,8 +220,8 @@ export default function ConnectConfig({ setCurrent, current }: API.StepProp) {
               {
                 required: true,
                 message: intl.formatMessage({
-                  id: 'OBD.component.ConnectConfig.EnterAnAccessPassword',
-                  defaultMessage: '请输入访问密码',
+                  id: 'OBD.component.ConnectConfig.EnterMetadbAccessPassword',
+                  defaultMessage: '请输入 MetaDB 访问密码',
                 }),
               },
             ]}

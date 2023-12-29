@@ -113,6 +113,7 @@ class InitDirFailedErrorMessage(object):
 DOC_LINK = '<DOC_LINK>'
 DOC_LINK_MSG = 'See {}'.format(DOC_LINK if DOC_LINK else "https://www.oceanbase.com/product/ob-deployer/error-codes .")
 
+# generic error code
 EC_CONFIG_CONFLICT_PORT = OBDErrorCodeTemplate(1000, 'Configuration conflict {server1}:{port} port is used for {server2}\'s {key}')
 EC_CONFLICT_PORT = OBDErrorCodeTemplate(1001, '{server}:{port} port is already used')
 EC_FAIL_TO_INIT_PATH = OBDErrorCodeTemplate(1002, 'Fail to init {server} {key}{msg}')
@@ -130,6 +131,19 @@ EC_SSH_CONNECT = OBDErrorCodeTemplate(1013, '{user}@{ip} connect failed: {messag
 EC_CHECK_STANDBY = OBDErrorCodeTemplate(1015, 'Unable to confirm the primary-standby relationship, rerun with "--ignore-standby" option if you want to proceed despite the risks.')
 EC_FAILED_TO_GET_PARAM = OBDErrorCodeTemplate(1016, '({ip}) failed to get {key} using command "{cmd}"')
 EC_PARAM_NOT_IN_NEED = OBDErrorCodeTemplate(1017, '({ip}) The value of the "{check_item}" must be {need} (Current value: {now}, Recommended value: {recommend})')
+EC_COMPONENT_CHANGE_CONFIG = OBDErrorCodeTemplate(1018, 'could not change {message}')
+EC_COMPONENT_EXISTS = OBDErrorCodeTemplate(1019, 'component {component} is already in cluster')
+EC_COMPONENT_FAIL_TO_UPDATE_CONFIG = OBDErrorCodeTemplate(1020, 'Update config for component {component} failed')
+EC_COMPONENT_NOT_EXISTS = OBDErrorCodeTemplate(1021, 'Component {component} is not in cluster')
+EC_COMPONENT_REMOVE_DEPENDS = OBDErrorCodeTemplate(1022, 'Component {component1} still depends by {component2}, could not remove')
+EC_COMPONENT_FAILED_TO_MERGE_CONFIG = OBDErrorCodeTemplate(1023, 'Failed to merge config: {message}')
+EC_COMPONENT_NO_REMAINING_COMPS = OBDErrorCodeTemplate(1024, 'The cluster will have no remaining components. If you are absolutely sure about DELETING ALL COMPONENTS, please use "obd cluster destroy <deploy>" command to completely destroy the cluster')
+
+WC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) The recommended number of {key} is {need} (Current value: {now})')
+WC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) The recommended value of fs.aio-max-nr is 1048576 (Current value: {current})')
+WC_OBSERVER_SAME_DISK = OBDErrorCodeTemplate(1012, '({ip}) clog and data use the same disk ({disk})')
+WC_FAIL_TO_RESTART_OR_RELOAD = OBDErrorCodeTemplate(1021, 'The components has been {action}, but encountered problems when reloading or restarting. Details:\n{detail}')
+WC_FAIL_TO_RESTART_OR_RELOAD_AFTER_SCALE_OUT = OBDErrorCodeTemplate(1022, 'The cluster has been scaled out, but encountered problems when reloading or restarting. Details:\n{detail}')
 
 # error code for observer
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
@@ -150,6 +164,8 @@ EC_OBSERVER_TIME_OUT_OF_SYNC = OBDErrorCodeTemplate(2008, 'Cluster clocks are ou
 EC_OBSERVER_PRODUCTION_MODE_LIMIT = OBDErrorCodeTemplate(2009, '({server}): when production_mode is True, {key} can not be less then {limit}')
 EC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory must be less than memory_limit/memory_limit_percentage.')
 EC_OBSERVER_GET_MEMINFO_FAIL = OBDErrorCodeTemplate(2011, "{server}: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
+
+WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 
 # error code for test commands
 EC_MYSQLTEST_PARSE_CMD_FAILED = OBDErrorCodeTemplate(3000, 'parse cmd failed: {path}')
@@ -187,15 +203,23 @@ EC_OCP_SERVER_MACHINE_STATUS = OBDErrorCodeTemplate(4351, 'The Server have gone'
 EC_OCP_SERVER_METADB_VERSION = OBDErrorCodeTemplate(4352, 'Metadb version not fewer than V2.2.50')
 EC_OCP_SERVER_TIME_SHIFT = OBDErrorCodeTemplate(4353, '{server}: Excessive deviation between machine time and ob time')
 EC_OCP_SERVER_LAUNCH_USER_NOT_EXIST = OBDErrorCodeTemplate(4354, '{user}@{server}: Not exist')
-EC_SUDO_NOPASSWD = OBDErrorCodeTemplate(4355, '{user}@{ip}: user {user} not in sudoers or sudoers file not exist')
-EC_CONNECT_METADB = OBDErrorCodeTemplate(4356, 'failed to connect meta db')
-EC_DB_NOT_IN_JDBC_URL = OBDErrorCodeTemplate(4357, 'database in jdbc_url is not exist')
-EC_ERROR_JDBC_URL = OBDErrorCodeTemplate(4358, 'unmatched jdbc url, skip meta db connection check')
+EC_OCP_SERVER_SUDO_NOPASSWD = OBDErrorCodeTemplate(4355, '{user}@{ip}: user {user} not in sudoers or sudoers file not exist')
+EC_OCP_SERVER_CONNECT_METADB = OBDErrorCodeTemplate(4356, 'failed to connect meta db')
+EC_OCP_SERVER_DB_NOT_IN_JDBC_URL = OBDErrorCodeTemplate(4357, 'database in jdbc_url is not exist')
+EC_OCP_SERVER_ERROR_JDBC_URL = OBDErrorCodeTemplate(4358, 'unmatched jdbc url, skip meta db connection check')
 EC_OCP_SERVER_JAVA_VERSION_ERROR = OBDErrorCodeTemplate(4359, "{server}: ocp-server need java with version {version} and update release must greater than 161")
+EC_OCP_SERVER_JAVA_NOT_FOUND = OBDErrorCodeTemplate(4359, "{server}: failed to query java version, you may not have java installed")
 EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS = OBDErrorCodeTemplate(4360, "{server}: clockdiff not exists. Please install clockdiff manually")
 EC_OCP_SERVER_TENANT_ALREADY_EXISTS = OBDErrorCodeTemplate(4361, "tenant({tenant_name}) alread exist")
 EC_OCP_SERVER_DIR_ACCESS_FORBIDE = OBDErrorCodeTemplate(4362, "{server}:{path} access failed for current user, {server}:{cur_path} access succeed, please run `chmod -R 755 {cur_path}` ")
+EC_OCP_SERVER_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4363, 'OCP server {ocp_server_version} needs to use {comp} with version {comp_version} or above')
+EC_OCP_SERVER_NOT_ENOUGH_MEMORY_AVAILABLE = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Available: {available}, Need: {need})')
+EC_OCP_SERVER_NOT_ENOUGH_MEMORY_CACHED = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Buff/Cache: {cached}, Need: {need})')
+EC_OCP_SERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Need: {need})')
+EC_OCP_SERVER_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4365, '({ip}) {disk} not enough disk space. (Avail: {avail}, Need: {need})')
 
+WC_OCP_EXPRESS_FAILED_TO_GET_DISK_INFO = OBDErrorCodeTemplate(4303, '({ip}) failed to get disk information, skip disk space check')
+WC_OCP_SERVER_FAILED_TO_GET_DISK_INFO = OBDErrorCodeTemplate(4365, '({ip}) failed to get disk information, skip disk space check')
 
 #ob-configserver
 EC_OBC_PROGRAM_START_ERROR = OBDErrorCodeTemplate(4401, 'Failed to start {server} ob-configserver.')
@@ -206,6 +230,10 @@ EC_OBC_DATABASE_TYPE_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserve
 EC_OBC_SQLITE_PERMISSION_DENIED = OBDErrorCodeTemplate(4403, 'ob-configserver connect to sqlite failed: {ip}: {path}: permission denied.')
 EC_OBC_DATABASE_CONNECT_ERROR = OBDErrorCodeTemplate(4404, 'ob-configserver connect to mysql failed: {server}: failed url to connect to database: {url}')
 
+# oblogproxy
+EC_OBLOGPROXY_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4501, 'OBLogProxy {oblogproxy_version} needs to use {comp} with version {comp_version} or above')
+
+WC_PARAM_USELESS = OBDErrorCodeTemplate(4521, 'The config {key} in {current_comp} did not take effect, please config it in {comp}')
 
 # sql
 EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
@@ -218,13 +246,6 @@ EC_OBDIAG_FUCYION_FAILED = OBDErrorCodeTemplate(6003, 'Failed to excute obdiag f
 
 # Unexpected exceptions code
 EC_UNEXPECTED_EXCEPTION = OBDErrorCodeTemplate(9999, 'Unexpected exception: need to be posted on "https://ask.oceanbase.com", and we will help you resolve them.')
-
-# WARN CODE 
-WC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) The recommended number of {key} is {need} (Current value: {now})')
-WC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) The recommended value of fs.aio-max-nr is 1048576 (Current value: {current})')
-WC_OBSERVER_SAME_DISK = OBDErrorCodeTemplate(1012, '({ip}) clog and data use the same disk ({disk})')
-WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
-WC_OCP_EXPRESS_FAILED_TO_GET_DISK_INFO = OBDErrorCodeTemplate(4303, '({ip}) failed to get disk information, skip disk space check')
 
 # SUGGESTION for ERROR
 SUG_SET_CONFIG = OBDErrorSuggestionTemplate('Please set config {key} correctly')
@@ -265,5 +286,12 @@ SUG_OCP_EXPRESS_COMP_VERSION = OBDErrorSuggestionTemplate('Please use {comp} wit
 SUG_OCP_EXPRESS_REDUCE_META_DB_MEM = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_memory_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_memory_size')])
 SUG_OCP_EXPRESS_REDUCE_META_DB_LOG_DISK = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_log_disk_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_log_disk_size')])
 SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD_ERROR = OBDErrorSuggestionTemplate('Please edit the `admin_passwd`, must be 8 to 32 characters in length, and must contain at least two digits, two uppercase letters, two lowercase letters, and two of the following special characters:~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_passwd')], auto_fix=True)
+SUG_RESTART_OR_RELOAD = OBDErrorSuggestionTemplate('Please restart or reload the cluster manually')
 SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR = OBDErrorSuggestionTemplate('Please ensure that the `jdbc_url` in the `config.yaml` configuration file is set correctly to establish a successful connection with your database')
+SUG_OCP_SERVER_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.')
+SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION = OBDErrorSuggestionTemplate('Please install java with version {version}. If java is already installed, please set `java_bin` to the expected java binary path')
+SUG_OCP_SERVER_REDUCE_MEM = OBDErrorSuggestionTemplate('Please reduce the `memory_size`', fix_eval=[FixEval(FixEval.DEL, 'memory_size')])
+SUG_OCP_SERVER_REDUCE_DISK = OBDErrorSuggestionTemplate('Please reduce the `logging_file_total_size_cap`', fix_eval=[FixEval(FixEval.DEL, 'logging_file_total_size_cap')])
 SUG_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.')
+SUG_OB_SYS_USERNAME = OBDErrorSuggestionTemplate('Please delete the "ob_sys_username" parameter.')
+SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" component.''')

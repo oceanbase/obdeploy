@@ -36,6 +36,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCS1_signature
 from Crypto.Cipher import PKCS1_OAEP as PKCS1_cipher
 
+from _errno import EC_FAIL_TO_CONNECT, EC_SQL_EXECUTE_FAILED
+
+
 PRI_KEY_FILE = '.ocp-express'
 PUB_KEY_FILE = '.ocp-express.pub'
 
@@ -109,6 +112,21 @@ class Cursor(SafeStdio):
                                cursorclass=mysql.cursors.DictCursor)
             self.cursor = self.db.cursor()
 
+    def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):
+        try:
+            stdio.verbose('execute sql: %s. args: %s' % (sql, args))
+            self.cursor.execute(sql, args)
+            if not execute_func:
+                return self.cursor
+            return getattr(self.cursor, execute_func)()
+        except Exception as e:
+            getattr(stdio, exc_level)(EC_SQL_EXECUTE_FAILED.format(sql=sql))
+            if raise_exception is None:
+                raise_exception = self._raise_exception
+            if raise_exception:
+                stdio.exception('')
+                raise e
+            return False
 
 def generate_key(client, key_dir, stdio):
     rsa = RSA.generate(1024)
@@ -330,11 +348,11 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         port = server_config['port']
         pid_path = os.path.join(home_path, 'run/ocp-express.pid')
         pids = client.execute_command("cat %s" % pid_path).stdout.strip()
-        bootstrap_flag = os.path.join(home_path, '.bootstrapped')
+        bootstrap_flag = client.execute_command('ls %s'%os.path.join(home_path, '.bootstrapped'))
         if pids and all([client.execute_command('ls /proc/%s' % pid) for pid in pids.split('\n')]):
             server_pid[server] = pids
             continue
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % bootstrap_flag):
+        if getattr(options, 'without_parameter', False) and bootstrap_flag:
             use_parameter = False
         else:
             use_parameter = True
@@ -359,9 +377,15 @@ def start(plugin_context, start_env=None, *args, **kwargs):
                 server_ip = connect_info[0]
                 server_port = connect_info[-1]
                 try:
-                    Cursor(ip=server_ip, port=server_port, user=jdbc_username, password=jdbc_password, database=database, stdio=stdio)
+                    ob_cursor = Cursor(ip=server_ip, port=server_port, user=jdbc_username, password=jdbc_password, database=database, stdio=stdio)
                     jdbc_url = 'jdbc:oceanbase://{}:{}/{}'.format(server_ip, server_port, database)
                     connected = True
+                    if not bootstrap_flag:
+                        if not ob_cursor.execute("update config_properties set `value`=NULL, default_value=NULL where `key`='ocp.version' or `key`='ocp.version.full'"):
+                            stdio.warn("failed to update 'ocp.version' and 'ocp.version.full' to NULL in config_properties table")
+                        if not ob_cursor.execute("update user set need_change_password=true where id='100' "):
+                            stdio.warn("failed to update 'need_change_password' to true in user table")
+                        
                     break
                 except:
                     time.sleep(1)
@@ -399,7 +423,8 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             for key in server_config:
                 if key not in exclude_keys and key in config_mapper:
                     cmd += ' --with-property={}:{}'.format(config_mapper[key], server_config[key])
-
+        elif not bootstrap_flag:
+            cmd += ' --bootstrap --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
         data = {
             "cluster": {
                 "name": server_config["cluster_name"],

@@ -69,6 +69,11 @@ class PrometheusAPICursor(object):
 
 
 def connect(plugin_context, target_server=None, *args, **kwargs):
+    def return_true(**kwargs):
+        for key, value in kwargs.items():
+            plugin_context.set_variable(key, value)
+        return plugin_context.return_true(**kwargs)
+    
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     if target_server:
@@ -98,4 +103,4 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         stdio.stop_loading('fail')
         return plugin_context.return_false()
     stdio.stop_loading('succeed')
-    return plugin_context.return_true(connect=cursors, cursor=cursors)
+    return return_true(connect=cursors, cursor=cursors)

@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function
 import os
 
 
-def bootstrap(plugin_context, cursor, *args, **kwargs):
+def bootstrap(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio

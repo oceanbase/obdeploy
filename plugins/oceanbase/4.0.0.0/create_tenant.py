@@ -83,7 +83,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
     return tenant_cursor.execute(sql, raise_exception=False, exc_level='verbose') if tenant_cursor else False
 
 
-def create_tenant(plugin_context, cursor, create_tenant_options=None, *args, **kwargs):
+def create_tenant(plugin_context, create_tenant_options=None, cursor=None, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -109,6 +109,7 @@ def create_tenant(plugin_context, cursor, create_tenant_options=None, *args, **k
     stdio = plugin_context.stdio
     options = create_tenant_options if create_tenant_options else plugin_context.options
     create_if_not_exists = get_option('create_if_not_exists', False)
+    cursor = plugin_context.get_return('connect').get_return('cursor') if not cursor else cursor
     global tenant_cursor
     tenant_cursor = None
 

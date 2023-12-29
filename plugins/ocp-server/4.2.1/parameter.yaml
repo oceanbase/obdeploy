@@ -2,7 +2,7 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   need_redeploy: true
   description_en: the directory for the work data
   description_local: OCP server server工作目录
@@ -17,7 +17,7 @@
   description_local: OCP server使用的端口
 - name: log_dir
   name_local: 日志目录
-  type: STRING
+  type: PATH
   require: false
   essential: true
   need_redeploy: true
@@ -25,14 +25,14 @@
   description_local: OCP server server日志目录， 默认为工作目录下的log
 - name: soft_dir
   name_local: 软件包目录
-  type: STRING
+  type: PATH
   require: false
   need_redeploy: true
   description_en: The directory for software. The default value is ~/ocp-server/lib.
   description_local: OCP server 软件包安装目录， ~/ocp-server/lib
 - name: java_bin
   name_local: java路径
-  type: STRING
+  type: PATH
   require: true
   essential: true
   default: java
@@ -59,7 +59,7 @@
   description_en: When logining ocp, use it
 - name: logging_file_max_size
   name_local: 单个日志文件大小
-  type: STRING
+  type: CAPACITY
   require: false
   essential: true
   default: 100MB
@@ -68,7 +68,7 @@
   description_en: When logging_file_name is configured, specify the log file size through this configuration
 - name: logging_file_total_size_cap
   name_local: 日志总大小
-  type: STRING
+  type: CAPACITY
   require: true
   essential: true
   default: 1GB
@@ -83,7 +83,7 @@
   description_local: OCP使用的元数据库的jdbc连接串
 - name: jdbc_username
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_redeploy: true
   description_en: The username name for ocp meta dbx
   description_local: OCP使用的元数据库的用户名
@@ -103,7 +103,7 @@
   description_local: OCP server中system用户的密码
 - name: launch_user
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: ''
   need_redeploy: true
   description_en: Start user of OCP process
@@ -314,7 +314,7 @@
   description_local: ocp server的监控租户使用的租户日志磁盘大小
 - name: ocp_meta_username
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: meta
   need_redeploy: true
   description_en: The user name for ocp meta db
@@ -328,14 +328,14 @@
   description_local: ocp server的元数据库使用的密码
 - name: ocp_meta_db
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: meta_database
   need_redeploy: true
   description_en: The database name for ocp meta db
   description_local: ocp server的元数据库使用的数据库名
 - name: ocp_monitor_username
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: monitor_user
   description_en: The username for obagent monitor user
   description_local: obagent 监控用户的用户名
@@ -348,7 +348,7 @@
   description_local: obagent 监控用户的密码
 - name: ocp_monitor_db
   require: false
-  type: STRING
+  type: SAFE_STRING
   default: monitor_database
   need_redeploy: true
   description_en: The database name for ocp meta db

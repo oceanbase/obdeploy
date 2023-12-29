@@ -28,7 +28,7 @@ global_ret = True
 def destroy(plugin_context, *args, **kwargs):
     def clean(path):
         client = clients[server]
-        ret = client.execute_command('rm -fr %s/*' % path, timeout=-1)
+        ret = client.execute_command('sudo rm -fr %s/*' % path, timeout=-1)
         if not ret:
             global global_ret
             global_ret = False
@@ -52,6 +52,11 @@ def destroy(plugin_context, *args, **kwargs):
             if path:
                 clean(path)
     if global_ret:
+        # if ocp depends on oceanbase, then clean tenant info
+        if 'oceanbase-ce' in cluster_config.depends or 'oceanbase' in cluster_config.depends:
+            cluster_config.update_component_attr("meta_tenant", "", save=True)
+            cluster_config.update_component_attr("monitor_tenant", "", save=True)
+        stdio.warn('OCP successfully destroyed, please check and delete the tenant manually')
         stdio.stop_loading('succeed')
         return plugin_context.return_true()
     else:

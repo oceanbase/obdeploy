@@ -123,7 +123,12 @@ class Cursor(SafeStdio):
             self.db = None
 
 
-def connect(plugin_context, target_server=None, retry_times=101, *args, **kwargs):
+def connect(plugin_context, target_server=None, retry_times=101, connect_all=False, *args, **kwargs):
+    def return_true(**kwargs):
+        for key, value in kwargs.items():
+            plugin_context.set_variable(key, value)
+        return plugin_context.return_true(**kwargs)
+    
     count = retry_times
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
@@ -136,20 +141,28 @@ def connect(plugin_context, target_server=None, retry_times=101, *args, **kwargs
         stdio.start_loading('Connect to observer')
     while count:
         count -= 1
+        connect_nums = 0
         for server in servers:
             try:
                 server_config = cluster_config.get_server_conf(server)
                 password = server_config.get('root_password', '') if count % 2 == 0 else ''
                 cursor = Cursor(ip=server.ip, port=server_config['mysql_port'], tenant='', password=password if password is not None else '', stdio=stdio)
-
                 if cursor.execute('select 1', raise_exception=False, exc_level='verbose'):
-                    stdio.stop_loading('succeed', text='Connect to observer {}:{}'.format(server.ip, server_config['mysql_port']))
-                    return plugin_context.return_true(connect=cursor.db, cursor=cursor, server=server)
+                    if not connect_all:
+                        stdio.stop_loading('succeed', text='Connect to observer {}:{}'.format(server.ip, server_config['mysql_port']))
+                        return return_true(connect=cursor.db, cursor=cursor, server=server)
+                    else:
+                        connect_nums += 1
+                        if connect_nums == len(servers):
+                            stdio.stop_loading('succeed')
+                            return return_true(connect=cursor.db, cursor=cursor, server=server)
                 else:
                     raise Exception('Connect to observer {}:{} failed'.format(server.ip, server_config['mysql_port']))
             except:
                 if count == 0:
                     stdio.exception('')
+                if connect_all:
+                    break
         time.sleep(3)
 
     stdio.stop_loading('fail')

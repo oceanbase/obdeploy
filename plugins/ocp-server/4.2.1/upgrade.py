@@ -67,7 +67,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     if not init_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, upgrade=True, *args, **kwargs):
         return plugin_context.return_false()
 
-    if not start_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, sys_cursor1=sys_cursor, cursor=metadb_cursor, without_ocp_parameter=True, *args, **kwargs):
+    if not start_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, sys_cursor1=sys_cursor, cursor=metadb_cursor, without_parameter=True, *args, **kwargs):
         return plugin_context.return_false()
 
     ret = connect_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)

@@ -25,7 +25,7 @@ import os
 from tool import YamlLoader
 
 
-def reload(plugin_context, cursor, new_cluster_config, deploy_name='<deploy name>',  *args, **kwargs):
+def reload(plugin_context, new_cluster_config, deploy_name='<deploy name>',  *args, **kwargs):
 
     def generate_or_update_config(config):
         if client.execute_command('ls {}'.format(runtime_prometheus_conf)):
@@ -57,6 +57,7 @@ def reload(plugin_context, cursor, new_cluster_config, deploy_name='<deploy name
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     servers = cluster_config.servers
+    cursor = plugin_context.get_return('connect').get_return('cursor')
     yaml = YamlLoader(stdio=stdio)
     stdio.start_loading('Reload prometheus')
     success = True

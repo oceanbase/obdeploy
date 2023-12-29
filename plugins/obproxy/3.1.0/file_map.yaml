@@ -1,4 +1,4 @@
-- src_path: ./opt/taobao/install/obproxy-$version/bin/obproxy
+- src_path: ./home/admin/obproxy-$version/bin/obproxy
   target_path: bin/obproxy
   type: bin
   mode: 755

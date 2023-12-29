@@ -2,13 +2,13 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   need_redeploy: true
   description_en: the directory for the work data
   description_local: OCP express server工作目录
 - name: log_dir
   name_local: 日志目录
-  type: STRING
+  type: PATH
   require: false
   essential: true
   need_redeploy: true
@@ -16,7 +16,7 @@
   description_local: OCP express server日志目录， 默认为工作目录下的log
 - name: java_bin
   name_local: java路径
-  type: STRING
+  type: PATH
   require: true
   essential: true
   default: java
@@ -67,7 +67,7 @@
   description_local: OCP使用的元数据库的jdbc连接串
 - name: jdbc_username
   require: false
-  type: STRING
+  type: SAFE_STRING
   need_redeploy: true
   description_en: The username name for ocp meta db
   description_local: OCP使用的元数据库的用户名
@@ -89,7 +89,7 @@
 # bootstrap parameters
 - name: cluster_name
   requrire: false
-  type: STRING
+  type: SAFE_STRING
   default: obcluster
   need_restart: true
   description_en: The cluster name of observer

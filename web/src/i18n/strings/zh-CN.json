@@ -889,5 +889,14 @@
   "OBD.OCPPreCheck.CheckInfo.ResourceInfo.OcpApplicationMemory": "OCP 应用内存",
   "OBD.src.utils.EnterTheCorrectIpAddress": "请输入正确的 IP 地址",
   "OBD.src.utils.SelectTheCorrectObproxyNode": "请选择正确的 OBProxy 节点",
-  "OBD.src.utils.DoNotEnterDuplicateNodes": "禁止输入重复节点"
+  "OBD.src.utils.DoNotEnterDuplicateNodes": "禁止输入重复节点",
+  "OBD.component.ConnectConfig.MetadbAccessAddress": "MetaDB 访问地址",
+  "OBD.component.ConnectConfig.PleaseEnterMetadbAccessAddress": "请输入 MetaDB 访问地址",
+  "OBD.component.ConnectConfig.TheMetadbAccessAddressFormat": "MetaDB 访问地址格式不正确",
+  "OBD.component.ConnectConfig.MetadbAccessPort": "MetaDB 访问端口",
+  "OBD.component.ConnectConfig.EnterTheMetadbAccessPort": "请输入 MetaDB 访问端口",
+  "OBD.component.ConnectConfig.MetadbAccessAccount": "MetaDB 访问账号",
+  "OBD.component.ConnectConfig.EnterAMetadbAccessAccount": "请输入 MetaDB 访问账号",
+  "OBD.component.ConnectConfig.MetadbAccessPassword": "MetaDB 访问密码",
+  "OBD.component.ConnectConfig.EnterMetadbAccessPassword": "请输入 MetaDB 访问密码"
 }

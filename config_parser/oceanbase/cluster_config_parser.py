@@ -42,6 +42,7 @@ class ClusterConfigParser(ConfigParser):
     INNER_CONFIG_MAP = {
         '$_zone_idc': 'idc'
     }
+    META_KEYS = ['version', 'tag', 'release', 'package_hash', 'config', RsyncConfig.RSYNC, ENV]
 
     @classmethod
     def get_server_src_conf(cls, cluster_config, component_config, server):
@@ -63,24 +64,15 @@ class ClusterConfigParser(ConfigParser):
         return component_config['config']
 
     @classmethod
-    def _to_cluster_config(cls, component_name, conf):
+    def _to_cluster_config(cls, component_name, conf, added_servers=None):
         servers = OrderedDict()
         zones = conf.get('zones', {})
         for zone_name in zones:
             zone = zones[zone_name]
-            zone_servers = zone.get('servers', [])
+            zone_servers = cls._get_servers(zone.get('servers', []))
             zone_configs = zone.get('config', {})
             zone_global_config = zone_configs.get('global', {})
             for server in zone_servers:
-                if isinstance(server, dict):
-                    ip = ConfigUtil.get_value_from_dict(server, 'ip', transform_func=str)
-                    name = ConfigUtil.get_value_from_dict(server, 'name', transform_func=str)
-                else:
-                    ip = server
-                    name = None
-                if not re.match('^\d{1,3}(\\.\d{1,3}){3}$', ip):
-                    continue
-                server = ServerConfigFlyweightFactory.get_instance(ip, name)
                 if server not in servers:
                     server_config = deepcopy(zone_global_config)
                     if server.name in zone_configs:
@@ -101,6 +93,8 @@ class ClusterConfigParser(ConfigParser):
             ConfigUtil.get_value_from_dict(conf, 'release', None, str),
             ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str)
         )
+        if added_servers:
+            cluster_config.added_servers = added_servers
         global_config = {}
         if 'id' in conf:
             global_config['cluster_id'] = int(conf['id'])
@@ -119,6 +113,47 @@ class ClusterConfigParser(ConfigParser):
         for server in servers:
             cluster_config.add_server_conf(server, servers[server])
         return cluster_config
+
+    @classmethod
+    def merge_config(cls, component_name, config, new_config):
+        unmergeable_keys = cls.META_KEYS + ['config', RsyncConfig.RSYNC, ENV]
+        for key in unmergeable_keys:
+            assert key not in new_config, Exception('{} is not allowed to be set in additional conf'.format(key))
+        zones = config.get('zones', {})
+        merge_zones = new_config.get('zones', {})
+        all_servers = []
+        added_servers = []
+        for zone in zones.values():
+            all_servers.extend(cls._get_servers(zone.get('servers', [])))
+
+        for zone_name in merge_zones:
+            exists_zone = zone_name in zones
+            merge_zone = merge_zones[zone_name]
+            merge_config = merge_zone.get('config', {})
+            merge_servers_data = merge_zone.get('servers', [])
+            merge_servers = cls._get_servers(merge_servers_data)
+            for server in merge_servers:
+                assert server not in all_servers, Exception('Server {} is already in cluster'.format(server))
+            merge_server_names = [s.name for s in merge_servers]
+            added_servers.extend(merge_servers)
+            for key in merge_config:
+                assert key == 'global' or key in merge_server_names, Exception("{} is not allowed to be set in {}'s config".format(key, zone_name))
+            if exists_zone:
+                zone = zones[zone_name]
+                zone_servers_data = zone.get('servers', [])
+                zone_config = zone.get('config', {})
+                assert 'idc' not in merge_zone or merge_zone['idc'] == zone.get('idc'), Exception('idc is not allowed to be changed in {}'.format(zone_name))
+                for key in merge_config:
+                    assert key in merge_server_names, Exception('{} is not allowed to be set in {}.'.format(key, zone_name))
+                zone_servers_data.extend(merge_servers_data)
+                zone['servers'] = zone_servers_data
+                for key in merge_config:
+                    zone_config[key] = merge_config[key]
+                zone['config'] = zone_config
+            else:
+                zones[zone_name] = merge_zone
+        config['zones'] = zones
+        return cls.to_cluster_config(component_name, config, added_servers)
 
     @classmethod
     def extract_inner_config(cls, cluster_config, config):
@@ -145,10 +180,13 @@ class ClusterConfigParser(ConfigParser):
     def _from_cluster_config(cls, conf, cluster_config):
         global_config_items = {}
         zones_config = {}
+        zones = CommentedMap()
         for server in cluster_config.servers:
             server_config = cluster_config.get_server_conf(server)
             server_config_with_default = cluster_config.get_server_conf_with_default(server)
             zone_name = server_config_with_default.get('zone', 'zone1')
+            if zone_name not in zones:
+                zones[zone_name] = CommentedMap()
             if zone_name not in zones_config:
                 zones_config[zone_name] = {
                     'servers': OrderedDict(),
@@ -158,6 +196,13 @@ class ClusterConfigParser(ConfigParser):
             zone_config_items = zones_config[zone_name]['config']
             zone_servers[server] = server_config
             for key in server_config:
+                if cls._is_inner_item(key):
+                    if key in cls.INNER_CONFIG_MAP:
+                        if cls.INNER_CONFIG_MAP[key] in zones[zone_name]:
+                            assert zones[zone_name][cls.INNER_CONFIG_MAP[key]] == server_config[key], Exception('key {} in zone {} is inconsistent '.format(cls.INNER_CONFIG_MAP[key], zone_name))
+                        else:
+                            zones[zone_name][cls.INNER_CONFIG_MAP[key]] = server_config[key]
+                    continue
                 if key in zone_config_items:
                     if zone_config_items[key]['value'] == server_config[key]:
                         zone_config_items[key]['count'] += 1
@@ -167,10 +212,7 @@ class ClusterConfigParser(ConfigParser):
                         'count': 1
                     }
 
-        zones = CommentedMap()
-        server_num = len(cluster_config.servers)
         for zone_name in zones_config:
-            zones[zone_name] = CommentedMap()
             zone_global_config = {}
             zone_servers = zones_config[zone_name]['servers']
             zone_config_items = zones_config[zone_name]['config']
