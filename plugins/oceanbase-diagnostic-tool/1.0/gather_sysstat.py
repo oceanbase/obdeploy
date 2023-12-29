@@ -20,7 +20,6 @@
 
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
-from subprocess import call, Popen, PIPE
 import _errno as err
 import os
 
@@ -34,7 +33,7 @@ def gather_sysstat(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && sh ".format(install_dir=obdiag_install_dir) + command
+        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
@@ -65,5 +64,5 @@ def gather_sysstat(plugin_context, *args, **kwargs):
         if run():
             plugin_context.return_true()
     except KeyboardInterrupt:
-        stdio.exception("obdiag gather sysstat failded")
+        stdio.exception("obdiag gather sysstat failed")
         return plugin_context.return_false()

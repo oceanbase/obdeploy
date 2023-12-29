@@ -65,6 +65,11 @@ class ObConfigServerCursor(object):
 
 
 def connect(plugin_context, *args, **kwargs):
+    def return_true(**kwargs):
+        for key, value in kwargs.items():
+            plugin_context.set_variable(key, value)
+        return plugin_context.return_true(**kwargs)
+    
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     global_ret = True
@@ -84,7 +89,7 @@ def connect(plugin_context, *args, **kwargs):
 
     if global_ret:
         stdio.stop_loading('succeed')
-        return plugin_context.return_true(connect=cursors, cursor=cursors)
+        return return_true(connect=cursors, cursor=cursors)
     else:
         stdio.stop_loading('fail')
         return plugin_context.return_false()

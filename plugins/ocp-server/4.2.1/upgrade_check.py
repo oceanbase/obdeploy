@@ -67,7 +67,6 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
     for server in cluster_config.servers:
         check_status[server] = {
             'check_operation_task': err.CheckStatus(),
-            'check_machine_status': err.CheckStatus(),
             'metadb_version': err.CheckStatus(),
             'java': err.CheckStatus(),
         }
@@ -107,13 +106,6 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
             error('check_operation_task', err.EC_OCP_SERVER_RUNNING_TASK)
         else:
             check_pass('check_operation_task')
-
-        sql = "select count(*) num from %s.compute_host where status not in ('available', 'online');" % database
-        if meta_cursor.fetchone(sql)['num'] > 0:
-            success = False
-            error('check_machine_status', err.EC_OCP_SERVER_MACHINE_STATUS)
-        else:
-            check_pass('check_machine_status')
 
         sql = "select ob_version();"
         v1 = meta_cursor.fetchone(sql)['ob_version()']

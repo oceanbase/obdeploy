@@ -19,10 +19,13 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 import re
+import uuid
+import traceback
 
 
-__all__ = ("Moment", "Time", "Capacity", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String")
+__all__ = ("Moment", "Time", "Capacity", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String", "Path", "SafeString", "PathList", "SafeStringList")
 
 
 class Null(object):
@@ -259,3 +262,52 @@ class String(ConfigItemType):
 
     def _format(self):
         self.value = self._value = str(self._origin) if self._origin else ''
+
+# this type is used to ensure the parameter not containing special characters to inject command
+class SafeString(ConfigItemType):
+    PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    def _format(self):
+        if not self.PATH_PATTERN.match(str(self._origin)):
+            raise Exception("%s is not a valid config" % self._origin)
+        self.value = self._value = str(self._origin) if self._origin else ''
+
+# this type is used to ensure the parameter not containing special characters to inject command
+class SafeStringList(ConfigItemType):
+    PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    def _format(self):
+        if self._origin:
+            self._origin = str(self._origin).strip()
+            self._value = self._origin.split(';')
+            for v in self._value:
+                if not self.PATH_PATTERN.match(v):
+                    raise Exception("%s is not a valid config" % v)
+        else:
+            self._value = []
+
+# this type is used to ensure the parameter is a valid path by checking it's only certaining certain characters and not crossing path
+class Path(ConfigItemType):
+    PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    def _format(self):
+        parent_path = "/{0}".format(uuid.uuid4().hex)
+        absolute_path = "/".join([parent_path, str(self._origin)])
+        normalized_path = os.path.normpath(absolute_path)
+
+        if not (self.PATH_PATTERN.match(str(self._origin)) and normalized_path.startswith(parent_path)):
+            raise Exception("%s is not a valid path" % self._origin)
+        self.value = self._value = str(self._origin) if self._origin else ''
+
+# this type is used to ensure the parameter is a valid path by checking it's only certaining certain characters and not crossing path
+class PathList(ConfigItemType):
+    PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    def _format(self):
+        parent_path = "/{0}".format(uuid.uuid4().hex)
+        if self._origin:
+            self._origin = str(self._origin).strip()
+            self._value = self._origin.split(';')
+            for v in self._value:
+                absolute_path = "/".join([parent_path, v])
+                normalized_path = os.path.normpath(absolute_path)
+                if not (self.PATH_PATTERN.match(v) and normalized_path.startswith(parent_path)):
+                    raise Exception("%s is not a valid path" % v)
+        else:
+            self._value = []

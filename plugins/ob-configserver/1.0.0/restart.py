@@ -124,7 +124,8 @@ class Restart(object):
 
         ret = self.call_plugin(self.connect_plugin, clients=clients, cluster_config=cluster_config)
         if ret:
-            ret = self.call_plugin(self.display_plugin, clients=clients, cluster_config=cluster_config,
+            if self.display_plugin is not None:
+                ret = self.call_plugin(self.display_plugin, clients=clients, cluster_config=cluster_config,
                                    cursor=ret.get_return('cursor'))
         return ret
 

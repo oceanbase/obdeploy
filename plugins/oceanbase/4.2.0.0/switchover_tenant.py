@@ -118,7 +118,7 @@ def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cur
     stdio.start_loading('Find relationship')
     # 1.find primary tenant`s others standby tenant
     for repository in get_standbys_plugins:
-        ret = call_plugin(get_standbys_plugins[repository], primary_deploy_name, primary_tenant=primary_tenant, exclude_tenant=[standby_deploy_name, standby_tenant])
+        ret = call_plugin(get_standbys_plugins[repository], primary_deploy_name=primary_deploy_name, primary_tenant=primary_tenant, exclude_tenant=[standby_deploy_name, standby_tenant])
         if not ret:
             error("Find primary tenant {}:{}'s others standby tenants failed".format(primary_deploy_name, primary_tenant))
             return
@@ -126,7 +126,7 @@ def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cur
     stdio.verbose("Primary tenant {}:{}'s others standby tenants:{}".format(primary_deploy_name, primary_tenant, primary_standby_tenants))
     # 2.find standby tenant`s standby tenant
     for repository in get_standbys_plugins:
-        ret = call_plugin(get_standbys_plugins[repository], standby_deploy_name, primary_tenant=standby_tenant, exclude_tenant=[primary_deploy_name, primary_tenant])
+        ret = call_plugin(get_standbys_plugins[repository], primary_deploy_name=standby_deploy_name, primary_tenant=standby_tenant, exclude_tenant=[primary_deploy_name, primary_tenant])
         if not ret:
             error("Find primary tenant {}:{}'s others standby tenants failed".format(primary_deploy_name, primary_tenant))
             return

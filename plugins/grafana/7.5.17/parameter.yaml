@@ -2,7 +2,7 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   need_redeploy: true
   description_en: working directory for grafana
   description_local: grafana工作目录
@@ -17,28 +17,28 @@
 - name: data_dir
   name_local: 数据目录
   essential: true
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used)
   description_local: 用来存储sqlite3、临时文件、会话等路径
 - name: logs_dir
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: Directory where grafana can store logs
   description_local: grafana可以存放日志的目录
 - name: plugins_dir
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
   description_en: Directory where grafana will automatically scan and look for plugins
   description_local: grafana 将自动扫描并查找插件的目录
 - name: provisioning_dir
-  type: STRING
+  type: PATH
   min_value: NULL
   max_value: NULL
   need_redeploy: true
@@ -59,7 +59,7 @@
   description_en: Expired days of log file(delete after max days)
   description_local: 日志文件的过期天数（最多天后删除）
 - name: domain
-  type: STRING
+  type: SAFE_STRING
   default: localhost
   need_restart: true
   description_en: The ip address to bind to

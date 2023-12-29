@@ -35,6 +35,7 @@ oceanbase-ce:
     # appname: obcluster
     # root_password: # root user password
     # proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
+    # cdcro_password: # cdcro user password, consistent with oblogproxy's observer_sys_password, can be empty
     # ocp_meta_db: ocp_express # The database name of ocp express meta
     # ocp_meta_username: meta # The username of ocp express meta
     # ocp_meta_password: '' # The password of ocp express meta
@@ -272,3 +273,15 @@ ob-configserver:
     #   database_type: sqlite3 # sqlite3 or mysql. Default sqlite3
     #   connection_url: "" # When database_type is set to sqlite3, the connection_url parameter can be left empty. If it is empty, the default value $home_path/.data.db?cache=shared&_fk=1 will be used. When database_type is set to mysql, the connection_url parameter must be configured, with a sample value of user:password@tcp(10.10.10.1:2883)/test?parseTime=true.
 
+oblogproxy:
+  depends:
+    - oceanbase-ce
+    - obproxy-ce
+  servers:
+    - 192.168.1.5
+  version: 2.0.0
+  global:
+    home_path: /root/oblogproxy
+    service_port: 2983
+#    binlog_dir: /root/oblogproxy/run   # The directory for binlog file. The default value is $home_path/run.
+#    binlog_mode: true   # enable binlog mode, default true

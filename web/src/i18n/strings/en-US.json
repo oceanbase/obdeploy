@@ -889,5 +889,14 @@
   "OBD.OCPPreCheck.CheckInfo.ResourceInfo.OcpApplicationMemory": "OCP application memory",
   "OBD.src.utils.EnterTheCorrectIpAddress": "Enter the correct IP address.",
   "OBD.src.utils.SelectTheCorrectObproxyNode": "Select the correct OBProxy node",
-  "OBD.src.utils.DoNotEnterDuplicateNodes": "Do not enter duplicate nodes"
+  "OBD.src.utils.DoNotEnterDuplicateNodes": "Do not enter duplicate nodes",
+  "OBD.component.ConnectConfig.MetadbAccessAddress": "MetaDB access address",
+  "OBD.component.ConnectConfig.PleaseEnterMetadbAccessAddress": "Please enter MetaDB access address",
+  "OBD.component.ConnectConfig.TheMetadbAccessAddressFormat": "The MetaDB access address format is incorrect.",
+  "OBD.component.ConnectConfig.MetadbAccessPort": "MetaDB access port",
+  "OBD.component.ConnectConfig.EnterTheMetadbAccessPort": "Enter the MetaDB access port",
+  "OBD.component.ConnectConfig.MetadbAccessAccount": "MetaDB access account",
+  "OBD.component.ConnectConfig.EnterAMetadbAccessAccount": "Enter a MetaDB access account",
+  "OBD.component.ConnectConfig.MetadbAccessPassword": "MetaDB access password",
+  "OBD.component.ConnectConfig.EnterMetadbAccessPassword": "Enter MetaDB access password"
 }

@@ -77,15 +77,20 @@ class OcpCursor(object):
         if resp.code == 200:
             return resp.content
         else:
-            raise Exception("failed to query ocp info")
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to query ocp info: %s" % msg)
 
     def take_over_precheck(self, data, stdio=None):
         resp = self._request('POST', '/api/v2/ob/clusters/takeOverPreCheck', data=data, stdio=stdio)
         if resp.code == 200:
             return resp.content
         else:
-            msg = resp.content['error']['message']
-            raise Exception("takeover precheck failed %s" % msg)
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("takeover precheck failed: %s" % msg)
 
     def compute_host_types(self, data, stdio=None):
         resp = self._request('POST', '/api/v2/compute/hostTypes', data=data, stdio=stdio)
@@ -128,6 +133,14 @@ class OcpCursor(object):
         return self.Response(code=return_code, content=content)
 
 def takeover_precheck(plugin_context, *args, **kwargs):
+    stdio = plugin_context.stdio
+    try:
+        _do_takeover_precheck(plugin_context, *args, **kwargs)
+    except Exception as ex:
+        stdio.error("do takeover precheck got exception:%s", ex)
+        return plugin_context.return_false()
+
+def _do_takeover_precheck(plugin_context, *args, **kwargs):
     # init variables, include get obcluster info from deploy config
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -154,9 +167,6 @@ def takeover_precheck(plugin_context, *args, **kwargs):
     proxyro_password = cluster_config.get_global_conf().get("proxyro_password")
     if proxyro_password is not None and proxyro_password != "":
         precheck_data.update({"proxyroPassword": proxyro_password})
-    try:
-        precheck_result = ocp_cursor.take_over_precheck(precheck_data, stdio=stdio)
-        stdio.verbose("precheck result %s" % precheck_result)
-    except Exception as ex:
-        return plugin_context.return_false(exception=ex)
+    precheck_result = ocp_cursor.take_over_precheck(precheck_data, stdio=stdio)
+    stdio.verbose("precheck result %s" % precheck_result)
     return plugin_context.return_true(ocp_version=ocp_version)

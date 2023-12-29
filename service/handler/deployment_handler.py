@@ -19,6 +19,7 @@
 
 import json
 import tempfile
+from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid1 as uuid
 from optparse import Values
@@ -52,7 +53,12 @@ class DeploymentHandler(BaseHandler):
         deployment_info.status = deployment.deploy_info.status.value.upper()
         deployment_info.config = self.context['deployment'][deployment.name] if self.context[
                                                                                     'deployment'] is not None else None
-        return deployment_info
+        deployment_info_copy = deepcopy(deployment_info)
+        if deployment_info_copy.config and deployment_info_copy.config.auth and deployment_info_copy.config.auth.password:
+            deployment_info_copy.config.auth.password = ''
+        if deployment_info_copy.config and deployment_info_copy.config.components and deployment_info_copy.config.components.oceanbase and deployment_info_copy.config.components.oceanbase.root_password:
+            deployment_info_copy.config.components.oceanbase.root_password = ''
+        return deployment_info_copy
 
     def generate_deployment_config(self, name: str, config: DeploymentConfig):
         log.get_logger().debug('generate cluster config')
@@ -413,7 +419,9 @@ class DeploymentHandler(BaseHandler):
             display_ret = self.obd.namespaces[component].get_return("display")
             connection_info = self.__build_connection_info(component, display_ret.get_return("info"))
             if connection_info is not None:
-                connection_info_list.append(connection_info)
+                connection_info_copy = deepcopy(connection_info)
+                connection_info_copy.password = ''
+                connection_info_list.append(connection_info_copy)
             else:
                 log.get_logger().warn("can not get connection info for component: {0}".format(component))
         return connection_info_list

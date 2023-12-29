@@ -21,5 +21,5 @@
 from __future__ import absolute_import, division, print_function
 
 
-def bootstrap(plugin_context, cursor, *args, **kwargs):
+def bootstrap(plugin_context, *args, **kwargs):
     plugin_context.return_true()

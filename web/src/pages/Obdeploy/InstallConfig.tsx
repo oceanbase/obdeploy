@@ -24,18 +24,24 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import useRequest from '@/utils/useRequest';
-import { queryAllComponentVersions } from '@/services/ob-deploy-web/Components';
+import {
+  queryAllComponentVersions,
+  queryComponentParameters,
+} from '@/services/ob-deploy-web/Components';
 import {
   getDeployment,
   destroyDeployment,
 } from '@/services/ob-deploy-web/Deployments';
 import { listRemoteMirrors } from '@/services/ob-deploy-web/Mirror';
 import { handleQuit, checkLowVersion, getErrorInfo } from '@/utils';
+import { formatMoreConfig } from '@/utils/helper';
 import NP from 'number-precision';
 import copy from 'copy-to-clipboard';
 import DeployType from './DeployType';
 import DeleteDeployModal from './DeleteDeployModal';
 import ErrorCompToolTip from '@/component/ErrorCompToolTip';
+import { getParamstersHandler } from './ClusterConfig/helper';
+import { selectOcpexpressConfig } from '@/constant/configuration';
 import {
   commonStyle,
   allComponentsName,
@@ -171,6 +177,8 @@ export default function InstallConfig() {
     selectedConfig,
     setSelectedConfig,
     aliveTokenTimer,
+    clusterMoreConfig,
+    setClusterMoreConfig,
   } = useModel('global');
   const { components, home_path } = configData || {};
   const { oceanbase } = components || {};
@@ -188,20 +196,16 @@ export default function InstallConfig() {
   const [unavailableList, setUnavailableList] = useState<string[]>([]);
   const [componentLoading, setComponentLoading] = useState(false);
   const draftNameRef = useRef();
-
+  const errorCommonHandle = (e: any) => {
+    const errorInfo = getErrorInfo(e);
+    setErrorVisible(true);
+    setErrorsList([...errorsList, errorInfo]);
+  };
   const { run: fetchDeploymentInfo, loading } = useRequest(getDeployment, {
-    onError: (e: any) => {
-      const errorInfo = getErrorInfo(e);
-      setErrorVisible(true);
-      setErrorsList([...errorsList, errorInfo]);
-    },
+    onError: errorCommonHandle,
   });
   const { run: handleDeleteDeployment } = useRequest(destroyDeployment, {
-    onError: (e: any) => {
-      const errorInfo = getErrorInfo(e);
-      setErrorVisible(true);
-      setErrorsList([...errorsList, errorInfo]);
-    },
+    onError: errorCommonHandle,
   });
   const { run: fetchListRemoteMirrors } = useRequest(listRemoteMirrors, {
     onSuccess: () => {
@@ -213,14 +217,12 @@ export default function InstallConfig() {
           fetchListRemoteMirrors();
         }, 1000);
       } else {
-        const errorInfo = getErrorInfo({ response, data, type });
-        setErrorVisible(true);
-        setErrorsList([...errorsList, errorInfo]);
+        errorCommonHandle({ response, data, type });
         setComponentLoading(false);
       }
     },
   });
-
+  const { run: getMoreParamsters } = useRequest(queryComponentParameters);
   const judgVersions = (source: API.ComponentsVersionInfo) => {
     if (Object.keys(source).length !== allComponentsName.length) {
       setExistNoVersion(true);
@@ -696,6 +698,23 @@ export default function InstallConfig() {
     return NP.divide(NP.divide(originSize, 1024), 1024).toFixed(2);
   };
 
+  const getNewParamsters = async () => {
+    const res = await getParamstersHandler(
+      getMoreParamsters,
+      oceanbase,
+      errorCommonHandle,
+    );
+    if (res?.success) {
+      const { data } = res,
+        isSelectOcpexpress = selectedConfig.includes('ocp-express');
+      const newClusterMoreConfig = formatMoreConfig(
+        data?.items,
+        isSelectOcpexpress,
+      );
+      return newClusterMoreConfig;
+    }
+  };
+
   useEffect(() => {
     setComponentLoading(true);
     if (isFirstTime) {
@@ -796,6 +815,34 @@ export default function InstallConfig() {
       appname: configData?.components?.oceanbase?.appname || initAppName,
     });
   }, [configData]);
+
+  /**
+   * 是否选择ocp-express组件会影响参数
+   */
+  useEffect(() => {
+    if (clusterMoreConfig.length) {
+      const haveOcpexpressParam: boolean =
+        clusterMoreConfig[0].configParameter.some((parameter) =>
+          selectOcpexpressConfig.includes(parameter.name || ''),
+        );
+      const isSelectOcpexpress = selectedConfig.includes('ocp-express');
+      //选择了ocpexpress组件 缺少ocpexpress参数 需要补充参数
+      if (isSelectOcpexpress && !haveOcpexpressParam) {
+        getNewParamsters().then((newParamsters) => {
+          if (newParamsters) setClusterMoreConfig(newParamsters);
+        });
+      }
+      //未选择ocpexpress组件 有ocpexpress参数 需要去除参数
+      if (!isSelectOcpexpress && haveOcpexpressParam) {
+        let newParamsters = [...clusterMoreConfig];
+        newParamsters[0].configParameter =
+          newParamsters[0].configParameter.filter((parameter) => {
+            return !selectOcpexpressConfig.includes(parameter.name || '');
+          });
+        setClusterMoreConfig(newParamsters);
+      }
+    }
+  }, [selectedConfig]);
 
   return (
     <Spin spinning={loading || componentLoading}>

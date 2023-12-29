@@ -181,7 +181,7 @@ def execute_cmd(server_config, cmd):
     return cmd if not server_config.get('launch_user', None) else 'sudo ' + cmd
 
 
-def start_check(plugin_context, init_check_status=False, work_dir_check=False, work_dir_empty_check=True, strict_check=False, precheck=False, *args, **kwargs):
+def start_check(plugin_context, init_check_status=False, work_dir_check=False, work_dir_empty_check=True, strict_check=False, precheck=False, source_option="start", *args, **kwargs):
 
     def check_pass(item):
         status = check_status[server]
@@ -252,9 +252,54 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
     if not env:
         return plugin_context.return_false()
 
-    if not cluster_config.depends:
-        for server in cluster_config.servers:
-            server_config = env[server]
+    stdio.verbose('oceanbase version check')
+    versions_check = {
+        "oceanbase version": {
+            'comps': ['oceanbase', 'oceanbase-ce'],
+            'min_version': Version('4.0')
+        },
+    }
+    repo_versions = {}
+    for repository in plugin_context.repositories:
+        repo_versions[repository.name] = repository.version
+
+    for check_item in versions_check:
+        for comp in versions_check[check_item]['comps']:
+            if comp not in cluster_config.depends:
+                continue
+            depend_comp_version = repo_versions.get(comp)
+            if depend_comp_version is None:
+                stdio.verbose('failed to get {} version, skip version check'.format(comp))
+                continue
+            min_version = versions_check[check_item]['min_version']
+            if depend_comp_version < min_version:
+                critical(check_item, err.EC_OCP_SERVER_DEPENDS_COMP_VERSION.format(ocp_server_version=cluster_config.version, comp=comp, comp_version=min_version))
+
+    server_port = {}
+    servers_dirs = {}
+    servers_check_dirs = {}
+    for server in cluster_config.servers:
+        client = clients[server]
+
+        if not (client.execute_command('sudo -n true') or client.execute_command('[ `id -u` == "0" ]')):
+            critical('sudo nopasswd', err.EC_OCP_SERVER_SUDO_NOPASSWD.format(ip=str(server), user=client.config.username),
+                     [err.SUG_OCP_SERVER_SUDO_NOPASSWD.format(ip=str(server), user=client.config.username)])
+        server_config = env[server]
+        missed_keys = get_missing_required_parameters(server_config)
+        if missed_keys:
+            stdio.error(err.EC_NEED_CONFIG.format(server=server, component=cluster_config.name, miss_keys=missed_keys))
+            success = False
+        home_path = server_config['home_path']
+        if not precheck:
+            remote_pid_path = '%s/run/ocp-server.pid' % home_path
+            remote_pid = client.execute_command(execute_cmd(server_config, 'cat %s' % remote_pid_path)).stdout.strip()
+            if remote_pid:
+                if client.execute_command(execute_cmd(server_config, 'ls /proc/%s' % remote_pid)):
+                    stdio.verbose('%s is running, skip' % server)
+                    wait_2_pass()
+                    continue
+
+        if not cluster_config.depends:
             # check meta db connect before start
             jdbc_url = server_config['jdbc_url']
             jdbc_username = server_config['jdbc_username']
@@ -282,11 +327,11 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                         time.sleep(1)
                 if not connected:
                     success = False
-                    error('metadb connect', err.EC_CONNECT_METADB, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
+                    error('metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
                 if cursor and not cursor.fetchone('show DATABASES like "%s"' % jdbc_database):
-                    critical('metadb connect', err.EC_DB_NOT_IN_JDBC_URL, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
+                    critical('metadb connect', err.EC_OCP_SERVER_DB_NOT_IN_JDBC_URL, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
             else:
-                critical('metadb connect', err.EC_ERROR_JDBC_URL, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
+                critical('metadb connect', err.EC_OCP_SERVER_ERROR_JDBC_URL, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
             client = clients[server]
             # time check
             stdio.verbose('time check ')
@@ -301,84 +346,22 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                     critical('time check', err.EC_OCP_SERVER_TIME_SHIFT.format(server=server))
 
                 # tenant check
-                skip_create_tenant = 'False'
-                skip_create_tenant = getattr(options, "skip_create_tenant", "False")
-                if skip_create_tenant == 'False':
-                    sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
-                    meta_tenant = server_config.get('ocp_meta_tenant')['tenant_name']
-                    meta_max_cpu = server_config['ocp_meta_tenant'].get('max_cpu', 2)
-                    meta_memory_size = server_config['ocp_meta_tenant'].get('memory_size', '2G')
-                    if server_config.get('ocp_monitor_tenant'):
-                        monitor_user = server_config.get('ocp_monitor_username', 'monitor_user')
-                        monitor_tenant = server_config['ocp_monitor_tenant']['tenant_name']
-                        monitor_max_cpu = server_config['ocp_monitor_tenant'].get('max_cpu', 2)
-                        monitor_memory_size = server_config['ocp_monitor_tenant'].get('memory_size', '4G')
-                        res = cursor.fetchone(sql, [monitor_tenant])
-                        if res:
-                            error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=monitor_tenant))
-                    res = cursor.fetchone(sql, [meta_tenant])
-                    if res:
-                        error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=meta_tenant))
-                    break
+                sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
+                meta_tenant = server_config.get('ocp_meta_tenant')['tenant_name']
+                if not cluster_config.get_component_attr("meta_tenant") and cursor.fetchone(sql, [meta_tenant]):
+                    error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=meta_tenant))
+                monitor_tenant = server_config.get('ocp_monitor_tenant')['tenant_name']
+                if not cluster_config.get_component_attr("monitor_tenant") and cursor.fetchone(sql, [monitor_tenant]):
+                    error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=monitor_tenant))
 
-    stdio.verbose('oceanbase version check')
-    versions_check = {
-        "oceanbase version": {
-            'comps': ['oceanbase', 'oceanbase-ce'],
-            'min_version': Version('4.0')
-        },
-    }
-    repo_versions = {}
-    for repository in plugin_context.repositories:
-        repo_versions[repository.name] = repository.version
-
-    for check_item in versions_check:
-        for comp in versions_check[check_item]['comps']:
-            if comp not in cluster_config.depends:
-                continue
-            depend_comp_version = repo_versions.get(comp)
-            if depend_comp_version is None:
-                stdio.verbose('failed to get {} version, skip version check'.format(comp))
-                continue
-            min_version = versions_check[check_item]['min_version']
-            if depend_comp_version < min_version:
-                critical(check_item, err.EC_OCP_EXPRESS_DEPENDS_COMP_VERSION.format(ocp_express_version=cluster_config.version, comp=comp, comp_version=min_version))
-
-    server_port = {}
-    servers_dirs = {}
-    servers_check_dirs = {}
-    for server in cluster_config.servers:
-        client = clients[server]
-
-        if not (client.execute_command('sudo -n true') or client.execute_command('[ `id -u` == "0" ]')):
-            critical('sudo nopasswd', err.EC_SUDO_NOPASSWD.format(ip=str(server), user=client.config.username),
-                     [err.SUG_SUDO_NOPASSWD.format(ip=str(server), user=client.config.username)])
-        server_config = env[server]
-        missed_keys = get_missing_required_parameters(server_config)
-        if missed_keys:
-            stdio.error(err.EC_NEED_CONFIG.format(server=server, component=cluster_config.name, miss_keys=missed_keys))
-            success = False
-        home_path = server_config['home_path']
-        if not precheck:
-            remote_pid_path = '%s/run/ocp-server.pid' % home_path
-            remote_pid = client.execute_command(execute_cmd(server_config, 'cat %s' % remote_pid_path)).stdout.strip()
-            if remote_pid:
-                if client.execute_command(execute_cmd(server_config, 'ls /proc/%s' % remote_pid)):
-                    stdio.verbose('%s is running, skip' % server)
-                    wait_2_pass()
-
-    # user check
-    for server in cluster_config.servers:
-        server_config = env[server]
+        # user check
+        stdio.verbose('user check ')
         ocp_user = server_config.get('launch_user', '')
         if ocp_user:
             client = clients[server]
             if not client.execute_command(execute_cmd(server_config, "id -u %s" % ocp_user)):
                 critical('launch user', err.EC_OCP_SERVER_LAUNCH_USER_NOT_EXIST.format(server=server, user=ocp_user))
 
-    for server in cluster_config.servers:
-        client = clients[server]
-        server_config = env[server]
         if work_dir_check:
             ip = server.ip
             stdio.verbose('%s dir check' % server)
@@ -434,6 +417,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                         path = os.path.dirname(path)
                         empty_check = False
 
+        stdio.verbose('port check ')
         port = server_config['port']
         ip = server.ip
         if ip not in server_port:
@@ -450,7 +434,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             'server': server,
             'key': 'port'
         }
-        if get_port_socket_inode(client, port):
+        if source_option == 'start' and get_port_socket_inode(client, port):
             critical(
                 'port',
                 err.EC_CONFLICT_PORT.format(server=ip, port=port),
@@ -460,28 +444,30 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
 
         try:
             # java version check
+            stdio.verbose('java check ')
             java_bin = server_config.get('java_bin', '/usr/bin/java')
             ret = client.execute_command(execute_cmd(server_config, '{} -version'.format(java_bin)))
             stdio.verbose('java version %s' % ret)
             if not ret:
-                critical('java', err.EC_OCP_EXPRESS_JAVA_NOT_FOUND.format(server=server), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0')])
+                critical('java', err.EC_OCP_SERVER_JAVA_NOT_FOUND.format(server=server), [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0')])
             version_pattern = r'version\s+\"(\d+\.\d+\.\d+)(\_\d+)'
             found = re.search(version_pattern, ret.stdout) or re.search(version_pattern, ret.stderr)
             if not found:
-                error('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
+                error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
             java_major_version = found.group(1)
             stdio.verbose('java_major_version %s' % java_major_version)
             java_update_version = found.group(2)[1:]
             stdio.verbose('java_update_version %s' % java_update_version)
             if Version(java_major_version) != Version('1.8.0') or int(java_update_version) < 161:
-                critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
+                critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
         except Exception as e:
             stdio.error(e)
-            error('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
-                  [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
+            error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
+                  [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
 
         try:
             # clockdiff status check
+            stdio.verbose('clockdiff check ')
             clockdiff_bin = 'which clockdiff'
             if client.execute_command(clockdiff_bin):
                 check_pass('clockdiff')
@@ -498,14 +484,11 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             stdio.error(e)
             critical('clockdiff', err.EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS.format(server=server))
 
-    servers_memory = {}
-    servers_disk = {}
-    servers_client = {}
-    ip_servers = {}
+        servers_memory = {}
+        servers_disk = {}
+        servers_client = {}
+        ip_servers = {}
 
-    for server in cluster_config.servers:
-        client = clients[server]
-        server_config = env[server]
         memory_size = parse_size(server_config.get('memory_size', '1G'))
         if server_config.get('log_dir'):
             log_dir = server_config['log_dir']
@@ -533,51 +516,53 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             ip_servers[ip] = [server]
         else:
             ip_servers[ip].append(server)
-    # memory check
-    for ip in servers_memory:
-        client = servers_client[ip]
-        memory_needed = servers_memory[ip]['need']
-        ret = client.execute_command('cat /proc/meminfo')
-        if ret:
-            server_memory_stats = {}
-            memory_key_map = {
-                'MemTotal': 'total',
-                'MemFree': 'free',
-                'MemAvailable': 'available',
-                'Buffers': 'buffers',
-                'Cached': 'cached'
-            }
-            for key in memory_key_map:
-                server_memory_stats[memory_key_map[key]] = 0
+        # memory check
+        stdio.verbose('memory check ')
+        for ip in servers_memory:
+            client = servers_client[ip]
+            memory_needed = servers_memory[ip]['need']
+            ret = client.execute_command('cat /proc/meminfo')
+            if ret:
+                server_memory_stats = {}
+                memory_key_map = {
+                    'MemTotal': 'total',
+                    'MemFree': 'free',
+                    'MemAvailable': 'available',
+                    'Buffers': 'buffers',
+                    'Cached': 'cached'
+                }
+                for key in memory_key_map:
+                    server_memory_stats[memory_key_map[key]] = 0
 
-            for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
-                if k in memory_key_map:
-                    key = memory_key_map[k]
-                    server_memory_stats[key] = parse_size(str(v))
-            mem_suggests = [err.SUG_OCP_EXPRESS_REDUCE_MEM.format()]
-            if memory_needed * 0.5 > server_memory_stats['available']:
-                for server in ip_servers[ip]:
-                    error('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_AVAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(memory_needed)), suggests=mem_suggests)
-            elif memory_needed > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
-                for server in ip_servers[ip]:
-                    error('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(memory_needed)), suggests=mem_suggests)
-            elif memory_needed > server_memory_stats['free']:
-                for server in ip_servers[ip]:
-                    alert('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY.format(ip=ip,  free=format_size(server_memory_stats['free']), need=format_size(memory_needed)), suggests=mem_suggests)
-    # disk check
-    for ip in servers_disk:
-        client = servers_client[ip]
-        disk_info = get_disk_info(all_paths=servers_disk[ip], client=client, stdio=stdio)
-        if disk_info:
-            for path in servers_disk[ip]:
-                disk_needed = servers_disk[ip][path]
-                mount_path = get_mount_path(disk_info, path)
-                if disk_needed > disk_info[mount_path]['avail']:
+                for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
+                    if k in memory_key_map:
+                        key = memory_key_map[k]
+                        server_memory_stats[key] = parse_size(str(v))
+                mem_suggests = [err.SUG_OCP_SERVER_REDUCE_MEM.format()]
+                if memory_needed > server_memory_stats['available']:
                     for server in ip_servers[ip]:
-                        error('disk', err.EC_OCP_EXPRESS_NOT_ENOUGH_DISK.format(ip=ip, disk=mount_path, need=format_size(disk_needed), avail=format_size(disk_info[mount_path]['avail'])), suggests=[err.SUG_OCP_EXPRESS_REDUCE_DISK.format()])
-        else:
-            stdio.warn(err.WC_OCP_EXPRESS_FAILED_TO_GET_DISK_INFO.format(ip))
-    plugin_context.set_variable('start_env', env)
+                        error('mem', err.EC_OCP_SERVER_NOT_ENOUGH_MEMORY_AVAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(memory_needed)), suggests=mem_suggests)
+                elif memory_needed > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
+                    for server in ip_servers[ip]:
+                        error('mem', err.EC_OCP_SERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(memory_needed)), suggests=mem_suggests)
+                elif memory_needed > server_memory_stats['free']:
+                    for server in ip_servers[ip]:
+                        alert('mem', err.EC_OCP_SERVER_NOT_ENOUGH_MEMORY.format(ip=ip,  free=format_size(server_memory_stats['free']), need=format_size(memory_needed)), suggests=mem_suggests)
+        # disk check
+        stdio.verbose('disk check ')
+        for ip in servers_disk:
+            client = servers_client[ip]
+            disk_info = get_disk_info(all_paths=servers_disk[ip], client=client, stdio=stdio)
+            if disk_info:
+                for path in servers_disk[ip]:
+                    disk_needed = servers_disk[ip][path]
+                    mount_path = get_mount_path(disk_info, path)
+                    if disk_needed > disk_info[mount_path]['avail']:
+                        for server in ip_servers[ip]:
+                            error('disk', err.EC_OCP_SERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=mount_path, need=format_size(disk_needed), avail=format_size(disk_info[mount_path]['avail'])), suggests=[err.SUG_OCP_SERVER_REDUCE_DISK.format()])
+            else:
+                stdio.warn(err.WC_OCP_SERVER_FAILED_TO_GET_DISK_INFO.format(ip))
+        plugin_context.set_variable('start_env', env)
 
     for server in cluster_config.servers:
         wait_2_pass()

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Space, InputNumber, Input, Select } from 'antd';
 import { getLocale } from 'umi';
 import { getUnit, isTakeUnit, takeNewUnit } from './helper';
+import { PARAMETER_TYPE } from '@/constant/configuration';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 
@@ -13,7 +14,7 @@ interface ParameterProps {
   value?: API.ParameterValue;
   onChange?: (value?: API.ParameterValue) => void;
   onBlur?: () => void;
-  defaultValue?:string
+  defaultValue?: string;
 }
 
 interface AdaptiveInputProps {
@@ -99,7 +100,7 @@ const AdaptiveInput = ({
       />
     );
   }
-  if (type === 'CapacityMB' || type === 'Capacity') {
+  if (type === PARAMETER_TYPE.capacity || type === PARAMETER_TYPE.capacityMB) {
     return (
       <div style={{ maxWidth: 126 }}>
         <InputNumber
@@ -213,7 +214,7 @@ export default function Parameter({
   );
   const { type } = parameterValue;
   const defaultUnit = useRef<string>(
-    type === 'CapacityMB' || type === 'Capacity'
+    type === PARAMETER_TYPE.capacity || type === PARAMETER_TYPE.capacityMB
       ? getUnit(parameterValue.value)
       : null,
   );

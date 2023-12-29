@@ -13,16 +13,14 @@ import {
 import { getErrorInfo, getRandomPassword } from '@/utils';
 import useRequest from '@/utils/useRequest';
 import { formatMoreConfig } from '@/utils/helper';
+import { PARAMETER_TYPE } from '@/constant/configuration';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import TooltipInput from '../TooltipInput';
 import ConfigTable from './ConfigTable';
 import Parameter from './Parameter';
 import Footer from './Footer';
-import {
-  commonStyle,
-  pathRule,
-  onlyComponentsKeys,
-} from '../../constants';
+import { commonStyle, pathRule, onlyComponentsKeys } from '../../constants';
+import { getParamstersHandler } from './helper';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 
@@ -212,7 +210,8 @@ export default function ClusterConfig() {
           return false;
         });
         if (
-          (parameter.params.type === 'CapacityMB' || parameter.params.type === 'Capacity') &&
+          (parameter.params.type === PARAMETER_TYPE.capacity ||
+            parameter.params.type === PARAMETER_TYPE.capacityMB) &&
           parameter.params.value == '0'
         ) {
           parameter.params.value += 'GB';
@@ -225,40 +224,37 @@ export default function ClusterConfig() {
     }
   };
 
+  const errorHandle = (e: any) => {
+    setClusterMore(false);
+    const errorInfo = getErrorInfo(e);
+    setErrorVisible(true);
+    setErrorsList([...errorsList, errorInfo]);
+  };
+
   const getClusterMoreParamsters = async () => {
     setClusterMoreLoading(true);
-    try {
-      const { success, data } = await getMoreParamsters(
-        {},
-        {
-          filters: [
-            {
-              component: oceanbase?.component,
-              version: oceanbase?.version,
-              is_essential_only: true,
-            },
-          ],
-        },
+    const res = await getParamstersHandler(
+      getMoreParamsters,
+      oceanbase,
+      errorHandle,
+    );
+    if (res?.success) {
+      const { data } = res,
+        isSelectOcpexpress = selectedConfig.includes('ocp-express');
+      const newClusterMoreConfig = formatMoreConfig(
+        data?.items,
+        isSelectOcpexpress,
       );
-      if (success) {
-        const isSelectOcpexpress = selectedConfig.includes('ocp-express')
-        const newClusterMoreConfig = formatMoreConfig(data?.items,isSelectOcpexpress);
-        setClusterMoreConfig(newClusterMoreConfig);
-        form.setFieldsValue({
-          oceanbase: {
-            parameters: getInitialParameters(
-              oceanbase?.component,
-              oceanbase?.parameters,
-              newClusterMoreConfig,
-            ),
-          },
-        });
-      }
-    } catch (e: any) {
-      setClusterMore(false);
-      const errorInfo = getErrorInfo(e);
-      setErrorVisible(true);
-      setErrorsList([...errorsList, errorInfo]);
+      setClusterMoreConfig(newClusterMoreConfig);
+      form.setFieldsValue({
+        oceanbase: {
+          parameters: getInitialParameters(
+            oceanbase?.component,
+            oceanbase?.parameters,
+            newClusterMoreConfig,
+          ),
+        },
+      });
     }
     setClusterMoreLoading(false);
   };
@@ -344,7 +340,7 @@ export default function ClusterConfig() {
     if (componentsMore) {
       getComponentsMoreParamsters();
     }
-  }, [selectedConfig]);
+  }, []);
 
   const initPassword = getRandomPassword();
 

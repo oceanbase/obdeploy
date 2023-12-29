@@ -119,6 +119,11 @@ class Cursor(SafeStdio):
 
 
 def connect(plugin_context, target_server=None, connect_proxysys=True, *args, **kwargs):
+    def return_true(**kwargs):
+        for key, value in kwargs.items():
+            plugin_context.set_variable(key, value)
+        return plugin_context.return_true(**kwargs)
+    
     count = 10
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
@@ -186,6 +191,6 @@ def connect(plugin_context, target_server=None, connect_proxysys=True, *args, **
     else:
         stdio.stop_loading('succeed')
         if target_server:
-            return plugin_context.return_true(connect=dbs[target_server], cursor=cursors[target_server])
+            return return_true(connect=dbs[target_server], cursor=cursors[target_server])
         else:
-            return plugin_context.return_true(connect=dbs, cursor=cursors)
+            return return_true(connect=dbs, cursor=cursors)

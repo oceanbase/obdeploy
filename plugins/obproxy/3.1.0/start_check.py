@@ -85,10 +85,26 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         if work_dir_check:
             check_status[server]['dir'] = err.CheckStatus()
 
+        for comp in ["oceanbase", "oceanbase-ce"]:
+            if comp in cluster_config.depends:
+                check_status[server]['password'] = err.CheckStatus()
+
     if init_check_status:
         return plugin_context.return_true(start_check_status=check_status)
 
     stdio.start_loading('Check before start obproxy')
+
+    global_config = cluster_config.get_original_global_conf()
+    key = 'observer_sys_password'
+    for comp in ["oceanbase", "oceanbase-ce"]:
+        if comp in cluster_config.depends:
+            if key in global_config:
+                alert('password',
+                    err.WC_PARAM_USELESS.format(key=key, current_comp=cluster_config.name, comp=comp),
+                    [err.SUG_OB_SYS_PASSWORD.format()]
+                )
+            break
+
     for server in cluster_config.servers:
         ip = server.ip
         client = clients[server]

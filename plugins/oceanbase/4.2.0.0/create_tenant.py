@@ -129,7 +129,7 @@ def dump_standbyro_password(deploy_name, tenant_name, standbyro_password, cluste
     return True
 
 
-def create_tenant(plugin_context, cursor, create_tenant_options=None, relation_tenants={}, cluster_configs={}, primary_tenant_info={}, standbyro_password='', *args, **kwargs):
+def create_tenant(plugin_context, cursor = None, create_tenant_options=None, relation_tenants={}, cluster_configs={}, primary_tenant_info={}, standbyro_password='', *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -156,6 +156,7 @@ def create_tenant(plugin_context, cursor, create_tenant_options=None, relation_t
     options = create_tenant_options if create_tenant_options else plugin_context.options
     create_if_not_exists = get_option('create_if_not_exists', False)
     standby_deploy_name = plugin_context.cluster_config.deploy_name
+    cursor = plugin_context.get_return('connect').get_return('cursor') if not cursor else cursor
     cursor = cursor if cursor else plugin_context.get_variable('cursors').get(standby_deploy_name)
     global tenant_cursor
     tenant_cursor = None
@@ -411,14 +412,20 @@ def create_tenant(plugin_context, cursor, create_tenant_options=None, relation_t
                 stdio.exception('Create error, error info:{}'.format(e))
                 return
             stdio.stop_loading('succeed')
-
+            root_password = get_option(name+'_root_password', None)
+            if root_password:
+                sql = "alter user root IDENTIFIED BY '%s'" % root_password
+                stdio.verbose(sql)
+                if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode) and not create_if_not_exists:
+                    stdio.error('failed to set root@{} password {}'.format(name))
+                    return
             database = get_option('database')
             if database:
                 sql = 'create database {}'.format(database)
-                if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode) and not create_if_not_exists:
+                if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '') and not create_if_not_exists:
                     stdio.error('failed to create database {}'.format(database))
                     return
-
+            
             db_username = get_option('db_username')
             db_password = get_option('db_password', '')
             if db_username:

@@ -47,7 +47,7 @@ def init(plugin_context, *args, **kwargs):
             need_clean = True
 
         if need_clean:
-            client.execute_command("^%s/bin/ob_agentctl stop'" % home_path)
+            client.execute_command("%s/bin/ob_agentctl stop" % home_path)
             if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
                 owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
                 global_ret = False

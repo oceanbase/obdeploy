@@ -818,6 +818,63 @@ class ClusterDeployCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterScaleoutCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterScaleoutCommand, self).__init__('scale_out', 'Scale out cluster with an additional deploy yaml file.')
+        self.parser.add_option('-c', '--config', type='string', help="Path to the configuration yaml file.")
+        self.parser.add_option('-f', '--force', action='store_true', help="Force deploy, overwrite the home_path.", default=False)
+        self.parser.add_option('-C', '--clean', action='store_true', help="Clean the home path if the directory belong to you.", default=False)
+        self.parser.add_option('-t', '--scale_out_timeout', type='int', help="Scale out timeout in seconds.", default=3600)
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.scale_out(self.cmds[0])
+        else:
+            return self._show_help()
+
+
+class ClusterComponentAddCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterComponentAddCommand, self).__init__('add', 'Add components for cluster')
+        self.parser.add_option('-c', '--config', type='string', help="Path to the configuration yaml file.")
+        self.parser.add_option('-f', '--force', action='store_true', help="Force deploy, overwrite the home_path.", default=False)
+        self.parser.add_option('-C', '--clean', action='store_true', help="Clean the home path if the directory belong to you.", default=False)
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.add_components(self.cmds[0])
+        else:
+            return self._show_help()
+
+
+class ClusterComponentDeleteCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterComponentDeleteCommand, self).__init__('del', 'Add components for cluster')
+        self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force kill the observer while standby tenant in others cluster exists.")
+
+    def init(self, cmd, args):
+        super(ClusterComponentDeleteCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <component> ... [component]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if self.cmds and len(self.cmds) >= 2:
+            return obd.delete_components(self.cmds[0], self.cmds[1:])
+        else:
+            return self._show_help()
+
+
+class ClusterComponentMajorCommand(MajorCommand):
+
+    def __init__(self):
+        super(ClusterComponentMajorCommand, self).__init__('component', 'Add or delete component for cluster')
+        self.register_command(ClusterComponentAddCommand())
+        self.register_command(ClusterComponentDeleteCommand())
+
+
 class ClusterStartCommand(ClusterMirrorCommand):
 
     def __init__(self):
@@ -1183,6 +1240,8 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(CLusterUpgradeCommand())
         self.register_command(ClusterChangeRepositoryCommand())
         self.register_command(ClusterTenantCommand())
+        self.register_command(ClusterScaleoutCommand())
+        self.register_command(ClusterComponentMajorCommand())
 
 
 class TestMirrorCommand(ObdCommand):
@@ -1796,6 +1855,7 @@ class ObdiagAnalyzeCommand(MajorCommand):
     def __init__(self):
         super(ObdiagAnalyzeCommand, self).__init__('analyze', 'Analyze oceanbase diagnostic info')
         self.register_command(ObdiagAnalyzeLogCommand())
+        self.register_command(ObdiagAnalyzeFltTraceCommand())
 
 class ObdiagAnalyzeLogCommand(ObdiagAnalyzeMirrorCommand):
     
@@ -1818,6 +1878,27 @@ class ObdiagAnalyzeLogCommand(ObdiagAnalyzeMirrorCommand):
         self.parser.add_option('--files', type='string', help="specify files")
         self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagAnalyzeFltTraceCommand(ObdiagAnalyzeMirrorCommand):
+    
+    def init(self, cmd, args):
+        super(ObdiagAnalyzeFltTraceCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def __init__(self):
+        super(ObdiagAnalyzeFltTraceCommand, self).__init__('flt_trace', 'Analyze oceanbase trace.log from online observer machines or offline oceanbase trace.log files')
+        self.parser.add_option('--flt_trace_id', type='string', help="flt trace id, . format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+        self.parser.add_option('--files', type='string', help="specify files")
+        self.parser.add_option('--top', type='string', help="top leaf span", default=5)
+        self.parser.add_option('--recursion', type='string', help="Maximum number of recursion", default=8)
+        self.parser.add_option('--output', type='string', help="Print the result to the maximum output line on the screen", default=60)
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
 
 
 class ObdiagCheckCommand(ObdCommand):

@@ -132,6 +132,15 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Fri Dec 29 2023 obd 2.5.0
+ - new features: support for component changes within a deployment
+ - new features: support for scaling up all components except the ocp-server
+ - new features: added support for the obLogProxy component
+ - enhancements: optimized task timeout and auto-exit mechanisms for web services
+ - bug fixes: fixed permission issues when starting OCP with a specified user
+ - bug fixes: fixed an issue where version selection was not effective when upgrading OCP
+ - bug fixes: fixed the issue of destroying multi-node OCP instances
+ - enhancements: optimized OCP's dependency tenant handling logic, removing unnecessary option dependencies
 * Tue Dec 12 2023 obd 2.4.1
  - bug fixes: restrict query of OCP credential info, only valid within 10 minutes after successfully deployed
  - bug fixes: fix ocp-express misconfigured when it's not selected as a component

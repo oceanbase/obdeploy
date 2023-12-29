@@ -18,6 +18,7 @@
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
+from datetime import timedelta
 
 import uvicorn
 from fastapi import FastAPI
@@ -33,14 +34,16 @@ from service.common.core import CoreManager
 from service.api.v1 import components, deployments, common, service_info, mirror
 from service.middleware.request_response_log import RequestResponseLogMiddleware
 from service.middleware.process_time import ProcessTimeMiddleware
-from service.handler import handler_utils
 from service.middleware.ip_white import IPBlockMiddleware
+from service.middleware.idle_shutdown import IdleShutdownMiddleware
+from service.handler import handler_utils
 from service.api.v1 import ocp_deployments
 from service.api.v1 import metadb
 from service.api.v1 import installer
 
 app = FastAPI()
 
+IDLE_TIME_BEFORE_SHUTDOWN = timedelta(minutes=30)
 
 class OBDWeb(object):
 
@@ -56,6 +59,7 @@ class OBDWeb(object):
         self.app.include_router(ocp_deployments.router, prefix='/api/v1')
         self.app.include_router(metadb.router, prefix='/api/v1')
         self.app.include_router(installer.router, prefix='/api/v1')
+        self.app.add_middleware(IdleShutdownMiddleware, logger=log.get_logger(), idle_time_before_shutdown=IDLE_TIME_BEFORE_SHUTDOWN)
         self.app.add_middleware(IPBlockMiddleware, ips=white_ip_list)
         self.app.add_middleware(ProcessTimeMiddleware)
         self.app.add_middleware(RequestResponseLogMiddleware, logger=log.get_logger())

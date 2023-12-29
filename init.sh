@@ -63,6 +63,9 @@ for DIR in plugins config_parser; do
     if [ ! -e ${OBD_HOME}/${DIR}/oceanbase-ce ]; then
         ln -s ${OBD_HOME}/${DIR}/oceanbase ${OBD_HOME}/${DIR}/oceanbase-ce
     fi
+    if [ ! -e ${OBD_HOME}/${DIR}/ocp-server-ce ]; then
+        ln -s ${OBD_HOME}/${DIR}/ocp-server ${OBD_HOME}/${DIR}/ocp-server-ce
+    fi
 done
 
 echo '<VERSION>' >> ${OBD_HOME}/version

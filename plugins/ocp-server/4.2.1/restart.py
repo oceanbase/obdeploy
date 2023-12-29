@@ -41,6 +41,7 @@ class Restart(object):
         self.cluster_config = plugin_context.cluster_config
         self.cmds = plugin_context.cmds
         self.options = plugin_context.options
+        setattr(self.options, "skip_create_tenant", True)
         self.dev_mode = plugin_context.dev_mode
         self.stdio = plugin_context.stdio
 
@@ -131,7 +132,7 @@ class Restart(object):
         if self.connect(cluster_config):
             if self.bootstrap_plugin:
                 self.call_plugin(self.bootstrap_plugin, cursor=self.cursors)
-            return self.call_plugin(self.display_plugin, cursor=self.cursors)
+            return self.call_plugin(self.display_plugin, cursor=self.cursors) if self.display_plugin else True
         return False
 
     def rollback(self):

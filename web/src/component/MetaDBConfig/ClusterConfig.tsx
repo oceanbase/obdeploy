@@ -10,6 +10,7 @@ import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import InputPort from '../InputPort';
 import { formatMoreConfig } from '@/utils/helper';
+import { PARAMETER_TYPE } from '@/constant/configuration';
 import {
   generateRandomPassword as generatePassword,
   passwordRules,
@@ -74,8 +75,8 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
           return false;
         });
         if (
-          (parameter.params.type === 'CapacityMB' ||
-            parameter.params.type === 'Capacity') &&
+          (parameter.params.type === PARAMETER_TYPE.capacity ||
+            parameter.params.type === PARAMETER_TYPE.capacityMB) &&
           parameter.params.value == '0'
         ) {
           parameter.params.value += 'GB';
@@ -104,7 +105,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
         },
       );
       if (success) {
-        const newClusterMoreConfig = formatMoreConfig(data?.items);
+        const newClusterMoreConfig = formatMoreConfig(data?.items, false);
         setOcpClusterMoreConfig(newClusterMoreConfig);
         form.setFieldsValue({
           oceanbase: {

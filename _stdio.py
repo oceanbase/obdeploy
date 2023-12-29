@@ -740,9 +740,14 @@ class IO(object):
         self._print(MsgLevel.ERROR, msg, prev_msg=self.ERROR_PREV.format(self.isatty()), *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
+        if 'code' in kwargs:
+            code = kwargs['code']
+            del kwargs['code']
+        else:
+            code = 255
         self._print(MsgLevel.CRITICAL, '%s %s' % (self.ERROR_PREV, msg), *args, **kwargs)
         if not self._root_io:
-            self.exit(kwargs['code'] if 'code' in kwargs else 255)
+            self.exit(code)
 
     def verbose(self, msg, *args, **kwargs):
         if self.level > self.VERBOSE_LEVEL:

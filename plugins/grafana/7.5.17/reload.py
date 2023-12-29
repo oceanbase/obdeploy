@@ -27,11 +27,12 @@ import re
 yaml = YamlLoader()
 
 
-def reload(plugin_context, cursor, new_cluster_config,  *args, **kwargs):
+def reload(plugin_context, new_cluster_config,  *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     servers = cluster_config.servers
+    cursor = plugin_context.get_return('connect').get_return('cursor')
 
     stdio.start_loading('Reload Grafana')
     global_ret = True

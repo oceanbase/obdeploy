@@ -74,6 +74,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
 
 
 def generate_random_password(cluster_config):
+    add_components = cluster_config.get_deploy_added_components()
     global_config = cluster_config.get_original_global_conf()
-    if 'obproxy_sys_password' not in global_config:
-        cluster_config.update_global_conf('obproxy_sys_password', ConfigUtil.get_random_pwd_by_total_length())
+    if cluster_config.name in add_components and 'obproxy_sys_password' not in global_config:
+        cluster_config.update_global_conf('obproxy_sys_password', ConfigUtil.get_random_pwd_by_total_length(), False)

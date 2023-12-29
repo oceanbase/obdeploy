@@ -793,17 +793,17 @@ class Cursor(SafeStdio):
                                     cursorclass=mysql.cursors.DictCursor)
             self.cursor = self.db.cursor()
 
-    def new_cursor(self, tenant='sys', user='root', password=''):
+    def new_cursor(self, tenant='sys', user='root', password='', ip='', port='', print_exception=True):
         try:
-            self.stdio.verbose('fail to connect %s -P%s -u%s@%s -p%s' % (self.ip, self.port, user, tenant, password))
-            return Cursor(ip=self.ip, port=self.port, user=user, tenant=tenant, password=str(password), stdio=self.stdio)
+            ip = ip if ip else self.ip
+            port = port if port else self.port
+            return Cursor(ip=ip, port=port, user=user, tenant=tenant, password=password, stdio=self.stdio)
         except:
-            self.stdio.exception('')
-            self.stdio.verbose('fail to connect %s -P%s -u%s -p%s' % (self.ip, self.port, user, password))
+            print_exception and self.stdio.exception('')
+            self.stdio.verbose('fail to connect %s -P%s -u%s@%s  -p%s' % (ip, port, user, tenant, password))
             return None
 
-    def execute(self, sql, args=None, execute_func=None, raise_exception=None, exc_level='error', stdio=None):
-
+    def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):
         try:
             stdio.verbose('execute sql: %s. args: %s' % (sql, args))
             self.cursor.execute(sql, args)
@@ -819,10 +819,10 @@ class Cursor(SafeStdio):
                 raise e
             return False
 
-    def fetchone(self, sql, args=None, raise_exception=None, exc_level='error', stdio=None):
+    def fetchone(self, sql, args=None, raise_exception=False, exc_level='error', stdio=None):
         return self.execute(sql, args=args, execute_func='fetchone', raise_exception=raise_exception, exc_level=exc_level, stdio=stdio)
 
-    def fetchall(self, sql, args=None, raise_exception=None, exc_level='error', stdio=None):
+    def fetchall(self, sql, args=None, raise_exception=False, exc_level='error', stdio=None):
         return self.execute(sql, args=args, execute_func='fetchall', raise_exception=raise_exception, exc_level=exc_level, stdio=stdio)
 
     def close(self):

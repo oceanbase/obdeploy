@@ -21,10 +21,11 @@
 from __future__ import absolute_import, division, print_function
 
 
-def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
+def reload(plugin_context, new_cluster_config, *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
+    cursor = plugin_context.get_return('connect').get_return('cursor')
     cluster_server = {}
     change_conf = {}
     global_change_conf = {}

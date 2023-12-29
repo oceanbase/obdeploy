@@ -24,6 +24,7 @@ import os
 import re
 import sys
 import time
+import inspect2
 from enum import Enum
 from glob import glob
 from copy import deepcopy, copy
@@ -280,8 +281,23 @@ def pyScriptPluginExec(func):
             method = getattr(self.module, method_name, False)
             namespace_vars = copy(self.context.namespace.variables)
             namespace_vars.update(kwargs)
+            if arg:
+                idx = 0
+                params = list(inspect2.signature(method).parameters.keys())[1:-2]
+                num = min(len(arg), len(params))
+                while idx < num:
+                    key = params[idx]
+                    if key in namespace_vars:
+                        del namespace_vars[key]
+                    idx += 1
             kwargs = namespace_vars
             if method:
+                if cluster_config:
+                    servers = cluster_config.servers
+                    target_servers = kwargs.get('target_servers')
+                    if target_servers is not None:
+                        cluster_config.servers = target_servers
+                        del kwargs['target_servers']
                 try:
                     ret = method(self.context, *arg, **kwargs)
                     if ret is None and self.context and self.context.get_return() is None:
@@ -291,6 +307,9 @@ def pyScriptPluginExec(func):
                     run_result[method_name]['result'] = False
                     self.context.return_false(exception=e)
                     stdio and getattr(stdio, 'exception', print)('%s RuntimeError: %s' % (self, e))
+                finally:
+                    if cluster_config:
+                        cluster_config.servers = servers
         end_time = time.time()
         run_result[method_name]['time'] = end_time - start_time
         self.context.set_variable('run_result', run_result)
@@ -456,6 +475,10 @@ class ParamPlugin(Plugin):
                     'BOOL': Boolean,
                     'INT': Integer,
                     'STRING': String,
+                    'PATH': Path,
+                    'PATH_LIST': PathList,
+                    'SAFE_STRING': SafeString,
+                    'SAFE_STRING_LIST': SafeStringList,
                     'MOMENT': Moment,
                     'TIME': Time,
                     'CAPACITY': Capacity,

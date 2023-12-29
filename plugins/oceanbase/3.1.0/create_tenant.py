@@ -69,7 +69,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, retries=10):
     return tenant_cursor.execute(sql)
 
 
-def create_tenant(plugin_context, cursor, create_tenant_options=None,  *args, **kwargs):
+def create_tenant(plugin_context, create_tenant_options=None, cursor=None,  *args, **kwargs):
     def get_option(key, default=''):
         if key in kwargs:
             return kwargs[key]
@@ -94,6 +94,7 @@ def create_tenant(plugin_context, cursor, create_tenant_options=None,  *args, **
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     options = create_tenant_options if create_tenant_options else plugin_context.options
+    cursor = plugin_context.get_return('connect').get_return('cursor') if not cursor else cursor
     create_if_not_exists = get_option('create_if_not_exists', False)
     tenant_exists = False
     global tenant_cursor

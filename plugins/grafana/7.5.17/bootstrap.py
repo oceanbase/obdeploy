@@ -24,14 +24,14 @@ import re
 import time
 import os
 
-from _errno import EC_FAIL_TO_CONNECT
 
-
-def bootstrap(plugin_context, cursor, *args, **kwargs):
+def bootstrap(plugin_context, cursor=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     clients = plugin_context.clients
     servers = cluster_config.servers
+    if not cursor:
+        cursor = plugin_context.get_return('connect').get_return('cursor')
 
     stdio.start_loading('grafana admin user password set')
     count = 10

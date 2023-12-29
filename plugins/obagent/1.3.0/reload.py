@@ -29,10 +29,11 @@ from tool import YamlLoader, FileUtil
 from _errno import *
 
 
-def reload(plugin_context, cursor, new_cluster_config, *args, **kwargs):
+def reload(plugin_context, new_cluster_config, *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
+    cursor = plugin_context.get_return('connect').get_return('cursor')
     servers = cluster_config.servers
 
     for repository in plugin_context.repositories:

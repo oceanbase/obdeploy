@@ -11,6 +11,7 @@ import ClusterConfig from './ClusterConfig';
 import UserConfig from './UserConfig';
 import NodeConfig from './NodeConfig';
 import DataBaseNodeConfig from './DataBaseNodeConfig';
+import { PARAMETER_TYPE } from '@/constant/configuration';
 import { formValidScorllHelper } from './helper';
 import ExitBtn from '../ExitBtn';
 
@@ -73,7 +74,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
 
   const [dbConfigData, setDBConfigData] =
     useState<API.DBConfig[]>(initDBConfigData);
-  const finalValidate = useRef<boolean>(false)
+  const finalValidate = useRef<boolean>(false);
   const tableFormRef = useRef<EditableFormInstance<API.DBConfig>>();
   const formatParameters = (dataSource: any) => {
     if (dataSource) {
@@ -132,7 +133,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
 
   const nextStep = () => {
     const tableFormRefValidate = () => {
-      finalValidate.current = true
+      finalValidate.current = true;
       return tableFormRef?.current?.validateFields().then((values) => {
         return values;
       });
@@ -143,15 +144,15 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
         return values;
       });
     };
-   
-    Promise.allSettled([formValidate(), tableFormRefValidate()])
-      .then((result) => {
-        finalValidate.current = false
+
+    Promise.allSettled([formValidate(), tableFormRefValidate()]).then(
+      (result) => {
+        finalValidate.current = false;
         if (
           result[0].status === 'rejected' ||
           result[1].status === 'rejected'
         ) {
-          formValidScorllHelper(result,form); 
+          formValidScorllHelper(result, form);
           return;
         }
         const formValues = result[0].value;
@@ -160,7 +161,8 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
         setErrorVisible(false);
         setErrorsList([]);
         window.scrollTo(0, 0);
-      })
+      },
+    );
   };
 
   const [form] = ProForm.useForm();
@@ -201,8 +203,8 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
           return false;
         });
         if (
-          (parameter.params.type === 'CapacityMB' ||
-            parameter.params.type === 'Capacity') &&
+          (parameter.params.type === PARAMETER_TYPE.capacity ||
+            parameter.params.type === PARAMETER_TYPE.capacityMB) &&
           parameter.params.value == '0'
         ) {
           parameter.params.value += 'GB';

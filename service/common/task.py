@@ -26,8 +26,11 @@ from singleton_decorator import singleton
 from enum import auto
 from fastapi_utils.enums import StrEnum
 from service.common import log
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+
 
 DEFAULT_TASK_TYPE="undefined"
+DEFAULT_TASK_TIMEOUT_SECONDS=3600
 
 def get_task_manager():
     return TaskManager()
@@ -101,8 +104,9 @@ class TaskManager(object):
 
 
 class AutoRegister(object):
-    def __init__(self, task_type=DEFAULT_TASK_TYPE):
+    def __init__(self, task_type=DEFAULT_TASK_TYPE, timeout=DEFAULT_TASK_TIMEOUT_SECONDS):
         self._task_type = task_type
+        self._timeout = timeout
 
     def __call__(self, func):
         @functools.wraps(func)
@@ -116,7 +120,18 @@ class AutoRegister(object):
             try:
                 log.get_logger().info("start run task %s", name)
                 task_info.run()
-                task_info.ret = func(*args, **kwargs)
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(func, *args, **kwargs)
+                    try:
+                        future.result(timeout=self._timeout)
+                    except TimeoutError:
+                        future.cancel()
+                        msg = "task {0} execution timeout".format(name)
+                        log.get_logger().exception(msg)
+                        task_info.exception = Exception(msg)
+                        task_info.fail()
+                        log.get_logger().info("task %s finished timeout", name)
+                        return 
                 log.get_logger().info("task %s run finished", name)
                 task_info.success()
                 log.get_logger().info("task %s finished successful", name)

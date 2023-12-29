@@ -288,7 +288,8 @@ class Restart(object):
                 ret = self.un_rolling()
         
             if ret and self.connect():
-                self.call_plugin(self.display_plugin, clients=self.now_clients, cluster_config=self.new_cluster_config if self.new_cluster_config else self.cluster_config, cursor=self.cursor)
+                if self.display_plugin:
+                    self.call_plugin(self.display_plugin, clients=self.now_clients, cluster_config=self.new_cluster_config if self.new_cluster_config else self.cluster_config, cursor=self.cursor)
                 if self.new_cluster_config:
                     self.call_plugin(self.reload_plugin, clients=self.now_clients, cursor=self.cursor, new_cluster_config=self.new_cluster_config, repository_dir=self.repository.repository_dir)
         except Exception as e:

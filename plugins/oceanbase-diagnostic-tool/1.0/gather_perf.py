@@ -20,7 +20,6 @@
 
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
-from subprocess import call, Popen, PIPE
 import _errno as err
 import os
 
@@ -34,7 +33,7 @@ def gather_perf(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && sh ".format(install_dir=obdiag_install_dir) + command
+        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
@@ -45,8 +44,6 @@ def gather_perf(plugin_context, *args, **kwargs):
         )
         if store_dir_option:
             cmd = cmd + r" --store_dir {store_dir_option}".format(store_dir_option=store_dir_option)
-        if ob_install_dir_option:
-            cmd = cmd + r" --ob_install_dir {ob_install_dir_option}".format(ob_install_dir_option=ob_install_dir_option)
         return cmd
 
     def run():
@@ -57,9 +54,6 @@ def gather_perf(plugin_context, *args, **kwargs):
     options = plugin_context.options
     obdiag_bin = "obdiag"
     stdio = plugin_context.stdio
-    cluster_config = plugin_context.cluster_config
-    global_conf = cluster_config.get_global_conf()
-    ob_install_dir_option=global_conf.get('home_path')
     scope_option = get_option('scope')
     store_dir_option = os.path.abspath(get_option('store_dir'))
     obdiag_install_dir = get_option('obdiag_dir')
@@ -72,5 +66,5 @@ def gather_perf(plugin_context, *args, **kwargs):
         if run():
             plugin_context.return_true()
     except KeyboardInterrupt:
-        stdio.exception("obdiag gather perf failded")
+        stdio.exception("obdiag gather perf failed")
         return plugin_context.return_false()

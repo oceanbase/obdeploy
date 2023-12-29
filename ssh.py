@@ -616,7 +616,7 @@ class SshClient(SafeStdio):
 
     def _client_put_dir(self, local_dir, remote_dir, stdio=None):
         has_failed = False
-        ret = LocalClient.execute_command('find %s -type f' % local_dir)
+        ret = LocalClient.execute_command('find -L %s -type f' % local_dir)
         if not ret:
             has_failed = True
         all_files = ret.stdout.strip().split('\n') if ret.stdout else []

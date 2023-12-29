@@ -14,7 +14,7 @@ import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import InputPort from '../InputPort';
 import { ocpServersValidator } from '@/utils';
 import { formatMoreConfig } from '@/utils/helper';
-import { obproxyAddonAfter } from '@/constant/configuration';
+import { obproxyAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
 export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
   const {
     ocpConfigData,
@@ -66,8 +66,8 @@ export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
           return false;
         });
         if (
-          (parameter.params.type === 'CapacityMB' ||
-            parameter.params.type === 'Capacity') &&
+          (parameter.params.type === PARAMETER_TYPE.capacity ||
+            parameter.params.type === PARAMETER_TYPE.capacityMB) &&
           parameter.params.value == '0'
         ) {
           parameter.params.value += 'GB';

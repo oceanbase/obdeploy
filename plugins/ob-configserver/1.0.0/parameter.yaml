@@ -2,7 +2,7 @@
   name_local: 工作目录
   require: true
   essential: true
-  type: STRING
+  type: PATH
   need_redeploy: true
   description_en: working directory for obagent
   description_local: Obagent工作目录
@@ -10,7 +10,7 @@
   name_local: 监听端口
   require: true
   essential: true
-  type: STRING
+  type: INT
   default: 8080
   need_redeploy: true
   description_en: The port of ob-configserver web
@@ -19,7 +19,7 @@
   name_local: 监听的ip
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: 0.0.0.0
   need_restart: true
   description_en: Listen to the ob-configserver server IP
@@ -27,7 +27,7 @@
 - name: log_level
   require: true
   essential: true
-  type: STRING
+  type: SAFE_STRING
   default: info
   need_restart: true
   description_en: The level of manager ob-configserver
