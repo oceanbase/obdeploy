@@ -76,7 +76,7 @@
   name_local: 负载均衡访问地址
   require: false
   essential: true
-  type: STRING
+  type: SAFE_STRING
   need_restart: true
   description_en: Load Balance host ip
   description_local: 负载均衡访问ip地址

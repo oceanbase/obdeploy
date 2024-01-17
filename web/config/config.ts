@@ -1,17 +1,13 @@
+import AntdMomentWebpackPlugin from '@ant-design/moment-webpack-plugin';
 import { defineConfig } from 'umi';
 import routes from './routes';
-import AntdMomentWebpackPlugin from '@ant-design/moment-webpack-plugin';
 
 export default defineConfig({
-  nodeModulesTransform: {
-    type: 'none',
-    exclude: [],
-  },
   // routes: [{ path: '/', component: 'index' }],
   routes,
   title: 'OceanBase Deployer',
-  fastRefresh: {},
-  favicon: '/assets/logo.png',
+  fastRefresh: true,
+  favicons: ['/assets/logo.png'],
   history: { type: 'hash' },
   mfsu: {},
   locale: {
@@ -19,6 +15,8 @@ export default defineConfig({
     antd: false,
     title: false,
   },
+  request: {},
+  model: {},
   metas: [
     {
       'http-equiv': 'Cache-Control',

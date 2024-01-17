@@ -27,6 +27,7 @@ import { ProCard } from '@ant-design/pro-components';
 import useRequest from '@/utils/useRequest';
 import type { ColumnsType } from 'antd/es/table';
 import copy from 'copy-to-clipboard';
+import { handleCopy } from '@/utils/helper';
 import {
   queryDeploymentReport,
   queryConnectionInfo,
@@ -102,26 +103,6 @@ export default function InstallProcess() {
       setErrorsList([...errorsList, errorInfo]);
     },
   });
-
-  const handleCopy = (content: string) => {
-    copy(content);
-    message.success(
-      intl.formatMessage({
-        id: 'OBD.pages.components.InstallFinished.CopiedSuccessfully',
-        defaultMessage: '复制成功',
-      }),
-    );
-  };
-
-  const handleCopyCommand = (command: string) => {
-    copy(command);
-    message.success(
-      intl.formatMessage({
-        id: 'OBD.pages.components.InstallFinished.CopiedSuccessfully',
-        defaultMessage: '复制成功',
-      }),
-    );
-  };
 
   useEffect(() => {
     fetchReportInfo({ name });
@@ -342,7 +323,7 @@ export default function InstallProcess() {
                           }}
                         >
                           <CopyOutlined
-                            onClick={() => handleCopyCommand(item.command)}
+                            onClick={() => handleCopy(item.command)}
                           />
                         </a>
                       </div>

@@ -277,7 +277,7 @@
   name_local: Alertmanager 地址
   require: false
   essential: true
-  type: STRING
+  type: WEB_URL
   default: ''
   min_value: NULL
   max_value: NULL

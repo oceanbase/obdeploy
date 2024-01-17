@@ -1,28 +1,28 @@
+import InputPort from '@/component/InputPort';
+import { PARAMETER_TYPE } from '@/constant/configuration';
+import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
+import { getErrorInfo, getRandomPassword } from '@/utils';
+import { formatMoreConfig } from '@/utils/helper';
 import { intl } from '@/utils/intl';
-import { useState, useEffect } from 'react';
-import { useModel, getLocale } from 'umi';
-import { Space, Tooltip, Row, Switch, Table, Spin, Form, message } from 'antd';
+import useRequest from '@/utils/useRequest';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import {
   ProCard,
   ProForm,
-  ProFormText,
   ProFormRadio,
-  ProFormDigit,
+  ProFormText,
 } from '@ant-design/pro-components';
-import { getErrorInfo, getRandomPassword } from '@/utils';
-import useRequest from '@/utils/useRequest';
-import { formatMoreConfig } from '@/utils/helper';
-import { PARAMETER_TYPE } from '@/constant/configuration';
-import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import TooltipInput from '../TooltipInput';
-import ConfigTable from './ConfigTable';
-import Parameter from './Parameter';
-import Footer from './Footer';
-import { commonStyle, pathRule, onlyComponentsKeys } from '../../constants';
-import { getParamstersHandler } from './helper';
+import { Form, message, Row, Space, Switch, Tooltip } from 'antd';
+import { useEffect, useState } from 'react';
+import { getLocale, useModel } from 'umi';
+import { commonStyle, onlyComponentsKeys, pathRule } from '../../constants';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
+import TooltipInput from '../TooltipInput';
+import ConfigTable from './ConfigTable';
+import Footer from './Footer';
+import { getParamstersHandler } from './helper';
+import Parameter from './Parameter';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
@@ -52,6 +52,7 @@ export default function ClusterConfig() {
     setErrorVisible,
     setErrorsList,
     errorsList,
+    MODE_CONFIG_RULE,
   } = useModel('global');
   const { components = {}, home_path } = configData || {};
   const {
@@ -158,19 +159,15 @@ export default function ClusterConfig() {
   };
 
   const portValidator = (_: any, value: number) => {
-    if (value) {
-      if (value >= 1024 && value <= 65535) {
-        return Promise.resolve();
-      }
+    if (value < 1024 || value > 65535) {
       return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.pages.components.ClusterConfig.ThePortNumberCanOnly',
-            defaultMessage: '端口号只支持 1024~65535 范围',
-          }),
-        ),
+        intl.formatMessage({
+          id: 'OBD.component.InputPort.ThePortNumberCanOnly',
+          defaultMessage: '端口号只支持 1024~65535 范围',
+        }),
       );
     }
+    return Promise.resolve();
   };
 
   const getInitialParameters = (
@@ -434,7 +431,7 @@ export default function ClusterConfig() {
             />
             <a
               className={styles.viewRule}
-              href="https://www.oceanbase.com/docs/obd-cn"
+              href={MODE_CONFIG_RULE}
               target="_blank"
               data-aspm-click="c307508.d326703"
               data-aspm-desc={intl.formatMessage({
@@ -525,50 +522,21 @@ export default function ClusterConfig() {
             </Row>
             <Row>
               <Space size="middle">
-                <ProFormDigit
+                <InputPort
                   name={['oceanbase', 'mysql_port']}
                   label={intl.formatMessage({
                     id: 'OBD.pages.components.ClusterConfig.SqlPort',
                     defaultMessage: 'SQL 端口',
                   })}
                   fieldProps={{ style: commonStyle }}
-                  placeholder={intl.formatMessage({
-                    id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                    defaultMessage: '请输入',
-                  })}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                        defaultMessage: '请输入',
-                      }),
-                    },
-                    { validator: portValidator },
-                  ]}
                 />
-
-                <ProFormDigit
+                <InputPort
                   name={['oceanbase', 'rpc_port']}
                   label={intl.formatMessage({
                     id: 'OBD.pages.components.ClusterConfig.RpcPort',
                     defaultMessage: 'RPC 端口',
                   })}
                   fieldProps={{ style: commonStyle }}
-                  placeholder={intl.formatMessage({
-                    id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                    defaultMessage: '请输入',
-                  })}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                        defaultMessage: '请输入',
-                      }),
-                    },
-                    { validator: portValidator },
-                  ]}
                 />
               </Space>
             </Row>
@@ -604,30 +572,15 @@ export default function ClusterConfig() {
               {selectedConfig.includes('obproxy') && (
                 <Row>
                   <Space size="middle">
-                    <ProFormDigit
+                    <InputPort
                       name={['obproxy', 'listen_port']}
                       label={intl.formatMessage({
                         id: 'OBD.pages.components.ClusterConfig.ObproxyServicePort',
                         defaultMessage: 'OBProxy 服务端口',
                       })}
                       fieldProps={{ style: commonStyle }}
-                      placeholder={intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                        defaultMessage: '请输入',
-                      })}
-                      rules={[
-                        {
-                          required: true,
-                          message: intl.formatMessage({
-                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                            defaultMessage: '请输入',
-                          }),
-                        },
-                        { validator: portValidator },
-                      ]}
                     />
-
-                    <ProFormDigit
+                    <InputPort
                       name={['obproxy', 'prometheus_listen_port']}
                       label={
                         <>
@@ -648,20 +601,6 @@ export default function ClusterConfig() {
                         </>
                       }
                       fieldProps={{ style: commonStyle }}
-                      placeholder={intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                        defaultMessage: '请输入',
-                      })}
-                      rules={[
-                        {
-                          required: true,
-                          message: intl.formatMessage({
-                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                            defaultMessage: '请输入',
-                          }),
-                        },
-                        { validator: portValidator },
-                      ]}
                     />
                   </Space>
                 </Row>
@@ -669,77 +608,34 @@ export default function ClusterConfig() {
               {selectedConfig.includes('obagent') && (
                 <Row>
                   <Space size="middle">
-                    <ProFormDigit
+                    <InputPort
                       name={['obagent', 'monagent_http_port']}
                       label={intl.formatMessage({
                         id: 'OBD.pages.components.ClusterConfig.ObagentMonitoringServicePort',
                         defaultMessage: 'OBAgent 监控服务端口',
                       })}
                       fieldProps={{ style: commonStyle }}
-                      placeholder={intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                        defaultMessage: '请输入',
-                      })}
-                      rules={[
-                        {
-                          required: true,
-                          message: intl.formatMessage({
-                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                            defaultMessage: '请输入',
-                          }),
-                        },
-                        { validator: portValidator },
-                      ]}
                     />
-
-                    <ProFormDigit
+                    <InputPort
                       name={['obagent', 'mgragent_http_port']}
                       label={intl.formatMessage({
                         id: 'OBD.pages.components.ClusterConfig.ObagentManageServicePorts',
                         defaultMessage: 'OBAgent 管理服务端口',
                       })}
                       fieldProps={{ style: commonStyle }}
-                      placeholder={intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                        defaultMessage: '请输入',
-                      })}
-                      rules={[
-                        {
-                          required: true,
-                          message: intl.formatMessage({
-                            id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                            defaultMessage: '请输入',
-                          }),
-                        },
-                        { validator: portValidator },
-                      ]}
                     />
                   </Space>
                 </Row>
               )}
               {selectedConfig.includes('ocp-express') && !lowVersion && (
                 <Row>
-                  <ProFormDigit
+                  <InputPort
                     name={['ocpexpress', 'port']}
                     label={intl.formatMessage({
                       id: 'OBD.pages.components.ClusterConfig.PortOcpExpress',
                       defaultMessage: 'OCP Express 端口',
                     })}
                     fieldProps={{ style: commonStyle }}
-                    placeholder={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                      defaultMessage: '请输入',
-                    })}
-                    rules={[
-                      {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                          defaultMessage: '请输入',
-                        }),
-                      },
-                      { validator: portValidator },
-                    ]}
                   />
                 </Row>
               )}

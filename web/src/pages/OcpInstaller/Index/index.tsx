@@ -11,12 +11,6 @@ import CustomFooter from '@/component/CustomFooter';
 import ExitBtn from '@/component/ExitBtn';
 import styles from './index.less';
 
-export interface IndexProps {
-  location: {
-    query: { type: string };
-  };
-}
-
 type ConfigMethodType = 'ocpInstaller/configuration' | 'ocpInstaller/install';
 type InstallIconType =
   | '/assets/welcome/new-db-selected.svg'
@@ -26,11 +20,7 @@ type ConfigurationIconType =
   | '/assets/welcome/old-db-unselected.svg';
 //创建新的数据库——》install
 //使用已有的 ——》configuration
-const Index: React.FC<IndexProps> = ({
-  location: {
-    query: { type },
-  },
-}) => {
+const Index: React.FC = () => {
   let isUpdate, isHaveMetadb;
   const [configMethod, setConfigMethod] = useState<ConfigMethodType>(
     'ocpInstaller/install',
@@ -306,7 +296,7 @@ const Index: React.FC<IndexProps> = ({
           </div>
           <CustomFooter>
             <ExitBtn />
-            <Button onClick={() => history.push('guide')}>
+            <Button onClick={() => history.push('/guide')}>
               {intl.formatMessage({
                 id: 'OBD.OcpInstaller.Index.PreviousStep',
                 defaultMessage: '上一步',
@@ -315,7 +305,7 @@ const Index: React.FC<IndexProps> = ({
             <Button
               type="primary"
               disabled={isHaveMetadb === ''}
-              onClick={() => history.push(configMethod)}
+              onClick={() => history.push(`/${configMethod}`)}
             >
               {intl.formatMessage({
                 id: 'OBD.OcpInstaller.Index.Ok',

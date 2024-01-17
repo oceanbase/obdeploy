@@ -94,7 +94,7 @@ def start(plugin_context, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     clusters_cmd = {}
-    need_bootstrap = True
+    need_bootstrap = False if len(cluster_config.added_servers) else True
     root_servers = {}
     global_config = cluster_config.get_global_conf()
     appname = global_config['appname'] if 'appname' in global_config else None

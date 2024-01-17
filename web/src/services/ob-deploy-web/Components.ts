@@ -1,6 +1,6 @@
 // @ts-ignore
 /* eslint-disable */
-import { request } from 'umi';
+import { request } from '@umijs/max';
 
 /** List Components query all component versions GET /api/v1/components */
 export async function queryAllComponentVersions(options?: {

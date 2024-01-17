@@ -898,5 +898,6 @@
   "OBD.component.ConnectConfig.MetadbAccessAccount": "MetaDB 访问账号",
   "OBD.component.ConnectConfig.EnterAMetadbAccessAccount": "请输入 MetaDB 访问账号",
   "OBD.component.ConnectConfig.MetadbAccessPassword": "MetaDB 访问密码",
-  "OBD.component.ConnectConfig.EnterMetadbAccessPassword": "请输入 MetaDB 访问密码"
+  "OBD.component.ConnectConfig.EnterMetadbAccessPassword": "请输入 MetaDB 访问密码",
+  "OBD.src.utils.helper.CopiedSuccessfully": "复制成功"
 }

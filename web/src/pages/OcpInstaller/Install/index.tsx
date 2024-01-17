@@ -17,18 +17,8 @@ import { STEPS_KEYS_INSTALL } from '@/constant/configuration';
 import MetaDBConfig from '@/component/MetaDBConfig';
 import OCPConfigNew from '@/component/OCPConfigNew';
 
-export interface InstallProps {
-  location: {
-    query: { step: number; metadbId: number; ocpId: number };
-  };
-}
-
-const Install: React.FC<InstallProps> = ({
-  location: {
-    query: { step, metadbId, ocpId },
-  },
-}) => {
-  const [current, setCurrent] = useState(step ? Number(step) : 1);
+const Install: React.FC = () => {
+  const [current, setCurrent] = useState(1);
 
   const {
     connectId,
@@ -63,7 +53,7 @@ const Install: React.FC<InstallProps> = ({
     }
   }, [current, installStatus, installResult]);
   return (
-    <PageContainer style={{ paddingBottom: 90 }}>
+    <PageContainer style={{ paddingBottom: 90,backgroundColor:'#f5f8ff' }}>
       <Steps
         currentStep={current}
         stepsItems={NEW_METADB_OCP_INSTALL}

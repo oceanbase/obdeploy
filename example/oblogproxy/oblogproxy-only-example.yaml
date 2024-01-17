@@ -1,0 +1,18 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+oblogproxy:
+  servers:
+    - 192.168.1.1
+  version: 2.0.0
+  global:
+    home_path: /root/oblogproxy
+    service_port: 2983   # External port. The default value is 2983.
+    ob_sys_username: ""  # A user under the sys tenant of oceanbase-ce, oblogproxy communicates with oceanbase-ce using this user.,default ''
+    ob_sys_password: ""  # ob_sys_username`s password, default ''
+    #binlog_dir: /root/oblogproxy/run   # The directory for binlog file. The default value is $home_path/run.
+    #binlog_mode: true  # enable binlog mode, default true

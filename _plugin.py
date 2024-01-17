@@ -292,11 +292,13 @@ def pyScriptPluginExec(func):
                     idx += 1
             kwargs = namespace_vars
             if method:
+                target_servers = None
                 if cluster_config:
                     servers = cluster_config.servers
                     target_servers = kwargs.get('target_servers')
                     if target_servers is not None:
                         cluster_config.servers = target_servers
+                        stdio.verbose('plugin %s target_servers: %s' % (self, target_servers))
                         del kwargs['target_servers']
                 try:
                     ret = method(self.context, *arg, **kwargs)
@@ -308,8 +310,9 @@ def pyScriptPluginExec(func):
                     self.context.return_false(exception=e)
                     stdio and getattr(stdio, 'exception', print)('%s RuntimeError: %s' % (self, e))
                 finally:
-                    if cluster_config:
+                    if target_servers:
                         cluster_config.servers = servers
+                        stdio.verbose('plugin %s restore servers: %s' % (self, servers))
         end_time = time.time()
         run_result[method_name]['time'] = end_time - start_time
         self.context.set_variable('run_result', run_result)
@@ -486,7 +489,10 @@ class ParamPlugin(Plugin):
                     'STRING_LIST': StringList,
                     'DICT': Dict,
                     'LIST': List,
-                    'PARAM_LIST': StringOrKvList
+                    'PARAM_LIST': StringOrKvList,
+                    'DB_URL': DBUrl,
+                    'WEB_URL': WebUrl,
+                    'OB_USER': OBUser
                 }
                 self._src_data = {}
                 with open(self.def_param_yaml_path, 'rb') as f:

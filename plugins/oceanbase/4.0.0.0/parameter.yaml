@@ -957,7 +957,7 @@
   description_local: perf event调试特性开关
 - name: obconfig_url
   require: false
-  type: STRING
+  type: WEB_URL
   default:
   min_value: NULL
   max_value: NULL

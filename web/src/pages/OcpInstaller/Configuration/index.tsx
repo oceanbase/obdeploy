@@ -52,7 +52,7 @@ const Configuration: React.FC = () => {
   }, [current, installStatus, installResult]);
 
   return (
-    <PageContainer style={{ paddingBottom: 90 }}>
+    <PageContainer style={{ paddingBottom: 90,backgroundColor:'#f5f8ff' }}>
       <Steps
         currentStep={current}
         stepsItems={METADB_OCP_INSTALL}

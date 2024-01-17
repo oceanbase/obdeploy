@@ -29,7 +29,7 @@ import {
   deployAndStartADeployment,
   createDeploymentConfig,
 } from '@/services/ob-deploy-web/Deployments';
-import { handleQuit, getErrorInfo, errorHandler } from '@/utils';
+import { getErrorInfo, errorHandler } from '@/utils';
 import CustomFooter from '../../CustomFooter';
 import ExitBtn from '@/component/ExitBtn';
 import NP from 'number-precision';
@@ -53,8 +53,6 @@ let timerFailed: NodeJS.Timer;
 const initDuration = 3;
 let durationScroll = initDuration;
 let durationFailed = initDuration;
-
-const errCodeUrl = 'https://www.oceanbase.com/product/ob-deployer/error-codes';
 interface PreCheckProps {
   isNewDB: boolean;
 }
@@ -64,17 +62,14 @@ interface PreCheckProps {
 export default function PreCheck({
   current,
   setCurrent,
-  isNewDB,
 }: PreCheckProps & API.StepProp) {
   const {
     setCheckOK,
-    handleQuitProgress,
-    getInfoByName,
-    setConfigData,
     setErrorVisible,
     setErrorsList,
     errorsList,
     ocpConfigData,
+    ERR_CODE
   } = useModel('global');
   const { setInstallTaskId } = useModel('ocpInstallData');
 
@@ -677,7 +672,7 @@ export default function PreCheck({
                           id: 'OBD.pages.components.PreCheckStatus.Reason',
                           defaultMessage: '原因：',
                         })}
-                        <a href={errCodeUrl} target="_blank">
+                        <a href={ERR_CODE} target="_blank">
                           ERR-{item.code}
                         </a>{' '}
                         {reason}
@@ -716,7 +711,7 @@ export default function PreCheck({
                       <br />
                       <a
                         className={styles.preCheckLearnMore}
-                        href={errCodeUrl}
+                        href={ERR_CODE}
                         target="_blank"
                       >
                         {intl.formatMessage({

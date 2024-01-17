@@ -229,7 +229,7 @@ export default function NodeConfig() {
     const allServers = getAllServers(dbConfigData);
     const allZoneServers: any = {};
     dbConfigData.forEach((item) => {
-      allZoneServers[`${item.id}`] = item.servers;
+      allZoneServers[`${item.id}`] = item.servers || [];
     });
     const obproxyServers = form.getFieldValue(['obproxy', 'servers']);
     const ocpexpressServers = form.getFieldValue(['ocpexpress', 'servers']);

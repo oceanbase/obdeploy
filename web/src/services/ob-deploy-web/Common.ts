@@ -1,6 +1,6 @@
 // @ts-ignore
 /* eslint-disable */
-import { request } from 'umi';
+import { request } from '@umijs/max';
 
 /** Keep Alive validate or set keep alive token POST /api/v1/connect/keep_alive */
 export async function validateOrSetKeepAliveToken(

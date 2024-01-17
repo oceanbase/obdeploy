@@ -29,8 +29,6 @@ import json
 from uuid import uuid1 as uuid, UUID
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
-from colorama import Fore
-
 from core import ObdHome
 from _stdio import IO, FormtatText
 from _lock import LockMode
@@ -668,7 +666,7 @@ class ClusterMirrorCommand(ObdCommand):
         if demploy_name is None:
             demploy_name = self.cmds[0]
         data = json.dumps(self.get_obd_namespaces_data(obd))
-        LocalClient.execute_command_background(f"nohup obd telemetry post {demploy_name} --data='{data}' >/dev/null 2>&1 &")
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' >/dev/null 2>&1 &" % (demploy_name, data))
 
 
 class ClusterConfigStyleChange(ClusterMirrorCommand):
@@ -812,7 +810,7 @@ class ClusterDeployCommand(ClusterMirrorCommand):
             res = obd.deploy_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
             if res:
-                obd.stdio.print(FormtatText('Please execute ` obd cluster start %s ` to start' % self.cmds[0], Fore.GREEN))
+                obd.stdio.print(FormtatText.success('Please execute ` obd cluster start %s ` to start' % self.cmds[0]))
             return res
         else:
             return self._show_help()
@@ -1603,7 +1601,7 @@ class DisplayTraceCommand(ObdCommand):
         except:
             ROOT_IO.print('%s is not trace id' % trace_id)
             return False
-        cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, log_dir, trace_id)
+        cmd = 'grep -h "\[{}\]" $(ls -tr {}*) | sed "s/\[{}\] //g" '.format(trace_id, log_dir, trace_id)
         data = LocalClient.execute_command(cmd)
         ROOT_IO.print(data.stdout)
         return True
@@ -1861,6 +1859,8 @@ class ObdiagAnalyzeLogCommand(ObdiagAnalyzeMirrorCommand):
     
     def init(self, cmd, args):
         super(ObdiagAnalyzeLogCommand, self).init(cmd, args)
+        self.parser.set_usage(
+            '%s <deploy name> [options]' % self.prev_cmd)
         return self
     
     @property
@@ -1884,6 +1884,8 @@ class ObdiagAnalyzeFltTraceCommand(ObdiagAnalyzeMirrorCommand):
     
     def init(self, cmd, args):
         super(ObdiagAnalyzeFltTraceCommand, self).init(cmd, args)
+        self.parser.set_usage(
+            '%s <deploy name> [options]' % self.prev_cmd)
         return self
     
     @property

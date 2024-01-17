@@ -105,8 +105,9 @@ function _obd_complete_func
       all_cmds["obd obdiag"]="check gather deploy analyze"
       all_cmds["obd obdiag gather"]="all log clog slog obproxy_log perf plan_monitor stack sysstat"
       all_cmds["obd obdiag gather *"]="_obd_reply_deploy_names"
-      all_cmds["obd obdiag analyze"]="log"
-      all_cmds["obd obdiag check *"]="_obd_reply_deploy_names"
+      all_cmds["obd obdiag analyze"]="log flt_trace"
+      all_cmds["obd obdiag analyze *"]="_obd_reply_deploy_names"
+      all_cmds["obd obdiag check"]="_obd_reply_deploy_names"
   # fi
   case $prev in
   list)

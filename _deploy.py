@@ -199,10 +199,12 @@ class ComponentInnerConfig(dict):
             key = InnerConfigKey.to_keyword(key)
         return self[item].get(key)
 
+
 class InnerConfigKeywords(object):
 
     DEPLOY_INSTALL_MODE = 'deploy_install_mode'
     DEPLOY_BASE_DIR = 'deploy_base_dir'
+
 
 class InnerConfig(object):
 
@@ -580,6 +582,10 @@ class ClusterConfig(object):
         self._inner_config.update_attr(key, value)
         return self._deploy_config.dump() if save else True
     
+    def del_component_attr(self, key, save=True):
+        self._inner_config.del_attr(key)
+        return self._deploy_config.dump() if save else True
+    
     def get_component_attr(self, key):
         return self._inner_config.get_attr(key)
     
@@ -633,6 +639,9 @@ class ClusterConfig(object):
     
     def get_deploy_added_components(self):
         return self._deploy_config.added_components
+    
+    def get_deploy_changed_components(self):
+        return self._deploy_config.changed_components
         
     def get_depend_config(self, name, server=None, with_default=True):
         if name not in self._depends:
@@ -1045,12 +1054,25 @@ class DeployConfig(SafeStdio):
         self._changed_components = []
         self._removed_components = []
         self._do_not_dump = False
+        self._mem_mode = False
+
+    def __deepcopy__(self, memo):
+        deploy_config = self.__class__(self.yaml_path, self.yaml_loader, self._inner_config, self.config_parser_manager, self.stdio)
+        for component_name in self.components:
+            deploy_config.components[component_name] = deepcopy(self.components[component_name])
+        return deploy_config
 
     def set_undumpable(self):
         self._do_not_dump = True
 
     def set_dumpable(self):
         self._do_not_dump = False
+
+    def enable_mem_mode(self):
+        self._mem_mode = True
+
+    def disable_mem_mode(self):
+        self._mem_mode = False
 
     @property
     def user(self):
@@ -1376,6 +1398,8 @@ class DeployConfig(SafeStdio):
         return self.dump() if save else True
 
     def update_component_server_conf(self, component_name, server, key, value, save=True):
+        if self._mem_mode: 
+            return True
         if component_name not in self.components:
             return False
         cluster_config = self.components[component_name]
@@ -1386,6 +1410,8 @@ class DeployConfig(SafeStdio):
         return self.dump() if save else True
 
     def update_component_global_conf(self, component_name, key, value, save=True):
+        if self._mem_mode:
+            return True
         if component_name not in self.components:
             return False
         cluster_config = self.components[component_name]
@@ -1438,12 +1464,20 @@ class DeployConfig(SafeStdio):
             self.stdio.error('The style of the added configuration do not match the style of the existing cluster')
             return False
         src_conf = parser.from_cluster_config(cluster_config)
+
+        global_attr = {}
+        if ComponentInnerConfig.COMPONENT_GLOBAL_ATTRS in src_conf['inner_config']:
+            global_attr = deepcopy(src_conf['inner_config'][(ComponentInnerConfig.COMPONENT_GLOBAL_ATTRS)])
         try:
             merged_cluster_config = parser.merge_config(component_name, src_conf['config'], conf)
         except Exception as e:
             self.stdio.exception(err.EC_COMPONENT_FAILED_TO_MERGE_CONFIG.format(message=str(e)))
             return False
         self.update_component(merged_cluster_config)
+        cluster_config = self.components[component_name]
+        for k in global_attr:
+            v = global_attr.get(k)
+            cluster_config.update_component_attr(k, v, save=False)
         self._changed_components.append(component_name)
         
         # 更新depends config

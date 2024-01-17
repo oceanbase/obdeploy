@@ -17,7 +17,6 @@ import omsUnselectIcon from '../../../public/assets/welcome/oms-unselected.png';
 import Banner from '@/component/Banner';
 import ExitBtn from '@/component/ExitBtn';
 import CustomFooter from '@/component/CustomFooter';
-import { DOCS_PRODUCTION } from '@/constant/docs';
 
 import styles from './index.less';
 
@@ -94,7 +93,7 @@ export default function Guide() {
   const guideConfigListRef = useRef<CustomCardProps[]>(
     getGuideConfigList(setChooseResult),
   );
-  const { setCurrentStep: setOBCurrentStep } = useModel('global');
+  const { setCurrentStep: setOBCurrentStep, DOCS_PRODUCTION } = useModel('global');
   const CustomCard = ({
     disable = false,
     unselectIconPath,
@@ -193,7 +192,7 @@ export default function Guide() {
     if (path === 'obdeploy') {
       setOBCurrentStep(1);
     }
-    history.push(path);
+    history.push(`/${path}`);
   };
 
   return (

@@ -388,7 +388,6 @@ class IO(object):
         self._root_io = root_io
         self.track_limit = track_limit
         self._verbose_prefix = '-' * self.level
-        self.sub_ios = {}
         self.sync_obj = None
         self.input_stream = None
         self._out_obj = None
@@ -630,21 +629,15 @@ class IO(object):
             return False
         return self._stop_sync_obj(IOProgressBar, 'interrupt')
 
-    def sub_io(self, pid=None, msg_lv=None):
-        if not pid:
-            pid = os.getpid()
+    def sub_io(self, msg_lv=None):
         if msg_lv is None:
             msg_lv = self.msg_lv
-        key = "%s-%s" % (pid, msg_lv)
-        if key not in self.sub_ios:
-            sub_io = self.__class__(
+        return self.__class__(
                 self.level + 1,
                 msg_lv=msg_lv,
                 track_limit=self.track_limit,
                 root_io=self._root_io if self._root_io else self
             )
-            self.sub_ios[key] = sub_io
-        return self.sub_ios[key]
 
     def print_list(self, ary, field_names=None, exp=lambda x: x if isinstance(x, (list, tuple)) else [x], show_index=False, start=0, **kwargs):
         if not ary:

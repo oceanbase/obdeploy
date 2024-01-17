@@ -39,7 +39,7 @@ def gather_clog(plugin_context, *args, **kwargs):
 
     def get_obdiag_cmd():
         base_commond = r"cd {install_dir} && ./obdiag gather clog".format(install_dir=obdiag_install_dir)
-        cmd = r"{base} --clog_dir {data_dir} --from {from_option} --to {to_option} --encrypt {encrypt_option}".format(
+        cmd = r"{base} --from {from_option} --to {to_option} --encrypt {encrypt_option}".format(
             base = base_commond,
             from_option = from_option,
             to_option = to_option,

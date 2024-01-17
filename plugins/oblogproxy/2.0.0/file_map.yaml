@@ -1,0 +1,19 @@
+- src_path: ./usr/local/oblogproxy/bin/logproxy
+  target_path: bin/logproxy
+  type: file
+- src_path: ./usr/local/oblogproxy/bin
+  target_path: bin
+  type: dir
+- src_path: ./usr/local/oblogproxy/conf/conf.json
+  target_path: conf/conf.json
+  type: file
+  install_method: cp
+- src_path: ./usr/local/oblogproxy/obcdc
+  target_path: obcdc
+  type: dir
+- src_path: ./usr/local/oblogproxy/run.sh
+  target_path: run.sh
+  type: file
+  install_method: cp
+
+

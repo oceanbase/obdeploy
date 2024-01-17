@@ -1,23 +1,29 @@
 import { intl } from '@/utils/intl';
-import { history } from 'umi';
-import React, { useEffect } from 'react';
-import { Typography, Result, Space } from '@oceanbase/design';
+import { Result, Space, Typography } from '@oceanbase/design';
 import { PageContainer } from '@oceanbase/ui';
+import queryString from 'query-string';
+import { history } from 'umi';
 
-import PageCard from '@/component/PageCard';
-import styles from './index.less';
-import { PathType } from '@/pages/type';
 import ExitPageWrapper from '@/component/ExitPageWrapper';
+import PageCard from '@/component/PageCard';
+
+import { PathType } from '@/pages/type';
+import { OBD_COMMAND, OBD_COMMAND_UPGRADE } from '@/constant/configuration';
+import styles from './index.less';
 
 const { Paragraph } = Typography;
 
 export default function Quit() {
   //@ts-ignore
-  const path = history.location.query.path as PathType | undefined;
-
+  const { path } = queryString.parse(history.location.search) as
+    | PathType
+    | undefined;
   return (
     <ExitPageWrapper>
-      <PageContainer className={styles.container}>
+      <PageContainer
+        className={styles.container}
+        style={{ backgroundColor: '#f5f8ff' }}
+      >
         <PageCard
           style={{
             height: 'calc(100vh - 72px)',
@@ -59,7 +65,7 @@ export default function Quit() {
                   data-aspm-expo
                 >
                   <Paragraph copyable={true}>
-                    {path === 'update' ? 'obd web upgrade' : 'obd web install'}
+                    {path === 'update' ? OBD_COMMAND_UPGRADE : OBD_COMMAND}
                   </Paragraph>
                 </a>
               </Space>

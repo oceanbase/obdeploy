@@ -1,132 +1,14 @@
-import { useRef, useState } from 'react';
-import useRequest from '@/utils/useRequest';
+import { getDocs } from '@/constant/docs';
 import { exitProcess } from '@/services/ob-deploy-web/Common';
 import { queryDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
 import { getErrorInfo } from '@/utils';
+import useRequest from '@/utils/useRequest';
+import { getLocale } from '@umijs/max';
+import { useRef, useState } from 'react';
 
-//ocp reqestBody
-// {
-//   "auth": {
-//     "user": "",
-//     "password": "string",
-//     "port": 22
-//   },
-//   "components": {
-//     "oceanbase": {
-//       "component": "string",
-//       "appname": "string",
-//       "version": "string",
-//       "release": "string",
-//       "package_hash": "",
-//       "mode": "DEMO",
-//       "root_password": "string",
-//       "mysql_port": 0,
-//       "rpc_port": 0,
-//       "home_path": "",
-//       "data_dir": "",
-//       "redo_dir": "",
-//       "parameters": [
-//         {
-//           "key": "string",
-//           "value": "string",
-//           "adaptive": true
-//         }
-//       ],
-//       "topology": [
-//         {
-//           "name": "string",
-//           "rootservice": "string",
-//           "servers": [
-//             {
-//               "ip": "string",
-//               "parameters": {}
-//             }
-//           ]
-//         }
-//       ]
-//     },
-//     "obproxy": {
-//       "component": "string",
-//       "version": "string",
-//       "package_hash": "",
-//       "release": "string",
-//       "cluster_name": "string",
-//       "home_path": "",
-//       "prometheus_listen_port": 0,
-//       "listen_port": 0,
-//       "parameters": [
-//         {
-//           "key": "string",
-//           "value": "string",
-//           "adaptive": true
-//         }
-//       ],
-//       "servers": [
-//         "string"
-//       ]
-//     },
-//     "ocpserver": {
-//       "component": "ocp-server",
-//       "version": "string",
-//       "package_hash": "",
-//       "release": "string",
-//       "home_path": "",
-//       "port": 0,
-//       "admin_password": "string",
-//       "parameters": [
-//         {
-//           "key": "string",
-//           "value": "string",
-//           "adaptive": true
-//         }
-//       ],
-//       "memory_size": "2G",
-//       "ocp_cpu": 0,
-//       "meta_tenant": {
-//         "name": {
-//           "tenant_name": "string",
-//           "user_name": "meta_user",
-//           "user_database": "meta_database"
-//         },
-//         "password": "",
-//         "resource": {
-//           "cpu": 2,
-//           "memory": 4
-//         }
-//       },
-//       "monitor_tenant": {
-//         "name": {
-//           "tenant_name": "string",
-//           "user_name": "meta_user",
-//           "user_database": "meta_database"
-//         },
-//         "password": "",
-//         "resource": {
-//           "cpu": 2,
-//           "memory": 4
-//         }
-//       },
-//       "manage_info": {
-//         "cluster": 0,
-//         "tenant": 0,
-//         "machine": 0
-//       },
-//       "servers": [
-//         "string"
-//       ],
-//       "metadb": {
-//         "id": 1,
-//         "host": "string",
-//         "port": 0,
-//         "user": "string",
-//         "password": "string",
-//         "database": "oceanbase"
-//       }
-//     }
-//   },
-//   "home_path": "",
-//   "launch_user": "string"
-// }
+
+
+// export { docs };
 
 export default () => {
   const initAppName = 'myoceanbase';
@@ -138,7 +20,6 @@ export default () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [configData, setConfigData] = useState<any>({});
   const [ocpConfigData, setOcpConfigData] = useState<any>({});
-  const [currentType, setCurrentType] = useState('all');
   const [checkOK, setCheckOK] = useState(false);
   const [installStatus, setInstallStatus] = useState('RUNNING');
   const [lowVersion, setLowVersion] = useState(false);
@@ -153,7 +34,6 @@ export default () => {
   const [errorsList, setErrorsList] = useState<API.ErrorInfo[]>([]);
   const [first, setFirst] = useState<boolean>(true);
   const [token, setToken] = useState('');
-  const [selectCluster, setSelectCluster] = useState<string>();
   const [clusterMoreConfig, setClusterMoreConfig] = useState<
     API.NewParameterMeta[]
   >([]);
@@ -168,7 +48,6 @@ export default () => {
     API.NewParameterMeta[]
   >([]);
   const [ocpCompMoreConfig, setOcpCompMoreConfig] = useState<
-
     API.NewParameterMeta[]
   >([]);
   const [componentsVersionInfo, setComponentsVersionInfo] =
@@ -184,8 +63,8 @@ export default () => {
   const { run: getInfoByName } = useRequest(queryDeploymentConfig, {
     throwOnError: true,
   });
-  const aliveTokenTimer = useRef<NodeJS.Timeout | null>(null)
-
+  const aliveTokenTimer = useRef<NodeJS.Timeout | null>(null);
+  const docs = getDocs(getLocale);
   return {
     selectedConfig,
     setSelectedConfig,
@@ -241,7 +120,6 @@ export default () => {
     token,
     setToken,
     aliveTokenTimer,
-    selectCluster,
-    setSelectCluster
+    ...docs
   };
 };

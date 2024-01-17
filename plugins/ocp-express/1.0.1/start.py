@@ -399,18 +399,18 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             public_key_str = get_plain_public_key(public_key)
             jdbc_password = rsa_private_sign(jdbc_password, private_key)
         else:
-            public_key_str = ""
+            public_key_str = ''
         memory_size = server_config['memory_size']
         jvm_memory_option = "-Xms{0} -Xmx{0}".format(format_size(parse_size(memory_size) * 0.5, 0).lower())
         java_bin = server_config['java_bin']
-        cmd = '{java_bin} -jar {jvm_memory_option} -DJDBC_URL={jdbc_url} -DJDBC_USERNAME={jdbc_username} ' \
-              '-DPUBLIC_KEY={public_key} {home_path}/lib/ocp-express-server.jar --port={port}'.format(
+        cmd = '{java_bin} -jar {jvm_memory_option} -DJDBC_URL={jdbc_url} -DJDBC_USERNAME={jdbc_username}' \
+              '{public_key} {home_path}/lib/ocp-express-server.jar --port={port}'.format(
                 java_bin=java_bin,
                 home_path=home_path,
                 port=port,
                 jdbc_url=jdbc_url,
                 jdbc_username=jdbc_username,
-                public_key=public_key_str,
+                public_key=' -DPUBLIC_KEY={}'.format(public_key_str) if public_key_str else "",
                 jvm_memory_option=jvm_memory_option
         )
         if "log_dir" not in server_config:
@@ -438,9 +438,9 @@ def start(plugin_context, start_env=None, *args, **kwargs):
 
         admin_passwd = cluster_config.get_global_conf_with_default().get("admin_passwd", '')
 
-        client.add_env('OCP_EXPRESS_INIT_PROPERTIES',  json.dumps(data) if client._is_local else ConfigUtil.passwd_format(json.dumps(data)))
-        client.add_env('OCP_EXPRESS_ADMIN_PASSWD', admin_passwd if client._is_local else ConfigUtil.passwd_format(admin_passwd))
-        client.add_env('JDBC_PASSWORD', jdbc_password if client._is_local else ConfigUtil.passwd_format(jdbc_password))
+        client.add_env('OCP_EXPRESS_INIT_PROPERTIES',  json.dumps(data) if client._is_local else ConfigUtil.passwd_format(json.dumps(data)), rewrite=True)
+        client.add_env('OCP_EXPRESS_ADMIN_PASSWD', admin_passwd if client._is_local else ConfigUtil.passwd_format(admin_passwd), rewrite=True)
+        client.add_env('JDBC_PASSWORD', jdbc_password if client._is_local else ConfigUtil.passwd_format(jdbc_password), rewrite=True)
 
         client.execute_command("cd {}; bash -c '{} > /dev/null 2>&1 &'".format(home_path, cmd))
         ret = client.execute_command("ps -aux | grep '%s' | grep -v grep | awk '{print $2}' " % cmd)

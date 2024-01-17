@@ -13,7 +13,7 @@ const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 export default function IndexPage(){
     let Video: any;
-
+   
   const aspectRatio = NP.divide(2498, 3940).toFixed(10);
 
   const screenWidth = window.innerWidth * 1.3;
@@ -80,10 +80,7 @@ export default function IndexPage(){
                 data-aspm-param={``}
                 data-aspm-expo
                 onClick={() => {
-                    history.push('guide')
-                //   setCurrentStep(1);
-                //   setErrorVisible(false);
-                //   setErrorsList([]);
+                  history.push('/guide')
                 }}
               >
                 {intl.formatMessage({

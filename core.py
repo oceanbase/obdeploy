@@ -27,8 +27,6 @@ from optparse import Values
 from copy import deepcopy, copy
 import requests
 
-from colorama import Fore
-
 import tempfile
 from subprocess import call as subprocess_call
 
@@ -1708,8 +1706,6 @@ class ObdHome(object):
         scale_out_check_plugins = self.search_py_script_plugin(all_repositories, 'scale_out_check', no_found_act='ignore')
         scale_out_plugins = self.search_py_script_plugin(repositories, 'scale_out', no_found_act='ignore')
         connect_plugins = self.search_py_script_plugin(repositories, 'connect')
-        reload_plugins = self.search_py_script_plugin(all_repositories, 'reload') # search for reload_cluster function
-        restart_plugins = self.search_py_script_plugin(all_repositories, 'restart') # search for restart_cluster function
 
         check_pass = True
         for repository in all_repositories:
@@ -1724,9 +1720,11 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Start to deploy additional servers')
         if not self._deploy_cluster(deploy, repositories, scale_out=True, dump=False):
             return False
+        deploy_config.enable_mem_mode()
         self._call_stdio('verbose', 'Start to start additional servers')
         if not self._start_cluster(deploy, repositories, scale_out=True):
             return False
+        
         for repository in repositories:
             if repository not in scale_out_plugins:
                 continue
@@ -1736,7 +1734,21 @@ class ObdHome(object):
                 return False
             if not self.call_plugin(scale_out_plugins[repository], repository):
                 return False
-            
+        
+        succeed = True
+        # prepare for added components
+        for repository in all_repositories:
+            if repository in scale_out_check_plugins:
+                plugin_return = self.get_namespace(repository.name).get_return(scale_out_check_plugins[repository].name)
+                plugins_list = plugin_return.get_return('plugins', [])
+                self._call_stdio('verbose', '%s custom plugins: %s' % (repository.name, plugins_list))
+                for plugin_name in plugins_list:
+                    plugin =  self.search_py_script_plugin([repository], plugin_name)
+                    if repository in plugin:
+                        succeed = succeed and self.call_plugin(plugin[repository], repository)
+        if not succeed:
+            return False
+        
         deploy_config.set_dumpable()
         if not deploy_config.dump():
             self._call_stdio('error', 'Failed to dump new deploy config')
@@ -1760,7 +1772,8 @@ class ObdHome(object):
         if errors:
             self._call_stdio('warn', err.WC_FAIL_TO_RESTART_OR_RELOAD_AFTER_SCALE_OUT.format(detail='\n -'.join(errors)))
             return False
-        self._call_stdio('print', Fore.GREEN + 'Execute ` obd cluster display %s ` to view the cluster status' % name + Fore.RESET)
+        
+        self._call_stdio('print', FormtatText.success('Execute ` obd cluster display %s ` to view the cluster status' % name))
         return True
 
     def add_components(self, name):
@@ -1842,6 +1855,7 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Start to deploy additional servers')
         if not self._deploy_cluster(deploy, repositories, dump=False):
             return False
+        deploy_config.enable_mem_mode()
         self._call_stdio('verbose', 'Start to start additional servers')
         if not self._start_cluster(deploy, repositories):
             return False
@@ -2103,7 +2117,7 @@ class ObdHome(object):
             if not self.call_plugin(connect_plugins[repository], repository, connect_all=scale_out, target_servers=target_servers):
                 break
 
-            if need_bootstrap and start_all:
+            if need_bootstrap and (start_all or scale_out):
                 self._call_stdio('start_loading', 'Initialize %s' % repository.name)
                 if not self.call_plugin(bootstrap_plugins[repository], repository, target_servers=target_servers):
                     self._call_stdio('stop_loading', 'fail')
@@ -3196,6 +3210,7 @@ class ObdHome(object):
         get_relation_tenants_plugins = self.search_py_script_plugin(repositories, 'get_relation_tenants', no_found_act='ignore')
         get_deployment_connections_plugins = self.search_py_script_plugin(repositories, 'get_deployment_connections', no_found_act='ignore')
         connect_plugins = self.search_py_script_plugin(repositories, 'connect', no_found_act='ignore')
+
         if not getattr(self.options, 'ignore_standby', False):
             for repository in get_relation_tenants_plugins:
                 if repository in get_deployment_connections_plugins and repository in get_standbys_plugins:
@@ -3283,7 +3298,6 @@ class ObdHome(object):
                 return False
             # Get the client
             ssh_clients = self.get_clients(deploy_config, [current_repository])
-            cluster_config = deploy_config.components[current_repository.name]
 
             # Check the status for the deployed cluster
             component_status = {}
@@ -3298,9 +3312,17 @@ class ObdHome(object):
                                 self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
                 return False
 
-            start_check_plugins = self.search_py_script_plugin(repositories, 'start_check')
-            ret = self.call_plugin(start_check_plugins[dest_repository], dest_repository, source_option='upgrade')
-            if not ret:
+
+            # do something before upgrade
+            pre_deploy_config = deepcopy(deploy_config)
+            cluster_config = pre_deploy_config.components[current_repository.name]
+            upgrade_pre_plugins = self.search_py_script_plugin([dest_repository], 'upgrade_pre', no_found_act='ignore')
+            if upgrade_pre_plugins and not self.call_plugin(upgrade_pre_plugins[dest_repository], dest_repository, cluster_config=cluster_config):
+                return False
+
+            self.search_param_plugin_and_apply([dest_repository], pre_deploy_config)
+            start_check_plugins = self.search_py_script_plugin([dest_repository], 'start_check', no_found_act='ignore')
+            if start_check_plugins and not self.call_plugin(start_check_plugins[dest_repository], dest_repository, cluster_config=cluster_config, source_option="upgrade"):
                 return False
 
             route = []
@@ -4706,9 +4728,9 @@ class ObdHome(object):
             self._call_stdio('critical', '%s package not found' % component_name)
             return False
         repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
-        deployed = self.obdiag_deploy(auto_deploy=True, version='1.5')
+        deployed = self.obdiag_deploy(auto_deploy=True, version=repository.version)
         if deployed:
-            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, component_name, )
+            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, component_name, repository.version)
             return self.call_plugin(obdiag_plugin, repository, clients={})
         else:
             self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))

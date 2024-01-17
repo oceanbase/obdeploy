@@ -1,4 +1,4 @@
-//与UI无关的函数
+import { intl } from '@/utils/intl'; //与UI无关的函数
 import {
   componentVersionTypeToComponent,
   componentsConfig,
@@ -7,8 +7,9 @@ import {
   showConfigKeys,
   selectOcpexpressConfig,
 } from '@/constant/configuration';
+import { message } from 'antd';
 import { getNoUnitValue, getUnit } from '@/pages/Obdeploy/ClusterConfig/helper';
-
+import copy from 'copy-to-clipboard';
 // 不用navigator.clipboard.writeText的原因：该接口需要在HTTPS环境下才能使用
 export function copyText(text: string) {
   let inputDom = document.createElement('input');
@@ -27,14 +28,14 @@ export function getTailPath() {
 }
 
 /**
- * 
+ *
  * @param dataSource 需要格式化的源数据
  * @param isSelectOcpexpress 是否选中/包含ocpexpress组件
- * @returns 
+ * @returns
  */
 export const formatMoreConfig = (
   dataSource: API.ParameterMeta[],
-  isSelectOcpexpress = true
+  isSelectOcpexpress = true,
 ) => {
   return dataSource.map((item) => {
     const component = componentVersionTypeToComponent[item.component]
@@ -43,7 +44,7 @@ export const formatMoreConfig = (
     const componentConfig = componentsConfig[component];
     // filter out existing parameters
     let configParameter = item?.config_parameters.filter((parameter) => {
-      let configKeys = {...showConfigKeys};
+      let configKeys = { ...showConfigKeys };
       if (!isSelectOcpexpress) {
         configKeys.oceanbase = [
           ...configKeys.oceanbase,
@@ -106,4 +107,14 @@ export const getAllServers = (dataSource: API.DBConfig[]) => {
     }
   });
   return newAllOBServer;
+};
+
+export const handleCopy = (content: string) => {
+  copy(content);
+  message.success(
+    intl.formatMessage({
+      id: 'OBD.src.utils.helper.CopiedSuccessfully',
+      defaultMessage: '复制成功',
+    }),
+  );
 };

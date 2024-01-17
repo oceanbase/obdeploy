@@ -779,5 +779,3 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         plugin_context.return_true()
     else:
         stdio.stop_loading('fail')
-
-

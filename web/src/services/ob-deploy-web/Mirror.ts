@@ -1,6 +1,6 @@
 // @ts-ignore
 /* eslint-disable */
-import { request } from 'umi';
+import { request } from '@umijs/max';
 
 /** Get Effective Mirror list remote mirrors GET /api/v1/mirrors */
 export async function listRemoteMirrors(options?: { [key: string]: any }) {
