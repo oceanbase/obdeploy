@@ -1,14 +1,13 @@
 import InputPort from '@/component/InputPort';
-import MyInput from '@/component/MyInput';
 import { FORM_ITEM_SMALL_LAYOUT } from '@/constant';
 import type { ConnectInfoType } from '@/models/ocpInstallData';
 import * as Metadb from '@/services/ocp_installer_backend/Metadb';
 import { intl } from '@/utils/intl';
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
-import { ProCard } from '@ant-design/pro-components';
-import { Card, Form, Spin } from '@oceanbase/design';
+import { ProCard, ProForm } from '@ant-design/pro-components';
+import { Card, Spin } from '@oceanbase/design';
 import { useRequest } from 'ahooks';
-import { Alert, Button, Table, Tag } from 'antd';
+import { Alert, Button, Input, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { FormInstance } from 'antd/lib/form';
 import React from 'react';
@@ -160,15 +159,17 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
           defaultMessage: '连接信息',
         })}
       >
-        <Form
+        <ProForm
           form={form}
+          submitter={false}
+          className={styles.formContainer}
           initialValues={initialValues}
           layout="vertical"
           requiredMark={false}
           scrollToFirstError
           {...FORM_ITEM_SMALL_LAYOUT}
         >
-          <Form.Item
+          <ProForm.Item
             name="host"
             label={intl.formatMessage({
               id: 'OBD.Component.ConnectionInfo.AccessAddress',
@@ -184,7 +185,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               },
             ]}
           >
-            <MyInput
+            <Input
               style={commonWidthStyle}
               placeholder={intl.formatMessage({
                 id: 'OBD.Component.ConnectionInfo.EnterADatabaseAccessIp',
@@ -192,7 +193,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               })}
               onChange={() => setCheckConnectInfo('unchecked')}
             />
-          </Form.Item>
+          </ProForm.Item>
           <InputPort
             name="port"
             label={intl.formatMessage({
@@ -206,7 +207,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
             fieldProps={{ style: commonWidthStyle }}
           />
 
-          <Form.Item
+          <ProForm.Item
             name="database"
             label={intl.formatMessage({
               id: 'OBD.Component.ConnectionInfo.DatabaseName',
@@ -226,7 +227,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               // },
             ]}
           >
-            <MyInput
+            <Input
               onChange={() => {
                 setCheckConnectInfo('unchecked');
               }}
@@ -236,9 +237,9 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 defaultMessage: '请输入数据库名',
               })}
             />
-          </Form.Item>
+          </ProForm.Item>
 
-          <Form.Item
+          <ProForm.Item
             name="accessUser"
             label={intl.formatMessage({
               id: 'OBD.Component.ConnectionInfo.AccessAccount',
@@ -254,7 +255,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               },
             ]}
           >
-            <MyInput
+            <Input
               onChange={() => setCheckConnectInfo('unchecked')}
               style={commonWidthStyle}
               placeholder={intl.formatMessage({
@@ -262,8 +263,8 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 defaultMessage: '请输入账号',
               })}
             />
-          </Form.Item>
-          <Form.Item
+          </ProForm.Item>
+          <ProForm.Item
             name="accessCode"
             label={intl.formatMessage({
               id: 'OBD.Component.ConnectionInfo.AccessPassword',
@@ -279,7 +280,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               },
             ]}
           >
-            <MyInput.Password
+            <Input.Password
               onChange={() => {
                 setCheckConnectInfo('unchecked');
               }}
@@ -289,7 +290,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 defaultMessage: '请输入密码',
               })}
             />
-          </Form.Item>
+          </ProForm.Item>
           <Button onClick={() => handleCheck()}>
             {intl.formatMessage({
               id: 'OBD.Component.ConnectionInfo.Verification',
@@ -315,7 +316,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               })}
             </div>
           )}
-        </Form>
+        </ProForm>
         {checkConnectInfo === 'success' && updateInfo && (
           <div style={{ marginTop: 16 }}>
             <ProCard
@@ -332,7 +333,8 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 rowKey="name"
               />
             </ProCard>
-            <Form
+            <ProForm
+              submitter={false}
               form={systemUserForm}
               initialValues={systemUserInitialValues}
               layout="vertical"
@@ -344,7 +346,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                   defaultMessage: '操作系统用户',
                 })}
               >
-                <Form.Item
+                <ProForm.Item
                   name="user"
                   label={intl.formatMessage({
                     id: 'OBD.Component.ConnectionInfo.Username',
@@ -361,12 +363,12 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                     },
                   ]}
                 >
-                  <MyInput
+                  <Input
                     onChange={() => setCheckStatus('unchecked')}
                     disabled={!allowInputUser}
                     style={commonWidthStyle}
                   />
-                </Form.Item>
+                </ProForm.Item>
                 <p style={{ color: '#8592AD', marginTop: -20 }}>
                   {intl.formatMessage({
                     id: 'OBD.Component.ConnectionInfo.PleaseProvideTheUserName',
@@ -385,14 +387,14 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 />
 
                 <div style={{ display: 'flex', alignItems: 'end' }}>
-                  <Form.Item
+                  <ProForm.Item
                     label={intl.formatMessage({
                       id: 'OBD.Component.ConnectionInfo.PasswordOptional',
                       defaultMessage: '密码（可选）',
                     })}
                     name="password"
                   >
-                    <MyInput.Password
+                    <Input.Password
                       onChange={() => setCheckStatus('unchecked')}
                       placeholder={intl.formatMessage({
                         id: 'OBD.Component.ConnectionInfo.IfYouHaveConfiguredPassword',
@@ -400,7 +402,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                       })}
                       style={commonWidthStyle}
                     />
-                  </Form.Item>
+                  </ProForm.Item>
                   <Button
                     loading={checkUserLoading}
                     style={{ marginLeft: 12, marginBottom: 24 }}
@@ -438,7 +440,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                   )}
                 </div>
               </ProCard>
-            </Form>
+            </ProForm>
           </div>
         )}
       </Card>

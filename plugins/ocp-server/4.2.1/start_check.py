@@ -474,7 +474,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             else:
                 if not client.execute_command('sudo -n true'):
                     critical('clockdiff', err.EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS.format(server=server))
-                ret = client.execute_command('sudo' + clockdiff_bin)
+                ret = client.execute_command('sudo ' + clockdiff_bin)
                 if not ret:
                     critical('clockdiff', err.EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS.format(server=server))
 

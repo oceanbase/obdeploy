@@ -63,6 +63,8 @@ def delete_standby_info(plugin_context, cluster_configs={}, delete_password=True
     standbyro_password = deepcopy(cluster_config.get_component_attr('standbyro_password'))
     option_type = plugin_context.get_variable('option_type')
     relation_tenants = plugin_context.get_variable('relation_tenants')
+    if deploy_name in cluster_configs:
+        cluster_configs[deploy_name] = cluster_config
 
     # if option_type is 'failover' or 'decouple', can not delete relationship , because there are multiple relationships
     if option_type in ['failover', 'decouple'] and len(relation_tenants) > 2:
@@ -83,18 +85,17 @@ def delete_standby_info(plugin_context, cluster_configs={}, delete_password=True
             for relation_kv in relation_arr:
                 relation_deploy_name = relation_kv[0]
                 relation_tenant = relation_kv[1]
-                relation_cluster_config = plugin_context.get_variable('cluster_configs').get(relation_deploy_name)
+                relation_cluster_config = cluster_configs.get(relation_deploy_name)
                 if not relation_cluster_config:
                     continue
                 delete_relation_in_inner_config(relation_cluster_config, relation_tenant, deploy_name, inner_tenant_name, stdio)
             delete_relation_in_inner_config(cluster_config, inner_tenant_name, deploy_name, '', stdio)
     # dump
-    for deployment_name in plugin_context.get_variable('cluster_configs'):
+    for deployment_name in cluster_configs:
         cluster_config = cluster_configs[deployment_name]
         if not cluster_config.update_component_attr('standby_relation', cluster_config.get_component_attr('standby_relation'), save=True):
             stdio.warn('delete standby_relation failed, deployment_name: {}'.format(deployment_name))
         if not cluster_config.update_component_attr('standbyro_password', cluster_config.get_component_attr('standbyro_password'), save=True):
             stdio.warn('delete standbyro_password failed, deployment_name: {}'.format(deployment_name))
-
 
     return plugin_context.return_true()

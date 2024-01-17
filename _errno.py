@@ -164,6 +164,7 @@ EC_OBSERVER_TIME_OUT_OF_SYNC = OBDErrorCodeTemplate(2008, 'Cluster clocks are ou
 EC_OBSERVER_PRODUCTION_MODE_LIMIT = OBDErrorCodeTemplate(2009, '({server}): when production_mode is True, {key} can not be less then {limit}')
 EC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory must be less than memory_limit/memory_limit_percentage.')
 EC_OBSERVER_GET_MEMINFO_FAIL = OBDErrorCodeTemplate(2011, "{server}: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
+EC_OBSERVER_FAIL_TO_START_OCS = OBDErrorCodeTemplate(2012, 'Failed to start {server} obshell')
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 

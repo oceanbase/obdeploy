@@ -6,6 +6,7 @@ import { OCP_UPGRADE_STATUS_LIST } from '@/constant/index';
 import { intl } from '@/utils/intl';
 import { ProCard } from '@ant-design/pro-components';
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -15,8 +16,7 @@ import {
   Spin,
   Table,
   Tooltip,
-} from '@oceanbase/design';
-import { Alert } from 'antd';
+} from 'antd';
 import { find } from 'lodash';
 import React, { useEffect, useState } from 'react';
 import { useModel } from 'umi';
@@ -44,7 +44,7 @@ const UpdatePreCheck: React.FC<UpdatePreCheckProps> = ({
   const [ocpUpgradePrecheckResult, setOcpUpgradePrecheckResult] = useState(
     ocpUpgradePrecheckTask?.precheck_result,
   );
-  const { ocpConfigData } = useModel('global');
+  const { ocpConfigData, DOCS_SOP } = useModel('global');
   const version: string = ocpConfigData?.components?.ocpserver?.version;
   const precheckOcpUpgradeStatus = ocpUpgradePrecheckTask?.task_info?.status;
 

@@ -47,7 +47,7 @@ const InsstallResult: React.FC<InsstallResultProps> = ({
   ...restProps
 }) => {
   let isHaveMetadb;
-  const { ocpConfigData } = useModel('global');
+  const { ocpConfigData, RELEASE_RECORD, OCP_DOCS } = useModel('global');
   const version: string = ocpConfigData?.components?.ocpserver?.version;
   // 获取 升级主机列表
   const { data: upgraadeAgentHosts, run: getOcpNotUpgradingHost } = useRequest(
@@ -410,7 +410,7 @@ const InsstallResult: React.FC<InsstallResultProps> = ({
 
                     <a
                       target="_blank"
-                      href="https://www.oceanbase.com/softwarecenter"
+                      href={RELEASE_RECORD}
                     >
                       {' '}
                       {intl.formatMessage({
@@ -466,7 +466,7 @@ const InsstallResult: React.FC<InsstallResultProps> = ({
                               })}{' '}
                               <a
                                 target="_blank"
-                                href="https://www.oceanbase.com/docs/ocp-cn"
+                                href={OCP_DOCS}
                               >
                                 {intl.formatMessage({
                                   id: 'OBD.component.InsstallResult.OceanbaseDocumentCenter',

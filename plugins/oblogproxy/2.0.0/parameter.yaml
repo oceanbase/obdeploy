@@ -1,0 +1,577 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: Path
+  need_redeploy: true
+  description_en: the directory for the work data
+  description_local: log proxy工作目录
+- name: binlog_dir
+  name_local: 日志目录
+  type: Path
+  require: false
+  essential: true
+  need_redeploy: true
+  description_en: The directory for binlog file. The default value is $home_path/run.
+  description_local: log proxy bin日志目录， 默认为工作目录下的run
+- name: service_port
+  name_local: 端口
+  require: true
+  essential: true
+  type: INT
+  default: 2983
+  need_restart: true
+  description_en: the port of log proxy.
+  description_local: log proxy使用的端口
+- name: encode_threadpool_size
+  name_local: 编码线程池初始化大小
+  require: false
+  essential: false
+  type: INT
+  default: 8
+  need_restart: true
+  description_en: encode thread pool size.
+  description_local: 编码线程池初始化大小
+- name: encode_queue_size
+  name_local: 编码线程队列长度
+  require: false
+  essential: false
+  type: INT
+  default: 20000
+  need_restart: true
+  description_en: encode queue size
+  description_local: 编码线程队列长度
+- name: max_packet_bytes
+  name_local: 最大数据包字节数
+  require: false
+  essential: false
+  type: INT
+  default: 67108864
+  need_restart: true
+  description_en: max packet bytes
+  description_local: 最大数据包字节数
+- name: record_queue_size
+  name_local: 数据发送队列大小
+  require: false
+  essential: false
+  type: INT
+  default: 20000
+  need_restart: true
+  description_en: record send queue size
+  description_local: 数据发送队列大小
+- name: read_timeout_us
+  name_local: 次读取超时周期
+  require: false
+  essential: false
+  type: INT
+  default: 2000000
+  need_restart: true
+  description_en: batch read timeout period, in microseconds
+  description_local: 次读取超时周期，单位微秒
+- name: read_fail_interval_us
+  name_local: 批次读取失败周期
+  require: false
+  essential: false
+  type: INT
+  default: 1000000
+  need_restart: true
+  description_en: batch read failure period, in microseconds
+  description_local: 批次读取失败周期，单位微秒
+- name: read_wait_num
+  name_local: 批次读取等待数量
+  require: false
+  essential: false
+  type: INT
+  default: 20000
+  need_restart: true
+  description_en: batch read wait count
+  description_local: 批次读取等待数量
+- name: send_timeout_us
+  name_local: 批次发送超时周期
+  require: false
+  essential: false
+  type: INT
+  default: 2000000
+  need_restart: true
+  description_en: batch send timeout period, in microseconds
+  description_local: 批次发送超时周期，单位微秒
+- name: send_fail_interval_us
+  name_local: 批次发送失败周期
+  require: false
+  essential: false
+  type: INT
+  default: 1000000
+  need_restart: true
+  description_en: batch send failure period, in microseconds
+  description_local: 批次发送失败周期，单位微秒
+- name: check_quota_enable
+  name_local: 开启检查配额
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: enable check quota
+  description_local: 开启检查配额
+- name: check_clog_enable
+  name_local: 开启检查clog
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: enable check clog
+  description_local: 开启检查clog
+- name: command_timeout_s
+  name_local: 命令执行超时时间
+  require: false
+  essential: false
+  type: INT
+  default: 10
+  need_restart: true
+  description_en: command execute timeout, in microseconds
+  description_local: 命令执行超时时间，单位微妙
+- name: log_quota_size_mb
+  name_local: 日志文件总大小阈值
+  require: false
+  essential: false
+  type: INT
+  default: 5120
+  need_restart: true
+  description_en: total log file size , in MB
+  description_local: 日志文件总大小阈值，单位MB
+- name: log_quota_day
+  name_local: 日志文件存储时间阈值
+  require: false
+  essential: false
+  type: INT
+  default: 7
+  need_restart: true
+  description_en: log file save time, in days
+  description_local: 日志文件存储时间阈值，单位天
+- name: log_gc_interval_s
+  name_local: 日志文件清理周期
+  require: false
+  essential: false
+  type: INT
+  default: 43200
+  need_restart: true
+  description_en: log file cleanup period, in seconds
+  description_local: 日志文件清理周期，单位秒
+- name: log_level
+  name_local: 日志级别
+  require: false
+  essential: false
+  type: INT
+  default: 2
+  need_restart: true
+  description_en: log level, default info level
+  description_local: 日志级别，默认info级别
+- name: log_flush_strategy
+  name_local: 日志刷新策略
+  require: false
+  essential: false
+  type: INT
+  default: 1
+  need_restart: true
+  description_en: log flush strategy
+  description_local: 日志刷新策略
+- name: log_flush_level
+  name_local: 日志刷新等级
+  require: false
+  essential: false
+  type: INT
+  default: 2
+  need_restart: true
+  description_en: log flush level
+  description_local: 日志刷新等级
+- name: log_flush_period_s
+  name_local: 日志刷新周期
+  require: false
+  essential: false
+  type: INT
+  default: 1
+  need_restart: true
+  description_en: log flush period, in seconds
+  description_local: 日志刷新周期，单位秒
+- name: log_max_file_size_mb
+  name_local: 单个日志文件最大值
+  require: false
+  essential: false
+  type: INT
+  default: 1024
+  need_restart: true
+  description_en: log file max size, in MB
+  description_local: 单个日志文件最大大小，单位MB
+- name: log_retention_h
+  name_local: 日志文件保留时间
+  require: false
+  essential: false
+  type: INT
+  default: 360
+  need_restart: true
+  description_en: log file retention time, in hours
+  description_local: 日志文件保留时间，单位小时
+- name: oblogreader_path_retain_hour
+  name_local: oblogreader子进程目录保留时间
+  require: false
+  essential: false
+  type: INT
+  default: 168
+  need_restart: true
+  description_en: oblogreader sub process directory retention time, in hours
+  description_local: oblogreader子进程目录保留时间，单位小时
+- name: oblogreader_lease_s
+  name_local: oblogreader子进程租约时间
+  require: false
+  essential: false
+  type: INT
+  default: 300
+  need_restart: true
+  description_en: oblogreader sub process startup probe time, in seconds
+  description_local: oblogreader子进程启动探测时间，单位秒
+- name: oblogreader_path
+  name_local: oblogreader子进程目录
+  require: false
+  essential: false
+  type: Path
+  need_redeploy: true
+  description_en: root path to oblogreader subprocess directory (absolute path)
+  description_local: oblogreader子进程目录根路径（绝对路径）
+- name: bin_path
+  name_local: oblogreader子进程可执行程序路径
+  require: false
+  essential: false
+  type: Path
+  need_redeploy: true
+  description_en: project execute program path (absolute path)
+  description_local: 项目可执行程序路径（绝对路径）
+- name: oblogreader_obcdc_ce_path_template
+  name_local: oblogreader依赖obcdc库路径模板
+  require: false
+  essential: false
+  type: Path
+  need_redeploy: true
+  description_en: oblogreader depends on obcdc library path template (absolute path)
+  description_local: oblogreader依赖obcdc库路径模板（绝对路径）
+- name: allow_all_tenant
+  name_local: 允许订阅所有租户
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: allow subscription to all tenants
+  description_local: 允许订阅所有租户
+- name: auth_user
+  name_local: 开启用户鉴权
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: enable user authentication
+  description_local: 开启用户鉴权
+- name: auth_allow_sys_user
+  name_local: 允许订阅系统租户
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: allow subscribing system tenant
+  description_local: 允许订阅系统租户
+- name: ob_sys_username
+  name_local: 系统租户用户名
+  require: false
+  essential: false
+  type: SAFE_STRING
+  need_restart: true
+  description_en: system tenant username cipher (must be self-configured)
+  description_local: 系统租户用户名密文（必须自行配置）
+- name: ob_sys_password
+  name_local: 系统租户密码
+  require: false
+  essential: false
+  type: STRING
+  need_restart: true
+  description_en: system tenant password cipher (must be self-configured)
+  description_local: 系统租户密码密文（必须自行配置）
+- name: counter_interval_s
+  name_local: 计数器周期
+  require: false
+  essential: false
+  type: INT
+  default: 2
+  need_restart: true
+  description_en: counter period in seconds
+  description_local: 计数器周期，单位秒
+- name: metric_enable
+  name_local: 开启指标采集
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: enable metrics collection (resource consumption, CPU, memory, network)
+  description_local: 开启指标采集（资源消耗，CPU、内存、网络）
+- name: metric_interval_s
+  name_local: 指标采集周期
+  require: false
+  essential: false
+  type: INT
+  default: 10
+  need_restart: true
+  description_en: metrics collection cycle
+  description_local: 指标采集周期
+- name: debug
+  name_local: 打印调试信息
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: print debug information
+  description_local: 打印调试信息
+- name: verbose
+  name_local: 打印详细信息
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: print details
+  description_local: 打印详细信息
+- name: verbose_packet
+  name_local: 打印数据包详细信息
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: print packet details
+  description_local: 打印数据包详细信息
+- name: verbose_record_read
+  name_local: 打印记录读取详细信息
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: print record read details
+  description_local: 打印记录读取详细信息
+- name: readonly
+  name_local: 只读模式
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: read-only mode
+  description_local: 只读模式
+- name: count_record
+  name_local: 记录数量
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: record count
+  description_local: 记录数量
+- name: channel_type
+  name_local: 链路类型
+  require: false
+  essential: false
+  type: SAFE_STRING
+  default: plain
+  need_restart: true
+  description_en: channel type
+  description_local: 链路类型
+- name: tls_ca_cert_file
+  name_local: CA证书文件路径
+  require: false
+  essential: false
+  type: Path
+  default: ''
+  need_restart: true
+  description_en: CA certificate file path (absolute path)
+  description_local: CA证书文件路径（绝对路径）
+- name: tls_cert_file
+  name_local: 证书文件路径
+  require: false
+  essential: false
+  type: Path
+  default: ''
+  need_restart: true
+  description_en: server signing certificate path (absolute path)
+  description_local: 服务器端签名证书路径（绝对路径）
+- name: tls_key_file
+  name_local: 私钥文件路径
+  require: false
+  essential: false
+  type: Path
+  default: ''
+  need_restart: true
+  description_en: server private key path (absolute path)
+  description_local: 服务器端的私钥路径（绝对路径）
+- name: tls_verify_peer
+  name_local: 验证对端证书
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: enable OBLogClient authentication
+  description_local: 开启OBLogClient验证
+- name: liboblog_tls
+  name_local: 开启与ObServer通信的TLS
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: true
+  description_en: enable TLS communication with ObServer
+  description_local: 开启与ObServer通信的TLS
+- name: liboblog_tls_cert_path
+  name_local: ObServer证书文件路径
+  require: false
+  essential: false
+  type: Path
+  default: ''
+  need_restart: true
+  description_en: ObServer certificate file path (absolute path)
+  description_local: ObServer相关证书文件路径（绝对路径）
+- name: binlog_obcdc_ce_path_template
+  name_local: binlog依赖obcdc库路径模板
+  require: false
+  essential: false
+  type: Path
+  need_restart: true
+  description_en: binlog depend obcdc library path template (absolute path)
+  description_local: binlog依赖obcdc库路径模板（绝对路径）
+- name: binlog_ignore_unsupported_event
+  name_local: 忽略不支持转换的event
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: ignore events that don't support convert
+  description_local: 忽略不支持转换的event
+- name: binlog_max_event_buffer_bytes
+  name_local: binlog事件缓冲区大小
+  require: false
+  essential: false
+  type: INT
+  default: 67108864
+  need_restart: true
+  description_en: binlog event convert buffer size
+  description_local: binlog事件转换缓冲区大小
+- name: binlog_mode
+  name_local: 开启binlog模式
+  require: true
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: enable binlog mode
+  description_local: 开启binlog模式
+- name: table_whitelist
+  name_local: binlog转换白名单
+  require: false
+  essential: false
+  type: SAFE_STRING
+  default: ''
+  need_restart: true
+  description_en: binlog convert white list
+  description_local: binlog转换白名单
+- name: binlog_nof_work_threads
+  name_local: 非BC调度请求的线程池大小
+  require: false
+  essential: false
+  type: INT
+  default: 16
+  need_restart: true
+  description_en: thread pool size for non-BC scheduling requests
+  description_local: 非BC调度请求的线程池大小
+- name: binlog_bc_work_threads
+  name_local: BC调度请求的线程池大小
+  require: false
+  essential: false
+  type: INT
+  default: 2
+  need_restart: true
+  description_en: thread pool size for BC scheduling requests
+  description_local: BC调度请求的线程池大小
+- name: binlog_max_file_size_bytes
+  name_local: 单个binlog文件的大小
+  require: false
+  essential: false
+  type: INT
+  default: 524288000
+  need_restart: true
+  description_en: single binlog file size
+  description_local: 单个binlog文件的大小
+- name: binlog_convert_timeout_us
+  name_local: binlog转换超时时间
+  require: false
+  essential: false
+  type: INT
+  default: 10000
+  need_restart: true
+  description_en: binlog convert timeout, in microseconds
+  description_local: binlog转换超时时间，单位微妙
+- name: binlog_checksum
+  name_local: 开启binlog校验和
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: enable binlog checksum
+  description_local: 开启binlog校验和
+- name: binlog_heartbeat_interval_us
+  name_local: binlog心跳事件发送周期
+  require: false
+  essential: false
+  type: INT
+  default: 100000
+  need_restart: true
+  description_en: binlog heartbeat event send period, in microseconds
+  description_local: binlog心跳事件发送周期，单位微妙
+- name: binlog_gtid_display
+  name_local: 展示GTID信息
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: display GTID information
+  description_local: 展示GTID信息
+- name: binlog_memory_limit
+  name_local: binlog内存限制
+  require: false
+  essential: false
+  type: CAPACITY_MB
+  default: 3G
+  need_restart: true
+  description_en: binlog memory limit, default 3G
+  description_local: binlog内存限制，默认为3G
+- name: binlog_working_mode
+  name_local: binlog工作模式
+  require: false
+  essential: false
+  type: SAFE_STRING
+  default: storage
+  need_restart: true
+  description_en: binlog work mode, default storage
+  description_local: binlog工作模式，默认为storage
+- name: binlog_recover_backup
+  name_local: 开启binlog备份恢复
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: enable binlog backup recover
+  description_local: 是否开启binlog备份恢复

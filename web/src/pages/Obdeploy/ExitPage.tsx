@@ -4,6 +4,7 @@ import { CopyOutlined } from '@ant-design/icons';
 import copy from 'copy-to-clipboard';
 import { getLocale } from 'umi';
 import ExitPageWrapper from '@/component/ExitPageWrapper';
+import { OBD_COMMAND } from '@/constant/configuration';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
@@ -11,10 +12,9 @@ const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 export default function ExitPage() {
-  const command = 'obd web';
 
   const handleCopy = () => {
-    copy(command);
+    copy(OBD_COMMAND);
     message.success(
       intl.formatMessage({
         id: 'OBD.pages.components.ExitPage.CopiedSuccessfully',
@@ -62,7 +62,7 @@ export default function ExitPage() {
           })}
 
           <a>
-            {command} <CopyOutlined onClick={handleCopy} />
+            {OBD_COMMAND} <CopyOutlined onClick={handleCopy} />
           </a>
         </div>
       </Card>

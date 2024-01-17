@@ -4,7 +4,6 @@ import { useModel, history } from 'umi';
 import {
   Space,
   Button,
-  Form,
   Tag,
   Table,
   Alert,
@@ -16,9 +15,7 @@ import {
 } from 'antd';
 import { ProCard, ProForm, ProFormText } from '@ant-design/pro-components';
 import {
-  CloseOutlined,
   SafetyCertificateFilled,
-  InfoOutlined,
   InfoCircleOutlined,
   CopyOutlined,
 } from '@ant-design/icons';
@@ -37,7 +34,6 @@ import { handleQuit, checkLowVersion, getErrorInfo } from '@/utils';
 import { formatMoreConfig } from '@/utils/helper';
 import NP from 'number-precision';
 import copy from 'copy-to-clipboard';
-import DeployType from './DeployType';
 import DeleteDeployModal from './DeleteDeployModal';
 import ErrorCompToolTip from '@/component/ErrorCompToolTip';
 import { getParamstersHandler } from './ClusterConfig/helper';
@@ -65,93 +61,8 @@ type rowDataType = {
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
-const appnameReg = /^[a-zA-Z]([a-zA-Z0-9]{0,19})$/;
 
-const oceanBaseInfo = {
-  group: intl.formatMessage({
-    id: 'OBD.pages.components.InstallConfig.Database',
-    defaultMessage: '数据库',
-  }),
-  key: 'database',
-  content: [
-    {
-      key: oceanbaseComponent,
-      name: 'OceanBase Database',
-      onlyAll: false,
-      desc: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.ItIsAFinancialLevel',
-        defaultMessage:
-          '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
-      }),
-      doc: 'https://www.oceanbase.com/docs/oceanbase-database-cn',
-    },
-  ],
-};
-const componentsGroupInfo = [
-  {
-    group: intl.formatMessage({
-      id: 'OBD.pages.components.InstallConfig.Proxy',
-      defaultMessage: '代理',
-    }),
-    key: 'agency',
-    onlyAll: true,
-    content: [
-      {
-        key: obproxyComponent,
-        name: 'OBProxy',
-        onlyAll: true,
-        desc: intl.formatMessage({
-          id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
-          defaultMessage:
-            '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
-        }),
-        doc: 'https://www.oceanbase.com/docs/odp-enterprise-cn',
-      },
-    ],
-  },
-  {
-    group: intl.formatMessage({
-      id: 'OBD.pages.components.InstallConfig.Tools',
-      defaultMessage: '工具',
-    }),
-    key: 'ocpexpressTool',
-    onlyAll: true,
-    content: [
-      {
-        key: ocpexpressComponent,
-        name: 'OCP Express',
-        onlyAll: true,
-        desc: intl.formatMessage({
-          id: 'OBD.pages.components.InstallConfig.ItIsAManagementAnd',
-          defaultMessage:
-            '是专为 OceanBase 设计的管控平台，可实现对集群、租户的监控管理、诊断等核心能力。',
-        }),
-        doc: 'https://www.oceanbase.com/docs/common-oceanbase-database-cn-0000000001626262',
-      },
-    ],
-  },
-  {
-    group: intl.formatMessage({
-      id: 'OBD.pages.components.InstallConfig.Tools',
-      defaultMessage: '工具',
-    }),
-    key: 'obagentTool',
-    onlyAll: true,
-    content: [
-      {
-        key: obagentComponent,
-        name: 'OBAgent',
-        onlyAll: true,
-        desc: intl.formatMessage({
-          id: 'OBD.pages.components.InstallConfig.IsAMonitoringAndCollection',
-          defaultMessage:
-            '是一个监控采集框架。OBAgent 支持推、拉两种数据采集模式，可以满足不同的应用场景。',
-        }),
-        doc: 'https://www.oceanbase.com/docs/common-oceanbase-database-cn-10000000001576872',
-      },
-    ],
-  },
-];
+
 
 const mirrors = ['oceanbase.community.stable', 'oceanbase.development-kit'];
 
@@ -179,7 +90,12 @@ export default function InstallConfig() {
     aliveTokenTimer,
     clusterMoreConfig,
     setClusterMoreConfig,
+    OBD_DOCS,
+    OCP_EXPRESS,
+    OBAGENT_DOCS,
+    OBPROXY_DOCS 
   } = useModel('global');
+  
   const { components, home_path } = configData || {};
   const { oceanbase } = components || {};
   const [existNoVersion, setExistNoVersion] = useState(false);
@@ -196,6 +112,93 @@ export default function InstallConfig() {
   const [unavailableList, setUnavailableList] = useState<string[]>([]);
   const [componentLoading, setComponentLoading] = useState(false);
   const draftNameRef = useRef();
+
+  const oceanBaseInfo = {
+    group: intl.formatMessage({
+      id: 'OBD.pages.components.InstallConfig.Database',
+      defaultMessage: '数据库',
+    }),
+    key: 'database',
+    content: [
+      {
+        key: oceanbaseComponent,
+        name: 'OceanBase Database',
+        onlyAll: false,
+        desc: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.ItIsAFinancialLevel',
+          defaultMessage:
+            '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
+        }),
+        doc: OBD_DOCS,
+      },
+    ],
+  };
+  const componentsGroupInfo = [
+    {
+      group: intl.formatMessage({
+        id: 'OBD.pages.components.InstallConfig.Proxy',
+        defaultMessage: '代理',
+      }),
+      key: 'agency',
+      onlyAll: true,
+      content: [
+        {
+          key: obproxyComponent,
+          name: 'OBProxy',
+          onlyAll: true,
+          desc: intl.formatMessage({
+            id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
+            defaultMessage:
+              '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
+          }),
+          doc: OBPROXY_DOCS,
+        },
+      ],
+    },
+    {
+      group: intl.formatMessage({
+        id: 'OBD.pages.components.InstallConfig.Tools',
+        defaultMessage: '工具',
+      }),
+      key: 'ocpexpressTool',
+      onlyAll: true,
+      content: [
+        {
+          key: ocpexpressComponent,
+          name: 'OCP Express',
+          onlyAll: true,
+          desc: intl.formatMessage({
+            id: 'OBD.pages.components.InstallConfig.ItIsAManagementAnd',
+            defaultMessage:
+              '是专为 OceanBase 设计的管控平台，可实现对集群、租户的监控管理、诊断等核心能力。',
+          }),
+          doc: OCP_EXPRESS,
+        },
+      ],
+    },
+    {
+      group: intl.formatMessage({
+        id: 'OBD.pages.components.InstallConfig.Tools',
+        defaultMessage: '工具',
+      }),
+      key: 'obagentTool',
+      onlyAll: true,
+      content: [
+        {
+          key: obagentComponent,
+          name: 'OBAgent',
+          onlyAll: true,
+          desc: intl.formatMessage({
+            id: 'OBD.pages.components.InstallConfig.IsAMonitoringAndCollection',
+            defaultMessage:
+              '是一个监控采集框架。OBAgent 支持推、拉两种数据采集模式，可以满足不同的应用场景。',
+          }),
+          doc: OBAGENT_DOCS,
+        },
+      ],
+    },
+  ];
+
   const errorCommonHandle = (e: any) => {
     const errorInfo = getErrorInfo(e);
     setErrorVisible(true);
@@ -396,7 +399,7 @@ export default function InstallConfig() {
       clearTimeout(aliveTokenTimer.current);
       aliveTokenTimer.current = null;
     }
-    history.push('guide');
+    history.push('/guide');
   };
 
   const nextStep = () => {

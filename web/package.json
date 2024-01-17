@@ -2,12 +2,12 @@
   "name": "ob-deploy-web",
   "private": true,
   "scripts": {
-    "build": "umi build",
-    "dev": "cross-env MOCK=none umi dev",
-    "postinstall": "umi generate tmp",
-    "openapi": "umi openapi",
+    "build": "max build",
+    "dev": "cross-env MOCK=none max dev",
+    "postinstall": "max setup",
+    "openapi": "max openapi",
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
-    "start": "umi dev",
+    "start": "max dev",
     "test": "umi-test",
     "test:coverage": "umi-test --coverage"
   },
@@ -34,16 +34,16 @@
     "classnames": "^2.3.2",
     "copy-to-clipboard": "3.3.3",
     "cross-env": "7.0.3",
-    "i18next": "^23.7.11",
+    "i18next": "^23.7.16",
     "lodash": "^4.17.21",
     "lottie-web": "5.10.2",
     "moment": "^2.29.4",
     "number-precision": "1.6.0",
+    "query-string": "^8.1.0",
     "randexp": "0.5.3",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "react-intl": "6.4.1",
-    "umi": "3.5.35",
     "validator": "^12.1.0",
     "video.js": "7.20.3"
   },
@@ -54,15 +54,17 @@
     "@types/react-dom": "17.0.2",
     "@types/validator": "^12.0.1",
     "@types/video.js": "7.3.50",
-    "@umijs/preset-react": "1.8.31",
-    "@umijs/test": "3.5.35",
+    "@umijs/max": "^4.0.88",
+    "immer": "9.0.6",
     "lint-staged": "10.5.4",
     "prettier": "2.7.1",
+    "stylelint": "14.8.2",
     "typescript": "4.9.3",
     "yorkie": "2.0.0"
   },
   "resolutions": {
-    "@types/react": "17.0.44"
+    "@types/react": "17.0.44",
+    "@oceanbase/ui": "0.2.17"
   },
   "gitHooks": {
     "pre-commit": "lint-staged"

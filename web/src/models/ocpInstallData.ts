@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import type { TableDataType } from '@/component/DeployConfig/constants';
-import {
-  OCPComponent,
-  OBComponent,
-  OBProxyComponent,
-} from '@/component/DeployConfig/constants';
+import { useState } from 'react';
+
+import { getCompoents } from '@/component/DeployConfig/constants';
+import { getDocs } from '@/constant/docs';
 import { getTailPath } from '@/utils/helper';
+import { getLocale } from '@umijs/max';
 
 type VersionInfoType = {
   version: string;
@@ -25,6 +24,12 @@ export type ConnectInfoType = {
   password?: string;
 };
 export default () => {
+  const { OBD_DOCS, OCP_DOCS, OBPROXY_DOCS } = getDocs(getLocale);
+  const { OCPComponent, OBComponent, OBProxyComponent } = getCompoents(
+    OBD_DOCS,
+    OCP_DOCS,
+    OBPROXY_DOCS,
+  );
   const taiPath = getTailPath();
   const isNewDB = taiPath === 'install';
   const defaultTableData = isNewDB

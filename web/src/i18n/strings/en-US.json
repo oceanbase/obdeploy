@@ -898,5 +898,6 @@
   "OBD.component.ConnectConfig.MetadbAccessAccount": "MetaDB access account",
   "OBD.component.ConnectConfig.EnterAMetadbAccessAccount": "Enter a MetaDB access account",
   "OBD.component.ConnectConfig.MetadbAccessPassword": "MetaDB access password",
-  "OBD.component.ConnectConfig.EnterMetadbAccessPassword": "Enter MetaDB access password"
+  "OBD.component.ConnectConfig.EnterMetadbAccessPassword": "Enter MetaDB access password",
+  "OBD.src.utils.helper.CopiedSuccessfully": "Copied successfully"
 }

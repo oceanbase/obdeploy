@@ -150,8 +150,9 @@ export default function DataBaseNodeConfig({
             }),
           },
           {
-            validator: (_: any, value: string[]) =>
-              serversValidator(_, value, allOBServer, 'OBServer',allZoneOBServer,finalValidate),
+            validator: (_: any, value: string[]) =>{
+              return serversValidator(_, value, allOBServer, 'OBServer',allZoneOBServer,finalValidate)
+            }
           },
         ],
       },
@@ -233,7 +234,7 @@ export default function DataBaseNodeConfig({
     const allServers = getAllServers(dbConfigData);
     const allZoneServers: any = {};
     dbConfigData.forEach((item) => {
-      allZoneServers[`${item.id}`] = item.servers;
+      allZoneServers[`${item.id}`] = item.servers || [];
     });
     setAllOBServer(allServers);
     setAllZoneOBServer(allZoneServers);

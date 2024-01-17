@@ -25,7 +25,7 @@ import uuid
 import traceback
 
 
-__all__ = ("Moment", "Time", "Capacity", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String", "Path", "SafeString", "PathList", "SafeStringList")
+__all__ = ("Moment", "Time", "Capacity", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String", "Path", "SafeString", "PathList", "SafeStringList", "DBUrl", "WebUrl", "OBUser")
 
 
 class Null(object):
@@ -263,23 +263,31 @@ class String(ConfigItemType):
     def _format(self):
         self.value = self._value = str(self._origin) if self._origin else ''
 
+# this type is used to ensure the parameter is a valid oceanbase user
+class OBUser(ConfigItemType):
+    OB_USER_PATTERN = re.compile("^[a-zA-Z0-9_\.-]+(@[a-zA-Z0-9_\.-]+)?(#[a-zA-Z0-9_\.-]+)?$")
+    def _format(self):
+        if not self.OB_USER_PATTERN.match(str(self._origin)):
+            raise Exception("%s is not a valid config" % self._origin)
+        self.value = self._value = str(self._origin) if self._origin else ''
+
 # this type is used to ensure the parameter not containing special characters to inject command
 class SafeString(ConfigItemType):
-    PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
     def _format(self):
-        if not self.PATH_PATTERN.match(str(self._origin)):
+        if not self.SAFE_STRING_PATTERN.match(str(self._origin)):
             raise Exception("%s is not a valid config" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
 # this type is used to ensure the parameter not containing special characters to inject command
 class SafeStringList(ConfigItemType):
-    PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
     def _format(self):
         if self._origin:
             self._origin = str(self._origin).strip()
             self._value = self._origin.split(';')
             for v in self._value:
-                if not self.PATH_PATTERN.match(v):
+                if not self.SAFE_STRING_PATTERN.match(v):
                     raise Exception("%s is not a valid config" % v)
         else:
             self._value = []
@@ -311,3 +319,19 @@ class PathList(ConfigItemType):
                     raise Exception("%s is not a valid path" % v)
         else:
             self._value = []
+
+# this type is used to ensure the parameter is a valid database connection url
+class DBUrl(ConfigItemType):
+    DBURL_PATTERN = re.compile("^jdbc:(mysql|oceanbase):(\/\/)([a-zA-Z0-9_.-]+)(:[0-9]{1,5})?\/([a-zA-Z0-9_\-]+)(\?[a-zA-Z0-9_&;=.-]*)?$")
+    def _format(self):
+        if not self.DBURL_PATTERN.match(str(self._origin)):
+            raise Exception("%s is not a valid config" % self._origin)
+        self.value = self._value = str(self._origin) if self._origin else ''
+
+# this type is used to ensure the parameter is a valid web url
+class WebUrl(ConfigItemType):
+    WEBURL_PATTERN = re.compile("^(https?:\/\/)?([\da-z_.-]+)(:[0-9]{1,5})?([\/\w \.-]*)*\/?(?:\?[\w&=_.-]*)?$")
+    def _format(self):
+        if not self.WEBURL_PATTERN.match(str(self._origin)):
+            raise Exception("%s is not a valid config" % self._origin)
+        self.value = self._value = str(self._origin) if self._origin else ''

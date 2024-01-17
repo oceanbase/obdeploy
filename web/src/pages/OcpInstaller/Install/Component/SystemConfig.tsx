@@ -13,7 +13,6 @@ import {
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { some } from 'lodash';
 import Password from '@/component/Password';
-import MyInput from '@/component/MyInput';
 import MySelect from '@/component/MySelect';
 import {
   SMLL_FORM_ITEM_LAYOUT,
@@ -249,7 +248,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({
                 </div>
               }
             >
-              <MyInput.Password
+              <Input.Password
                 placeholder={intl.formatMessage({
                   id: 'OBD.Install.Component.SystemConfig.PleaseEnter',
                   defaultMessage: '请输入',

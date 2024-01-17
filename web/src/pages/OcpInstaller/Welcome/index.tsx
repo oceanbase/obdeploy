@@ -61,7 +61,7 @@ export default function Welcome() {
               className={styles.startButton}
               type="primary"
               onClick={() => {
-                history.replace('update');
+                history.replace('/update');
                 setErrorVisible(false);
                 setErrorsList([]);
               }}

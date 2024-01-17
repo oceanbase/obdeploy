@@ -1,37 +1,36 @@
-import { intl } from '@/utils/intl';
-import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  Result,
-  Descriptions,
-  Card,
-  Space,
-  Table,
-  Typography,
-  Button,
-  Row,
-  Col,
-  Tag,
-} from '@oceanbase/design';
-import { useRequest } from 'ahooks';
-import {
-  ExclamationCircleOutlined,
-  CaretRightOutlined,
-  CaretDownOutlined,
-} from '@ant-design/icons';
-import { Alert, Spin } from 'antd';
-import { history, useModel } from 'umi';
-import { errorHandler } from '@/utils';
-import * as Process from '@/services/ocp_installer_backend/Process';
-import * as OCP from '@/services/ocp_installer_backend/OCP';
-import type { ResultProps } from 'antd/es/result';
 import ArrowIcon from '@/component/Icon/ArrowIcon';
 import NewIcon from '@/component/Icon/NewIcon';
-import { copyText } from '@/utils';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
+import * as Process from '@/services/ocp_installer_backend/Process';
+import { errorHandler } from '@/utils';
+import { getTailPath, handleCopy } from '@/utils/helper';
+import { intl } from '@/utils/intl';
+import {
+  CaretDownOutlined,
+  CaretRightOutlined,
+  CopyOutlined,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons';
+import {
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Result,
+  Row,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from '@oceanbase/design';
+import { useRequest } from 'ahooks';
+import { Alert, Modal, Spin } from 'antd';
+import type { ResultProps } from 'antd/es/result';
+import React, { useEffect, useState } from 'react';
+import { history, useModel } from 'umi';
 import CustomFooter from '../CustomFooter';
 import ExitBtn from '../ExitBtn';
 import styles from './index.less';
-import { getTailPath } from '@/utils/helper';
 
 const { Text } = Typography;
 
@@ -58,6 +57,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
 }) => {
   let isHaveMetadb = 'install';
   const isUpdate = getTailPath() === 'update';
+  const { RELEASE_RECORD, OCP_DOCS } = useModel('global');
   // 获取 升级主机列表
   const { data: upgraadeAgentHosts, run: getOcpNotUpgradingHost } = useRequest(
     OCP.getOcpNotUpgradingHost,
@@ -425,10 +425,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                     defaultMessage: '点击',
                   })}
 
-                  <a
-                    target="_blank"
-                    href="https://www.oceanbase.com/softwarecenter"
-                  >
+                  <a target="_blank" href={RELEASE_RECORD}>
                     {' '}
                     {intl.formatMessage({
                       id: 'OBD.component.InstallResult.OcpReleaseRecords',
@@ -461,7 +458,6 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                   type="info"
                   showIcon={true}
                   style={{
-                    height: 54,
                     marginBottom: 24,
                   }}
                   message={
@@ -469,6 +465,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
+                        alignItems:'center',
                         padding: '0 4px',
                         lineHeight: '32px',
                       }}
@@ -481,7 +478,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                         })}{' '}
                         <a
                           target="_blank"
-                          href="https://www.oceanbase.com/docs/ocp-cn"
+                          href={OCP_DOCS}
                         >
                           {intl.formatMessage({
                             id: 'OBD.component.InstallResult.OceanbaseDocumentCenter',
@@ -492,7 +489,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       <Button
                         type="primary"
                         onClick={() => {
-                          copyText(ocpInfo ? JSON.stringify(ocpInfo) : '');
+                          handleCopy(ocpInfo ? JSON.stringify(ocpInfo) : '');
                         }}
                       >
                         {intl.formatMessage({
@@ -544,17 +541,16 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       paddingLeft: 16,
                     }}
                   >
-                    {ocpInfo?.password ? (
-                      <Text
-                        copyable={{
-                          text: ocpInfo?.password,
-                        }}
-                      >
-                        {ocpInfo?.password}
-                      </Text>
-                    ) : (
-                      '-'
-                    )}
+                    {ocpInfo?.password}
+                    <a>
+                      {ocpInfo?.password ? (
+                        <CopyOutlined
+                          onClick={() => handleCopy(ocpInfo?.password)}
+                        />
+                      ) : (
+                        '-'
+                      )}
+                    </a>
                   </Descriptions.Item>
                 </Descriptions>
               </Card>
@@ -653,18 +649,19 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                           '退出前，请确保已复制访问地址及账密信息',
                       })}
                     </div>
-                    <Text
-                      copyable={{
-                        text: ocpInfo?.password ? JSON.stringify(ocpInfo) : '',
-                      }}
-                    >
-                      <a>
-                        {intl.formatMessage({
-                          id: 'OBD.component.InstallResult.CopyInformation',
-                          defaultMessage: '复制信息',
-                        })}
-                      </a>
-                    </Text>
+                    <a>
+                      {intl.formatMessage({
+                        id: 'OBD.component.InstallResult.CopyInformation',
+                        defaultMessage: '复制信息',
+                      })}
+                      <CopyOutlined
+                        onClick={() =>
+                          handleCopy(
+                            ocpInfo?.password ? JSON.stringify(ocpInfo) : '',
+                          )
+                        }
+                      />
+                    </a>
                   </div>
                 ),
 

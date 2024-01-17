@@ -1,8 +1,7 @@
 import { intl } from '@/utils/intl';
-import { Button } from 'antd';
+import { Button,Modal } from 'antd';
 import { useRequest, history } from 'umi';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { Modal } from '@oceanbase/design';
 import { errorHandler } from '@/utils';
 import { useModel } from 'umi';
 import * as Process from '@/services/ocp_installer_backend/Process';

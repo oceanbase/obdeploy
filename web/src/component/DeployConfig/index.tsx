@@ -1,5 +1,6 @@
 import { commonStyle, STABLE_OCP_VERSION } from '@/pages/constants';
 import { queryAllComponentVersions } from '@/services/ob-deploy-web/Components';
+import { listRemoteMirrors } from '@/services/ob-deploy-web/Mirror';
 import {
   getClusterNames,
   getConnectInfo,
@@ -10,26 +11,27 @@ import {
   getErrorInfo,
   updateClusterNameReg,
 } from '@/utils';
-import copy from 'copy-to-clipboard';
 import { getTailPath } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import customRequest from '@/utils/useRequest';
-import { InfoCircleOutlined, CopyOutlined } from '@ant-design/icons';
+import { CopyOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormText } from '@ant-design/pro-components';
-import { useRequest, useUpdateEffect } from 'ahooks';
+import { useRequest } from 'ahooks';
 import {
+  Alert,
+  AutoComplete,
   Button,
+  message,
   Select,
   Space,
   Spin,
   Table,
   Tag,
   Tooltip,
-  Alert,
-  message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FormInstance } from 'antd/lib/form';
+import copy from 'copy-to-clipboard';
 import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
 import { getLocale, history, useModel } from 'umi';
@@ -37,22 +39,13 @@ import EnStyles from '../../pages/Obdeploy/indexEn.less';
 import ZhStyles from '../../pages/Obdeploy/indexZh.less';
 import CustomFooter from '../CustomFooter';
 import ErrorCompToolTip from '../ErrorCompToolTip';
-import { listRemoteMirrors } from '@/services/ob-deploy-web/Mirror';
 import ExitBtn from '../ExitBtn';
 import type {
   ClusterNameType,
   TableDataType,
   VersionInfoType,
 } from './constants';
-import {
-  CompoentsInfo,
-  OBComponent,
-  OBPROXY,
-  OBProxyComponent,
-  OCEANBASE,
-  OCP,
-  OCPComponent,
-} from './constants';
+import { getCompoents } from './constants';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
@@ -74,8 +67,9 @@ export default function DeployConfig({
     setOcpNewFirstTime,
     ocpConfigData,
     setOcpConfigData,
-    selectCluster,
-    setSelectCluster,
+    OBD_DOCS,
+    OCP_DOCS,
+    OBPROXY_DOCS,
   } = useModel('global');
   const {
     obVersionInfo,
@@ -89,6 +83,16 @@ export default function DeployConfig({
     tableData,
     setTableData,
   } = useModel('ocpInstallData');
+
+  const {
+    CompoentsInfo,
+    OBComponent,
+    OBPROXY,
+    OBProxyComponent,
+    OCEANBASE,
+    OCP,
+    OCPComponent,
+  } = getCompoents(OBD_DOCS, OCP_DOCS, OBPROXY_DOCS);
   const [componentLoading, setComponentLoading] = useState(false);
   const taiPath = getTailPath();
   const isUpdate = taiPath === 'update';
@@ -111,8 +115,6 @@ export default function DeployConfig({
   const { components = {} } = ocpConfigData || {};
   const { oceanbase = {} } = components || {};
   const [clusterOption, setClusterOption] = useState<ClusterNameType[]>([]);
-  const selectClusetNameRef = useRef();
-  const searchTextRef = useRef<string>();
   const [existNoVersion, setExistNoVersion] = useState(false);
   const wholeComponents = useRef<TableDataType[]>([]);
   const [unavailableList, setUnavailableList] = useState<string[]>([]);
@@ -464,6 +466,7 @@ export default function DeployConfig({
     manual: true,
     onSuccess: (res) => {
       if (res.success) {
+        // res.data.name = ['aaa','bbb','ccc']
         let clusterNames = res.data?.name.map((val: string) => ({
           label: val,
           value: val,
@@ -748,26 +751,7 @@ export default function DeployConfig({
     }
   }, []);
   const handleChangeCluster = (val: string) => {
-    setSelectCluster(val);
     form.setFieldValue('appname', val);
-  };
-
-  const handleSearchCluster = (val: string) => {
-    if (val) {
-      searchTextRef.current = val;
-    }
-  };
-
-  const handleChangeSearchText = () => {
-    const select = clusterOption.find((option) => {
-      return option.value === searchTextRef.current;
-    });
-    if (!select && searchTextRef.current) {
-      setClusterOption([
-        { value: searchTextRef.current, label: searchTextRef.current },
-        ...clusterOption,
-      ]);
-    }
   };
 
   const handleCopy = (content: string) => {
@@ -812,17 +796,6 @@ export default function DeployConfig({
     validateTrigger: ['onBlur', 'onChange'],
   };
 
-  useEffect(() => {
-    if (searchTextRef.current) {
-      setSelectCluster(searchTextRef.current);
-      form.setFieldValue('appname', searchTextRef.current);
-    }
-  }, [clusterOption]);
-
-  useUpdateEffect(() => {
-    form.validateFields(['appname']);
-  }, [selectCluster]);
-
   return (
     <>
       <Spin spinning={componentLoading}>
@@ -850,21 +823,15 @@ export default function DeployConfig({
                 {isUpdate ? (
                   <>
                     <ProForm.Item {...cluserNameProps} validateFirst>
-                      <Select
-                        ref={selectClusetNameRef}
-                        style={commonStyle}
-                        options={clusterOption}
-                        value={selectCluster}
-                        onInputKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.stopPropagation();
-                            selectClusetNameRef.current.blur();
-                          }
-                        }}
+                      <AutoComplete
+                        style={{ width: 200 }}
                         onChange={handleChangeCluster}
-                        onBlur={handleChangeSearchText}
-                        showSearch
-                        onSearch={handleSearchCluster}
+                        // onSearch={handleSearch}
+                        placeholder={intl.formatMessage({
+                          id: 'OBD.component.DeployConfig.PleaseEnter',
+                          defaultMessage: '请输入',
+                        })}
+                        options={clusterOption}
                       />
                     </ProForm.Item>
                   </>

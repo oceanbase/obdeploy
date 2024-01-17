@@ -142,6 +142,9 @@ export const ocpAddonAfter = '/ocp';
 export const obproxyAddonAfter = '/obproxy';
 export const oceanbaseAddonAfter = '/oceanbase';
 
+export const OBD_COMMAND = 'obd web';
+export const OBD_COMMAND_UPGRADE = 'obd web upgrade'
+
 // 参数类型
 export const PARAMETER_TYPE = {
   number:'Integer',

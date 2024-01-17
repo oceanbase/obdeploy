@@ -1,23 +1,23 @@
 import { ConfigProvider, Space, Dropdown } from 'antd';
-import { ReactElement, useState } from 'react';
+import { useState } from 'react';
 import type { Locale } from 'antd/es/locale-provider';
 import enUS from 'antd/es/locale/en_US';
 import zhCN from 'antd/es/locale/zh_CN';
-import { getLocale, setLocale } from 'umi';
+import { getLocale, setLocale, Outlet, useModel } from 'umi';
 import {
   HomeOutlined,
   ReadOutlined,
   ProfileOutlined,
   GlobalOutlined,
 } from '@ant-design/icons';
-
 import { intl } from '@/utils/intl';
 import { localeList, localeText } from '@/constants';
 import theme from '../theme';
 import styles from '../Obdeploy/index.less';
 
-export default function Layout(props: React.PropsWithChildren<ReactElement>) {
+export default function Layout() {
   const locale = getLocale();
+  const { OFFICAIL_WEBSITE, FORUMS_VISITED, HELP_CENTER } = useModel('global')
   const [token, setToken] = useState('');
   const [localeConfig, setLocalConfig] = useState<Locale>(
     locale === 'zh-CN' ? zhCN : enUS,
@@ -71,7 +71,7 @@ export default function Layout(props: React.PropsWithChildren<ReactElement>) {
             </Dropdown>
             <a
               className={styles.action}
-              href="https://www.oceanbase.com/"
+              href={OFFICAIL_WEBSITE}
               target="_blank"
               data-aspm-click="c307509.d317285"
               data-aspm-desc={intl.formatMessage({
@@ -89,7 +89,7 @@ export default function Layout(props: React.PropsWithChildren<ReactElement>) {
             </a>
             <a
               className={styles.action}
-              href="https://ask.oceanbase.com/"
+              href={FORUMS_VISITED}
               target="_blank"
               data-aspm-click="c307509.d317284"
               data-aspm-desc={intl.formatMessage({
@@ -107,7 +107,7 @@ export default function Layout(props: React.PropsWithChildren<ReactElement>) {
             </a>
             <a
               className={styles.action}
-              href="https://www.oceanbase.com/docs/obd-cn"
+              href={HELP_CENTER}
               target="_blank"
               data-aspm-click="c307509.d317286"
               data-aspm-desc={intl.formatMessage({
@@ -125,7 +125,7 @@ export default function Layout(props: React.PropsWithChildren<ReactElement>) {
             </a>
           </Space>
         </header>
-        {props.children}
+        <Outlet />
       </div>
     </ConfigProvider>
   );

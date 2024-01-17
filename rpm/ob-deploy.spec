@@ -55,11 +55,12 @@ VERSION="$RPM_PACKAGE_VERSION"
 if  [ "$OBD_DUBUG" ]; then
     VERSION=$VERSION".`date +%s`"
 fi
+DISABLE_SWAGGER='True'
 cd $SRC_DIR/web
 yarn
 yarn build
 cd $SRC_DIR
-sed -i "s/<CID>/$CID/" const.py  && sed -i "s/<B_BRANCH>/$BRANCH/" const.py  && sed -i  "s/<B_TIME>/$DATE/" const.py  && sed -i "s/<DEBUG>/$OBD_DUBUG/" const.py && sed -i "s/<VERSION>/$VERSION/" const.py && sed -i "s/<TELEMETRY_WEBSITE>/$TELEMETRY_WEBSITE/" const.py
+sed -i "s/<CID>/$CID/" const.py  && sed -i "s/<B_BRANCH>/$BRANCH/" const.py  && sed -i  "s/<B_TIME>/$DATE/" const.py  && sed -i "s/<DEBUG>/$OBD_DUBUG/" const.py && sed -i "s/<VERSION>/$VERSION/" const.py && sed -i "s/<TELEMETRY_WEBSITE>/$TELEMETRY_WEBSITE/" const.py && sed -i "s/<DISABLE_SWAGGER>/$DISABLE_SWAGGER/" const.py
 cp -f _cmd.py obd.py
 sed -i "s|<DOC_LINK>|$OBD_DOC_LINK|" _errno.py
 mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}

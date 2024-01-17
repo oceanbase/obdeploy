@@ -33,7 +33,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
     inner_config = {
         InnerConfigItem('$_zone_idc'): 'idc'
     }
-    not_paramters = ['production_mode', 'local_ip']
+    not_paramters = ['production_mode', 'local_ip', 'obshell_port']
     inner_keys = inner_config.keys()
     zones_config = {}
     cluster_server = {}
@@ -128,8 +128,8 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
         global_ret = False
     
     if global_ret:
-        stdio.stop_load('succeed')
+        stdio.stop_loading('succeed')
         return plugin_context.return_true()
     else:
-        stdio.stop_load('fail')
+        stdio.stop_loading('fail')
         return

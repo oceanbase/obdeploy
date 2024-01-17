@@ -1,7 +1,8 @@
+import { TIME_REFRESH } from '@/pages/constants';
+import { PathType } from '@/pages/type';
+import queryString from 'query-string';
 import { useEffect } from 'react';
 import { history } from 'umi';
-import { PathType } from '@/pages/type';
-import { TIME_REFRESH } from '@/pages/constants';
 
 export default function ExitPageWrapper(props: {
   target?: PathType;
@@ -12,7 +13,10 @@ export default function ExitPageWrapper(props: {
   path = target
     ? target
     : //@ts-ignore
-      (history.location.query.path as PathType | undefined);
+      (queryString.parse(history.location.search)?.path as
+        | PathType
+        | undefined);
+
   const PATH_HANDLES = [
     {
       paths: ['guide', 'ocpInstaller', 'update'],
@@ -59,7 +63,6 @@ export default function ExitPageWrapper(props: {
     try {
       sessionData = JSON.parse(sessionStorage.getItem('pathInfo') as string);
     } catch (e) {
-      
     } finally {
       if (sessionData) {
         const isRefresh =
@@ -76,7 +79,5 @@ export default function ExitPageWrapper(props: {
     };
   }, []);
 
-  return <div>
-    {props.children}
-    </div>;
+  return <div>{props.children}</div>;
 }

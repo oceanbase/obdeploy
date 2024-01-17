@@ -11,7 +11,6 @@ import { nameReg } from '@/utils';
 import styles from './indexZh.less';
 import { useState } from 'react';
 import { getTailPath } from '@/utils/helper';
-import { DOCS_USER } from '@/constant/docs';
 
 type UserInfoType = {
   user?: string;
@@ -22,7 +21,7 @@ type UserInfoType = {
 export default function UserConfig({ form }: { form: FormInstance<any> }) {
   const { useRunningUser, setUseRunningUser, setUsername } =
     useModel('ocpInstallData');
-  const { ocpConfigData = {} } = useModel('global');
+  const { ocpConfigData = {}, DOCS_USER} = useModel('global');
   const { auth = {}, launch_user = '' } = ocpConfigData;
   const [userInfo, setUserInfo] = useState<UserInfoType>({
     ...auth,

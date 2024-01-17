@@ -367,7 +367,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
             }
             extra_options_str = ' '.join(["-D{}={}".format(k, v) for k, v in extra_options.items()])
             java_bin = server_config['java_bin']
-            cmd = f'{java_bin} -jar {jvm_memory_option} {extra_options_str} {home_path}/lib/ocp-server.jar --bootstrap'
+            cmd = f'{java_bin} -Dfile.encoding=UTF-8 -jar {jvm_memory_option} {extra_options_str} {home_path}/lib/ocp-server.jar --bootstrap'
             jar_cmd = copy.deepcopy(cmd)
             if "log_dir" not in server_config:
                 log_dir = os.path.join(home_path, 'log')

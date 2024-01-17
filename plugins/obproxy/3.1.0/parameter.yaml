@@ -390,7 +390,7 @@
   need_restart: true
   description_en: local bound ip(any)
 - name: obproxy_config_server_url
-  type: STRING
+  type: WEB_URL
   default: ''
   need_restart: true
   description_en: url of config info(rs list and so on)

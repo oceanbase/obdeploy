@@ -55,7 +55,6 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
         check_fail(item, error, suggests)
         stdio.error(error)
 
-
     check_status = {}
     repositories = plugin_context.repositories
     options = plugin_context.options
@@ -77,28 +76,35 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
     stdio.start_loading('Check before upgrade ocp-server')
     success = True
 
+    check_pass('java')
     for server in cluster_config.servers:
         client = clients[server]
         server_config = cluster_config.get_server_conf_with_default(server)
         try:
             # java version check
+            stdio.verbose('java check ')
             java_bin = server_config.get('java_bin', '/usr/bin/java')
-            ret = client.execute_command('{} -version'.format(java_bin))
+            ret = client.execute_command('%s -version' % java_bin if not server_config.get('launch_user', None) else 'sudo su - %s -c "%s -version"' % (server_config.get('launch_user', None), java_bin))
+            stdio.verbose('java version %s' % ret)
             if not ret:
-                critical('java', err.EC_OCP_EXPRESS_JAVA_NOT_FOUND.format(server=str(server)), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0')])
+                critical('java', err.EC_OCP_SERVER_JAVA_NOT_FOUND.format(server=server),
+                         [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0')])
             version_pattern = r'version\s+\"(\d+\.\d+\.\d+)(\_\d+)'
             found = re.search(version_pattern, ret.stdout) or re.search(version_pattern, ret.stderr)
             if not found:
-                error('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=str(server), version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
+                error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
+                      [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
             java_major_version = found.group(1)
+            stdio.verbose('java_major_version %s' % java_major_version)
             java_update_version = found.group(2)[1:]
-            if Version(java_major_version) != Version('1.8.0') and int(java_update_version) >= 161:
-                critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=str(server), version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
-            check_pass('java')
+            stdio.verbose('java_update_version %s' % java_update_version)
+            if Version(java_major_version) != Version('1.8.0') or int(java_update_version) < 161:
+                critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
+                         [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
         except Exception as e:
             stdio.error(e)
-            error('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=str(server), version='1.8.0'),
-                  [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
+            error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
+                  [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
 
         sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL');" % database
         if meta_cursor.fetchone(sql)['num'] > 0:

@@ -1,38 +1,37 @@
+import {
+  createDeploymentConfig,
+  deployAndStartADeployment,
+  preCheck,
+  preCheckStatus,
+  recover,
+} from '@/services/ob-deploy-web/Deployments';
+import { getErrorInfo, handleQuit } from '@/utils';
 import { intl } from '@/utils/intl';
-import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import useRequest from '@/utils/useRequest';
 import {
-  Space,
-  Button,
-  Progress,
-  Timeline,
-  Checkbox,
-  Typography,
-  Tooltip,
-  Tag,
-  Spin,
-  message,
-  Empty,
-} from 'antd';
-import { ProCard } from '@ant-design/pro-components';
-import {
+  CheckCircleFilled,
+  CloseCircleFilled,
   CloseOutlined,
   QuestionCircleFilled,
   ReadFilled,
-  CheckCircleFilled,
-  CloseCircleFilled,
 } from '@ant-design/icons';
-import useRequest from '@/utils/useRequest';
+import { ProCard } from '@ant-design/pro-components';
 import {
-  preCheck,
-  preCheckStatus,
-  deployAndStartADeployment,
-  createDeploymentConfig,
-  recover,
-} from '@/services/ob-deploy-web/Deployments';
-import { handleQuit, getErrorInfo } from '@/utils';
+  Button,
+  Checkbox,
+  Empty,
+  message,
+  Progress,
+  Space,
+  Spin,
+  Tag,
+  Timeline,
+  Tooltip,
+  Typography,
+} from 'antd';
 import NP from 'number-precision';
-import { getLocale } from 'umi';
+import { useEffect, useState } from 'react';
+import { getLocale, useModel } from 'umi';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
@@ -53,8 +52,6 @@ const initDuration = 3;
 let durationScroll = initDuration;
 let durationFailed = initDuration;
 
-const errCodeUrl = 'https://www.oceanbase.com/product/ob-deployer/error-codes';
-
 export default function PreCheckStatus() {
   const {
     setCurrentStep,
@@ -66,6 +63,7 @@ export default function PreCheckStatus() {
     setErrorVisible,
     setErrorsList,
     errorsList,
+    ERR_CODE,
   } = useModel('global');
   const oceanbase = configData?.components?.oceanbase;
   const name = configData?.components?.oceanbase?.appname;
@@ -277,8 +275,18 @@ export default function PreCheckStatus() {
           });
           if (nameSuccess) {
             const { config } = nameData;
-            setConfigData(config || {});
-            handleRetryCheck(config);
+            //后端不会返回密码 需要从原配置中获取
+            let newConfigData = config
+              ? {
+                  ...config,
+                  auth: {
+                    ...config?.auth,
+                    password: configData.auth?.password,
+                  },
+                }
+              : {};
+            setConfigData(newConfigData);
+            handleRetryCheck(newConfigData);
           } else {
             message.error(
               intl.formatMessage({
@@ -644,7 +652,7 @@ export default function PreCheckStatus() {
                           id: 'OBD.pages.components.PreCheckStatus.Reason',
                           defaultMessage: '原因：',
                         })}
-                        <a href={errCodeUrl} target="_blank">
+                        <a href={ERR_CODE} target="_blank">
                           OBD-{item.code}
                         </a>{' '}
                         {reason}
@@ -683,7 +691,7 @@ export default function PreCheckStatus() {
                       <br />
                       <a
                         className={styles.preCheckLearnMore}
-                        href={errCodeUrl}
+                        href={ERR_CODE}
                         target="_blank"
                       >
                         {intl.formatMessage({

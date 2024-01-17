@@ -1,35 +1,28 @@
+import CustomFooter from '@/component/CustomFooter';
+import DeployConfig from '@/component/DeployConfig';
+import ExitBtn from '@/component/ExitBtn';
+import InstallProcess from '@/component/InstallProcess';
+import Steps from '@/component/Steps';
+import { METADB_OCP_UPDATE, STEPS_KEYS_UPDATE } from '@/constant/configuration';
+import {
+  destroyDeployment,
+  getDestroyTaskInfo,
+} from '@/services/ob-deploy-web/Deployments';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
+import { errorHandler } from '@/utils';
 import { intl } from '@/utils/intl';
-import React, { useState, useEffect } from 'react';
-import { history,useModel } from 'umi';
-import { Button, Form, Tooltip, Space,message } from '@oceanbase/design';
+import { Button, Form, message, Space, Tooltip } from '@oceanbase/design';
 import { PageContainer } from '@oceanbase/ui';
 import { useRequest } from 'ahooks';
-import { errorHandler } from '@/utils';
 import { find } from 'lodash';
-import * as Metadb from '@/services/ocp_installer_backend/Metadb';
-import * as OCP from '@/services/ocp_installer_backend/OCP';
-import { destroyDeployment,getDestroyTaskInfo } from '@/services/ob-deploy-web/Deployments';
+import React, { useEffect, useState } from 'react';
+import { history, useLocation, useModel } from 'umi';
 import ConnectionInfo from './Component/ConnectionInfo';
 import UpdatePreCheck from './Component/UpdatePreCheck';
-import InstallProcess from '@/component/InstallProcess';
-import DeployConfig from '@/component/DeployConfig';
-import Steps from '@/component/Steps';
-import CustomFooter from '@/component/CustomFooter';
-import ExitBtn from '@/component/ExitBtn';
-import { METADB_OCP_UPDATE, STEPS_KEYS_UPDATE } from '@/constant/configuration';
 
-export interface UpdateProps {
-  location: {
-    pathname: string;
-    query: { step: number; taskId: number };
-  };
-}
-
-const Update: React.FC<UpdateProps> = ({
-  location: {
-    query: { step },
-  },
-}) => {
+const Update: React.FC = () => {
+  const location = useLocation();
+  const step = location.search?.split('=')[1];
   const [form] = Form.useForm();
   const [systemUserForm] = Form.useForm();
   const { validateFields } = form;
@@ -44,8 +37,8 @@ const Update: React.FC<UpdateProps> = ({
   const { ocpConfigData, setOcpConfigData } = useModel('global');
   const [current, setCurrent] = useState(step ? Number(step) : -1);
   const [precheckNoPassed, setPrecheckNoPassed] = useState(false);
-  const [preCheckLoading,setPreCheckLoading] = useState<boolean>(false)
-  const [allowInputUser,setAllowInputUser] = useState<boolean>(true)
+  const [preCheckLoading, setPreCheckLoading] = useState<boolean>(false);
+  const [allowInputUser, setAllowInputUser] = useState<boolean>(true);
   // const [serverErrorInfo, setServerErrorInfo] = useState();
   // 操作系统用户验证状态
   const [checkStatus, setCheckStatus] = useState<
@@ -69,16 +62,16 @@ const Update: React.FC<UpdateProps> = ({
   }, [cluster_name, step]);
 
   const {
-    data:connectReqData,
+    data: connectReqData,
     run: connectMetaDB,
     loading,
   } = useRequest(OCP.connectMetaDB, {
     manual: true,
-    onSuccess: ({success,data}) => {
+    onSuccess: ({ success, data }) => {
       if (success) {
-        if(data?.user){
-          setAllowInputUser(false)
-          systemUserForm.setFieldValue('user',data.user)
+        if (data?.user) {
+          setAllowInputUser(false);
+          systemUserForm.setFieldValue('user', data.user);
         }
         setCheckConnectInfo('success');
       } else {
@@ -97,7 +90,7 @@ const Update: React.FC<UpdateProps> = ({
     },
   });
 
-  const updateInfo = connectReqData?.data
+  const updateInfo = connectReqData?.data;
 
   const { run: createOcpPrecheck } = useRequest(OCP.createUpgradePrecheck, {
     manual: true,
@@ -118,12 +111,7 @@ const Update: React.FC<UpdateProps> = ({
     manual: true,
     onSuccess: (res) => {
       if (res?.success) {
-        history.push({
-          pathname: '/update',
-          query: {
-            step: `${current}`,
-          },
-        });
+        history.push('/update');
         getOcpUpgradePrecheckTask({
           cluster_name,
           task_id: res?.data?.id,
@@ -139,17 +127,17 @@ const Update: React.FC<UpdateProps> = ({
   const {
     data: ocpUpgradePrecheckTaskData,
     run: getOcpUpgradePrecheckTask,
-    cancel:stopPreCheck
+    cancel: stopPreCheck,
   } = useRequest(OCP.getOcpUpgradePrecheckTask, {
     manual: true,
-    pollingInterval:1000,
+    pollingInterval: 1000,
     onSuccess: (res) => {
       if (res?.success) {
-        if(res?.data?.task_info?.status !== 'RUNNING'){
-          stopPreCheck()
-          setPreCheckLoading(false)
-        }else{
-          setPreCheckLoading(true)
+        if (res?.data?.task_info?.status !== 'RUNNING') {
+          stopPreCheck();
+          setPreCheckLoading(false);
+        } else {
+          setPreCheckLoading(true);
         }
         if (find(res.data?.precheck_result || [], ['result', 'FAILED'])) {
           setPrecheckNoPassed(true);
@@ -188,38 +176,39 @@ const Update: React.FC<UpdateProps> = ({
   });
 
   // 清理环境
-  const {run:handleDestroyDeployment} = useRequest(destroyDeployment,{
-    manual:true,
-    onSuccess:({success})=>{
-      if(success){
-        handleGetDestroyTaskInfo({name:cluster_name})
+  const { run: handleDestroyDeployment } = useRequest(destroyDeployment, {
+    manual: true,
+    onSuccess: ({ success }) => {
+      if (success) {
+        handleGetDestroyTaskInfo({ name: cluster_name });
       }
     },
     onError: ({ response, data }: any) => {
       errorHandler({ response, data });
     },
-  })
+  });
 
   // 获取清理结果
-  const {run:handleGetDestroyTaskInfo,cancel:stopGetDestroyTaskInfo} = useRequest(getDestroyTaskInfo,{
-    manual:true,
-    pollingInterval:1000,
-    onSuccess:({success,data})=>{
-      if(success && data?.status !== 'RUNNING'){
-        stopGetDestroyTaskInfo()
-        if(data?.status === 'SUCCESSFUL'){
-          refresh()
-          setInstallStatus('RUNNING');
+  const { run: handleGetDestroyTaskInfo, cancel: stopGetDestroyTaskInfo } =
+    useRequest(getDestroyTaskInfo, {
+      manual: true,
+      pollingInterval: 1000,
+      onSuccess: ({ success, data }) => {
+        if (success && data?.status !== 'RUNNING') {
+          stopGetDestroyTaskInfo();
+          if (data?.status === 'SUCCESSFUL') {
+            refresh();
+            setInstallStatus('RUNNING');
+          }
+          if (data?.status === 'FAILED') {
+            message.error(data?.msg);
+          }
         }
-        if(data?.status === 'FAILED'){
-          message.error(data?.msg);
-        }
-      }
-    },
-    onError: ({ response, data }: any) => {
-      errorHandler({ response, data });
-    },
-  })
+      },
+      onError: ({ response, data }: any) => {
+        errorHandler({ response, data });
+      },
+    });
 
   const upgradeOcpInfo = upgradeOcpData?.data || {};
 
@@ -265,10 +254,10 @@ const Update: React.FC<UpdateProps> = ({
       const { host, port, database, accessUser, accessCode } = values;
       setOcpConfigData({
         ...ocpConfigData,
-        updateConnectInfo:{
+        updateConnectInfo: {
           ...ocpConfigData.updateConnectInfo,
-          ...values
-        }
+          ...values,
+        },
       });
       connectMetaDB({
         host,
@@ -285,19 +274,17 @@ const Update: React.FC<UpdateProps> = ({
     setCurrent(current - 1);
   };
 
-  const resetConnectState = ()=>{
+  const resetConnectState = () => {
     systemUserForm.setFieldsValue({
-      user:'',
-      password:'',
-      systemPort:22
-    })
-    setCheckConnectInfo('unchecked')
-  }
-
-  
+      user: '',
+      password: '',
+      systemPort: 22,
+    });
+    setCheckConnectInfo('unchecked');
+  };
 
   return (
-    <PageContainer style={{ paddingBottom: 90 }}>
+    <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
       {installResult !== 'FAILED' && installResult !== 'SUCCESSFUL' && (
         <Steps
           currentStep={current + 2}
@@ -316,7 +303,12 @@ const Update: React.FC<UpdateProps> = ({
         }}
       >
         {current == -1 && (
-          <DeployConfig current={current} clearConnection={resetConnectState} connectForm={form} setCurrent={setCurrent} />
+          <DeployConfig
+            current={current}
+            clearConnection={resetConnectState}
+            connectForm={form}
+            setCurrent={setCurrent}
+          />
         )}
 
         {current == 0 && (
@@ -392,12 +384,7 @@ const Update: React.FC<UpdateProps> = ({
                             // setCheckConnectInfo('unchecked')
                             setCheckStatus('unchecked');
                             setCurrent(current > 0 ? current - 1 : 0);
-                            history.push({
-                              pathname: '/update',
-                              query: {
-                                step: `${current - 1}`,
-                              },
-                            });
+                            history.push('/update');
                           }}
                         >
                           {intl.formatMessage({
@@ -450,28 +437,18 @@ const Update: React.FC<UpdateProps> = ({
                               !precheckNoPassed)
                           ) {
                             handleSubmit(current + 1);
-                            history.push({
-                              pathname: '/update',
-                              query: {
-                                step: `${current + 1}`,
-                              },
-                            });
+                            history.push('/update');
                           } else if (current === 0) {
                             validateFields().then((val) => {
                               setOcpConfigData({
                                 ...ocpConfigData,
-                                updateConnectInfo:{
+                                updateConnectInfo: {
                                   ...ocpConfigData.updateConnectInfo,
-                                  ...val
-                                }
-                              });
-                              setCurrent(current + 1);
-                              history.push({
-                                pathname: '/update',
-                                query: {
-                                  step: `${current + 1}`,
+                                  ...val,
                                 },
                               });
+                              setCurrent(current + 1);
+                              history.push('/update');
                             });
                           } else {
                             handleSubmit(current);
@@ -506,14 +483,10 @@ const Update: React.FC<UpdateProps> = ({
                         data-aspm-param={``}
                         data-aspm-expo
                         type="primary"
-                        disabled={
-                          precheckOcpUpgradeLoading || preCheckLoading
-                        }
-                        loading={
-                          precheckOcpUpgradeLoading || preCheckLoading
-                        }
+                        disabled={precheckOcpUpgradeLoading || preCheckLoading}
+                        loading={precheckOcpUpgradeLoading || preCheckLoading}
                         onClick={() => {
-                          handleDestroyDeployment({name:cluster_name})
+                          handleDestroyDeployment({ name: cluster_name });
                         }}
                       >
                         {intl.formatMessage({

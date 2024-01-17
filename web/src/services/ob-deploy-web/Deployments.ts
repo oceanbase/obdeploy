@@ -1,6 +1,6 @@
 // @ts-ignore
 /* eslint-disable */
-import { request } from 'umi';
+import { request } from '@umijs/max';
 
 /** Get Deployments get deployment GET /api/v1/deployments */
 export async function getDeployment(

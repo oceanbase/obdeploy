@@ -1,8 +1,8 @@
 import { intl } from '@/utils/intl';
-import { notification, Modal, message } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import RandExp from 'randexp';
+import { message, Modal, notification } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
+import RandExp from 'randexp';
 import { getLocale, history } from 'umi';
 
 export const handleResponseError = (desc: any, msg?: string | undefined) => {
@@ -414,7 +414,7 @@ export const serversValidator = (
       success: false,
       msg: '',
     },
-    inputServer = value[0];
+    inputServer = value[value.length - 1];
   let id = _.field?.split('.')[0];
 
   result = resultHandlePipeline(
