@@ -206,7 +206,7 @@ class Upgrader(object):
         self._display_plugin = None
 
     def call_plugin(self, plugin, *args, **kwargs):
-        return plugin(self.plugin_context.namespace, self.plugin_context.namespaces, self.plugin_context.deploy_name,
+        return plugin(self.plugin_context.namespace, self.plugin_context.namespaces, self.plugin_context.deploy_name, self.plugin_context.deploy_status,
                       self.plugin_context.repositories, self.plugin_context.components, self.plugin_context.clients,
                       self.plugin_context.cluster_config, self.plugin_context.cmds, self.plugin_context.options,
                       self.plugin_context.stdio, *args, **kwargs)

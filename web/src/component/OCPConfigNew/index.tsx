@@ -178,7 +178,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
     return res;
   };
 
-  const formValidScorllHelper = (result:PromiseSettledResult<any>[])=>{
+  const formValidScrollHelper = (result:PromiseSettledResult<any>[])=>{
     let errorFields = [];
     for(let item of result){
       if(item.status === 'rejected'){
@@ -260,7 +260,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
       .then((result) => {
         if(result.find((item:any)=>item.status === 'rejected'))
         {
-          formValidScorllHelper(result)
+          formValidScrollHelper(result)
           return
         }
         setData(result[0].value);

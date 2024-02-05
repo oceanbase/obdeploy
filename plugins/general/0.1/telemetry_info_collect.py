@@ -27,9 +27,9 @@ import uuid
 import resource
 import hashlib
 
-from tool import NetUtil
-from const import VERSION, REVISION
-
+from tool import NetUtil, COMMAND_ENV
+from const import VERSION, REVISION, TELEMETRY_COMPONENT
+from _environ import ENV_TELEMETRY_REPORTER
 
 shell_command_map = {
     "host_type": 'systemd-detect-virt',
@@ -64,7 +64,7 @@ def shell_command(func):
 class BaseInfo:
     @staticmethod
     def reporter():
-        return 'obd'
+        return COMMAND_ENV.get(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT)
 
     @staticmethod
     def report_time():

@@ -547,6 +547,12 @@ class IO(object):
     def set_verbose_level(level):
         IO.VERBOSE_LEVEL = level
 
+    @property
+    def syncing(self):
+        if self._root_io:
+            return self._root_io.syncing
+        return self.sync_obj is not None
+
     def _start_sync_obj(self, sync_clz, before_critical, *arg, **kwargs):
         if self._root_io:
             return self._root_io._start_sync_obj(sync_clz, before_critical, *arg, **kwargs)
@@ -667,8 +673,9 @@ class IO(object):
         msg = '%s [y/n]: ' % msg
         self.print(msg, end='')
         if self.default_confirm:
+            self.verbose("default confirm: True")
             return True
-        if self._input_is_tty:
+        if self.isatty() and not self.syncing:
             while True:
                 try:
                     ans = self.get_input_stream().readline(blocked=True).strip().lower()
@@ -680,6 +687,7 @@ class IO(object):
                     if not e:
                         return False
         else:
+            self.verbose("isatty: %s, syncing: %s, auto confirm: False" % (self.isatty(), self.syncing))
             return False
 
     def _format(self, msg, *args):

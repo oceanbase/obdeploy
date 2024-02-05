@@ -23,6 +23,8 @@ OB_OFFICIAL_WEBSITE = 'https://www.oceanbase.com/'
 # post telemetry data to OceanBase official
 TELEMETRY_WEBSITE = '<TELEMETRY_WEBSITE>'
 TELEMETRY_URL = '{}/api/web/oceanbase/report'.format(TELEMETRY_WEBSITE if TELEMETRY_WEBSITE else 'https://openwebapi.oceanbase.com')
+TELEMETRY_COMPONENT = 'obd'
+TELEMETRY_SIG = 'dbe97393a695335d67de91dd4049ba'
 
 # obdeploy version
 VERSION = '<VERSION>'

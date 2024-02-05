@@ -441,7 +441,7 @@ class TelemetryPostCommand(HiddenObdCommand):
 
     @property
     def enable_log(self):
-        return COMMAND_ENV.get(ENV.TELEMETRY_LOG_MODE, default='0') == '1'
+        return COMMAND_ENV.get(ENV.ENV_TELEMETRY_LOG_MODE, default='0') == '1'
 
     def init(self, cmd, args):
         super(TelemetryPostCommand, self).init(cmd, args)
@@ -459,7 +459,7 @@ class TelemetryMajorCommand(HiddenMajorCommand):
         self.register_command(TelemetryPostCommand())
 
     def do_command(self):
-        if COMMAND_ENV.get(ENV.TELEMETRY_MODE, default='1') == '1':
+        if COMMAND_ENV.get(ENV.ENV_TELEMETRY_MODE, default='1') == '1':
             return super(TelemetryMajorCommand, self).do_command()
         else:
             ROOT_IO.critical('Telemetry is disabled. To enable OBD telemetry, run the `obd env set TELEMETRY_MODE 1` command.')
@@ -914,11 +914,12 @@ class ClusterDestroyCommand(ClusterMirrorCommand):
     def __init__(self):
         super(ClusterDestroyCommand, self).__init__('destroy', 'Destroy a deployed cluster.')
         self.parser.add_option('-f', '--force-kill', action='store_true', help="Force kill the running observer process in the working directory.")
+        self.parser.add_option('--confirm', action='store_true', help='Confirm to destroy.')
         self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force kill the observer while standby tenant in others cluster exists.")
 
     def _do_command(self, obd):
         if self.cmds:
-            res = obd.destroy_cluster(self.cmds[0])
+            res = obd.destroy_cluster(self.cmds[0], need_confirm=not getattr(self.opts, 'confirm', False))
             return res
         else:
             return self._show_help()
@@ -1082,7 +1083,7 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
         self.parser.add_option('-s', '--variables', type='string', help="Set the variables for the system tenant. [ob_tcp_invited_nodes='%'].", default="ob_tcp_invited_nodes='%'")
 
     def _do_command(self, obd):
-        if self.cmds:
+        if len(self.cmds) == 1:
             return obd.create_tenant(self.cmds[0])
         else:
             return self._show_help()

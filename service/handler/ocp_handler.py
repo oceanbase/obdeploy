@@ -49,8 +49,6 @@ class OcpHandler(BaseHandler):
 
     def create_ocp_config_path(self, config):
         cluster_config = {}
-        log.get_logger().info('meta connections: %s' % self.context['connection_info'])
-        log.get_logger().info('meta_password: %s' % self.context['meta_password'])
 
         home_path = config.home_path
         launch_user = config.launch_user
@@ -74,7 +72,7 @@ class OcpHandler(BaseHandler):
             f.write(yaml.dump(cluster_config, sort_keys=False))
             cluster_config_yaml_path = f.name
         self.context['id'] = self.context['id'] + 1 if self.context['id'] else 1
-        log.get_logger().info('ocp-server id: %s' % self.context['id'])
+        log.get_logger().info('ocp deployment id: %s' % self.context['id'])
         status = self.context['ocp_deployment_info'][self.context['id']]['status'] \
             if self.context['ocp_deployment_info'][self.context['id']] and self.context['ocp_deployment_info'][self.context['id']]['status'] \
             else OCPDeploymentStatus.INIT
@@ -184,7 +182,7 @@ class OcpHandler(BaseHandler):
             ocp_config['global'] = {}
 
         for key in config_dict:
-            if config_dict[key] and key in ('port', 'admin_password', 'memory_size', 'manage_info', 'home_path', 'soft_dir', 'log_dir'):
+            if config_dict[key] and key in ('port', 'admin_password', 'memory_size', 'manage_info', 'home_path', 'soft_dir', 'log_dir', 'ocp_site_url', 'launch_user'):
                 ocp_config['global'][key] = config_dict[key]
 
         if config.metadb:
@@ -214,9 +212,6 @@ class OcpHandler(BaseHandler):
 
         if config.home_path == '':
             ocp_config['global']['home_path'] = home_path + '/ocp-server'
-
-        if launch_user:
-            ocp_config['global']['launch_user'] = launch_user
 
         if config.soft_dir == '':
             ocp_config['global']['soft_dir'] = ocp_config['global']['home_path'] + '/data/files/'
@@ -381,7 +376,7 @@ class OcpHandler(BaseHandler):
         self.obd.set_repositories(repositories)
 
         start_check_plugins = self.obd.search_py_script_plugin(repositories, 'start_check', no_found_act='warn')
-        log.get_logger().info('start_check plugins: %s' % start_check_plugins)
+        log.get_logger().debug('start_check plugins: %s' % start_check_plugins)
         self._precheck(app_name, repositories, start_check_plugins, init_check_status=True)
         info = task_manager.get_task_info(app_name, task_type="ocp_precheck")
         if info is not None and info.exception is not None:
@@ -465,8 +460,8 @@ class OcpHandler(BaseHandler):
             param_check_status_result[comp_name] = self._init_check_status('param', status_res.keys(), status_res)
         self.context['ocp_deployment']['param_check_status'] = param_check_status_result
 
-        log.get_logger().info('precheck param check status: %s' % param_check_status)
-        log.get_logger().info('precheck param check status res: %s' % check_pass)
+        log.get_logger().debug('precheck param check status: %s' % param_check_status)
+        log.get_logger().debug('precheck param check status res: %s' % check_pass)
         if not check_pass:
             return
 
@@ -525,7 +520,7 @@ class OcpHandler(BaseHandler):
             if connect_check_status and 'ssh' in connect_check_status.keys():
                 namespace_union = util.recursive_update_dict(namespace_union, connect_check_status['ssh'])
 
-            log.get_logger().info('namespace_union: %s' % namespace_union)
+            log.get_logger().debug('namespace_union: %s' % namespace_union)
             if namespace_union:
                 for server, result in namespace_union.items():
                     if result is None:
@@ -550,7 +545,7 @@ class OcpHandler(BaseHandler):
         for k, v in result.items():
             check_info = PreCheckResult(name='{}:{}'.format(component, k), server=server.ip)
             task_info.current = '{}:{}'.format(component, k)
-            log.get_logger().info('precheck result current: %s' % task_info.current)
+            log.get_logger().debug('precheck result current: %s' % task_info.current)
             info = TaskStepInfo(name='{}:{}'.format(component, k))
             if v.status == v.PASS:
                 check_info.result = PrecheckEventResult.PASSED
@@ -602,11 +597,11 @@ class OcpHandler(BaseHandler):
                         log.get_logger().warn('component : {},precheck_result is None'.format(component))
                         continue
                     for k, v in precheck_result.items():
-                        log.get_logger().info('k: %s, v: %s' % (k, v))
-                        log.get_logger().info('status: %s' % v.status)
+                        log.get_logger().debug('k: %s, v: %s' % (k, v))
+                        log.get_logger().debug('status: %s' % v.status)
                         if v.status == v.FAIL and v.suggests is not None and v.suggests[0].auto_fix and v.suggests[0].fix_eval:
-                            log.get_logger().info('auto_fix : %s' % v.suggests[0].auto_fix)
-                            log.get_logger().info('fix_eval: %s' % v.suggests[0].fix_eval)
+                            log.get_logger().debug('auto_fix : %s' % v.suggests[0].auto_fix)
+                            log.get_logger().debug('fix_eval: %s' % v.suggests[0].fix_eval)
                             for fix_eval in v.suggests[0].fix_eval:
                                 if fix_eval.operation == FixEval.SET:
                                     config_json = None
@@ -1386,7 +1381,7 @@ class OcpHandler(BaseHandler):
 
             if dest_repository == current_repository:
                 self.obd._call_stdio('print', 'The current version is already %s.\nNoting to do.' % current_repository)
-                raise Exception('The current version is already %s.\nNoting to do.' % current_repository)
+                return True
             ssh_clients = self.obd.get_clients(deploy_config, [current_repository])
             cluster_config = deploy_config.components[current_repository.name]
 
@@ -1585,7 +1580,6 @@ class OcpHandler(BaseHandler):
             if component not in self.obd.namespaces:
                 break
             if self.obd.namespaces[component].get_return('stop') is not None:
-                log.get_logger().info('stop: %s' % self.obd.namespaces[component].get_return('stop'))
                 if not self.obd.namespaces[component].get_return('stop'):
                     step_info.result = TaskResult.FAILED
                 else:
@@ -1593,7 +1587,6 @@ class OcpHandler(BaseHandler):
                 step_info.status = TaskStatus.FINISHED
 
             if self.obd.namespaces[component].get_return('start') is not None:
-                log.get_logger().info('start: %s' % self.obd.namespaces[component].get_return('start'))
                 if not self.obd.namespaces[component].get_return('start'):
                     step_info.result = TaskResult.FAILED
                 else:
@@ -1601,7 +1594,6 @@ class OcpHandler(BaseHandler):
                 step_info.status = TaskStatus.FINISHED
 
             if self.obd.namespaces[component].get_return('display') is not None:
-                log.get_logger().info('display: %s' % self.obd.namespaces[component].get_return('display'))
                 if not self.obd.namespaces[component].get_return('display'):
                     step_info.result = TaskResult.FAILED
                 else:

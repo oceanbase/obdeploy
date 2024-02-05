@@ -32,6 +32,7 @@ class Restart(object):
         self.namespace = plugin_context.namespace
         self.namespaces = plugin_context.namespaces
         self.deploy_name = plugin_context.deploy_name
+        self.deploy_status = plugin_context.deploy_status
         self.repositories = plugin_context.repositories
         self.plugin_name = plugin_context.plugin_name
 
@@ -64,6 +65,7 @@ class Restart(object):
             'namespace': self.namespace,
             'namespaces': self.namespaces,
             'deploy_name': self.deploy_name,
+            'deploy_status': self.deploy_status,
             'cluster_config': self.cluster_config,
             'repositories': self.repositories,
             'repository': self.repository,
@@ -189,7 +191,7 @@ class Restart(object):
             for server in self.cluster_config.servers:
                 new_client = self.new_clients[server]
                 server_config = self.cluster_config.get_server_conf(server)
-                new_client.execute_command('chmod +666 %s' % '/tmp/obshell')
+                new_client.execute_command('[ -w {dir} ] || chmod +666 {dir}'.format(dir='/tmp/obshell'))
                 chown_cmd = 'sudo chown -R %s:' % new_client.config.username
                 for key in ['home_path', 'data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '.meta', 'log_obshell']:
                     if key in server_config:

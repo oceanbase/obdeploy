@@ -2,7 +2,7 @@ import { intl } from '@/utils/intl';
 import { useEffect, useRef, useState } from 'react';
 import { Space, InputNumber, Input, Select } from 'antd';
 import { getLocale } from 'umi';
-import { getUnit, isTakeUnit, takeNewUnit } from './helper';
+import { changeUnit, isTakeUnit, takeNewUnit } from '@/constant/unit';
 import { PARAMETER_TYPE } from '@/constant/configuration';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
@@ -215,7 +215,7 @@ export default function Parameter({
   const { type } = parameterValue;
   const defaultUnit = useRef<string>(
     type === PARAMETER_TYPE.capacity || type === PARAMETER_TYPE.capacityMB
-      ? getUnit(parameterValue.value)
+      ? changeUnit(parameterValue.value)
       : null,
   );
   const [unit, setUnit] = useState<string>(defaultUnit.current);

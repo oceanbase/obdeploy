@@ -165,6 +165,7 @@ class ObdHome(object):
             'namespace': self.get_namespace(repository.name if spacename == None else spacename),
             'namespaces': self.namespaces,
             'deploy_name': None,
+            'deploy_status': None,
             'cluster_config': None,
             'repositories': self.repositories,
             'repository': repository,
@@ -176,6 +177,7 @@ class ObdHome(object):
         }
         if self.deploy:
             args['deploy_name'] = self.deploy.name
+            args['deploy_status'] = self.deploy.deploy_info.status
             args['components'] = self.deploy.deploy_info.components
             args['cluster_config'] = self.deploy.deploy_config.components[repository.name]
             if "clients" not in kwargs:
@@ -2962,12 +2964,14 @@ class ObdHome(object):
             self.set_repositories(repositories)
         return self._deploy_cluster(deploy, repositories) and self._start_cluster(deploy, repositories)
 
-    def destroy_cluster(self, name):
+    def destroy_cluster(self, name, need_confirm=False):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
         self.set_deploy(deploy)
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+        if need_confirm and not self._call_stdio('confirm', FormtatText.warning('Are you sure to destroy the "%s" cluster ?' % name)):
             return False
 
         deploy_info = deploy.deploy_info

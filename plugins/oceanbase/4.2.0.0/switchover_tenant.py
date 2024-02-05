@@ -95,7 +95,7 @@ def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cur
         return value
 
     def call_plugin(plugin, *args, **kwargs):
-        return plugin(plugin_context.namespace, plugin_context.namespaces, plugin_context.deploy_name,
+        return plugin(plugin_context.namespace, plugin_context.namespaces, plugin_context.deploy_name, plugin_context.deploy_status,
             plugin_context.repositories, plugin_context.components, plugin_context.clients,
             plugin_context.cluster_config, plugin_context.cmds, plugin_context.options,
             plugin_context.stdio, *args, **kwargs)

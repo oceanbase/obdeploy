@@ -493,7 +493,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                 if expect_log_disk_size > max_available and generate_check:
                     stdio.error(err.EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE.format(avail=max_available, need=expect_log_disk_size))
                     success = False
-                cluster_config.update_global_conf('ocp_meta_tenant_log_disk_size', format_size(expect_log_disk_size, 0))
+                cluster_config.update_global_conf('ocp_meta_tenant_log_disk_size', format_size(expect_log_disk_size, 0), save=False)
         if generate_config_mini and 'ocp_meta_tenant_memory_size' not in global_config and 'memory_size' not in global_config.get('ocp_meta_tenant', {}):
             update_global_conf('ocp_meta_tenant_memory_size', '1536M')
 

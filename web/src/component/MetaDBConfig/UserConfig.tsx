@@ -9,117 +9,28 @@ import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { commonStyle } from '@/pages/constants';
 import { nameReg } from '@/utils';
 import styles from './indexZh.less';
-import { useState } from 'react';
-import { getTailPath } from '@/utils/helper';
-
-type UserInfoType = {
-  user?: string;
-  password?: string;
-  launch_user?: string;
-};
 
 export default function UserConfig({ form }: { form: FormInstance<any> }) {
-  const { useRunningUser, setUseRunningUser, setUsername } =
+  const { useRunningUser, setUseRunningUser,setDeployUser } =
     useModel('ocpInstallData');
-  const { ocpConfigData = {}, DOCS_USER} = useModel('global');
-  const { auth = {}, launch_user = '' } = ocpConfigData;
-  const [userInfo, setUserInfo] = useState<UserInfoType>({
-    ...auth,
-    launch_user,
-  });
-  const isNewDB = getTailPath() === 'install';
+  const { DOCS_USER } = useModel('global')
   const onChange = (e: CheckboxChangeEvent) => {
-    setUseRunningUser(e.target.checked);
-    if (e.target.checked) {
-      setUsername(form.getFieldValue('launch_user'));
-    } else {
-      if (form.getFieldValue('launch_user')) {
-        form.setFieldValue('launch_user', undefined);
-        setUserInfo({ ...userInfo, launch_user: undefined });
-      }
-      if (userInfo.user) {
-        if (isNewDB) {
-          form.setFieldValue(
-            ['obproxy', 'home_path'],
-            `/home/${userInfo.user}`,
-          );
-          form.setFieldValue(
-            ['oceanbase', 'home_path'],
-            `/home/${userInfo.user}`,
-          );
-        }
-        form.setFieldValue(
-          ['ocpserver', 'home_path'],
-          `/home/${userInfo.user}`,
-        );
-        form.setFieldValue(
-          ['ocpserver', 'log_dir'],
-          `/home/${userInfo.user}/logs`,
-        );
-        form.setFieldValue(
-          ['ocpserver', 'soft_dir'],
-          `/home/${userInfo.user}/software`,
-        );
-      }
-      setUsername(form.getFieldValue(['auth', 'user']));
+    let {checked} = e.target
+    setUseRunningUser(checked);
+    if(checked){
+      let launch_user = form.getFieldValue('launch_user')
+      launch_user && setDeployUser(launch_user)
+    }else{
+      let user = form.getFieldValue(['auth', 'user'])
+      user && setDeployUser(user)
     }
   };
 
-  const passwordChange = (e: any) => {
-    userInfo
-      ? setUserInfo({ ...userInfo, password: e.target.value })
-      : setUserInfo({ password: e.target.value });
-    form.setFieldValue(['auth', 'password'], e.target.value);
-  };
-  const userChange = (e: any) => {
-    userInfo
-      ? setUserInfo({ ...userInfo, user: e.target.value })
-      : setUserInfo({ user: e.target.value });
-    form.setFieldValue(['auth', 'user'], e.target.value);
-    if (!form.getFieldValue('launch_user')) {
-      let value = '';
-      if (e.target.value !== 'root') {
-        value = `/home/${e.target.value}`;
-      } else {
-        value = `/${e.target.value}`;
-      }
-      if (isNewDB) {
-        form.setFieldValue(['obproxy', 'home_path'], value);
-        form.setFieldValue(['oceanbase', 'home_path'], value);
-      }
-      form.setFieldValue(['ocpserver', 'home_path'], value);
-      form.setFieldValue(
-        ['ocpserver', 'log_dir'],
-        `/home/${e.target.value}/logs`,
-      );
-      form.setFieldValue(
-        ['ocpserver', 'soft_dir'],
-        `/home/${e.target.value}/software`,
-      );
-    }
-    setUsername(e.target.value);
-  };
+  const userChange = (e:React.ChangeEvent<HTMLInputElement>)=>{
+    const {value} = e.target
+    setDeployUser(value)
+  }
 
-  const launchUserChange = (e: any) => {
-    userInfo
-      ? setUserInfo({ ...userInfo, launch_user: e.target.value })
-      : setUserInfo({ launch_user: e.target.value });
-    form.setFieldValue('launch_user', e.target.value);
-    if (isNewDB) {
-      form.setFieldValue(['obproxy', 'home_path'], `/home/${e.target.value}`);
-      form.setFieldValue(['oceanbase', 'home_path'], `/home/${e.target.value}`);
-    }
-    form.setFieldValue(['ocpserver', 'home_path'], `/home/${e.target.value}`);
-    form.setFieldValue(
-      ['ocpserver', 'log_dir'],
-      `/home/${e.target.value}/logs`,
-    );
-    form.setFieldValue(
-      ['ocpserver', 'soft_dir'],
-      `/home/${e.target.value}/software`,
-    );
-    setUsername(e.target.value);
-  };
   return (
     <div className={styles.userConfigContainer}>
       <p className={styles.titleText}>
@@ -149,7 +60,6 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
         }
       >
         <Input
-          value={userInfo?.user}
           style={commonStyle}
           disabled={useRunningUser}
           onChange={userChange}
@@ -176,8 +86,6 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
         })}
       >
         <Input.Password
-          value={userInfo?.password}
-          onChange={passwordChange}
           style={{ width: 328, marginBottom: 21 }}
           autoComplete="new-password"
           disabled={useRunningUser}
@@ -262,8 +170,7 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
           }
         >
           <Input
-            value={userInfo?.launch_user}
-            onChange={launchUserChange}
+            onChange={userChange}
             style={{ width: 216 }}
             placeholder={intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.UserConfig.PleaseEnter',

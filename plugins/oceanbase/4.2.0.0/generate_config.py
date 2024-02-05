@@ -147,7 +147,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
     MINI_DATA_FILE_SIZE = 2 << 30
     MINI_DATA_FILE_NEXT = 2 << 30
     MINI_DATA_FILE_MAX_SIZE = 8 << 30
-    MINI_LOG_DISK_SIZE = 13 << 30
+    MINI_LOG_DISK_SIZE = 14 << 30
 
     has_ocp = 'ocp-express' in added_components and 'ocp-express' in be_depend
     if any([key in global_config for key in ["ocp_meta_tenant", "ocp_meta_db", "ocp_meta_username", "ocp_meta_password"]]):

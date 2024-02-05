@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useModel, getLocale } from 'umi';
+import { useUpdateEffect } from 'ahooks';
 import { copyText } from '@/utils/helper';
 import {
   generateRandomPassword as generatePassword,
@@ -44,7 +45,8 @@ export default function ServiceConfig({
     'unchecked' | 'fail' | 'success'
   >('unchecked');
   const { ocpConfigData } = useModel('global');
-  const { isSingleOcpNode } = useModel('ocpInstallData');
+  const { isSingleOcpNode, deployUser, useRunningUser } =
+    useModel('ocpInstallData');
   const { components = {} } = ocpConfigData;
   const { ocpserver = {} } = components;
   const [adminPassword, setAdminPassword] = useState<string>(
@@ -92,6 +94,19 @@ export default function ServiceConfig({
       }
     }
   }, [isSingleOcpNode]);
+
+  useEffect(() => {
+    form.setFieldsValue({
+      ocpserver: {
+        home_path:
+          !useRunningUser && deployUser === 'root'
+            ? `/${deployUser}`
+            : `/home/${deployUser}`,
+        log_dir: `/home/${deployUser}/logs`,
+        soft_dir: `/home/${deployUser}/software`,
+      },
+    });
+  }, [deployUser]);
 
   return (
     <ProCard

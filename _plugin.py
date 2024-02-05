@@ -147,10 +147,11 @@ class PluginReturn(object):
 
 class PluginContext(object):
 
-    def __init__(self, plugin_name, namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmd, options, dev_mode, stdio):
+    def __init__(self, plugin_name, namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmd, options, dev_mode, stdio):
         self.namespace = namespace
         self.namespaces = namespaces
         self.deploy_name  = deploy_name
+        self.deploy_status  = deploy_status
         self.repositories =repositories
         self.plugin_name = plugin_name
         self.components = components
@@ -244,7 +245,7 @@ class ScriptPlugin(Plugin):
         self._export()
 
     def before_do(
-        self, plugin_name, namespace, namespaces, deploy_name,
+        self, plugin_name, namespace, namespaces, deploy_name, deploy_status,
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs
         ):
@@ -254,7 +255,7 @@ class ScriptPlugin(Plugin):
         for server in clients:
             sub_clients[server] = ScriptPlugin.ClientForScriptPlugin(clients[server], sub_stdio)
         self.context = PluginContext(
-            plugin_name, namespace, namespaces, deploy_name, repositories, components,
+            plugin_name, namespace, namespaces, deploy_name, deploy_status, repositories, components,
             sub_clients, cluster_config, cmd, options, self.dev_mode, sub_stdio
         )
         namespace.set_return(plugin_name, None)
@@ -266,11 +267,11 @@ class ScriptPlugin(Plugin):
 
 def pyScriptPluginExec(func):
     def _new_func(
-        self, namespace, namespaces, deploy_name,
+        self, namespace, namespaces, deploy_name, deploy_status,
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs
         ):
-        self.before_do(self.name, namespace, namespaces, deploy_name,
+        self.before_do(self.name, namespace, namespaces, deploy_name, deploy_status,
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs)
         method_name = self.PLUGIN_NAME
@@ -337,14 +338,14 @@ class PyScriptPlugin(ScriptPlugin):
         self.libs_path.append(self.plugin_path)
 
     def __call__(
-        self, namespace, namespaces, deploy_name,
+        self, namespace, namespaces, deploy_name, deploy_status,
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs
         ):
         method = getattr(self, self.PLUGIN_NAME, False)
         if method:
             return method(
-                namespace, namespaces, deploy_name,
+                namespace, namespaces, deploy_name, deploy_status,
                 repositories, components, clients, cluster_config, cmd,
                 options, stdio, *arg, **kwargs
             )
@@ -794,7 +795,7 @@ class %s(PyScriptPlugin):
 
     @pyScriptPluginExec
     def %s(
-        self, namespace, namespaces, deploy_name,
+        self, namespace, namespaces, deploy_name, deploy_status,
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs):
         pass
