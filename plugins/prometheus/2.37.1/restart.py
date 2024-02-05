@@ -33,6 +33,7 @@ class Restart(object):
         self.namespace = plugin_context.namespace
         self.namespaces = plugin_context.namespaces
         self.deploy_name = plugin_context.deploy_name
+        self.deploy_status = plugin_context.deploy_status
         self.repositories = plugin_context.repositories
         self.plugin_name = plugin_context.plugin_name
 
@@ -64,6 +65,7 @@ class Restart(object):
             'namespace': self.namespace,
             'namespaces': self.namespaces,
             'deploy_name': self.deploy_name,
+            'deploy_status': self.deploy_status,
             'cluster_config': self.cluster_config,
             'repositories': self.repositories,
             'repository': self.repository,
@@ -81,7 +83,7 @@ class Restart(object):
     def connect(self, cluster_config):
         if self.cursors is None:
             self.sub_io.start_loading('Connect to prometheus')
-            ret = self.connect_plugin(self.namespace, self.namespaces, self.deploy_name, self.repositories, self.components, self.clients, cluster_config, self.cmds, self.options, self.sub_io)
+            ret = self.connect_plugin(self.namespace, self.namespaces, self.deploy_name, self.deploy_status, self.repositories, self.components, self.clients, cluster_config, self.cmds, self.options, self.sub_io)
             if not ret:
                 self.sub_io.stop_loading('fail')
                 return False

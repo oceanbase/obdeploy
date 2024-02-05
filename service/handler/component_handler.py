@@ -90,10 +90,10 @@ class ComponentHandler(BaseHandler):
                     ComponentInfo(version=pkg.version, md5=pkg.md5, release=pkg.release, arch=pkg.arch, type=MirrorRepositoryType.REMOTE.value, estimated_size=const.PKG_ESTIMATED_SIZE[pkg.name]))
         for component, version in component_filter.items():
             if component in component_dict.keys():
-                log.get_logger().info("filter component: {0} above version: {1}".format(component, version))
-                log.get_logger().info("original components: {0}".format(component_dict[component]))
+                log.get_logger().debug("filter component: {0} above version: {1}".format(component, version))
+                log.get_logger().debug("original components: {0}".format(component_dict[component]))
                 component_dict[component] = list(filter(lambda c: Version(c.version) >= Version(version), component_dict[component]))
-                log.get_logger().info("filtered components: {0}".format(component_dict[component]))
+                log.get_logger().debug("filtered components: {0}".format(component_dict[component]))
         return component_dict
 
     def list_components(self):

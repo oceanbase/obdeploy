@@ -24,7 +24,7 @@ oceanbase-ce:
     datafile_size: 2G # Size of the data file. 
     datafile_next: 2G # the auto extend step. Please enter an capacity, such as 2G
     datafile_maxsize: 20G # the auto extend max size. Please enter an capacity, such as 20G
-    log_disk_size: 13G # The size of disk space used by the clog files.
+    log_disk_size: 14G # The size of disk space used by the clog files.
     cpu_count: 16
     production_mode: false
     enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.

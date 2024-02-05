@@ -27,13 +27,14 @@ def call_plugin(plugin, plugin_context, repositories, *args, **kwargs):
     namespace = plugin_context.namespace
     namespaces = plugin_context.namespaces
     deploy_name = plugin_context.deploy_name
+    deploy_status = plugin_context.deploy_status
     components = plugin_context.components
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
     cmds = plugin_context.cmds
     options = plugin_context.options
     stdio = plugin_context.stdio
-    return plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options,
+    return plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options,
         stdio, *args, **kwargs)
 
 

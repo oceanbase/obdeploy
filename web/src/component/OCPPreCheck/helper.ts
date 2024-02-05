@@ -1,4 +1,17 @@
+import { getUnit, takeNewUnit, UNITS } from '@/constant/unit';
 import _ from 'lodash';
+
+export const changeParameterUnit = (parameter: any) => {
+  let _parameter = _.clone(parameter);
+  let unit = getUnit(_parameter.value);
+  if (unit && unit.length === 2) {
+    _parameter.value = takeNewUnit(
+      _parameter.value,
+      UNITS[unit.toUpperCase()].alias,
+    );
+  }
+  return _parameter;
+};
 
 export const formatPreCheckData = (configData: any) => {
   let _configData = _.cloneDeep(configData);
@@ -11,13 +24,16 @@ export const formatPreCheckData = (configData: any) => {
     _configData.components.oceanbase &&
     _configData.components.oceanbase.topology
   ) {
-    let {parameters,topology} = _configData.components.oceanbase
+    let { parameters, topology } = _configData.components.oceanbase;
     for (let item of topology) {
       delete item.id;
     }
-    for(let idx = 0;idx<parameters.length;idx++){
-      if(parameters[idx].key === 'cluster_id' && parameters[idx].value == '0'){
-        parameters.splice(idx,1)
+    for (let idx = 0; idx < parameters.length; idx++) {
+      if (
+        parameters[idx].key === 'cluster_id' &&
+        parameters[idx].value == '0'
+      ) {
+        parameters.splice(idx, 1);
       }
     }
   }

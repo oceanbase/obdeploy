@@ -20,27 +20,9 @@
 
 from __future__ import absolute_import, division, print_function
 
-import json
-import requests
 
-from const import TELEMETRY_URL, TELEMETRY_COMPONENT, TELEMETRY_SIG
-from tool import timeout
-
-
-def telemetry_post(plugin_context, telemetry_post_data={}, *args, **kwargs):
+def scale_in_check(plugin_context, *args, **kwargs):
+    cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-    if telemetry_post_data:
-        data = json.dumps(telemetry_post_data, indent=4)
-        stdio.verbose('post data: %s' % data)
-        try:
-            with timeout(30):
-                requests.post(url=TELEMETRY_URL, \
-                    data=json.dumps({'component': TELEMETRY_COMPONENT, 'content': data}), \
-                    headers={'sig': TELEMETRY_SIG, 'Content-Type': 'application/json'})
-            return plugin_context.return_true()
-        except:
-            stdio.exception('post data failed')
-            return plugin_context.return_false()
-    else:
-        stdio.verbose('noting to post')
-        return plugin_context.return_false()
+    stdio.error("Not support component `%s`".format(cluster_config.name))
+    return plugin_context.return_false()

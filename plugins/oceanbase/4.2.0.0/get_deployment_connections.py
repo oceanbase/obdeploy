@@ -22,7 +22,7 @@ from pymysql import err
 
 def get_deployment_connections(plugin_context, connect_plugin, relation_deploy_names=[], cursors={}, cluster_configs={}, retry_times=1, not_connect_act="ignore", *args, **kwargs):
     def call_plugin(plugin, cluster_config, *args, **kwargs):
-        return plugin(plugin_context.namespace, plugin_context.namespaces, plugin_context.deploy_name,
+        return plugin(plugin_context.namespace, plugin_context.namespaces, plugin_context.deploy_name, plugin_context.deploy_status,
             plugin_context.repositories, plugin_context.components, plugin_context.clients,
             cluster_config, plugin_context.cmds, plugin_context.options,
             None, *args, **kwargs)

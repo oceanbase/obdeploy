@@ -57,6 +57,7 @@ export default () => {
   const [isShowMoreConfig, setIsShowMoreConfig] = useState<boolean>(false);
   const [connectInfo, setConnectInfo] = useState<ConnectInfoType>();
   const [tableData, setTableData] = useState<TableDataType[]>(defaultTableData);
+  const [deployUser, setDeployUser] = useState<string>();
   return {
     obVersionInfo,
     setObVersionInfo,
@@ -92,5 +93,7 @@ export default () => {
     setConnectInfo,
     tableData,
     setTableData,
+    deployUser,
+    setDeployUser,
   };
 };

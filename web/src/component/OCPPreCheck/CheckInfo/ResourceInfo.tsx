@@ -1,5 +1,5 @@
 import { intl } from '@/utils/intl';
-import { Row, Col } from 'antd';
+import { Row, Col, Typography } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import type { ResourceInfoPropType } from './type';
 import styles from './index.less';
@@ -10,6 +10,8 @@ interface BasicInfoProps {
   isNewDB: boolean;
   resourceInfoProp: ResourceInfoPropType;
 }
+
+const { Text } = Typography;
 
 export default function ResourceInfo({
   isNewDB,
@@ -63,7 +65,12 @@ export default function ResourceInfo({
                     defaultMessage: '用户名',
                   })}
                 >
-                  {userConfig.user}
+                  <Text
+                    style={{ width: 200 }}
+                    ellipsis={{ tooltip: userConfig.user }}
+                  >
+                    {userConfig.user}
+                  </Text>
                 </ProCard>
                 <PasswordCard password={userConfig.password} />
                 <ProCard
@@ -110,13 +117,22 @@ export default function ResourceInfo({
             <Col span={24}>
               <ProCard className={styles.infoSubCard} split="vertical">
                 {serviceConfig &&
-                  Object.keys(serviceConfig).map((key, idx) => (
-                    <ProCard key={idx} colSpan={6} title={serviceMap[key]}>
-                      {key === 'home_path'
+                  Object.keys(serviceConfig).map((key, idx) => {
+                    let path =
+                      key === 'home_path'
                         ? `${serviceConfig[key]}${ocpAddonAfter}`
-                        : `${serviceConfig[key]}`}
-                    </ProCard>
-                  ))}
+                        : `${serviceConfig[key]}`;
+                    return (
+                      <ProCard key={idx} colSpan={6} title={serviceMap[key]}>
+                        <Text
+                          style={{ width: 200 }}
+                          ellipsis={{ tooltip: path }}
+                        >
+                          {path}
+                        </Text>
+                      </ProCard>
+                    );
+                  })}
               </ProCard>
             </Col>
           </Row>

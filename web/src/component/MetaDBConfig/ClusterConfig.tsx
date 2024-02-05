@@ -1,31 +1,31 @@
-import { intl } from '@/utils/intl';
-import { Space, Button, Row } from 'antd';
-import { ProFormText } from '@ant-design/pro-components';
-import { RightOutlined, DownOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
-import { FormInstance } from 'antd/lib/form';
-import { useModel } from 'umi';
-import useRequest from '@/utils/useRequest';
-import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
+import { oceanbaseAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
-import InputPort from '../InputPort';
-import { formatMoreConfig } from '@/utils/helper';
-import { PARAMETER_TYPE } from '@/constant/configuration';
+import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import {
   generateRandomPassword as generatePassword,
-  passwordRules,
   getErrorInfo,
+  passwordRules,
 } from '@/utils';
+import { formatMoreConfig } from '@/utils/helper';
+import { intl } from '@/utils/intl';
+import useRequest from '@/utils/useRequest';
+import { DownOutlined, RightOutlined } from '@ant-design/icons';
+import { ProFormText } from '@ant-design/pro-components';
+import { useUpdateEffect } from 'ahooks';
+import { Button, Row, Space } from 'antd';
+import { FormInstance } from 'antd/lib/form';
+import { useState } from 'react';
+import { useModel } from 'umi';
+import InputPort from '../InputPort';
 import styles from './indexZh.less';
-import { oceanbaseAddonAfter } from '@/constant/configuration';
 
 export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
+  const { deployUser, useRunningUser } = useModel('ocpInstallData');
   const {
     ocpClusterMore,
     setOcpClusterMore,
     ocpConfigData,
-    setOcpConfigData,
     ocpClusterMoreConfig,
     setOcpClusterMoreConfig,
     setErrorVisible,
@@ -143,6 +143,14 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
     const password = generatePassword();
     setPassword(password);
   };
+
+  useUpdateEffect(() => {
+    const homePath =
+      !useRunningUser && deployUser === 'root'
+        ? `/${deployUser}`
+        : `/home/${deployUser}`;
+    form.setFieldValue(['oceanbase', 'home_path'], homePath);
+  }, [deployUser]);
 
   return (
     <div className={styles.clusterContainer}>

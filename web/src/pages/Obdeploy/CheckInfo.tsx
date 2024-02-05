@@ -1,22 +1,22 @@
-import { intl } from '@/utils/intl';
-import { useState } from 'react';
-import { useModel } from 'umi';
-import { Space, Button, Table, Row, Col, Alert, Tooltip } from 'antd';
-import { ProCard } from '@ant-design/pro-components';
-import type { ColumnsType } from 'antd/es/table';
-import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
-import useRequest from '@/utils/useRequest';
-import { createDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
-import { handleQuit, getErrorInfo } from '@/utils';
+import { changeParameterUnit } from '@/component/OCPPreCheck/helper';
 import PasswordCard from '@/component/PasswordCard';
+import { createDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
+import { getErrorInfo, handleQuit } from '@/utils';
+import { intl } from '@/utils/intl';
+import useRequest from '@/utils/useRequest';
+import { ProCard } from '@ant-design/pro-components';
+import { Alert, Button, Col, Row, Space, Table, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import _ from 'lodash';
+import { useState } from 'react';
+import { getLocale, useModel } from 'umi';
 import {
-  componentsConfig,
   allComponentsKeys,
-  onlyComponentsKeys,
+  componentsConfig,
   modeConfig,
   obproxyComponent,
+  onlyComponentsKeys,
 } from '../constants';
-import { getLocale } from 'umi';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
@@ -66,13 +66,26 @@ export default function CheckInfo() {
     },
   );
 
+  const formatConfigData = (configData: API.DeploymentConfig) => {
+    const _configData = _.clone(configData);
+    _configData.components.oceanbase.parameters?.forEach((parameter)=>{
+      if(parameter.key === "ocp_meta_tenant_memory_size"){
+        parameter.value = changeParameterUnit(parameter).value
+      }
+    })
+    return _configData;
+  };
+
   const prevStep = () => {
     setCurrentStep(3);
     window.scrollTo(0, 0);
   };
 
   const handlePreCheck = () => {
-    handleCreateConfig({ name: oceanbase?.appname }, { ...configData });
+    handleCreateConfig(
+      { name: oceanbase?.appname },
+      formatConfigData(configData),
+    );
   };
 
   const getComponentsList = () => {
@@ -518,7 +531,7 @@ export default function CheckInfo() {
                 >
                   {auth?.user}
                 </ProCard>
-                <PasswordCard password={auth?.password}/>
+                <PasswordCard password={auth?.password} />
               </ProCard>
             </Col>
           </ProCard>

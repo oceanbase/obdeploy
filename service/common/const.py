@@ -26,7 +26,7 @@ MINIMAL_CONFIG = '''
 '''
 
 PKG_ESTIMATED_SIZE = defaultdict(lambda:0)
-PKG_ESTIMATED_SIZE.update({"oceanbase-ce": 347142720, "oceanbase": 358142928, "obproxy-ce": 45424640, "obproxy": 56428687, "obagent": 76124864, "ocp-express": 95924680})
+PKG_ESTIMATED_SIZE.update({"oceanbase-ce": 347142720, "oceanbase": 358142928, "obproxy-ce": 45424640, "obproxy": 56428687, "obagent": 76124864, "ocp-express": 95924680, "ocp-server-ce": 622854144})
 
 
 OCEANBASE_CE = 'oceanbase-ce'

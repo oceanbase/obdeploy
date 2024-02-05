@@ -33,6 +33,7 @@ from tool import Cursor, FileUtil, YamlLoader
 from _rpm import Version
 from _plugin import PluginManager
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
+from _deploy import DeployStatus
 
 
 OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
@@ -284,7 +285,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
             monitor_memory_size = global_config['ocp_monitor_tenant'].get('memory_size', '4G')
             monitor_password = global_config.get('ocp_monitor_password', '')
             monitor_db = global_config.get('ocp_monitor_db', 'monitor_database')
-        if not times and not cluster_config.get_component_attr("meta_tenant"):
+        if not times and deploy_status == DeployStatus.STATUS_DEPLOYED and not cluster_config.get_component_attr("meta_tenant"):
             setattr(options, 'tenant_name', meta_tenant)
             setattr(options, 'max_cpu', meta_max_cpu)
             setattr(options, 'memory_size', parse_size(meta_memory_size))
@@ -302,7 +303,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
             stdio.verbose('Search create_tenant plugin for oceanbase-ce-%s' % version)
             tenant_plugin = PluginManager(kwargs.get('local_home_path')).get_best_py_script_plugin('create_tenant', 'oceanbase-ce', version)
             stdio.verbose('Found for %s oceanbase-ce-%s' % (tenant_plugin, version))
-            if not tenant_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
+            if not tenant_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
                 return plugin_context.return_false()
             cluster_config.update_component_attr("meta_tenant", meta_tenant, save=True)
             meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, '', stdio)
@@ -314,7 +315,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
             meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, str(meta_password), stdio)
             plugin_context.set_variable('meta_cursor', meta_cursor)
 
-        if not times and not cluster_config.get_component_attr("monitor_tenant"):
+        if not times and deploy_status == DeployStatus.STATUS_DEPLOYED and not cluster_config.get_component_attr("monitor_tenant"):
             setattr(options, 'tenant_name', monitor_tenant)
             setattr(options, 'max_cpu', monitor_max_cpu)
             setattr(options, 'memory_size', parse_size(monitor_memory_size))
@@ -322,7 +323,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
             setattr(options, 'db_username', monitor_user)
             setattr(options, 'db_password', '')
             setattr(options, "variables", "ob_tcp_invited_nodes='%'")
-            if not tenant_plugin(namespace, namespaces, deploy_name, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
+            if not tenant_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
                 return plugin_context.return_false()
             cluster_config.update_component_attr("monitor_tenant", monitor_tenant, save=True)
             monitor_cursor = Cursor(jdbc_host, jdbc_port, monitor_user, monitor_tenant, '', stdio)
@@ -509,6 +510,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
                 return plugin_context.return_true()
 
     cluster_config = plugin_context.cluster_config
+    deploy_status = plugin_context.deploy_status
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio

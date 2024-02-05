@@ -31,6 +31,7 @@ import _errno as err
 from ssh import SshConfig, SshClient
 from tool import Cursor
 from const import CONST_OBD_HOME
+from _deploy import DeployStatus
 
 success = True
 
@@ -223,6 +224,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    deploy_status = plugin_context.deploy_status
     global success
     success = True
 
@@ -346,13 +348,14 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                     critical('time check', err.EC_OCP_SERVER_TIME_SHIFT.format(server=server))
 
                 # tenant check
-                sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
-                meta_tenant = server_config.get('ocp_meta_tenant')['tenant_name']
-                if not cluster_config.get_component_attr("meta_tenant") and cursor.fetchone(sql, [meta_tenant]):
-                    error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=meta_tenant))
-                monitor_tenant = server_config.get('ocp_monitor_tenant')['tenant_name']
-                if not cluster_config.get_component_attr("monitor_tenant") and cursor.fetchone(sql, [monitor_tenant]):
-                    error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=monitor_tenant))
+                if plugin_context in {DeployStatus.STATUS_DEPLOYED, DeployStatus.STATUS_CONFIGURED}:
+                    sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
+                    meta_tenant = server_config.get('ocp_meta_tenant')['tenant_name']
+                    if not cluster_config.get_component_attr("meta_tenant") and cursor.fetchone(sql, [meta_tenant]):
+                        error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=meta_tenant))
+                    monitor_tenant = server_config.get('ocp_monitor_tenant')['tenant_name']
+                    if not cluster_config.get_component_attr("monitor_tenant") and cursor.fetchone(sql, [monitor_tenant]):
+                        error('tenant', err.EC_OCP_SERVER_TENANT_ALREADY_EXISTS.format(tenant_name=monitor_tenant))
 
         # user check
         stdio.verbose('user check ')
@@ -454,12 +457,13 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             found = re.search(version_pattern, ret.stdout) or re.search(version_pattern, ret.stderr)
             if not found:
                 error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
-            java_major_version = found.group(1)
-            stdio.verbose('java_major_version %s' % java_major_version)
-            java_update_version = found.group(2)[1:]
-            stdio.verbose('java_update_version %s' % java_update_version)
-            if Version(java_major_version) != Version('1.8.0') or int(java_update_version) < 161:
-                critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
+            else:
+                java_major_version = found.group(1)
+                stdio.verbose('java_major_version %s' % java_major_version)
+                java_update_version = found.group(2)[1:]
+                stdio.verbose('java_update_version %s' % java_update_version)
+                if Version(java_major_version) != Version('1.8.0') or int(java_update_version) < 161:
+                    critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
         except Exception as e:
             stdio.error(e)
             error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
@@ -488,6 +492,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
         servers_disk = {}
         servers_client = {}
         ip_servers = {}
+        MIN_MEMORY_VALUE = 1073741824
 
         memory_size = parse_size(server_config.get('memory_size', '1G'))
         if server_config.get('log_dir'):
@@ -545,7 +550,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 elif memory_needed > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
                     for server in ip_servers[ip]:
                         error('mem', err.EC_OCP_SERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(memory_needed)), suggests=mem_suggests)
-                elif memory_needed > server_memory_stats['free']:
+                elif server_memory_stats['free'] < MIN_MEMORY_VALUE:
                     for server in ip_servers[ip]:
                         alert('mem', err.EC_OCP_SERVER_NOT_ENOUGH_MEMORY.format(ip=ip,  free=format_size(server_memory_stats['free']), need=format_size(memory_needed)), suggests=mem_suggests)
         # disk check

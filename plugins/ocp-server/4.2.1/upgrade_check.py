@@ -94,19 +94,20 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
             if not found:
                 error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
                       [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
-            java_major_version = found.group(1)
-            stdio.verbose('java_major_version %s' % java_major_version)
-            java_update_version = found.group(2)[1:]
-            stdio.verbose('java_update_version %s' % java_update_version)
-            if Version(java_major_version) != Version('1.8.0') or int(java_update_version) < 161:
-                critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
-                         [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
+            else:
+                java_major_version = found.group(1)
+                stdio.verbose('java_major_version %s' % java_major_version)
+                java_update_version = found.group(2)[1:]
+                stdio.verbose('java_update_version %s' % java_update_version)
+                if Version(java_major_version) != Version('1.8.0') or int(java_update_version) < 161:
+                    critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
+                             [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
         except Exception as e:
             stdio.error(e)
             error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
                   [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
 
-        sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL');" % database
+        sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL', 'ABORTED');" % database
         if meta_cursor.fetchone(sql)['num'] > 0:
             success = False
             error('check_operation_task', err.EC_OCP_SERVER_RUNNING_TASK)

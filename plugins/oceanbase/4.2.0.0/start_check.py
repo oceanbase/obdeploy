@@ -684,7 +684,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
     has_ocp = 'ocp-express' in plugin_context.components
     if not has_ocp and any([key.startswith('ocp_meta') for key in global_conf]):
         has_ocp = True
-    if has_ocp and need_bootstrap:
+    if has_ocp and need_bootstrap and parameter_check:
         global_conf_with_default = copy.deepcopy(cluster_config.get_global_conf_with_default())
         original_global_conf = cluster_config.get_original_global_conf()
         ocp_meta_tenant_prefix = 'ocp_meta_tenant_'

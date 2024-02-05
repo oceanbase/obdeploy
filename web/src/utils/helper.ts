@@ -8,7 +8,7 @@ import {
   selectOcpexpressConfig,
 } from '@/constant/configuration';
 import { message } from 'antd';
-import { getNoUnitValue, getUnit } from '@/pages/Obdeploy/ClusterConfig/helper';
+import { getNoUnitValue, getUnit } from '@/constant/unit';
 import copy from 'copy-to-clipboard';
 // 不用navigator.clipboard.writeText的原因：该接口需要在HTTPS环境下才能使用
 export function copyText(text: string) {

@@ -78,20 +78,20 @@
 - name: jdbc_url
   require: false
   type: DB_URL
-  need_redeploy: true
+  need_restart: true
   description_en: The jdbc connection url for ocp meta db
   description_local: OCP使用的元数据库的jdbc连接串
 - name: jdbc_username
   require: false
   type: OB_USER
-  need_redeploy: true
+  need_restart: true
   description_en: The username name for ocp meta dbx
   description_local: OCP使用的元数据库的用户名
 - name: jdbc_password
   require: false
   type: STRING
   default:
-  need_redeploy: true
+  need_restart: true
   description_en: The password name for ocp meta db
   description_local: OCP使用的元数据库的密码
 - name: system_password

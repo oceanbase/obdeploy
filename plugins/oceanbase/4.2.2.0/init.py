@@ -70,6 +70,7 @@ def init(plugin_context, *args, **kwargs):
     clean = getattr(plugin_context.options, 'clean', False)
     stdio.verbose('option `force` is %s' % force)
     stdio.start_loading('Initializes observer work home')
+    tmp_sock_dir = '/tmp/obshell'
     for server in cluster_config.servers:
         ip = server.ip
         if ip not in servers_dirs:
@@ -130,8 +131,8 @@ def init(plugin_context, *args, **kwargs):
 
         if not client.execute_command('rm -f %s/.meta' % home_path):
             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
-        if not client.execute_command('mkdir -p /tmp/obshell; chmod +666 /tmp/obshell'):
-            critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='sock path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path='/tmp/obshell')))
+        if not client.execute_command('mkdir -p {dir}; [ -w {dir} ] || chmod +666 {dir}'.format(dir=tmp_sock_dir)):
+            critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='sock path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=tmp_sock_dir)))
 
         ret = client.execute_command('bash -c "mkdir -p %s/{etc,admin,.conf,log,log_obshell,bin,lib}"' % home_path)
         if ret:

@@ -141,7 +141,7 @@ def create_tenant(plugin_context, create_tenant_options=None, cursor=None, *args
     res = cursor.fetchone(sql, [name])
     if res:
         if create_if_not_exists:
-            tenant_exists = True
+            return plugin_context.return_true()
         else:
             error('Tenant %s already exists' % name)
             return

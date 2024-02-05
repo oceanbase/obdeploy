@@ -23,6 +23,8 @@ from __future__ import absolute_import, division, print_function
 import os
 import re
 import time
+import socket
+import sys
 import copy
 from math import sqrt
 
@@ -33,9 +35,16 @@ stdio = None
 success = True
 production_mode = False
 
-def get_port_socket_inode(client, port):
-    port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+def format_for_proc_net_tcp4(ip_address, port):
+    ip_int = int.from_bytes(socket.inet_aton(ip_address), byteorder=sys.byteorder) # 
+    port_hex = hex(port)[2:].upper().zfill(4)  
+    ip_hex = hex(ip_int)[2:].upper().zfill(8)
+    formatted_address = f"{ip_hex}:{port_hex}"
+    return formatted_address
+
+def get_port_socket_inode(client, port, ip='0.0.0.0'):
+    formatted_address = format_for_proc_net_tcp4(ip, port)
+    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '%s' | awk -F' ' '{print $2}' | uniq" % formatted_address
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
         return False
@@ -378,7 +387,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                     'server': server,
                     'key': key
                 }
-                if get_port_socket_inode(client, port):
+                if (key == 'obshell_port' and get_port_socket_inode(client, port, ip)) or get_port_socket_inode(client, port):
                     critical('port', err.EC_CONFLICT_PORT.format(server=ip, port=port), [err.SUG_USE_OTHER_PORT.format()])
 
         if parameter_check:
@@ -693,7 +702,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
     has_ocp = 'ocp-express' in plugin_context.components
     if not has_ocp and any([key.startswith('ocp_meta') for key in global_conf]):
         has_ocp = True
-    if has_ocp and need_bootstrap:
+    if has_ocp and need_bootstrap and parameter_check:
         global_conf_with_default = copy.deepcopy(cluster_config.get_global_conf_with_default())
         original_global_conf = cluster_config.get_original_global_conf()
         ocp_meta_tenant_prefix = 'ocp_meta_tenant_'

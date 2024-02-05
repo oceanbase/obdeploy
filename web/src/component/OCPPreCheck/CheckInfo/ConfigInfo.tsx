@@ -1,5 +1,5 @@
 import { intl } from '@/utils/intl';
-import { Row, Col, Tooltip, Space, Table } from 'antd';
+import { Row, Col, Tooltip, Space, Table,Typography } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import type { ConnectInfoPropType } from './type';
 import { componentsConfig } from '@/pages/constants';
@@ -18,6 +18,8 @@ interface BasicInfo {
   oceanbase: any;
   obproxy: any;
 }
+const { Text } = Typography;
+
 export default function ConfigInfo({
   isNewDB,
   configInfoProp,
@@ -298,9 +300,12 @@ export default function ConfigInfo({
                   defaultMessage: '用户名',
                 })}
               >
-                <Tooltip title={userConfig.user}>
-                  <div className="ellipsis"> {userConfig.user}</div>
-                </Tooltip>
+                 <Text
+                    style={{ width: 200 }}
+                    ellipsis={{ tooltip: userConfig.user }}
+                  >
+                    {userConfig.user}
+                  </Text>
               </ProCard>
               <PasswordCard password={userConfig.password} />
               <ProCard

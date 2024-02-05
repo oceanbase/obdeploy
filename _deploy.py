@@ -532,7 +532,7 @@ class ClusterConfig(object):
     def __deepcopy__(self, memo):
         cluster_config = self.__class__(deepcopy(self.servers), self.name, self.version, self.tag, self.release, self.package_hash, self.parser)
         copy_attrs = ['origin_tag', 'origin_version', 'origin_package_hash', 'parser', 'added_servers']
-        deepcopy_attrs = ['_temp_conf', '_default_conf', '_global_conf', '_server_conf', '_cache_server', '_original_global_conf', '_depends', '_original_servers', '_inner_config']
+        deepcopy_attrs = ['_temp_conf', '_all_default_conf', '_default_conf', '_global_conf', '_server_conf', '_cache_server', '_original_global_conf', '_depends', '_original_servers', '_inner_config']
         for attr in copy_attrs:
             setattr(cluster_config, attr, getattr(self, attr))
         for attr in deepcopy_attrs:

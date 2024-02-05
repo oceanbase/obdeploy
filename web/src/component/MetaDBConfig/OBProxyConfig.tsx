@@ -1,20 +1,20 @@
 import { intl } from '@/utils/intl';
+import { DownOutlined, RightOutlined } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormSelect } from '@ant-design/pro-components';
-import { useState } from 'react';
-import { RightOutlined, DownOutlined } from '@ant-design/icons';
+import { useUpdateEffect } from 'ahooks';
+import { Input, Row, Space } from 'antd';
 import { FormInstance } from 'antd/lib/form';
-import { Row, Input, Space } from 'antd';
+import { useState } from 'react';
 import { useModel } from 'umi';
 
-import useRequest from '@/utils/useRequest';
-import styles from './indexZh.less';
-import { getErrorInfo } from '@/utils';
-import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
-import InputPort from '../InputPort';
-import { ocpServersValidator } from '@/utils';
-import { formatMoreConfig } from '@/utils/helper';
 import { obproxyAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
+import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
+import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
+import { getErrorInfo, ocpServersValidator } from '@/utils';
+import { formatMoreConfig } from '@/utils/helper';
+import useRequest from '@/utils/useRequest';
+import InputPort from '../InputPort';
+import styles from './indexZh.less';
 export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
   const {
     ocpConfigData,
@@ -24,7 +24,8 @@ export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
     setErrorsList,
     errorsList,
   } = useModel('global');
-  const { isShowMoreConfig, setIsShowMoreConfig } = useModel('ocpInstallData');
+  const { isShowMoreConfig, setIsShowMoreConfig, deployUser, useRunningUser } =
+    useModel('ocpInstallData');
   const { components = {} } = ocpConfigData || {};
   const { obproxy = {} } = components;
   const [proxyMoreLoading, setProxyMoreLoading] = useState(false);
@@ -123,6 +124,15 @@ export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
       getProxyMoreParamsters();
     }
   };
+
+  useUpdateEffect(() => {
+    const homePath =
+      !useRunningUser && deployUser === 'root'
+        ? `/${deployUser}`
+        : `/home/${deployUser}`;
+    form.setFieldValue(['obproxy', 'home_path'], homePath);
+  }, [deployUser]);
+
   return (
     <ProCard
       title={intl.formatMessage({
