@@ -772,7 +772,6 @@ class OcpHandler(BaseHandler):
         for component, _ in self.obd.namespaces.items():
             data[component] = _.get_variable('run_result')
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
-        self.obd.set_deploy(None)
 
     def get_install_task_info(self, id, task_id):
         log.get_logger().info('get ocp install task info')
