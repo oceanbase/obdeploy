@@ -16,6 +16,7 @@ import styles from './index.less';
 export interface ConnectionInfoProps {
   form: FormInstance<any>;
   loading?: boolean;
+  checkLoading: boolean;
   onSuccess?: () => void;
   handleCheck: () => void;
   systemUserForm: any;
@@ -44,6 +45,7 @@ const commonWidthStyle = { width: 328 };
 const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
   form,
   loading = false,
+  checkLoading,
   handleCheck,
   checkConnectInfo,
   systemUserForm,
@@ -53,7 +55,6 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
   updateInfo,
   allowInputUser,
 }) => {
-  const { setFieldsValue, getFieldsValue } = form;
   const { ocpConfigData = {}, setOcpConfigData } = useModel('global');
   const { updateConnectInfo = {} } = ocpConfigData;
   const columns: ColumnsType<DataType> = [
@@ -125,7 +126,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
   };
   const initialValues: ConnectInfoType = {
     ...updateConnectInfo,
-    accessUser: updateConnectInfo.accessUser || 'root@sys',
+    accessUser: updateConnectInfo.accessUser || 'meta_user@ocp_meta',
   };
 
   const systemUserInitialValues = {
@@ -238,7 +239,6 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               })}
             />
           </ProForm.Item>
-
           <ProForm.Item
             name="accessUser"
             label={intl.formatMessage({
@@ -264,34 +264,48 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               })}
             />
           </ProForm.Item>
-          <ProForm.Item
-            name="accessCode"
-            label={intl.formatMessage({
-              id: 'OBD.Component.ConnectionInfo.AccessPassword',
-              defaultMessage: '访问密码',
-            })}
-            rules={[
-              {
-                required: true,
-                message: intl.formatMessage({
-                  id: 'OBD.Component.ConnectionInfo.EnterAnAccessPassword',
-                  defaultMessage: '请输入访问密码',
-                }),
-              },
-            ]}
-          >
-            <Input.Password
-              onChange={() => {
-                setCheckConnectInfo('unchecked');
-              }}
-              style={commonWidthStyle}
-              placeholder={intl.formatMessage({
-                id: 'OBD.Component.ConnectionInfo.PleaseEnter',
-                defaultMessage: '请输入密码',
-              })}
-            />
+          <ProForm.Item noStyle dependencies={['accessUser']}>
+            {({ getFieldValue, getFieldError }) => {
+              const accessUser = getFieldValue('accessUser')
+              if (
+                (/^root@/.test(accessUser) || accessUser === 'root') &&
+                getFieldError('accessCode').length
+              ) {
+                form.setFields([{ name: 'accessCode', errors: [] }]);
+              }
+              return (
+                <ProForm.Item
+                  name="accessCode"
+                  label={intl.formatMessage({
+                    id: 'OBD.Component.ConnectionInfo.AccessPassword',
+                    defaultMessage: '访问密码',
+                  })}
+                  rules={[
+                    {
+                      required: !/^root@/.test(accessUser) && accessUser !== 'root',
+                      message: intl.formatMessage({
+                        id: 'OBD.Component.ConnectionInfo.EnterAnAccessPassword',
+                        defaultMessage: '请输入访问密码',
+                      }),
+                    },
+                  ]}
+                >
+                  <Input.Password
+                    onChange={() => {
+                      setCheckConnectInfo('unchecked');
+                    }}
+                    style={commonWidthStyle}
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.Component.ConnectionInfo.PleaseEnter',
+                      defaultMessage: '请输入密码',
+                    })}
+                  />
+                </ProForm.Item>
+              );
+            }}
           </ProForm.Item>
-          <Button onClick={() => handleCheck()}>
+
+          <Button loading={checkLoading} onClick={() => handleCheck()}>
             {intl.formatMessage({
               id: 'OBD.Component.ConnectionInfo.Verification',
               defaultMessage: '验 证',

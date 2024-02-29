@@ -94,7 +94,11 @@ const AdaptiveInput = ({
         disabled={parameterValue?.adaptive}
         onBlur={onBlur}
         onChange={(value) =>
-          value !== null && setParameterValue({ ...parameterValue, value })
+          value !== null && setParameterValue({ 
+            ...parameterValue, 
+            value, 
+            isChanged: true 
+          })
         }
         value={parameterValue.value}
       />
@@ -122,6 +126,7 @@ const AdaptiveInput = ({
               setParameterValue({
                 ...parameterValue,
                 value: String(value) + unit,
+                isChanged: true,
               });
             }
           }}
@@ -135,11 +140,13 @@ const AdaptiveInput = ({
                     setParameterValue({
                       ...parameterValue,
                       value: `${parameterValue.value}${value}`,
+                      isChanged: true,
                     });
                   } else {
                     setParameterValue({
                       ...parameterValue,
                       value: takeNewUnit(parameterValue.value, value),
+                      isChanged: true,
                     });
                   }
                 }
@@ -170,6 +177,7 @@ const AdaptiveInput = ({
           setParameterValue({
             ...parameterValue,
             value,
+            isChanged: true,
           })
         }
         value={parameterValue.value}
@@ -197,7 +205,11 @@ const AdaptiveInput = ({
       disabled={parameterValue?.adaptive}
       onBlur={onBlur}
       onChange={(e) =>
-        setParameterValue({ ...parameterValue, value: e.target.value })
+        setParameterValue({ 
+           ...parameterValue,
+           value: e.target.value,
+           isChanged: true,
+         })
       }
     />
   );
@@ -241,10 +253,15 @@ export default function Parameter({
               ...parameterValue,
               adaptive: isAuto,
               value: defaultValue,
+              isChanged: true,
             });
             setUnit(defaultUnit.current);
           } else {
-            setParameterValue({ ...parameterValue, adaptive: isAuto });
+            setParameterValue({ 
+              ...parameterValue, 
+              adaptive: isAuto,
+              isChanged: true,
+            });
           }
         }}
         disabled={!parameterValue?.auto}

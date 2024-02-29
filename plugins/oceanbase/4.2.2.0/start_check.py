@@ -35,22 +35,14 @@ stdio = None
 success = True
 production_mode = False
 
-def format_for_proc_net_tcp4(ip_address, port):
-    ip_int = int.from_bytes(socket.inet_aton(ip_address), byteorder=sys.byteorder) # 
-    port_hex = hex(port)[2:].upper().zfill(4)  
-    ip_hex = hex(ip_int)[2:].upper().zfill(8)
-    formatted_address = f"{ip_hex}:{port_hex}"
-    return formatted_address
-
-def get_port_socket_inode(client, port, ip='0.0.0.0'):
-    formatted_address = format_for_proc_net_tcp4(ip, port)
-    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '%s' | awk -F' ' '{print $2}' | uniq" % formatted_address
+def get_port_socket_inode(client, port):
+    port = hex(port)[2:].zfill(4).upper()
+    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{if($4==\"0A\") print $2,$4,$10}' | grep ':%s' | awk -F' ' '{print $3}' | uniq" % port
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
         return False
     stdio.verbose(res.stdout)
     return res.stdout.strip().split('\n')
-
 
 def parse_size(size):
     _bytes = 0
@@ -387,7 +379,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                     'server': server,
                     'key': key
                 }
-                if (key == 'obshell_port' and get_port_socket_inode(client, port, ip)) or get_port_socket_inode(client, port):
+                if get_port_socket_inode(client, port):
                     critical('port', err.EC_CONFLICT_PORT.format(server=ip, port=port), [err.SUG_USE_OTHER_PORT.format()])
 
         if parameter_check:

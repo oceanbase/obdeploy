@@ -35,6 +35,7 @@ declare namespace API {
     auto?: boolean;
     require?: boolean;
     type?: string;
+    isChanged: boolean;
   }
 
   interface NewConfigParameter extends API.ConfigParameter {

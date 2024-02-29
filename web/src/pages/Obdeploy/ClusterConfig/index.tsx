@@ -190,6 +190,7 @@ export default function ClusterConfig() {
             auto: item.auto,
             require: item.require,
             type: item.type,
+            isChanged: item.is_changed
           },
         };
         dataSource?.some((dataItem) => {
@@ -235,6 +236,7 @@ export default function ClusterConfig() {
       oceanbase,
       errorHandle,
     );
+    
     if (res?.success) {
       const { data } = res,
         isSelectOcpexpress = selectedConfig.includes('ocp-express');
@@ -242,6 +244,7 @@ export default function ClusterConfig() {
         data?.items,
         isSelectOcpexpress,
       );
+      
       setClusterMoreConfig(newClusterMoreConfig);
       form.setFieldsValue({
         oceanbase: {

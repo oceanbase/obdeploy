@@ -330,11 +330,11 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         port = server_config['port']
         pid_path = os.path.join(home_path, 'run/ocp-express.pid')
         pids = client.execute_command("cat %s" % pid_path).stdout.strip()
-        bootstrap_flag = os.path.join(home_path, '.bootstrapped')
+        bootstrap_flag = client.execute_command('ls %s' % os.path.join(home_path, '.bootstrapped'))
         if pids and all([client.execute_command('ls /proc/%s' % pid) for pid in pids.split('\n')]):
             server_pid[server] = pids
             continue
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % bootstrap_flag):
+        if getattr(options, 'without_parameter', False) and bootstrap_flag:
             use_parameter = False
         else:
             use_parameter = True
@@ -375,18 +375,18 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             public_key_str = get_plain_public_key(public_key)
             jdbc_password = rsa_private_sign(jdbc_password, private_key)
         else:
-            public_key_str = ''
+            public_key_str = ""
         memory_size = server_config['memory_size']
         jvm_memory_option = "-Xms{0} -Xmx{0}".format(format_size(parse_size(memory_size) * 0.5, 0).lower())
         java_bin = server_config['java_bin']
         cmd = '{java_bin} -jar {jvm_memory_option} -DJDBC_URL={jdbc_url} -DJDBC_USERNAME={jdbc_username}' \
-              '{public_key} {home_path}/lib/ocp-express-server.jar --port={port}'.format(
+              ' -DPUBLIC_KEY={public_key} {home_path}/lib/ocp-express-server.jar --port={port}'.format(
                 java_bin=java_bin,
                 home_path=home_path,
                 port=port,
                 jdbc_url=jdbc_url,
                 jdbc_username=jdbc_username,
-                public_key=' -DPUBLIC_KEY={}'.format(public_key_str) if public_key_str else "",
+                public_key=public_key_str,
                 jvm_memory_option=jvm_memory_option
         )
         if "log_dir" not in server_config:
@@ -476,7 +476,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         return plugin_context.return_false()
     else:
         stdio.stop_loading('succeed')
-        plugin_context.return_true()
+        plugin_context.return_true(need_bootstrap=True)
 
     return False
 

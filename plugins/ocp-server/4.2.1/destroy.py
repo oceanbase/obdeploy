@@ -56,7 +56,8 @@ def destroy(plugin_context, *args, **kwargs):
         if 'oceanbase-ce' in cluster_config.depends or 'oceanbase' in cluster_config.depends:
             cluster_config.update_component_attr("meta_tenant", "", save=True)
             cluster_config.update_component_attr("monitor_tenant", "", save=True)
-        stdio.warn('OCP successfully destroyed, please check and delete the tenant manually')
+        else:
+            stdio.warn('OCP successfully destroyed, please check and delete the tenant manually')
         stdio.stop_loading('succeed')
         return plugin_context.return_true()
     else:

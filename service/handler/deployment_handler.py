@@ -337,6 +337,12 @@ class DeploymentHandler(BaseHandler):
         deployment_report = self.get_deployment_report(name)
         self.context["deployment_report"][name] = deployment_report
         self.obd.deploy.deploy_config.dump()
+
+        ## get obd namespace data
+        data = {}
+        for component, _ in self.obd.namespaces.items():
+            data[component] = _.get_variable('run_result')
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
         self.obd.set_deploy(None)
 
     def get_install_task_info(self, name):

@@ -52,6 +52,7 @@ declare namespace API {
     need_restart?: boolean;
     /** Section section */
     section?: string;
+    is_changed?:boolean;
   };
 
   type ConnectionInfo = {

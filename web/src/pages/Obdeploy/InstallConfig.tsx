@@ -714,6 +714,7 @@ export default function InstallConfig() {
         data?.items,
         isSelectOcpexpress,
       );
+      
       return newClusterMoreConfig;
     }
   };

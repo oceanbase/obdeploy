@@ -49,15 +49,11 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
     def get_obdiag_config():
         # obproxy
         obproxy_depend = None
-        obproxy_ip = None
-        obproxy_port = None
         for comp in ['obproxy', 'obproxy-ce']:
             if comp in deploy_config.components:
                 obproxy_depend = comp
                 obproxy_servers = deploy_config.components[comp].servers
                 obproxy_server = obproxy_servers[0]
-                obproxy_ip = obproxy_server.ip
-                obproxy_port = deploy_config.components[comp].get_server_conf(obproxy_servers[0]).get("listen_port")
                 break
         obproxy_nodes = []
         if obproxy_depend:
@@ -93,25 +89,11 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
             observer_nodes.append(nodeItem)
         sys_tenant_conf = {}
         if len(ob_services) > 0:
-            if obproxy_ip and obproxy_port:
-                obcluster_config["db_host"] = obproxy_ip
-                obcluster_config["db_port"] = obproxy_port
-                sys_tenant_conf["user"] = 'root@proxysys'
-                obproxy_sys_password = deploy_config.components[comp].get_global_conf().get("obproxy_sys_password")
-                sys_tenant_conf["password"] = obproxy_sys_password if obproxy_sys_password else ''
-            else:
-                port = 2881
-                if global_conf.get('mysql_port') is not None:
-                    port = global_conf.get('mysql_port')
-                else:
-                    port = cluster_config.get_server_conf(ob_services[0]).get("mysql_port")
-                if global_conf.get('root_password') is not None:
-                    sys_tenant_conf["password"] = global_conf.get('root_password')
-                else:
-                    sys_tenant_conf["password"] = ''
-                sys_tenant_conf["user"] = 'root@sys'
-                obcluster_config["db_host"] = ob_services[0].ip
-                obcluster_config["db_port"] = port
+            port = cluster_config.get_server_conf(ob_services[0]).get("mysql_port", 2881)
+            sys_tenant_conf["password"] = global_conf.get('root_password', '')
+            sys_tenant_conf["user"] = 'root@sys'
+            obcluster_config["db_host"] = ob_services[0].ip
+            obcluster_config["db_port"] = port
             obcluster_config["ob_cluster_name"] = deploy_name
             obcluster_config["tenant_sys"] = sys_tenant_conf
             obcluster_config["servers"] = {"nodes": observer_nodes, "global": {}}

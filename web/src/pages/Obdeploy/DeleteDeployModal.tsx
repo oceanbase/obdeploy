@@ -5,6 +5,7 @@ import { Modal, Progress, message } from 'antd';
 import { getDestroyTaskInfo } from '@/services/ob-deploy-web/Deployments';
 import useRequest from '@/utils/useRequest';
 import { checkLowVersion, getErrorInfo } from '@/utils';
+import { formatConfigData } from '@/utils/helper';
 import NP from 'number-precision';
 import { oceanbaseComponent, obproxyComponent } from '../constants';
 import { getLocale } from 'umi';
@@ -105,8 +106,9 @@ export default function DeleteDeployModal({
                   newSelectedConfig.push('ocp-express')
                 }
               })
+              
               setSelectedConfig(newSelectedConfig)
-              setConfigData(config || {});
+              setConfigData(formatConfigData(config) || {});
               setLowVersion(checkLowVersion(components?.oceanbase?.version));
               setClusterMore(!!components?.oceanbase?.parameters?.length);
               setComponentsMore(!!components?.obproxy?.parameters?.length);

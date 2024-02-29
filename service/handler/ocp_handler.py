@@ -42,6 +42,7 @@ from _errno import CheckStatus, FixEval
 from _repository import Repository
 from ssh import SshClient, SshConfig
 from tool import Cursor
+from ssh import LocalClient
 
 
 @singleton
@@ -765,6 +766,13 @@ class OcpHandler(BaseHandler):
         deploy = self.obd.deploy_manager.get_deploy_config(name)
         self.obd.set_deploy(deploy)
         self.context['process_installed'] = 'done'
+
+        ## get obd namespace data and report telemetry
+        data = {}
+        for component, _ in self.obd.namespaces.items():
+            data[component] = _.get_variable('run_result')
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
+        self.obd.set_deploy(None)
 
     def get_install_task_info(self, id, task_id):
         log.get_logger().info('get ocp install task info')

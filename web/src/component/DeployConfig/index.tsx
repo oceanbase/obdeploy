@@ -502,9 +502,9 @@ export default function DeployConfig({
   const formateConnectData = (data: API.ConnectInfo) => {
     return {
       host: data.host,
-      port: data.port,
-      database: data.database,
-      accessUser: data.user || 'ocp@ocp_meta',
+      port: data.port || 2881,
+      database: data.database || 'meta_database',
+      accessUser: data.user || 'meta_user@ocp_meta',
       accessCode: data.password,
     };
   };

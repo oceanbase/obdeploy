@@ -9,6 +9,7 @@ import { Alert, Button, Col, Row, Space, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import _ from 'lodash';
 import { useState } from 'react';
+import { isExist } from '@/utils/helper';
 import { getLocale, useModel } from 'umi';
 import {
   allComponentsKeys,
@@ -67,12 +68,21 @@ export default function CheckInfo() {
   );
 
   const formatConfigData = (configData: API.DeploymentConfig) => {
-    const _configData = _.clone(configData);
-    _configData.components.oceanbase.parameters?.forEach((parameter)=>{
-      if(parameter.key === "ocp_meta_tenant_memory_size"){
-        parameter.value = changeParameterUnit(parameter).value
+    const _configData = _.cloneDeep(configData);
+    
+    Object.keys(_configData.components).forEach((key)=>{
+      for(let i = 0;i<_configData.components[key].parameters.length;i++){
+        const parameter = _configData.components[key].parameters[i]
+        if((!parameter.adaptive && !isExist(parameter.value)) || parameter.adaptive || !parameter.isChanged){
+          _configData.components[key].parameters?.splice(i--,1);
+        }
+        if(parameter.key === "ocp_meta_tenant_memory_size"){
+          parameter.value = changeParameterUnit(parameter).value
+        }
+        delete parameter.isChanged;
       }
     })
+    
     return _configData;
   };
 

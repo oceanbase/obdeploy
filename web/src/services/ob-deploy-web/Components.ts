@@ -36,7 +36,7 @@ export async function queryComponentParameters(
   body: API.ParameterRequest,
   options?: { [key: string]: any },
 ) {
-  return request<API.OBResponseDataListParameterMeta_>(
+  const r = await request<API.OBResponseDataListParameterMeta_>(
     '/api/v1/components/parameters',
     {
       method: 'POST',
@@ -47,5 +47,13 @@ export async function queryComponentParameters(
       data: body,
       ...(options || {}),
     },
-  );
+  )
+  if(r.success){
+    r.data?.items?.forEach((component)=>{
+      component.config_parameters.forEach((parameter)=>{
+        parameter.is_changed = false;
+      })
+    })
+  }
+  return r
 }

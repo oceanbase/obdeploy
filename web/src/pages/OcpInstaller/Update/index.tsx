@@ -319,6 +319,7 @@ const Update: React.FC = () => {
             systemUserForm={systemUserForm}
             updateInfo={updateInfo}
             handleCheck={handleCheck}
+            checkLoading={loading}
             checkConnectInfo={checkConnectInfo}
             setCheckConnectInfo={setCheckConnectInfo}
             checkStatus={checkStatus}
