@@ -187,7 +187,7 @@ class OcpHandler(BaseHandler):
                 ocp_config['global'][key] = config_dict[key]
 
         if config.metadb:
-            ocp_config['global']['jdbc_url'] = 'jdbc:oceanbase://' + config_dict['metadb']['host'] + ':' + str(config_dict['metadb']['port']) + '/' + config_dict['metadb']['database']
+            ocp_config['global']['jdbc_url'] = 'jdbc:oceanbase://' + config_dict['metadb']['host'] + ':' + str(config_dict['metadb']['port']) + config_dict['metadb']['database']
             ocp_config['global']['jdbc_username'] = config_dict['metadb']['user']
             ocp_config['global']['jdbc_password'] = config_dict['metadb']['password']
 
