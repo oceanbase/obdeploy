@@ -46,7 +46,7 @@ def get_missing_required_parameters(parameters):
 
 def get_port_socket_inode(client, port):
     port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{udp*,tcp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
+    cmd = "bash -c 'cat /proc/net/{udp*,tcp*}' | awk -F' ' '{if($4==\"0A\") print $2,$4,$10}' | grep ':%s' | awk -F' ' '{print $3}' | uniq" % port
     res = client.execute_command(cmd)
     if not res or not res.stdout.strip():
         return False
@@ -329,11 +329,9 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                         time.sleep(1)
                 if not connected:
                     success = False
-                    error('metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
-                if cursor and not cursor.fetchone('show DATABASES like "%s"' % jdbc_database):
-                    critical('metadb connect', err.EC_OCP_SERVER_DB_NOT_IN_JDBC_URL, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
+                    error('metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR])
             else:
-                critical('metadb connect', err.EC_OCP_SERVER_ERROR_JDBC_URL, err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR)
+                critical('metadb connect', err.EC_OCP_SERVER_ERROR_JDBC_URL, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR])
             client = clients[server]
             # time check
             stdio.verbose('time check ')

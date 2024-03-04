@@ -1,4 +1,5 @@
 import { getUnit, takeNewUnit, UNITS } from '@/constant/unit';
+import { isExist } from '@/utils/helper';
 import _ from 'lodash';
 
 export const changeParameterUnit = (parameter: any) => {
@@ -24,29 +25,30 @@ export const formatPreCheckData = (configData: any) => {
     _configData.components.oceanbase &&
     _configData.components.oceanbase.topology
   ) {
-    let { parameters, topology } = _configData.components.oceanbase;
+    let { topology } = _configData.components.oceanbase;
     for (let item of topology) {
       delete item.id;
-    }
-    for (let idx = 0; idx < parameters.length; idx++) {
-      if (
-        parameters[idx].key === 'cluster_id' &&
-        parameters[idx].value == '0'
-      ) {
-        parameters.splice(idx, 1);
-      }
     }
   }
   for (let key of Object.keys(_configData.components)) {
     let item = _configData.components[key];
     if (item?.parameters?.length) {
-      item.parameters = item?.parameters.map((parameter: any) => {
-        return {
-          key: parameter.key,
-          value: parameter.value,
-          adaptive: parameter.adaptive,
-        };
-      });
+      for (let i = 0; i < item.parameters.length; i++) {
+        const parameter = item.parameters[i];
+        if (
+          (!parameter.adaptive && !isExist(parameter.value)) ||
+          parameter.adaptive ||
+          !parameter.isChanged
+        ) {
+          item.parameters.splice(i--, 1);
+        } else {
+          item.parameters[i] = {
+            key: item.parameters[i].key,
+            value: item.parameters[i].value,
+            adaptive: item.parameters[i].adaptive,
+          };
+        }
+      }
     }
     if (
       (key === 'oceanbase' || key === 'obproxy') &&

@@ -58,6 +58,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
             auto: item.auto,
             require: item.require,
             type: item.type,
+            isChange: item.is_changed,
           },
         };
         dataSource?.some((dataItem) => {

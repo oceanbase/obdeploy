@@ -560,12 +560,12 @@ class SshClient(SafeStdio):
         return False
 
     def _rsync(self, source, target, stdio=None):
-        identity_option = ""
+        identity_option = "-o StrictHostKeyChecking=no "
         if self.config.key_filename:
             identity_option += '-i {key_filename} '.format(key_filename=self.config.key_filename)
         if self.config.port:
             identity_option += '-p {}'.format(self.config.port)
-        cmd = 'rsync -a -W -e "ssh {identity_option}" {source} {target}'.format(
+        cmd = 'yes | rsync -a -W -e "ssh {identity_option}" {source} {target}'.format(
             identity_option=identity_option,
             source=source,
             target=target

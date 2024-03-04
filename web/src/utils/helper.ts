@@ -1,14 +1,15 @@
-import { intl } from '@/utils/intl'; //与UI无关的函数
 import {
-  componentVersionTypeToComponent,
-  componentsConfig,
-} from '@/pages/constants';
-import {
-  showConfigKeys,
   selectOcpexpressConfig,
+  showConfigKeys,
 } from '@/constant/configuration';
-import { message } from 'antd';
 import { getNoUnitValue, getUnit } from '@/constant/unit';
+import {
+  componentsConfig,
+  componentVersionTypeToComponent,
+} from '@/pages/constants';
+import { intl } from '@/utils/intl'; //与UI无关的函数
+import { message } from 'antd';
+import { clone } from 'lodash';
 import copy from 'copy-to-clipboard';
 // 不用navigator.clipboard.writeText的原因：该接口需要在HTTPS环境下才能使用
 export function copyText(text: string) {
@@ -65,6 +66,7 @@ export const formatMoreConfig = (
           adaptive: parameterItem.auto,
           auto: parameterItem.auto,
           require: parameterItem.require,
+          isChanged: parameterItem.is_changed,
         };
         if (
           parameterItem.type === 'CapacityMB' ||
@@ -117,4 +119,26 @@ export const handleCopy = (content: string) => {
       defaultMessage: '复制成功',
     }),
   );
+};
+
+/**
+ * 判断一个字符串或者数字是否有值,避免判断 0 为 false
+ */
+export const isExist = (val: string | number | undefined): boolean => {
+  if (typeof val === 'number') return true;
+  return !!val;
+};
+
+/**
+ *  当检测到系统中存在失败历史信息，重新部署时；
+ *  给历史数据的组件参数添加 isChanged 字段
+ */
+export const formatConfigData = (configData: any) => {
+  let _config = clone(configData);
+  Object.keys(_config?.components).forEach((compKey) => {
+    _config?.components[compKey]?.parameters?.forEach((parameter:any) => {
+      parameter.isChanged = true;
+    });
+  });
+  return _config;
 };

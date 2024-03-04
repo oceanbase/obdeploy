@@ -59,23 +59,6 @@
   need_redeploy: true
   description_en: the directory for the ilog file
   description_local: 存储ilog数据的目录
-- name: devname
-  name_local: 网卡名
-  essential: true
-  type: SAFE_STRING
-  min_value: NULL
-  max_value: NULL
-  need_restart: true
-  description_en: name of network adapter
-  description_local: 服务进程绑定的网卡设备名
-- name: local_ip
-  name_local: 本机ip
-  type: SAFE_STRING
-  min_value: NULL
-  max_value: NULL
-  need_restart: true
-  description_en: local ip address
-  description_local: 本机ip地址
 - name: rpc_port
   name_local: 内部通信端口
   require: true
@@ -1214,6 +1197,23 @@
   need_restart: true
   description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be set according to sysconf; otherwise, this parameter is used.
   description_local: 系统CPU总数，如果设置为0，将自动检测
+- name: devname
+  name_local: 网卡名
+  essential: true
+  type: SAFE_STRING
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: name of network adapter
+  description_local: 非必填, 服务进程绑定的网卡设备名, 默认通过配置的ip设置local_ip, 如果预检查失败可通过配置此项来指定网卡
+- name: local_ip
+  name_local: 本机ip
+  type: SAFE_STRING
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: local ip address
+  description_local: 本机ip地址
 - name: appname
   require: false
   type: SAFE_STRING

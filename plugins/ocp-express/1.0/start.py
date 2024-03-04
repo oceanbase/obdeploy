@@ -376,7 +376,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             jdbc_password = rsa_private_sign(jdbc_password, private_key)
             system_password = rsa_private_sign(system_password, private_key)
         else:
-            public_key_str = ''
+            public_key_str = ""
         memory_size = server_config['memory_size']
         jvm_memory_option = "-Xms{0} -Xmx{0}".format(format_size(parse_size(memory_size) * 0.5, 0).lower())
         extra_options = {
@@ -385,14 +385,14 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         extra_options_str = ' '.join(["-D{}={}".format(k, v) for k, v in extra_options.items()])
         java_bin = server_config['java_bin']
         cmd = '{java_bin} -jar {jvm_memory_option} -DJDBC_URL={jdbc_url} -DJDBC_USERNAME={jdbc_username} -DJDBC_PASSWORD={jdbc_password} ' \
-              '{public_key} {extra_options_str} {home_path}/lib/ocp-express-server.jar --port={port}'.format(
+              '-DPUBLIC_KEY={public_key} {extra_options_str} {home_path}/lib/ocp-express-server.jar --port={port}'.format(
                 java_bin=java_bin,
                 home_path=home_path,
                 port=port,
                 jdbc_url=jdbc_url,
                 jdbc_username=jdbc_username,
                 jdbc_password=jdbc_password,
-                public_key=' -DPUBLIC_KEY={}'.format(public_key_str) if public_key_str else "",
+                public_key=public_key_str,
                 jvm_memory_option=jvm_memory_option,
                 extra_options_str=extra_options_str,
         )
