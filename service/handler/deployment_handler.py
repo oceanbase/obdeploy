@@ -27,6 +27,8 @@ from singleton_decorator import singleton
 import yaml
 from _deploy import DeployStatus, DeployConfigStatus
 from _errno import CheckStatus, FixEval
+from _plugin import PluginType
+from const import COMP_JRE, COMP_OCP_EXPRESS
 from service.api.v1.deployments import DeploymentInfo
 from service.handler.base_handler import BaseHandler
 from service.model.deployments import DeploymentConfig, PreCheckResult, RecoverChangeParameter, TaskInfo, \
@@ -39,6 +41,9 @@ from service.common.task import TaskStatus, TaskResult
 from service.common.task import Serial as serial
 from service.common.task import AutoRegister as auto_register
 from ssh import LocalClient
+from tool import COMMAND_ENV
+from const import TELEMETRY_COMPONENT_OB
+from _environ import ENV_TELEMETRY_REPORTER
 
 
 @singleton
@@ -342,6 +347,7 @@ class DeploymentHandler(BaseHandler):
         data = {}
         for component, _ in self.obd.namespaces.items():
             data[component] = _.get_variable('run_result')
+        COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT_OB, save=True)
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
         self.obd.set_deploy(None)
 
@@ -557,7 +563,17 @@ class DeploymentHandler(BaseHandler):
                 raise Exception('generate config dump error,place check disk space!')
 
         for repository in repositories:
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False, work_dir_check=True, precheck=True)
+            java_check = True
+            if repository.name == COMP_OCP_EXPRESS:
+                jre_name = COMP_JRE
+                install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
+                if install_plugin and jre_name in install_plugin.requirement_map(repository):
+                    version = install_plugin.requirement_map(repository)[jre_name].version
+                    min_version = install_plugin.requirement_map(repository)[jre_name].min_version
+                    max_version = install_plugin.requirement_map(repository)[jre_name].max_version
+                    if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
+                        java_check = False
+            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False, work_dir_check=True, precheck=True, java_check=java_check)
             if not res and res.get_return("exception"):
                 raise res.get_return("exception")
 

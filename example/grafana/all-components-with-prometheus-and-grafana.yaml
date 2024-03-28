@@ -109,8 +109,8 @@ obagent:
     # log_compress: true
     # Username for HTTP authentication. The default value is admin.
     # http_basic_auth_user: admin
-    # Password for HTTP authentication. The default value is root.
-    # http_basic_auth_password: xxxxxx
+    # Password for HTTP authentication. The default is a random password.
+    # http_basic_auth_password: ******
     # Username for debug service. The default value is admin.
     # pprof_basic_auth_user: admin
     # Password for debug service. The default value is root.

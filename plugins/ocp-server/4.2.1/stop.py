@@ -49,7 +49,7 @@ def stop(plugin_context, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     servers = {}
-    stdio.start_loading('Stop ocp-server')
+    stdio.start_loading('Stop %s' % cluster_config.name)
     success = True
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
@@ -64,14 +64,14 @@ def stop(plugin_context, *args, **kwargs):
             if pid and client.execute_command('sudo ' + cmd if launch_user else cmd):
                 cmd = 'ls /proc/{}/fd'.format(pid)
                 if client.execute_command('sudo ' + cmd if launch_user else cmd):
-                    stdio.verbose('{} ocp-server[pid: {}] stopping...'.format(server, pid))
+                    stdio.verbose('{} {}[pid: {}] stopping...'.format(server, cluster_config.name, pid))
                     cmd = 'kill -9 {}'.format(pid)
                     client.execute_command('sudo ' + cmd if launch_user else cmd)
                 else:
-                    stdio.verbose('failed to stop ocp-server[pid:{}] in {}, permission deny'.format(pid, server))
+                    stdio.verbose('failed to stop {}[pid:{}] in {}, permission deny'.format(cluster_config.name, pid, server))
                     success = False
             else:
-                stdio.verbose('{} ocp-server is not running'.format(server))
+                stdio.verbose('{} {} is not running'.format(server, cluster_config.name))
         if not success:
             stdio.stop_loading('fail')
             return plugin_context.return_true()

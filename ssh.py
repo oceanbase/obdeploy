@@ -362,7 +362,7 @@ class SshClient(SafeStdio):
             if self._is_local:
                 self._add_env_for_local(key, value, rewrite)
             else:
-                self.env[key] += value
+                self.env[key] = value + self.env[key]
         self._update_env()
 
     def _add_env_for_local(self, key, value, rewrite=False):
@@ -371,7 +371,7 @@ class SshClient(SafeStdio):
         else:
             if key not in self.env:
                 self.env[key] = COMMAND_ENV.get(key, '')
-            self.env[key] += value
+            self.env[key] = value + self.env[key]
 
     def get_env(self, key, stdio=None):
         return self.env[key] if key in self.env else None
@@ -394,6 +394,7 @@ class SshClient(SafeStdio):
         err = None
         try:
             self.ssh_client.set_missing_host_key_policy(AutoAddPolicy())
+            self.ssh_client.set_log_channel(None)
             stdio.verbose('host: %s, port: %s, user: %s, password: %s' % (self.config.host, self.config.port, self.config.username, self.config.password))
             self.ssh_client.connect(
                 self.config.host,

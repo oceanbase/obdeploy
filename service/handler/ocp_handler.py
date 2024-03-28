@@ -40,9 +40,14 @@ from service.model.task import TaskStatus, TaskResult, TaskInfo, PreCheckResult,
 from _deploy import DeployStatus, DeployConfigStatus, UserConfig
 from _errno import CheckStatus, FixEval
 from _repository import Repository
-from ssh import SshClient, SshConfig
+from _plugin import PluginType
+from ssh import SshClient, SshConfig, LocalClient
 from tool import Cursor
-from ssh import LocalClient
+from const import COMP_JRE, COMPS_OCP
+from tool import COMMAND_ENV
+from const import TELEMETRY_COMPONENT_OCP
+from _environ import ENV_TELEMETRY_REPORTER
+
 
 
 @singleton
@@ -140,7 +145,7 @@ class OcpHandler(BaseHandler):
             log.get_logger().error('oceanbase component : %s not exist' % oceanbase.component)
             raise Exception('oceanbase component : %s not exist' % oceanbase.component)
 
-    def generate_obproxy_config(self, cluster_config, obproxy_config, home_path, ob_componet):
+    def generate_obproxy_config(self, cluster_config, obproxy_config, home_path, ob_component):
         comp_config = dict()
         config_dict = obproxy_config.dict()
         for key in config_dict:
@@ -162,7 +167,7 @@ class OcpHandler(BaseHandler):
                 comp_config['global'][parameter.key] = parameter.value
         if 'depends' not in comp_config.keys():
             comp_config['depends'] = list()
-            comp_config['depends'].append(ob_componet)
+            comp_config['depends'].append(ob_component)
         if obproxy_config.component == const.OBPROXY_CE:
             cluster_config[const.OBPROXY_CE] = comp_config
         elif obproxy_config.component == const.OBPROXY:
@@ -192,23 +197,25 @@ class OcpHandler(BaseHandler):
             ocp_config['global']['jdbc_password'] = config_dict['metadb']['password']
 
         if config.meta_tenant:
-            ocp_config['global']['ocp_meta_tenant'] = {}
-            ocp_config['global']['ocp_meta_tenant']['tenant_name'] = config_dict['meta_tenant']['name']['tenant_name']
-            ocp_config['global']['ocp_meta_tenant']['max_cpu'] = config_dict['meta_tenant']['resource']['cpu']
-            ocp_config['global']['ocp_meta_tenant']['memory_size'] = str(config_dict['meta_tenant']['resource']['memory']) + 'G'
-            ocp_config['global']['ocp_meta_username'] = config_dict['meta_tenant']['name']['user_name']
-            ocp_config['global']['ocp_meta_password'] = config_dict['meta_tenant']['password']
-            ocp_config['global']['ocp_meta_db'] = config_dict['meta_tenant']['name']['user_database'] if config_dict['meta_tenant']['name']['user_database'] != '' else 'meta_database'
+            tenant_config = cluster_config[ob_component] if ob_component is not None else ocp_config
+            tenant_config['global']['ocp_meta_tenant'] = {}
+            tenant_config['global']['ocp_meta_tenant']['tenant_name'] = config_dict['meta_tenant']['name']['tenant_name']
+            tenant_config['global']['ocp_meta_tenant']['max_cpu'] = config_dict['meta_tenant']['resource']['cpu']
+            tenant_config['global']['ocp_meta_tenant']['memory_size'] = str(config_dict['meta_tenant']['resource']['memory']) + 'G'
+            tenant_config['global']['ocp_meta_username'] = config_dict['meta_tenant']['name']['user_name']
+            tenant_config['global']['ocp_meta_password'] = config_dict['meta_tenant']['password']
+            tenant_config['global']['ocp_meta_db'] = config_dict['meta_tenant']['name']['user_database'] if config_dict['meta_tenant']['name']['user_database'] != '' else 'meta_database'
             self.context['meta_tenant'] = config_dict['meta_tenant']['name']['tenant_name']
 
         if config.monitor_tenant:
-            ocp_config['global']['ocp_monitor_tenant'] = {}
-            ocp_config['global']['ocp_monitor_tenant']['tenant_name'] = config_dict['monitor_tenant']['name']['tenant_name']
-            ocp_config['global']['ocp_monitor_tenant']['max_cpu'] = config_dict['monitor_tenant']['resource']['cpu']
-            ocp_config['global']['ocp_monitor_tenant']['memory_size'] = str(config_dict['monitor_tenant']['resource']['memory']) + 'G'
-            ocp_config['global']['ocp_monitor_username'] = config_dict['monitor_tenant']['name']['user_name']
-            ocp_config['global']['ocp_monitor_password'] = config_dict['monitor_tenant']['password']
-            ocp_config['global']['ocp_monitor_db'] = config_dict['monitor_tenant']['name']['user_database'] if config_dict['monitor_tenant']['name']['user_database'] != '' else 'monitor_database'
+            tenant_config = cluster_config[ob_component] if ob_component is not None else ocp_config
+            tenant_config['global']['ocp_monitor_tenant'] = {}
+            tenant_config['global']['ocp_monitor_tenant']['tenant_name'] = config_dict['monitor_tenant']['name']['tenant_name']
+            tenant_config['global']['ocp_monitor_tenant']['max_cpu'] = config_dict['monitor_tenant']['resource']['cpu']
+            tenant_config['global']['ocp_monitor_tenant']['memory_size'] = str(config_dict['monitor_tenant']['resource']['memory']) + 'G'
+            tenant_config['global']['ocp_monitor_username'] = config_dict['monitor_tenant']['name']['user_name']
+            tenant_config['global']['ocp_monitor_password'] = config_dict['monitor_tenant']['password']
+            tenant_config['global']['ocp_monitor_db'] = config_dict['monitor_tenant']['name']['user_database'] if config_dict['monitor_tenant']['name']['user_database'] != '' else 'monitor_database'
             self.context['monitor_tenant'] = config_dict['monitor_tenant']['name']['tenant_name']
 
         if config.home_path == '':
@@ -227,9 +234,7 @@ class OcpHandler(BaseHandler):
         if not ob_component:
             if config_dict['metadb']:
                 ocp_config['global']['jdbc_url'] = 'jdbc:oceanbase://' + config_dict['metadb']['host'] + ':' + str(
-                    config_dict['metadb']['port']) + '/' + config_dict['metadb']['database']
-                ocp_config['global']['jdbc_username'] = config_dict['metadb']['user']
-                ocp_config['global']['jdbc_password'] = config_dict['metadb']['password']
+                    config_dict['metadb']['port']) + '/' + (config_dict['meta_tenant']['name']['user_database'] if config_dict['meta_tenant']['name']['user_database'] != '' else 'meta_database')
         if 'depends' not in ocp_config.keys() and ob_component and obp_component:
             ocp_config['depends'] = list()
             ocp_config['depends'].append(ob_component)
@@ -480,8 +485,19 @@ class OcpHandler(BaseHandler):
         ssh_clients = self.obd.get_clients(self.obd.deploy.deploy_config, repositories)
         for repository in repositories:
             log.get_logger().info('begin start_check: %s' % repository.name)
+            java_check = True
+            if repository.name in COMPS_OCP:
+                jre_name = COMP_JRE
+                install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
+                if install_plugin and jre_name in install_plugin.requirement_map(repository):
+                    version = install_plugin.requirement_map(repository)[jre_name].version
+                    min_version = install_plugin.requirement_map(repository)[jre_name].min_version
+                    max_version = install_plugin.requirement_map(repository)[jre_name].max_version
+                    if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
+                        java_check = False
             res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False,
-                                       work_dir_check=True, precheck=True, clients=ssh_clients, sys_cursor=self.context['metadb_cursor'])
+                                       work_dir_check=True, precheck=True, java_check=java_check, clients=ssh_clients, 
+                                       sys_cursor=self.context['metadb_cursor'])
             if not res and res.get_return("exception"):
                 raise res.get_return("exception")
             log.get_logger().info('end start_check: %s' % repository.name)
@@ -557,6 +573,7 @@ class OcpHandler(BaseHandler):
                 check_info.result = PrecheckEventResult.FAILED
                 check_info.code = v.error.code
                 check_info.advisement = v.error.msg
+                print(k, vars(v))
                 check_info.recoverable = len(v.suggests) > 0 and v.suggests[0].auto_fix
                 all_passed = False
                 info.status = TaskStatus.FINISHED
@@ -684,6 +701,46 @@ class OcpHandler(BaseHandler):
         self.context['task_info'][self.context['ocp_deployment'][ret.id]] = ret
         return ret
 
+    def _create_tenant(self):
+        metadb_version = self.context['metadb_cursor'].fetchone("select ob_version() as version")["version"]
+        mock_oceanbase_repository = Repository("oceanbase-ce", "/")
+        mock_oceanbase_repository.version = metadb_version
+        repositories = [mock_oceanbase_repository]
+        create_tenant_plugins = self.obd.search_py_script_plugin(repositories, "create_tenant")
+        ocp_config = self.obd.deploy.deploy_config.components["ocp-server-ce"]
+        global_conf_with_default = ocp_config.get_global_conf_with_default()
+        meta_tenant_config = global_conf_with_default['ocp_meta_tenant']
+        meta_tenant_config["variables"] = "ob_tcp_invited_nodes='%'"
+        meta_tenant_config["create_if_not_exists"] = True
+        meta_tenant_config["database"] = global_conf_with_default["ocp_meta_db"]
+        meta_tenant_config["db_username"] = global_conf_with_default["ocp_meta_username"]
+        meta_tenant_config["db_password"] = global_conf_with_default.get("ocp_meta_password", "")
+        meta_tenant_config[meta_tenant_config['tenant_name'] + "_root_password"] = global_conf_with_default.get("ocp_meta_password", "")
+        monitor_tenant_config = global_conf_with_default['ocp_monitor_tenant']
+        monitor_tenant_config["variables"] = "ob_tcp_invited_nodes='%'"
+        monitor_tenant_config["create_if_not_exists"] = True
+        monitor_tenant_config["database"] = global_conf_with_default["ocp_monitor_db"]
+        monitor_tenant_config["db_username"] = global_conf_with_default["ocp_monitor_username"]
+        monitor_tenant_config["db_password"] = global_conf_with_default.get("ocp_monitor_password", "")
+        monitor_tenant_config[monitor_tenant_config['tenant_name'] + "_root_password"] = global_conf_with_default.get("ocp_monitor_password", "")
+
+        ssh_clients = self.obd.get_clients(self.obd.deploy.deploy_config, self.obd.load_local_repositories(self.obd.deploy.deploy_info, False))
+
+        deploy = self.obd.deploy
+        self.obd.set_deploy(None)
+        log.get_logger().info("start create meta tenant")
+        create_meta_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(meta_tenant_config)], clients = ssh_clients)
+        if not create_meta_ret:
+            self.obd.set_deploy(deploy)
+            raise Exception("Create meta tenant failed")
+        log.get_logger().info("start create monitor tenant")
+        create_monitor_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(monitor_tenant_config)], clients = ssh_clients)
+        if not create_monitor_ret:
+            self.obd.set_deploy(deploy)
+            raise Exception("Create monitor tenant failed")
+        self.obd.set_deploy(deploy)
+
+
     @auto_register("install")
     def _do_install(self, id, task_id):
         self.context['deploy_status'] = self.context['process_installed'] = ''
@@ -707,7 +764,12 @@ class OcpHandler(BaseHandler):
         setattr(opt, "clean", True)
         setattr(opt, "force", True)
         self.obd.set_options(opt)
+
         try:
+            # add create tenant operations before deploy ocp if it uses an existing OceanBase as it's metadb cluster
+            if 'oceanbase-ce' not in self.obd.deploy.deploy_config.components['ocp-server-ce'].depends:
+                log.get_logger().info("not depends on oceanbase, create tenant first")
+                self._create_tenant()
             deploy_success = self.obd.deploy_cluster(name)
             if not deploy_success:
                 log.get_logger().warn("deploy %s failed", name)
@@ -771,6 +833,7 @@ class OcpHandler(BaseHandler):
         data = {}
         for component, _ in self.obd.namespaces.items():
             data[component] = _.get_variable('run_result')
+        COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT_OCP, save=True)
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
     def get_install_task_info(self, id, task_id):
@@ -1204,7 +1267,18 @@ class OcpHandler(BaseHandler):
                 raise Exception('generate config dump error,place check disk space!')
 
         for repository in repositories:
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, database=self.context['meta_database'] ,meta_cursor=self.context['metadb_cursor'])
+            java_check = True
+            if repository.name in COMPS_OCP:
+                jre_name = COMP_JRE
+                install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
+                if install_plugin and jre_name in install_plugin.requirement_map(repository):
+                    version = install_plugin.requirement_map(repository)[jre_name].version
+                    min_version = install_plugin.requirement_map(repository)[jre_name].min_version
+                    max_version = install_plugin.requirement_map(repository)[jre_name].max_version
+                    if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
+                        java_check = False
+            res = self.obd.call_plugin(start_check_plugins[repository], repository, database=self.context['meta_database'],
+                                       meta_cursor=self.context['metadb_cursor'], java_check=java_check)
             if not res and res.get_return("exception"):
                 raise res.get_return("exception")
 
@@ -1557,6 +1631,7 @@ class OcpHandler(BaseHandler):
                     raise Exception("failed to deploy component: %s", repository.name)
                 opt = Values()
                 setattr(opt, "without_parameter", True)
+                setattr(opt, "skip_password_check", True)
                 self.obd.set_options(opt)
                 log.get_logger().info('begin start ocp')
                 ret = self.obd.start_cluster(name)

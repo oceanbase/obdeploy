@@ -23,7 +23,9 @@ from __future__ import absolute_import, division, print_function
 import os
 
 
-def bootstrap(plugin_context, cursor = None, start_env=None, *args, **kwargs):
+def bootstrap(plugin_context, start_env=None, *args, **kwargs):
+    if not start_env:
+        raise Exception("start env is needed")
     clients = plugin_context.clients
     for server in start_env:
         client = clients[server]

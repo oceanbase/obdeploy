@@ -26,35 +26,7 @@ import time
 
 from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED
 from tool import ConfigUtil
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G']
-    units_num = len(units) - 1
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-        limit = 1024
-    else:
-        div = 1024
-        limit = 1024
-        format = '%d%s'
-    while idx < units_num and size >= limit:
-        size /= div
-        idx += 1
-    return format % (size, units[idx])
+from _types import Capacity
 
 
 def get_system_memory(memory_limit):
@@ -65,7 +37,7 @@ def get_system_memory(memory_limit):
     else:
         system_memory = memory_limit * 0.3
     system_memory = max(4 << 30, system_memory)
-    return format_size(system_memory, 0)
+    return str(Capacity(system_memory, 0))
 
 
 def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
@@ -138,7 +110,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
     
     if generate_config_mini:
         if not global_config.get('memory_limit_percentage') and not global_config.get('memory_limit'):
-            update_global_conf('memory_limit', format_size(MIN_MEMORY, 0))
+            update_global_conf('memory_limit', str(Capacity(MIN_MEMORY, 0)))
         if not global_config.get('datafile_size') and not global_config.get('datafile_disk_percentage'):
             update_global_conf('datafile_size', '20G')
         if not global_config.get('clog_disk_utilization_threshold'):
@@ -179,7 +151,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                 total_memory = 0
                 for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                     if k == 'MemTotal':
-                        total_memory = parse_size(str(v))
+                        total_memory = Capacity(str(v)).btyes
             memory_limit = int(total_memory * user_server_config.get('memory_limit_percentage') / 100)
         else:
             if not server_config.get('memory_limit'):
@@ -198,21 +170,21 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                     for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                         if k in memory_key_map:
                             key = memory_key_map[k]
-                            server_memory_stats[key] = parse_size(str(v))
+                            server_memory_stats[key] = Capacity(str(v)).btyes
 
                     if generate_check:
                         if server_memory_stats['available'] < START_NEED_MEMORY:
-                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(START_NEED_MEMORY)))
+                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=Capacity(server_memory_stats['available']), need=Capacity(START_NEED_MEMORY)))
                             success = False
                             continue
                         
                         if server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached'] < MIN_MEMORY:
-                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(MIN_MEMORY)))
+                            stdio.error(EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=Capacity(server_memory_stats['free']), cached=Capacity(server_memory_stats['buffers'] + server_memory_stats['cached']), need=Capacity(MIN_MEMORY)))
                             success = False
                             continue
 
-                    memory_limit = max(MIN_MEMORY, server_memory_stats['available'] * 0.9)
-                    server_config['memory_limit'] = format_size(memory_limit, 0)
+                    memory_limit = max(MIN_MEMORY, int(server_memory_stats['available'] * 0.9))
+                    server_config['memory_limit'] = str(Capacity(memory_limit, 0))
                     update_server_conf(server, 'memory_limit', server_config['memory_limit'])
                     auto_set_memory = True
                 else:
@@ -220,7 +192,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                     success = False
                     continue
             else:
-                memory_limit = parse_size(server_config.get('memory_limit'))
+                memory_limit = server_config.get('memory_limit')
 
         auto_set_system_memory = False
         if not user_server_config.get('system_memory'):
@@ -306,13 +278,13 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                         if auto_set_system_memory:
                             min_size = MIN_MEMORY * 7
                         else:
-                            min_size = max(MIN_MEMORY, parse_size(user_server_config.get('system_memory')) * 2) * 7
+                            min_size = max(MIN_MEMORY, Capacity(user_server_config.get('system_memory')).btyes * 2) * 7
                         min_need = padding_size + min_size
                         if min_need <= disk_free:
                             memory_limit = (disk_free - padding_size) / 7
-                            server_config['memory_limit'] = format_size(memory_limit, 0)
+                            server_config['memory_limit'] = str(Capacity(memory_limit, 0))
                             update_server_conf(server, 'memory_limit', server_config['memory_limit'])
-                            memory_limit = parse_size(server_config['memory_limit'])
+                            memory_limit = Capacity(server_config['memory_limit']).btyes
                             clog_disk_size = memory_limit * 4
                             clog_size = int(round(clog_disk_size * 0.64))
                             if auto_set_system_memory:
@@ -322,12 +294,12 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                     disk_flag = True
 
                 if generate_check and not disk_flag:
-                    stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s). Use `redo_dir` to set other disk for clog' % (ip, kp, format_size(disk_free), format_size(min_need)))
+                    stdio.error('(%s) %s not enough disk space. (Avail: %s, Need: %s). Use `redo_dir` to set other disk for clog' % (ip, kp, Capacity(disk_free), Capacity(min_need)))
                     success = False
                     continue
 
-                datafile_size_format = format_size(disk_total - clog_disk_size - disk_used, 0)
-                datafile_size = parse_size(datafile_size_format)
+                datafile_size_format = str(Capacity(disk_total - clog_disk_size - disk_used, 0))
+                datafile_size = Capacity(datafile_size_format).btyes
                 clog_disk_utilization_threshold = max(80, int(100.0 * (disk_used + datafile_size + padding_size + clog_disk_size * 0.8) / real_disk_total))
                 clog_disk_utilization_threshold = min(clog_disk_utilization_threshold, clog_disk_utilization_threshold_max)
                 clog_disk_usage_limit_percentage = min(int(clog_disk_utilization_threshold / 80.0 * 95), clog_disk_usage_limit_percentage_max)
@@ -337,7 +309,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                 update_server_conf(server, 'clog_disk_usage_limit_percentage', clog_disk_usage_limit_percentage)
             else:
                 datafile_size = max(5 << 30, data_dir_disk['avail'] * 0.8, 0)
-                update_server_conf(server, 'datafile_size', format_size(datafile_size, 0))
+                update_server_conf(server, 'datafile_size', Capacity(datafile_size, 0))
     if generate_password:
         generate_random_password(cluster_config)
 
@@ -356,13 +328,13 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                 if key in generate_configs.get(server, {}):
                     value = generate_configs[server][key]
                     servers.append(server)
-                    values.append(parse_size(value) if is_capacity_key else value)
+                    values.append(Capacity(value).btyes if is_capacity_key else value)
             if values:
                 if len(values) != server_num and key in generate_global_config:
                     continue
                 comp = min if key in MIN_KEY else max
                 value = comp(values)
-                generate_global_config[key] = format_size(value, 0) if is_capacity_key else value
+                generate_global_config[key] = str(Capacity(value, 0)) if is_capacity_key else value
                 for server in servers:
                     del generate_configs[server][key]
 

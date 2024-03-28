@@ -20,6 +20,16 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 
-def bootstrap(plugin_context, *args, **kwargs):
-    return True
+
+def bootstrap(plugin_context, start_env=None, *args, **kwargs):
+    if not start_env:
+        raise Exception("start env is needed")
+    clients = plugin_context.clients
+    for server in start_env:
+        server_config = start_env[server]
+        bootstrap_flag = os.path.join(server_config['home_path'], '.bootstrapped')
+        client = clients[server]
+        client.execute_command('touch %s' % bootstrap_flag)
+    return plugin_context.return_true()

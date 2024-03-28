@@ -27,6 +27,7 @@ import copy
 from math import sqrt
 
 import _errno as err
+from _types import Capacity
 
 
 stdio = None
@@ -41,26 +42,6 @@ def get_port_socket_inode(client, port):
         return False
     stdio.verbose(res.stdout)
     return res.stdout.strip().split('\n')
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size):
-    units = ['B', 'K', 'M', 'G', 'T', 'P']
-    idx = 0
-    while idx < 5 and size >= 1024:
-        size /= 1024.0
-        idx += 1
-    return '%.1f%s' % (size, units[idx])
 
 
 def time_delta(client):
@@ -383,12 +364,12 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory_limit = 0
             percentage = 0
             if server_config.get('memory_limit'):
-                memory_limit = parse_size(server_config['memory_limit'])
+                memory_limit = Capacity(server_config['memory_limit']).btyes
                 if production_mode and memory_limit < PRO_MEMORY_MIN:
-                    error('mem', err.EC_OBSERVER_PRODUCTION_MODE_LIMIT.format(server=server, key='memory_limit', limit=format_size(PRO_MEMORY_MIN)), [err.SUB_SET_NO_PRODUCTION_MODE.format()])
+                    error('mem', err.EC_OBSERVER_PRODUCTION_MODE_LIMIT.format(server=server, key='memory_limit', limit=str(Capacity(PRO_MEMORY_MIN))), [err.SUB_SET_NO_PRODUCTION_MODE.format()])
                 memory['num'] += memory_limit
             elif 'memory_limit_percentage' in server_config:
-                percentage = int(parse_size(server_config['memory_limit_percentage']))
+                percentage = server_config['memory_limit_percentage']
                 memory['percentage'] += percentage
             else:
                 percentage = 80
@@ -396,7 +377,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory['servers'][server] = {
                 'num': memory_limit,
                 'percentage': percentage,
-                'system_memory': parse_size(server_config.get('system_memory', 0))
+                'system_memory': Capacity(server_config.get('system_memory', 0)).btyes
             }
 
             data_path = server_config['data_dir'] if server_config.get('data_dir') else  os.path.join(server_config['home_path'], 'store')
@@ -405,14 +386,14 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             if not client.execute_command('ls %s/sstable/block_file' % data_path):
                 disk[data_path] = {'server': server}
                 clog_mount[clog_dir] = {'server': server}
-                if 'datafile_size' in server_config and server_config['datafile_size'] and parse_size(server_config['datafile_size']):
+                if 'datafile_size' in server_config and server_config['datafile_size'] and server_config['datafile_size']:
                     # if need is string, it means use datafile_size
                     disk[data_path]['need'] = server_config['datafile_size']
                 elif 'datafile_disk_percentage' in server_config and server_config['datafile_disk_percentage']:
                     # if need is integer, it means use datafile_disk_percentage
                     disk[data_path]['need'] = int(server_config['datafile_disk_percentage'])
 
-                if 'log_disk_size' in server_config and server_config['log_disk_size'] and parse_size(server_config['log_disk_size']):
+                if 'log_disk_size' in server_config and server_config['log_disk_size'] and server_config['log_disk_size']:
                     # if need is string, it means use log_disk_size
                     clog_mount[clog_dir]['need'] = server_config['log_disk_size']
                 elif 'log_disk_percentage' in server_config and server_config['log_disk_percentage']:
@@ -571,15 +552,15 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                 if k in memory_key_map:
                     key = memory_key_map[k]
-                    server_memory_stats[key] = parse_size(str(v))
+                    server_memory_stats[key] = Capacity(str(v)).btyes
 
             ip_server_memory_info[ip] = server_memory_stats
             server_memory_stat = servers_memory[ip]
             min_start_need = server_num * START_NEED_MEMORY
-            total_use = server_memory_stat['percentage'] * server_memory_stats['total'] / 100 + server_memory_stat['num']
+            total_use = int(server_memory_stat['percentage'] * server_memory_stats['total'] / 100 + server_memory_stat['num'])
             if min_start_need > server_memory_stats['available']:
                 for server in ip_servers:
-                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(min_start_need)), [err.SUG_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip)])
+                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=str(Capacity(server_memory_stats['available'])), need=str(Capacity(min_start_need))), [err.SUG_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip)])
             elif total_use > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
                 for server in ip_servers:
                     server_generate_config = generate_configs.get(server, {})
@@ -589,11 +570,11 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                         if key in global_generate_config or key in server_generate_config:
                             suggest.auto_fix = False
                             break
-                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(total_use)), [suggest])
+                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=str(Capacity(server_memory_stats['free'])), cached=str(Capacity(server_memory_stats['buffers'] + server_memory_stats['cached'])), need=str(Capacity(total_use))), [suggest])
             elif total_use > server_memory_stats['free']:
                 system_memory_check()
                 for server in ip_servers:
-                    alert('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(server_memory_stats['free']), need=format_size(total_use)), [err.SUG_OBSERVER_REDUCE_MEM.format()])
+                    alert('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=str(Capacity(server_memory_stats['free'])), need=str(Capacity(total_use))), [err.SUG_OBSERVER_REDUCE_MEM.format()])
             else:
                 system_memory_check()
 
@@ -619,7 +600,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 # slog need 10G
                 disk[mount_path]['need'] += max(disk[mount_path]['total'] - slog_size, 0) * need / 100
             else:
-                disk[mount_path]['need'] += parse_size(need)
+                disk[mount_path]['need'] += Capacity(need).btyes
 
             disk[mount_path]['need'] += slog_size
             disk[mount_path]['is_data_disk'] = True
@@ -639,7 +620,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 log_disk_size = disk[mount_path]['total'] * need / 100
             else:
                 # log_disk_size
-                log_disk_size = parse_size(need)
+                log_disk_size = Capacity(need).btyes
             servers_log_disk_size[servers_clog_mount[ip][path]['server']] = log_disk_size
             disk[mount_path]['need'] += log_disk_size
             disk[mount_path]['is_clog_disk'] = True
@@ -679,7 +660,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                                 break
                         tmp_suggests.append(suggest)
                     tmp_suggests = sorted(tmp_suggests, key=lambda suggest: suggest.auto_fix, reverse=True)
-                    critical('disk', err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=p, avail=format_size(avail), need=format_size(need)), tmp_suggests + suggests)
+                    critical('disk', err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=p, avail=str(Capacity(avail)), need=str(Capacity(need))), tmp_suggests + suggests)
 
     global_conf = cluster_config.get_global_conf()
     has_ocp = 'ocp-express' in plugin_context.components
@@ -692,7 +673,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         for key in global_conf_with_default:
             if key.startswith(ocp_meta_tenant_prefix) and original_global_conf.get(key, None):
                 global_conf_with_default['ocp_meta_tenant'][key.replace(ocp_meta_tenant_prefix, '', 1)] = global_conf_with_default[key]
-        meta_db_memory_size = parse_size(global_conf_with_default['ocp_meta_tenant'].get('memory_size'))
+        meta_db_memory_size = Capacity(global_conf_with_default['ocp_meta_tenant'].get('memory_size')).btyes
         servers_sys_memory = {}
         if meta_db_memory_size:
             sys_memory_size = None
@@ -708,7 +689,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 if system_memory == 0:
                     system_memory = get_system_memory(memory_limit, min_pool_memory)
                 if not sys_memory_size:
-                    sys_memory_size = servers_sys_memory[server] = max(min_pool_memory, min((memory_limit - system_memory) * 0.25, parse_size('16G')))
+                    sys_memory_size = servers_sys_memory[server] = max(min_pool_memory, min((memory_limit - system_memory) * 0.25, Capacity('16G').btyes))
                 if meta_db_memory_size + system_memory + sys_memory_size <= memory_limit:
                     break
             else:
@@ -719,7 +700,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 error('ocp meta db', err.EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM.format(), [suggest])
 
         meta_db_log_disk_size = global_conf_with_default['ocp_meta_tenant'].get('log_disk_size')
-        meta_db_log_disk_size = parse_size(meta_db_log_disk_size) if meta_db_log_disk_size else meta_db_log_disk_size
+        meta_db_log_disk_size = Capacity(meta_db_log_disk_size).btyes if meta_db_log_disk_size else meta_db_log_disk_size
         if not meta_db_log_disk_size and meta_db_memory_size:
             meta_db_log_disk_size = meta_db_memory_size * 3
         if meta_db_log_disk_size:

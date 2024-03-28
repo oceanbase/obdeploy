@@ -62,7 +62,7 @@ class LocalPackage(Package):
                 self.opens[path] = open(path, 'rb')
             return self.opens[path]
 
-    def __init__(self, path, name, version, files, release=None, arch=None):
+    def __init__(self, path, name, version, files, release=None, arch=None, size=None):
         self.name = name
         self.set_version(version)
         self.set_release(release if release else time.strftime("%Y%m%d%H%M%S", time.localtime(time.time())))
@@ -71,6 +71,7 @@ class LocalPackage(Package):
         self.headers = {}
         self.files = self.get_all_files(files)
         self.path = path
+        self.size = size if size else self.get_path_size(path)
         self.package()
 
     def __hash__(self):
@@ -98,6 +99,16 @@ class LocalPackage(Package):
             else:
                 files += LocalPackage.list_dir(fp)
         return files
+    
+    def get_path_size(self, path):
+        total_size = 0
+        with os.scandir(path) as entries:
+            for entry in entries:
+                if entry.is_file():
+                    total_size += entry.stat().st_size
+                elif entry.is_dir():
+                    total_size += self.get_path_size(entry.path)
+        return total_size
 
     def package(self):
         count = 0
@@ -244,7 +255,7 @@ class Repository(PackageInfo):
 
     def __init__(self, name, repository_dir, stdio=None):
         self.repository_dir = repository_dir
-        super(Repository, self).__init__(name, None, None, None, None)
+        super(Repository, self).__init__(name, None, None, None, None, None)
         self.stdio = stdio
         self._load()
     
@@ -308,6 +319,7 @@ class Repository(PackageInfo):
                 self.set_release(data.get('release'))
                 self.md5 = data.get('hash')
                 self.arch = data.get('arch')
+                self.size = data.get('size')
                 self.install_time = data.get('install_time', 0)
         except:
             pass
@@ -324,7 +336,8 @@ class Repository(PackageInfo):
             self.set_version(version)
 
     def _dump(self):
-        data = {'version': self.version, 'hash': self.hash, 'release': self.release, 'arch': self.arch}
+        data = {'version': self.version, 'hash': self.hash,
+                'release': self.release, 'arch': self.arch, 'size': self.size}
         if self.install_time:
             data['install_time'] = self.install_time
         try:
@@ -415,6 +428,7 @@ class Repository(PackageInfo):
             self.set_release(pkg.release)
             self.md5 = pkg.md5
             self.arch = pkg.arch
+            self.size = pkg.size
             self.install_time = time.time()
             if self._dump():
                 return True
@@ -433,7 +447,7 @@ class Repository(PackageInfo):
 
 class RepositoryVO(object):
 
-    def __init__(self, name, version, release, arch, md5, path, tags=[]):
+    def __init__(self, name, version, release, arch, md5, path, tags=[], size=0):
         self.name = name
         self.version = version
         self.release = release
@@ -441,6 +455,7 @@ class RepositoryVO(object):
         self.md5 = md5
         self.path = path
         self.tags = tags
+        self.size = size
 
 
 class ComponentRepository(object):
@@ -533,7 +548,8 @@ class RepositoryManager(Manager):
             repository.arch,
             repository.md5,
             repository.repository_dir,
-            []
+            [],
+            repository.size
         )
 
     def get_repositories(self, name, version=None, instance=True):

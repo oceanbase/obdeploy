@@ -40,9 +40,9 @@ export function getDocs(getLocale) {
 
   //OCP Express
   const OCP_EXPRESS_CN =
-    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000218662';
+    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000508228';
   const OCP_EXPRESS_EN =
-    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000000870497';
+    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000001166743';
   const OCP_EXPRESS = getLocale() === 'zh-CN' ? OCP_EXPRESS_CN : OCP_EXPRESS_EN;
 
   //OCP
@@ -52,9 +52,9 @@ export function getDocs(getLocale) {
 
   //OBAgent
   const OBAGENT_DOCS_CN =
-    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000220263';
+    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000509852';
   const OBAGENT_DOCS_EN =
-    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000001029751';
+    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000001168964';
   const OBAGENT_DOCS =
     getLocale() === 'zh-CN' ? OBAGENT_DOCS_CN : OBAGENT_DOCS_EN;
 
@@ -66,9 +66,9 @@ export function getDocs(getLocale) {
 
   //模式配置规则
   const MODE_CONFIG_RULE_CN =
-    'https://www.oceanbase.com/docs/community-obd-cn-1000000000487050';
+    'https://www.oceanbase.com/docs/community-obd-cn-1000000000634883';
   const MODE_CONFIG_RULE_EN =
-    'https://en.oceanbase.com/docs/community-obd-en-10000000001082203';
+    'https://en.oceanbase.com/docs/community-obd-en-10000000001181555';
   const MODE_CONFIG_RULE =
     getLocale() === 'zh-CN' ? MODE_CONFIG_RULE_CN : MODE_CONFIG_RULE_EN;
 
@@ -81,8 +81,12 @@ export function getDocs(getLocale) {
   const ERR_CODE = getLocale() === 'zh-CN' ? ERR_CODE_CN : ERR_CODE_EN;
 
   // 部署向导帮助文档
+  const DOCS_PRODUCTION_CN =
+    'https://www.oceanbase.com/docs/community-obd-cn-1000000000634915';
+  const DOCS_PRODUCTION_EN =
+    'https://en.oceanbase.com/docs/community-obd-en-10000000001181618';
   const DOCS_PRODUCTION =
-    'https://www.oceanbase.com/docs/community-obd-cn-1000000000314362';
+    getLocale() === 'zh-CN' ? DOCS_PRODUCTION_CN : DOCS_PRODUCTION_EN;
 
   // SOP文档
   const DOCS_SOP = 'https://ask.oceanbase.com/t/topic/35605473';

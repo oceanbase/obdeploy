@@ -14,7 +14,11 @@ import {
 import { getTailPath } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import customRequest from '@/utils/useRequest';
-import { CopyOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import {
+  CopyOutlined,
+  InfoCircleOutlined,
+  SafetyCertificateFilled,
+} from '@ant-design/icons';
 import { ProCard, ProForm, ProFormText } from '@ant-design/pro-components';
 import { useRequest } from 'ahooks';
 import {
@@ -272,15 +276,16 @@ export default function DeployConfig({
                   labelInValue
                   onChange={(value) => onVersionChange(value, record)}
                   style={{ width: 207 }}
+                  popupClassName={styles?.popupClassName}
                 >
-                  {_.map((item: any) => (
-                    <Select.Option
-                      value={`${item.version}-${item?.release}-${item.md5}`}
-                      // data_value={item.version}
-                      key={`${item.version}-${item?.release}-${item.md5}`}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <div
+                  {_.map((item: any) => {
+                    return (
+                      <Select.Option
+                        value={`${item.version}-${item?.release}-${item.md5}`}
+                        // data_value={item.version}
+                        key={`${item.version}-${item?.release}-${item.md5}`}
+                      >
+                        <span
                           style={{
                             textOverflow: 'ellipsis',
                             width: '122px',
@@ -290,7 +295,7 @@ export default function DeployConfig({
                         >
                           V {item.version}
                           {item?.release ? `-${item?.release}` : ''}
-                        </div>
+                        </span>
                         {item.versionType === 'ce' ? (
                           <Tag className="default-tag ml-8">
                             {intl.formatMessage({
@@ -306,9 +311,20 @@ export default function DeployConfig({
                             })}
                           </Tag>
                         )}
-                      </div>
-                    </Select.Option>
-                  ))}
+                        {item?.type === 'local' ? (
+                          <span className={styles.localTag}>
+                            <SafetyCertificateFilled />
+                            {intl.formatMessage({
+                              id: 'OBD.pages.components.InstallConfig.LocalImage',
+                              defaultMessage: '本地镜像',
+                            })}
+                          </span>
+                        ) : (
+                          ''
+                        )}
+                      </Select.Option>
+                    );
+                  })}
                 </Select>
               )}
             </Tooltip>
@@ -402,6 +418,7 @@ export default function DeployConfig({
       version: item.version,
       release: item.release,
       md5: item.md5,
+      type: item.type,
     }));
   };
 
@@ -609,7 +626,7 @@ export default function DeployConfig({
       key: component?.key!,
     };
     setInitVersion(item);
-    memory += caculateSize(getRecommendInfo(item).estimated_size);
+    memory += getRecommendInfo(item).estimated_size;
     dataSource.push(temp);
     return memory;
   };
@@ -721,7 +738,6 @@ export default function DeployConfig({
           } else {
             setComponentLoading(false);
           }
-
           completionComponent(dataSource);
           isNewDB && sortComponent(dataSource);
           setDeployMemory(memory);
@@ -858,7 +874,7 @@ export default function DeployConfig({
                       id: 'OBD.component.DeployConfig.EstimatedInstallationRequirements',
                       defaultMessage: '预计安装需要',
                     })}
-                    {deployMemory}
+                    {caculateSize(deployMemory)}
                     {intl.formatMessage({
                       id: 'OBD.component.DeployConfig.MbSpace',
                       defaultMessage: 'MB空间',

@@ -81,4 +81,4 @@ def generate_random_password(cluster_config):
     add_components = cluster_config.get_deploy_added_components()
     global_config = cluster_config.get_original_global_conf()
     if cluster_config.name in add_components and 'http_basic_auth_password' not in global_config:
-        cluster_config.update_global_conf('http_basic_auth_password', ConfigUtil.get_random_pwd_by_total_length(), save=False)
+        cluster_config.update_global_conf('http_basic_auth_password', ConfigUtil.get_random_pwd_by_rule(lowercase_length=3, uppercase_length=3, digits_length=3, punctuation_length=0), save=False)

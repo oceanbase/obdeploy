@@ -24,6 +24,8 @@ OB_OFFICIAL_WEBSITE = 'https://www.oceanbase.com/'
 TELEMETRY_WEBSITE = '<TELEMETRY_WEBSITE>'
 TELEMETRY_URL = '{}/api/web/oceanbase/report'.format(TELEMETRY_WEBSITE if TELEMETRY_WEBSITE else 'https://openwebapi.oceanbase.com')
 TELEMETRY_COMPONENT = 'obd'
+TELEMETRY_COMPONENT_OB = "obd_web_ob"
+TELEMETRY_COMPONENT_OCP = "obd_web_ocp"
 TELEMETRY_SIG = 'dbe97393a695335d67de91dd4049ba'
 
 # obdeploy version
@@ -44,5 +46,17 @@ CONST_OBD_INSTALL_PATH = "OBD_INSTALL_PATH"
 # obdeploy forbidden variable
 FORBIDDEN_VARS = (CONST_OBD_HOME, CONST_OBD_INSTALL_PRE, CONST_OBD_INSTALL_PATH)
 
+# tool variable
+COMP_OBCLIENT = "obclient"
+COMP_OCEANBASE_DIAGNOSTIC_TOOL = "oceanbase-diagnostic-tool"
+COMP_OBDIAG = "obdiag"
+COMP_JRE = 'openjdk-jre'
+COMP_OCP_EXPRESS = 'ocp-express'
+COMP_OCP_SERVER = 'ocp-server'
+COMP_OCP_SERVER_CE = 'ocp-server-ce'
+COMPS_OCP = [COMP_OCP_SERVER, COMP_OCP_SERVER_CE]
+
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
+
+RSA_KEY_SIZE = 512

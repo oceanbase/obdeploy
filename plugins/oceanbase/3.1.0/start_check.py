@@ -25,6 +25,7 @@ import re
 import time
 
 import _errno as err
+from _types import Capacity
 
 
 stdio = None
@@ -39,26 +40,6 @@ def get_port_socket_inode(client, port):
         return False
     stdio.verbose(res.stdout)
     return res.stdout.strip().split('\n')
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size):
-    units = ['B', 'K', 'M', 'G', 'T', 'P']
-    idx = 0
-    while idx < 5 and size >= 1024:
-        size /= 1024.0
-        idx += 1
-    return '%.1f%s' % (size, units[idx])
 
 
 def time_delta(client):
@@ -346,10 +327,10 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory_limit = 0
             percentage = 0
             if server_config.get('memory_limit'):
-                memory_limit = parse_size(server_config['memory_limit'])
+                memory_limit = Capacity(server_config['memory_limit']).btyes
                 memory['num'] += memory_limit
             elif 'memory_limit_percentage' in server_config:
-                percentage = int(parse_size(server_config['memory_limit_percentage']))
+                percentage = server_config['memory_limit_percentage']
                 memory['percentage'] += percentage
             else:
                 percentage = 80
@@ -357,7 +338,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory['servers'][server] = {
                 'num': memory_limit,
                 'percentage': percentage,
-                'system_memory': parse_size(server_config.get('system_memory', 0))
+                'system_memory': Capacity(server_config.get('system_memory', 0)).btyes
             }
 
             data_path = server_config['data_dir'] if server_config.get('data_dir') else  os.path.join(server_config['home_path'], 'store')
@@ -528,14 +509,14 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                 if k in memory_key_map:
                     key = memory_key_map[k]
-                    server_memory_stats[key] = parse_size(str(v))
+                    server_memory_stats[key] = Capacity(str(v)).btyes
 
             server_memory_stat = servers_memory[ip]
             min_start_need = server_num * START_NEED_MEMORY
-            total_use = server_memory_stat['percentage'] * server_memory_stats['total'] / 100 + server_memory_stat['num']
+            total_use = int(server_memory_stat['percentage'] * server_memory_stats['total'] / 100 + server_memory_stat['num'])
             if min_start_need > server_memory_stats['available']:
                 for server in ip_servers:
-                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(min_start_need)), [err.SUG_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip)])
+                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip, available=str(Capacity(server_memory_stats['available'])), need=str(Capacity(min_start_need))), [err.SUG_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE.format(ip=ip)])
             elif total_use > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
                 for server in ip_servers:
                     server_generate_config = generate_configs.get(server, {})
@@ -545,11 +526,11 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                         if key in global_generate_config or key in server_generate_config:
                             suggest.auto_fix = False
                             break
-                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(total_use)), [suggest])
+                    error('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=str(Capacity(server_memory_stats['free'])), cached=str(Capacity(server_memory_stats['buffers'] + server_memory_stats['cached'])), need=str(Capacity(total_use))), [suggest])
             elif total_use > server_memory_stats['free']:
                 system_memory_check()
                 for server in ip_servers:
-                    alert('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=format_size(server_memory_stats['free']), need=format_size(total_use)), [err.SUG_OBSERVER_REDUCE_MEM.format()])
+                    alert('mem', err.EC_OBSERVER_NOT_ENOUGH_MEMORY.format(ip=ip, free=str(Capacity(server_memory_stats['free'])), need=str(Capacity(total_use))), [err.SUG_OBSERVER_REDUCE_MEM.format()])
             else:
                 system_memory_check()
 
@@ -567,7 +548,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             if isinstance(need, int):
                 disk[kp]['need'] += disk[kp]['total'] * need / 100
             else:
-                disk[kp]['need'] += parse_size(need)
+                disk[kp]['need'] += Capacity(need).btyes
         
         for path in servers_clog_mount[ip]:
             kp = '/'
@@ -596,7 +577,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                         if key in global_generate_config or key in server_generate_config:
                             suggest.auto_fix = False
                             break
-                    critical('disk', err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=p, avail=format_size(avail), need=format_size(need)), [suggest] + suggests)
+                    critical('disk', err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=p, avail=str(Capacity(avail)), need=str(Capacity(need))), [suggest] + suggests)
             elif 1.0 * (total - avail + need) / total > disk[p]['threshold']:
                 # msg = '(%s) %s not enough disk space for clog. Use `redo_dir` to set other disk for clog' % (ip, p)
                 # msg += ', or reduce the value of `datafile_size`' if need > 0 else '.'

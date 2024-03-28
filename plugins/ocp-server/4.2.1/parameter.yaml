@@ -11,7 +11,7 @@
   require: true
   essential: true
   type: INT
-  default: 8180
+  default: 8080
   need_restart: true
   description_en: the port of ocp server.
   description_local: OCP server使用的端口
@@ -316,14 +316,14 @@
   require: false
   type: OB_USER
   default: meta
-  need_redeploy: true
+  need_restart: true
   description_en: The user name for ocp meta db
   description_local: ocp server的元数据库使用的用户名
 - name: ocp_meta_password
   require: true
   type: STRING
   default: oceanbase
-  need_redeploy: true
+  need_restart: true
   description_en: The password for ocp meta db
   description_local: ocp server的元数据库使用的密码
 - name: ocp_meta_db
@@ -337,13 +337,14 @@
   require: false
   type: OB_USER
   default: monitor_user
+  need_restart: true
   description_en: The username for obagent monitor user
   description_local: obagent 监控用户的用户名
 - name: ocp_monitor_password
   require: false
   type: STRING
   default: oceanbase
-  need_redeploy: true
+  need_restart: true
   description_en: The password for obagent monitor password
   description_local: obagent 监控用户的密码
 - name: ocp_monitor_db
@@ -358,6 +359,5 @@
   type: WEB_URL
   default: ''
   need_restart: true
-  need_redeploy: true
   description_en: The url for ocp server
   description_local: ocp server的连接串

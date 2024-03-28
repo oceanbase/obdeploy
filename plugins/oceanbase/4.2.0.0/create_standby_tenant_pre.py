@@ -21,7 +21,7 @@ import time
 from collections import defaultdict
 
 from tool import ConfigUtil
-
+from _stdio import FormtatText
 
 tenant_cursor_cache = defaultdict(dict)
 
@@ -82,12 +82,12 @@ def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenan
     if not mode in ['mysql', 'oracle']:
         error('No such tenant mode: %s.\n--mode must be `mysql` or `oracle`' % mode)
         return
-    
+
     primary_cluster_config = cluster_configs.get(primary_deploy_name)
     if not primary_cluster_config:
         stdio.error('No such deploy: %s.' % primary_deploy_name)
         return False
-    
+
     root_password = get_option('tenant_root_password', '')
     standbyro_password_input = get_option('standbyro_password', None)
     # check standbyro_password
@@ -142,8 +142,9 @@ def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenan
     # check primary tenant have full log
     sql = 'select MAX(BEGIN_LSN) as max_begin_lsn from oceanbase.GV$OB_LOG_STAT as a WHERE a.tenant_id =%s'
     res = primary_cursor.fetchone(sql, (primary_tenant_info['tenant_id'], ))
-    if not res:
+    if not res or res['max_begin_lsn'] is None:
         error('Check primary tenant have full log failed.')
+        stdio.print(FormtatText.success('Please try again in a moment.'))
         return
     if res['max_begin_lsn'] > 0:
         error('Primary cluster have not full log, not support create standby cluster.')
@@ -201,7 +202,7 @@ def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenan
     if not primary_cluster_config.update_component_attr('standbyro_password', standbyro_password_dict, save=True):
         error('Dump standbyro password failed.')
         return
-        
+
     plugin_context.set_variable('standbyro_password', standbyro_password)
     stdio.stop_loading('succeed')
     return plugin_context.return_true()

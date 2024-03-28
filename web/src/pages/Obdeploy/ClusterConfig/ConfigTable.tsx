@@ -1,23 +1,29 @@
-import { Space, Table, Spin, Form, Tooltip, InputNumber } from 'antd';
-import { ProCard, ProForm } from '@ant-design/pro-components';
-import { getLocale } from 'umi';
-import type { ColumnsType } from 'antd/es/table';
-
 import { intl } from '@/utils/intl';
-import Parameter from './Parameter';
+import { ProCard } from '@ant-design/pro-components';
+import { Form, Space, Spin, Table, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { getLocale } from 'umi';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
+import Parameter from './Parameter';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
+
+export type RulesDetail = {
+  targetTable?: 'oceanbase-ce' | 'obproxy-ce' | 'ocp-express' | 'obagent';
+  rules: any;
+  targetColumn?: string;
+};
 interface ConfigTableProps {
   showVisible: boolean;
   dataSource: API.NewParameterMeta[];
   loading: boolean;
   customParameter?: JSX.Element;
+  parameterRules?: RulesDetail[] | RulesDetail;
 }
 
-const parameterValidator = (_: any, value?: API.ParameterValue) => {
+export const parameterValidator = (_: any, value?: API.ParameterValue) => {
   if (value?.adaptive) {
     return Promise.resolve();
   } else if (value?.require && !value?.value) {
@@ -36,6 +42,7 @@ const parameterValidator = (_: any, value?: API.ParameterValue) => {
 const getMoreColumns = (
   label: string,
   componentKey: string,
+  rulesDetail?: RulesDetail,
 ) => {
   const columns: ColumnsType<API.NewConfigParameter> = [
     {
@@ -52,20 +59,25 @@ const getMoreColumns = (
       width: locale === 'zh-CN' ? 280 : 360,
       dataIndex: 'parameterValue',
       render: (parameterValue, record) => {
-        const {defaultValue,defaultUnit} = record.parameterValue
+        const { defaultValue, defaultUnit } = record.parameterValue;
         const param = {
-          defaultValue
-        }
-        if(defaultUnit)param.defaultUnit = defaultUnit
+          defaultValue,
+        };
+        if (defaultUnit) param.defaultUnit = defaultUnit;
+
         return (
-          <ProForm.Item
+          <Form.Item
+            validateFirst={true}
             className={styles.inlineFormItem}
             name={[componentKey, 'parameters', record.name || '', 'params']}
-            
-            // rules={[{ validator: parameterValidator }]}
+            rules={
+              rulesDetail && rulesDetail.targetColumn === record.name
+                ? rulesDetail.rules
+                : [() => ({ validator: parameterValidator })]
+            }
           >
-            <Parameter {...param}/>
-          </ProForm.Item>
+            <Parameter {...param} />
+          </Form.Item>
         );
       },
     },
@@ -98,11 +110,16 @@ const getMoreColumns = (
 
   return columns;
 };
-
+/**
+ *
+ * @param parameterRules 用于动态自定义某些字段的校验规则 RulesDetail | RulesDetail[] 涉及到多个table需要传数组，rule需要通过targetTable字段映射到对应的table
+ * @returns
+ */
 export default function ConfigTable({
   showVisible,
   dataSource,
   loading,
+  parameterRules,
 }: ConfigTableProps) {
   return (
     <>
@@ -115,6 +132,17 @@ export default function ConfigTable({
             style={{ minHeight: 50, marginTop: 16 }}
           >
             {dataSource.map((moreItem) => {
+              let rulesDetail: RulesDetail = { rules: [] };
+              if (parameterRules) {
+                if (Array.isArray(parameterRules)) {
+                  rulesDetail = parameterRules.find(
+                    (item) => item.targetTable === moreItem.component,
+                  )!;
+                } else {
+                  rulesDetail = parameterRules;
+                }
+              }
+
               return (
                 <ProCard
                   className={styles.infoSubCard}
@@ -127,6 +155,7 @@ export default function ConfigTable({
                     columns={getMoreColumns(
                       moreItem.label,
                       moreItem.componentKey,
+                      rulesDetail,
                     )}
                     rowKey="name"
                     dataSource={moreItem.configParameter}

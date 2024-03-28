@@ -68,26 +68,38 @@ class ComponentHandler(BaseHandler):
             local_pkg = local_packages[local_pkg_idx]
             remote_pkg = remote_packages[remote_pkg_idx]
             if local_pkg >= remote_pkg:
+                size = getattr(local_pkg, 'size', const.PKG_ESTIMATED_SIZE[local_pkg.name])
+                size = const.PKG_ESTIMATED_SIZE[local_pkg.name] if not size else size
                 component_dict[local_pkg.name].append(
                     ComponentInfo(version=local_pkg.version, md5=local_pkg.md5, release=local_pkg.release,
-                                  arch=local_pkg.arch, type=MirrorRepositoryType.LOCAL.value, estimated_size=const.PKG_ESTIMATED_SIZE[local_pkg.name]))
+                                  arch=local_pkg.arch, type=MirrorRepositoryType.LOCAL.value, 
+                                  estimated_size=size))
                 local_pkg_idx -= 1
             else:
                 if len(component_dict[remote_pkg.name]) > 0 and component_dict[remote_pkg.name][-1].md5 == remote_pkg.md5:
                     log.get_logger().debug("already found local package %s", remote_pkg)
                 else:
+                    size = getattr(remote_pkg, 'size', const.PKG_ESTIMATED_SIZE[remote_pkg.name])
+                    size = const.PKG_ESTIMATED_SIZE[remote_pkg.name] if not size else size
                     component_dict[remote_pkg.name].append(
                         ComponentInfo(version=remote_pkg.version, md5=remote_pkg.md5, release=remote_pkg.release,
-                                      arch=remote_pkg.arch, type=MirrorRepositoryType.REMOTE.value, estimated_size=const.PKG_ESTIMATED_SIZE[remote_pkg.name]))
+                                      arch=remote_pkg.arch, type=MirrorRepositoryType.REMOTE.value, 
+                                      estimated_size=size))
                 remote_pkg_idx -= 1
         if local_pkg_idx >= 0:
             for pkg in local_packages[local_pkg_idx::-1]:
+                size = getattr(pkg, 'size', const.PKG_ESTIMATED_SIZE[pkg.name])
+                size = const.PKG_ESTIMATED_SIZE[pkg.name] if not size else size
                 component_dict[pkg.name].append(
-                    ComponentInfo(version=pkg.version, md5=pkg.md5, release=pkg.release, arch=pkg.arch, type=MirrorRepositoryType.LOCAL.value, estimated_size=const.PKG_ESTIMATED_SIZE[pkg.name]))
+                    ComponentInfo(version=pkg.version, md5=pkg.md5, release=pkg.release, arch=pkg.arch, type=MirrorRepositoryType.LOCAL.value, 
+                                estimated_size=size))
         if remote_pkg_idx >= 0:
             for pkg in remote_packages[remote_pkg_idx::-1]:
+                size = getattr(pkg, 'size', const.PKG_ESTIMATED_SIZE[pkg.name])
+                size = const.PKG_ESTIMATED_SIZE[pkg.name] if not size else size
                 component_dict[pkg.name].append(
-                    ComponentInfo(version=pkg.version, md5=pkg.md5, release=pkg.release, arch=pkg.arch, type=MirrorRepositoryType.REMOTE.value, estimated_size=const.PKG_ESTIMATED_SIZE[pkg.name]))
+                    ComponentInfo(version=pkg.version, md5=pkg.md5, release=pkg.release, arch=pkg.arch, type=MirrorRepositoryType.REMOTE.value, 
+                                estimated_size=size))
         for component, version in component_filter.items():
             if component in component_dict.keys():
                 log.get_logger().debug("filter component: {0} above version: {1}".format(component, version))
@@ -173,10 +185,10 @@ class ComponentHandler(BaseHandler):
             del(self.obd.namespaces[spacename])
             if not ret:
                 self.obd.deploy_manager.remove_deploy_config(name)
-                raise Exception("genconfig failed for compoennt: {0}".format(parameter_filter.component))
+                raise Exception("genconfig failed for component: {0}".format(parameter_filter.component))
             else:
                 auto_keys = ret.get_return("generate_keys")
-            log.get_logger().info("auto keys for comopnent %s are %s", parameter_filter.component, auto_keys)
+            log.get_logger().info("auto keys for component %s are %s", parameter_filter.component, auto_keys)
 
             parameter_plugin = self.obd.plugin_manager.get_best_plugin(PluginType.PARAM, parameter_filter.component, parameter_filter.version)
             ## use plugin.params to generate parameter meta

@@ -26,16 +26,19 @@ import re
 from _plugin import InstallPlugin
 from _deploy import InnerConfigKeywords
 from tool import YamlLoader
+from _rpm import Version
 
 
 def install_repo(plugin_context, obd_home, install_repository, install_plugin, check_repository, check_file_map,
-                 msg_lv, *args, **kwargs):
+                 requirement_map, msg_lv, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
 
     def install_to_home_path():
         repo_dir = install_repository.repository_dir.replace(obd_home, remote_obd_home, 1)
         if is_lib_repo:
             home_path = os.path.join(remote_home_path, 'lib')
+        elif is_jre_repo:
+            home_path = os.path.join(remote_home_path, 'jre')
         else:
             home_path = remote_home_path
         client.add_env("_repo_dir", repo_dir, True)
@@ -60,11 +63,13 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
             else:
                 success = client.execute_command("%(install_cmd)s ${source} ${target}" % {"install_cmd": install_cmd}) and success
         return success
+    
     stdio = plugin_context.stdio
     clients = plugin_context.clients
     servers = cluster_config.servers
     is_lib_repo = install_repository.name.endswith("-libs")
     is_utils_repo = install_repository.name.endswith("-utils")
+    is_jre_repo = install_repository.name.endswith("-jre")
     home_path_map = {}
     for server in servers:
         server_config = cluster_config.get_server_conf(server)
@@ -154,10 +159,25 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
                     if not libs and not ret:
                         stdio.error('Failed to execute repository lib check.')
                         return
-                    need_libs.update(libs)
+                    if requirement_map and libs and file_item.require in requirement_map:
+                        need_libs.add(requirement_map[file_item.require])
+                elif file_item.type == InstallPlugin.FileItemType.JAR:
+                    client.add_env('PATH', '%s/jre/bin:' % remote_home_path)
+                    ret = client.execute_command('java -version')
+                    if not ret:
+                        need_libs.add(requirement_map[file_item.require])
+                    else:
+                        pattern = r'version\s+\"(\d+\.\d+\.\d+_?\d*)'
+                        match = re.search(pattern, ret.stderr)
+                        if not match:
+                            need_libs.add(requirement_map[file_item.require])
+                        else:
+                            if Version(match.group(1)) < Version(requirement_map[file_item.require].min_version) or \
+                                Version(match.group(1)) > Version(requirement_map[file_item.require].max_version):
+                                    need_libs.add(requirement_map[file_item.require])
             if need_libs:
                 for lib in need_libs:
-                    getattr(stdio, msg_lv, '%s %s require: %s' % (server, check_repository, lib))
+                    getattr(stdio, msg_lv, '%s %s require: %s' % (server, check_repository, lib.name))
                 lib_check = False
             client.add_env('LD_LIBRARY_PATH', '', True)
 
@@ -165,7 +185,7 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
             stdio.stop_loading('succeed' if lib_check else 'fail')
         elif msg_lv == 'warn':
             stdio.stop_loading('succeed' if lib_check else 'warn')
-        return plugin_context.return_true(checked=lib_check)
+        return plugin_context.return_true(checked=lib_check, requirements=need_libs)
 
     # check utils
     def check_utils():

@@ -12,7 +12,7 @@ import { QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getAllServers } from '@/utils/helper';
 import { serversValidator } from '@/utils';
 import ServerTags from '@/pages/Obdeploy/ServerTags';
-import styles from './indexZh.less';
+import styles from './index.less';
 
 interface DataBaseNodeConfigProps {
   tableFormRef: React.MutableRefObject<

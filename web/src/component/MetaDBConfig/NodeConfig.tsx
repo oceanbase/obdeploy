@@ -1,6 +1,6 @@
 import { intl } from '@/utils/intl';
 import { ProForm, ProFormDigit } from '@ant-design/pro-components';
-import styles from './indexZh.less';
+import styles from './index.less';
 import { Select, Row } from 'antd';
 import { ocpServersValidator } from '@/utils';
 import { useModel } from 'umi';

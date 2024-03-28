@@ -84,7 +84,7 @@ class Restart(object):
 
     def connect(self, cluster_config):
         if self.cursors is None:
-            self.sub_io.start_loading('Connect to ocp express')
+            self.sub_io.start_loading('Connect to %s' % cluster_config.name)
             ret = self.call_plugin(self.connect_plugin, cluster_config=cluster_config)
             if not ret:
                 self.sub_io.stop_loading('fail')
@@ -126,7 +126,7 @@ class Restart(object):
         if not self.call_plugin(self.start_check_plugin, clients=clients, cluster_config=cluster_config):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
-        if not self.call_plugin(self.start_plugin, clients=clients, cluster_config=cluster_config, local_home_path=self.local_home_path, need_bootstrap=need_bootstrap, repository_dir_map=self.repository_dir_map):
+        if not self.call_plugin(self.start_plugin, source_option='restart', clients=clients, cluster_config=cluster_config, local_home_path=self.local_home_path, need_bootstrap=need_bootstrap, repository_dir_map=self.repository_dir_map):
             self.rollback()
             self.stdio.stop_loading('stop_loading', 'fail')
             return False

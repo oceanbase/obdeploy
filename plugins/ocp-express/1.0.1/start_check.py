@@ -26,6 +26,7 @@ import os
 from copy import deepcopy
 from _rpm import Version
 import _errno as err
+from _types import Capacity
 
 success = True
 
@@ -51,35 +52,6 @@ def get_port_socket_inode(client, port):
 def password_check(passwd):
     pattern = r'''^(?=(.*[a-z]){2,})(?=(.*[A-Z]){2,})(?=(.*\d){2,})(?=(.*[~!@#%^&*_\-+=|(){}\[\]:;,.?/]){2,})[A-Za-z\d~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$'''
     return True if re.match(pattern, passwd) else False
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G']
-    units_num = len(units) - 1
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-        limit = 1024
-    else:
-        div = 1024
-        limit = 1024
-        format = '%d%s'
-    while idx < units_num and size >= limit:
-        size /= div
-        idx += 1
-    return format % (size, units[idx])
 
 
 def get_mount_path(disk, _path):
@@ -234,7 +206,8 @@ def prepare_parameters(cluster_config, stdio):
     return env
 
 
-def start_check(plugin_context, init_check_status=False, work_dir_check=False, work_dir_empty_check=True, strict_check=False, precheck=False, *args, **kwargs):
+def start_check(plugin_context, init_check_status=False, work_dir_check=False, work_dir_empty_check=True, strict_check=False, precheck=False, 
+                java_check=True, *args, **kwargs):
     def check_pass(item):
         status = check_status[server]
         if status[item].status == err.CheckStatus.WAIT:
@@ -423,23 +396,25 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
         check_pass('port')
 
     # java version check
-    for server in cluster_config.servers:
-        client = clients[server]
-        server_config = env[server]
-        java_bin = server_config['java_bin']
-        ret = client.execute_command('{} -version'.format(java_bin))
-        if not ret:
-            critical('java', err.EC_OCP_EXPRESS_JAVA_NOT_FOUND.format(server=server), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0')])
-            continue
-        version_pattern = r'version\s+\"(\d+\.\d+.\d+)'
-        found = re.search(version_pattern, ret.stdout) or re.search(version_pattern, ret.stderr)
-        if not found:
-            error('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
-            continue
-        java_major_version = found.group(1)
-        if Version(java_major_version) != Version('1.8.0'):
-            critical('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
-            continue
+    if java_check:
+        for server in cluster_config.servers:
+            client = clients[server]
+            server_config = env[server]
+            java_bin = server_config['java_bin']
+            client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
+            ret = client.execute_command('{} -version'.format(java_bin))
+            if not ret:
+                critical('java', err.EC_OCP_EXPRESS_JAVA_NOT_FOUND.format(server=server), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0')])
+                continue
+            version_pattern = r'version\s+\"(\d+\.\d+.\d+)'
+            found = re.search(version_pattern, ret.stdout) or re.search(version_pattern, ret.stderr)
+            if not found:
+                error('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
+                continue
+            java_major_version = found.group(1)
+            if Version(java_major_version) != Version('1.8.0'):
+                critical('java', err.EC_OCP_EXPRESS_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'), [err.SUG_OCP_EXPRESS_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'),])
+                continue
 
     servers_memory = {}
     servers_disk = {}
@@ -449,12 +424,12 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
     for server in cluster_config.servers:
         client = clients[server]
         server_config = env[server]
-        memory_size = parse_size(server_config['memory_size'])
+        memory_size = Capacity(server_config['memory_size']).btyes
         if server_config.get('log_dir'):
             log_dir = server_config['log_dir']
         else:
             log_dir = os.path.join(server_config['home_path'], 'log')
-        need_size = parse_size(server_config['logging_file_total_size_cap'])
+        need_size = Capacity(server_config['logging_file_total_size_cap']).btyes
         ip = server.ip
         if ip not in servers_client:
             servers_client[ip] = client
@@ -496,17 +471,17 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                 if k in memory_key_map:
                     key = memory_key_map[k]
-                    server_memory_stats[key] = parse_size(str(v))
+                    server_memory_stats[key] = Capacity(str(v)).btyes
             mem_suggests = [err.SUG_OCP_EXPRESS_REDUCE_MEM.format()]
             if memory_needed * 0.5 > server_memory_stats['available']:
                 for server in ip_servers[ip]:
-                    error('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_AVAILABLE.format(ip=ip, available=format_size(server_memory_stats['available']), need=format_size(memory_needed)), suggests=mem_suggests)
+                    error('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_AVAILABLE.format(ip=ip, available=Capacity(server_memory_stats['available']), need=Capacity(memory_needed)), suggests=mem_suggests)
             elif memory_needed > server_memory_stats['free'] + server_memory_stats['buffers'] + server_memory_stats['cached']:
                 for server in ip_servers[ip]:
-                    error('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=format_size(server_memory_stats['free']), cached=format_size(server_memory_stats['buffers'] + server_memory_stats['cached']), need=format_size(memory_needed)), suggests=mem_suggests)
+                    error('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_CACHED.format(ip=ip, free=Capacity(server_memory_stats['free']), cached=Capacity(server_memory_stats['buffers'] + server_memory_stats['cached']), need=Capacity(memory_needed)), suggests=mem_suggests)
             elif memory_needed > server_memory_stats['free']:
                 for server in ip_servers[ip]:
-                    alert('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY.format(ip=ip,  free=format_size(server_memory_stats['free']), need=format_size(memory_needed)), suggests=mem_suggests)
+                    alert('mem', err.EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY.format(ip=ip,  free=Capacity(server_memory_stats['free']), need=Capacity(memory_needed)), suggests=mem_suggests)
     # disk check
     for ip in servers_disk:
         client = servers_client[ip]
@@ -517,7 +492,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 mount_path = get_mount_path(disk_info, path)
                 if disk_needed > disk_info[mount_path]['avail']:
                     for server in ip_servers[ip]:
-                        error('disk', err.EC_OCP_EXPRESS_NOT_ENOUGH_DISK.format(ip=ip, disk=mount_path, need=format_size(disk_needed), avail=format_size(disk_info[mount_path]['avail'])), suggests=[err.SUG_OCP_EXPRESS_REDUCE_DISK.format()])
+                        error('disk', err.EC_OCP_EXPRESS_NOT_ENOUGH_DISK.format(ip=ip, disk=mount_path, need=Capacity(disk_needed), avail=Capacity(disk_info[mount_path]['avail'])), suggests=[err.SUG_OCP_EXPRESS_REDUCE_DISK.format()])
         else:
             stdio.warn(err.WC_OCP_EXPRESS_FAILED_TO_GET_DISK_INFO.format(ip))
 
@@ -526,7 +501,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
         server_config = env[server]
         admin_passwd = server_config.get('admin_passwd')
         if not admin_passwd or not password_check(admin_passwd):
-            error('admin_passwd', err.EC_OCP_EXPRESS_ADMIN_PASSWD_ERROR.format(ip=server.ip, current=admin_passwd), suggests=[err.SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD_ERROR.format()])
+            error('admin_passwd', err.EC_COMPONENT_PASSWD_ERROR.format(ip=server.ip, component='ocp-express', key='admin_passwd', rule='Must be 8 to 32 characters in length, containing at least 3 types from digits, lowercase letters, uppercase letters and the following special characters: ~!@#%^&*_-+=|(){{}}[]:;,.?/'), suggests=[err.SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD.format()])
 
     plugin_context.set_variable('start_env', env)
 

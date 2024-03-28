@@ -76,3 +76,22 @@ export const formatPreCheckData = (configData: any) => {
   }
   return _configData;
 };
+
+export const formatOcpPreCheckStatusData = (
+  dataSource: API.PrecheckTaskInfo,
+) => {
+  dataSource.finished =
+    dataSource?.task_info?.info.filter(
+      (item) => item.result === 'SUCCESSFUL' || item.result === 'FAILED',
+    ).length || 0;
+  dataSource.total = dataSource?.precheck_result?.length || 0;
+  dataSource.all_passed = dataSource.task_info.result === 'SUCCESSFUL';
+
+  dataSource.timelineData = dataSource.task_info.info.map((item) => {
+    let result = {};
+    result.isRunning = item?.result === 'RUNNING';
+    result.result = item?.result;
+    return result;
+  });
+  return { ...dataSource };
+};

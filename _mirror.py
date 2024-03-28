@@ -59,6 +59,7 @@ SUP_MAP = {
     'anolis': {'23': 7},
     'openEuler': {'22.03': 7},
     'kylin': {'V10': 8},
+    'alinux': {'2': 7, '3': 8}
 }
 _SERVER_VARS = {
     'basearch': getBaseArch(),
@@ -148,7 +149,7 @@ class RemotePackageInfo(PackageInfo):
         self.checksum = (None,None) # type,value
         self.openchecksum = (None,None) # type,value
         self.time = (None, None)
-        super(RemotePackageInfo, self).__init__(None, None, None, None, None)
+        super(RemotePackageInfo, self).__init__(None, None, None, None, None, None)
         self._parser(elem)
 
     @property
@@ -488,8 +489,12 @@ class RemoteMirrorRepository(MirrorRepository):
         self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % arch)
         release = pattern['release'] if 'release' in pattern else None
         self.stdio and getattr(self.stdio, 'verbose', print)('release is %s' % release)
-        version = pattern['version'] if 'version' in pattern else None
+        version = ConfigUtil.get_value_from_dict(pattern, 'version', transform_func=Version)
         self.stdio and getattr(self.stdio, 'verbose', print)('version is %s' % version)
+        min_version = ConfigUtil.get_value_from_dict(pattern, 'min_version', transform_func=Version)
+        self.stdio and getattr(self.stdio, 'verbose', print)('min_version is %s' % min_version)
+        max_version = ConfigUtil.get_value_from_dict(pattern, 'max_version', transform_func=Version)
+        self.stdio and getattr(self.stdio, 'verbose', print)('max_version is %s' % max_version)
         pkgs = []
         for key in self.db:
             info = self.db[key]
@@ -501,12 +506,22 @@ class RemoteMirrorRepository(MirrorRepository):
                 continue
             if version and version != info.version:
                 continue
+            if min_version and min_version > info.version:
+                continue
+            if max_version and max_version <= info.version:
+                continue
             pkgs.append(info)
         if pkgs:
             pkgs.sort()
             return pkgs[-1]
         else:
             return None
+    
+    def get_best_pkg_info_with_score(self, **pattern):
+        matchs = self.get_pkgs_info_with_score(**pattern)
+        if matchs:
+            return [info[0] for info in sorted(matchs, key=lambda x: x[1], reverse=True)]
+        return None
 
     def get_pkgs_info_with_score(self, **pattern):
         matchs = []
@@ -541,11 +556,15 @@ class RemoteMirrorRepository(MirrorRepository):
                     matchs.append([info, score])
         return matchs
 
-    def match_score(self, info, name, arch, version=None, release=None):
+    def match_score(self, info, name, arch, version=None, min_version=None, max_version=None, release=None):
         if info.arch not in arch:
             return [0, ]
         info_version = '%s.' % info.version
         if version and info_version.find(version) != 0:
+            return [0 ,]
+        if min_version and Version(info_version) <= Version(min_version):
+            return [0 ,]
+        if max_version and Version(info_version) > Version(max_version):
             return [0 ,]
         if release and info.release != release:
             raise Exception ('break')
@@ -605,6 +624,8 @@ class LocalMirrorRepository(MirrorRepository):
 
     MIRROR_TYPE = MirrorRepositoryType.LOCAL
     _DB_FILE = '.db'
+    __VERSION_KEY__ = '__version__'
+    __VERSION__ = Version("1.0")
 
     def __init__(self, mirror_path, stdio=None):
         super(LocalMirrorRepository, self).__init__(mirror_path, stdio=stdio)
@@ -623,21 +644,31 @@ class LocalMirrorRepository(MirrorRepository):
             if os.path.isfile(self.db_path):
                 with open(self.db_path, 'rb') as f:
                     db = pickle.load(f)
-                    for key in db:
-                        data = db[key]
-                        path = getattr(data, 'path', False)
-                        if not path or not os.path.exists(path):
-                            continue
-                        self.db[key] = data
+                    self._flush_db(db)
         except:
             self.stdio.exception('')
             pass
+        
+    def _flush_db(self, db):
+        need_flush = self.__VERSION__ > Version(db.get(self.__VERSION_KEY__, '0')) 
+        for key in db:
+            data = db[key]
+            path = getattr(data, 'path', False)
+            if not path or not os.path.exists(path):
+                continue
+            if need_flush:
+                data = Package(path)
+            self.db[key] = data
+        if need_flush:
+            self._dump_db()
 
     def _dump_db(self):
         # 所有 dump方案都为临时
         try:
+            data = deepcopy(self.db)
+            data[self.__VERSION_KEY__] = self.__VERSION__
             with open(self.db_path, 'wb') as f:
-                pickle.dump(self.db, f)
+                pickle.dump(data, f)
             return True
         except:
             self.stdio.exception('')
@@ -721,8 +752,12 @@ class LocalMirrorRepository(MirrorRepository):
         self.stdio and getattr(self.stdio, 'verbose', print)('arch is %s' % arch)
         release = pattern['release'] if 'release' in pattern else None
         self.stdio and getattr(self.stdio, 'verbose', print)('release is %s' % release)
-        version = pattern['version'] if 'version' in pattern else None
+        version = ConfigUtil.get_value_from_dict(pattern, 'version', transform_func=Version)
         self.stdio and getattr(self.stdio, 'verbose', print)('version is %s' % version)
+        min_version = ConfigUtil.get_value_from_dict(pattern, 'min_version', transform_func=Version)
+        self.stdio and getattr(self.stdio, 'verbose', print)('min_version is %s' % min_version)
+        max_version = ConfigUtil.get_value_from_dict(pattern, 'max_version', transform_func=Version)
+        self.stdio and getattr(self.stdio, 'verbose', print)('max_version is %s' % max_version)
         pkgs = []
         for key in self.db:
             info = self.db[key]
@@ -733,6 +768,10 @@ class LocalMirrorRepository(MirrorRepository):
             if release and info.release != release:
                 continue
             if version and version != info.version:
+                continue
+            if min_version and min_version > info.version:
+                continue
+            if max_version and max_version <= info.version:
                 continue
             pkgs.append(info)
         if pkgs:
@@ -779,11 +818,15 @@ class LocalMirrorRepository(MirrorRepository):
                     matchs.append([info, score])
         return matchs
 
-    def match_score(self, info, name, arch, version=None, release=None):
+    def match_score(self, info, name, arch, version=None, min_version=None, max_version=None, release=None):
         if info.arch not in arch:
             return [0, ]
         info_version = '%s.' % info.version
         if version and info_version.find(version) != 0:
+            return [0 ,]
+        if min_version and Version(info_version) <= Version(min_version):
+            return [0 ,]
+        if max_version and Version(info_version) > Version(max_version):
             return [0 ,]
         if release and info.release != release:
             return [0 ,]
@@ -958,7 +1001,7 @@ class MirrorRepositoryManager(Manager):
     def get_mirrors(self, is_enabled=True):
         self._lock()
         mirrors = self.get_remote_mirrors(is_enabled=is_enabled)
-        mirrors.append(self.local_mirror)
+        mirrors.insert(0, self.local_mirror)
         return mirrors
 
     def get_exact_pkg(self, **pattern):

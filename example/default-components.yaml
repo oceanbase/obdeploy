@@ -47,6 +47,7 @@ oceanbase-ce:
   server1:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    obshell_port: 2886 # Operation and maintenance port for Oceanbase Database. The default value is 2886. This parameter is valid only when the version of oceanbase-ce is 4.2.2.0 or later.
     # The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
     # The directory for data storage. The default value is $home_path/store.
@@ -57,6 +58,7 @@ oceanbase-ce:
   server2:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    obshell_port: 2886 # Operation and maintenance port for Oceanbase Database. The default value is 2886. This parameter is valid only when the version of oceanbase-ce is 4.2.2.0 or later.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
     # The directory for data storage. The default value is $home_path/store.
@@ -67,6 +69,7 @@ oceanbase-ce:
   server3:
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    obshell_port: 2886 # Operation and maintenance port for Oceanbase Database. The default value is 2886. This parameter is valid only when the version of oceanbase-ce is 4.2.2.0 or later.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     home_path: /root/observer
     # The directory for data storage. The default value is $home_path/store.

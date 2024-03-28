@@ -69,7 +69,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % passwd_format(password) if password else '')
             break
 
-    if not with_observer:
+    if (with_observer and server_config.get('obproxy_sys_password', '')) or not with_observer:
         user = 'root@proxysys'
         password = server_config.get('obproxy_sys_password', '')
         info_dict['user'] = user

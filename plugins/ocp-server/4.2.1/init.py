@@ -25,6 +25,7 @@ from glob import glob
 
 import _errno as err
 from const import CONST_OBD_HOME
+from ssh import LocalClient
 
 
 OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
@@ -55,6 +56,16 @@ def _ocp_lib(client, home_path, soft_dir='', stdio=None):
         client.put_file(rpm, os.path.join(home_path, 'ocp-server/lib/', name))
         if soft_dir:
             client.put_file(rpm, os.path.join(soft_dir, name))
+    max_ob_pkg = LocalClient.execute_command('find %s/mirror/ -type f -name "oceanbase-*.rpm" -exec readlink -f {} \; | grep -v "oceanbase.*libs" | grep -v "oceanbase.*utils" | sort -V | tail -n 1' % OBD_HOME, stdio=stdio).stdout.strip()
+    max_odp_pkg = LocalClient.execute_command('find %s/mirror/ -type f -name "obproxy-*.rpm" -exec readlink -f {} \; | sort -V | tail -n 1' % OBD_HOME, stdio=stdio).stdout.strip()
+    name = os.path.basename(max_ob_pkg)
+    client.put_file(max_ob_pkg, os.path.join(home_path, 'ocp-server/lib/', name))
+    if soft_dir:
+        client.put_file(max_ob_pkg, os.path.join(soft_dir, name))
+    name = os.path.basename(max_odp_pkg)
+    client.put_file(max_odp_pkg, os.path.join(home_path, 'ocp-server/lib/', name))
+    if soft_dir:
+        client.put_file(max_odp_pkg, os.path.join(soft_dir, name))
 
 
 def init(plugin_context, upgrade=False, *args, **kwargs):
@@ -75,8 +86,9 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
         plugin_context.return_true()
         return
 
-    stdio.start_loading('Initializes ocp-server work home')
+    stdio.start_loading('Initializes %s work home' % cluster_config.name)
     servers_dirs = {}
+    cp_lib = 0
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
@@ -150,7 +162,9 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
                 continue
         link_path = os.path.join(home_path, 'log')
         client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))
-        _ocp_lib(client, home_path, soft_dir, stdio)
+        if cp_lib < 1:
+            _ocp_lib(client, home_path, soft_dir, stdio)
+        cp_lib += 1
         if launch_user:
             res_home = client.execute_command("sudo chown -R %s %s" % (launch_user, home_path))
             res_log = client.execute_command("sudo chown -R %s %s" % (launch_user, log_dir))

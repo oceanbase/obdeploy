@@ -28,24 +28,14 @@ import hashlib
 from ssh import LocalClient
 from tool import FileUtil
 from _errno import EC_MYSQLTEST_FAILE_NOT_FOUND, EC_MYSQLTEST_PARSE_CMD_FAILED
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
+from _types import Capacity
 
 
 def get_memory_limit(cursor, client):
     try:
         memory_limit = cursor.fetchone('show parameters where name = \'memory_limit\'')
         if memory_limit and 'value' in memory_limit and memory_limit['value']:
-            return parse_size(memory_limit['value'])
+            return Capacity(memory_limit['value']).btyes
         ret = client.execute_command('free -b')
         if ret:
             ret = client.execute_command("cat /proc/meminfo | grep 'MemTotal:' | awk -F' ' '{print $2}'")
@@ -127,7 +117,7 @@ def init(plugin_context, env, *args, **kwargs):
         exec_init_user_for_oracle = 'init_user_oracle.sql|SYS@oracle|SYS'
         client = plugin_context.clients[server]
         memory_limit = get_memory_limit(cursor, client)
-        is_mini = memory_limit and parse_size(memory_limit) < (16<<30)
+        is_mini = memory_limit and Capacity(memory_limit).btyes < (16<<30)
         if env['is_business']:
             init_sql = [exec_mini_init if is_mini else exec_init, exec_init_user_for_oracle, exec_init_user]
         else:

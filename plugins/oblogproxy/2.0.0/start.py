@@ -99,9 +99,11 @@ def prepare_conf(repositories, cluster_config, clients, stdio):
         config['ob_sys_password'] = client.execute_command("{}/bin/logproxy -x {}".format(home_path, ob_sys_password)).stdout.strip() if ob_sys_password else ""
         config['binlog_log_bin_basename'] = custom_config.get('binlog_dir') if custom_config.get('binlog_dir') else '%s/run' % home_path
         if not custom_config.get('binlog_obcdc_ce_path_template'):
-            config['binlog_obcdc_ce_path_template'] = '{}/obcdc/obcdc-ce-%d.x-access/libobcdc.so'.format(home_path)
+            source_binlog_path = config['binlog_obcdc_ce_path_template']
+            config['binlog_obcdc_ce_path_template'] = os.path.join(home_path, source_binlog_path[source_binlog_path.find('/obcdc/') + 1:])
         if not custom_config.get('oblogreader_obcdc_ce_path_template'):
-            config['oblogreader_obcdc_ce_path_template'] = '{}/obcdc/obcdc-ce-%d.x-access/libobcdc.so'.format(home_path)
+            source_oblogreader_path = config['oblogreader_obcdc_ce_path_template']
+            config['oblogreader_obcdc_ce_path_template'] = os.path.join(home_path, source_oblogreader_path[source_oblogreader_path.find('/obcdc/') + 1:])
         if not custom_config.get('bin_path'):
             config['bin_path'] = '{}/bin'.format(home_path)
         if not custom_config.get('oblogreader_path'):

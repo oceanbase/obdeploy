@@ -121,7 +121,7 @@ class Restart(object):
 
         cluster_config = self.new_cluster_config if self.new_cluster_config else self.cluster_config
         need_bootstrap = self.bootstrap_plugin is not None
-        if not self.call_plugin(self.start_plugin, clients=clients, cluster_config=cluster_config, local_home_path=self.local_home_path, repository=self.repository, need_bootstrap=need_bootstrap):
+        if not self.call_plugin(self.start_plugin, clients=clients, cluster_config=cluster_config, local_home_path=self.local_home_path, repository=self.repository):
             self.rollback()
             self.stdio.stop_loading('stop_loading', 'fail')
             return False

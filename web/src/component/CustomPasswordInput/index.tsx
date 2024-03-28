@@ -1,10 +1,17 @@
+import {
+  copyText,
+  generateRandomPassword,
+  OB_PASSWORD_ERROR_REASON,
+  OCP_PASSWORD_ERROR_REASON,
+  OCP_PASSWORD_ERROR_REASON_OLD,
+  passwordCheck,
+  passwordCheckLowVersion
+} from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import { ProForm } from '@ant-design/pro-components';
-import { Input, Button, message } from 'antd';
+import { Button, Input, message } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { NamePath } from 'rc-field-form/lib/interface';
-import { generateRandomPassword } from '@/utils';
-import { copyText } from '@/utils/helper';
 
 interface CustomPasswordInputProps {
   onChange: (value: string) => void;
@@ -14,6 +21,8 @@ interface CustomPasswordInputProps {
   showCopyBtn?: boolean;
   form: FormInstance<any>;
   msgInfo: MsgInfoType;
+  useOldRuler?: boolean;
+  useFor: 'ob' | 'ocp';
   setMsgInfo: React.Dispatch<React.SetStateAction<MsgInfoType | undefined>>;
 }
 
@@ -21,8 +30,12 @@ type MsgInfoType = {
   validateStatus: 'success' | 'error';
   errorMsg: string | null;
 };
-const passwordReg =
-  /^(?=.*[A-Z].*[A-Z])(?=.*[a-z].*[a-z])(?=.*\d.*\d)(?=.*[~!@#%^&*_\-+=`|(){}[\]:;',.?/].*[~!@#%^&*_\-+=`|(){}[\]:;',.?/])[A-Za-z\d~!@#%^&*_\-+=`|(){}[\]:;',.?/]{8,32}$/;
+
+/**
+ *
+ * @param useOldRuler ocp版本<4.2.2用之前的密码校验规则
+ * @returns
+ */
 export default function CustomPasswordInput({
   onChange,
   value,
@@ -31,35 +44,16 @@ export default function CustomPasswordInput({
   name,
   msgInfo,
   setMsgInfo,
+  useOldRuler = false,
+  useFor,
   ...props
 }: CustomPasswordInputProps) {
   const textStyle = { marginTop: '8px' };
-  const validateInput = (value: string): MsgInfoType => {
-    const regex = /^[A-Za-z\d~!@#%^&*_\-+=`|(){}[\]:;',.?/]*$/;
-    if (value.length < 8 || value.length > 32) {
+  const oldValidateInput = (value: string): MsgInfoType => {
+    if (!passwordCheckLowVersion(value)) {
       return {
         validateStatus: 'error',
-        errorMsg: intl.formatMessage({
-          id: 'OBD.component.CustomPasswordInput.TheLengthShouldBeTo',
-          defaultMessage: '长度应为 8~32 个字符',
-        }),
-      };
-    } else if (!regex.test(value)) {
-      return {
-        validateStatus: 'error',
-        errorMsg: intl.formatMessage({
-          id: 'OBD.component.CustomPasswordInput.CanOnlyContainLettersNumbers',
-          defaultMessage:
-            "只能包含字母、数字和特殊字符~!@#%^&*_-+=`|(){}[]:;',.?/",
-        }),
-      };
-    } else if (!passwordReg.test(value)) {
-      return {
-        validateStatus: 'error',
-        errorMsg: intl.formatMessage({
-          id: 'OBD.component.CustomPasswordInput.AtLeastUppercaseAndLowercase',
-          defaultMessage: '大小写字母、数字和特殊字符都至少包含 2 个',
-        }),
+        errorMsg: OCP_PASSWORD_ERROR_REASON_OLD,
       };
     }
     return {
@@ -67,13 +61,28 @@ export default function CustomPasswordInput({
       errorMsg: null,
     };
   };
+  const newValidateInput = (value: string): MsgInfoType => {
+    if (!passwordCheck(value, useFor)) {
+      const REASON =
+        useFor === 'ob' ? OB_PASSWORD_ERROR_REASON : OCP_PASSWORD_ERROR_REASON;
+      return {
+        validateStatus: 'error',
+        errorMsg: REASON,
+      };
+    }
+    return {
+      validateStatus: 'success',
+      errorMsg: null,
+    };
+  };
+  const validateInput = useOldRuler ? oldValidateInput : newValidateInput;
   const handleChange = (value: string) => {
     setMsgInfo(validateInput(value));
     onChange(value);
   };
 
   const handleRandomGenerate = () => {
-    const password = generateRandomPassword();
+    const password = generateRandomPassword(useFor, useOldRuler);
     setMsgInfo(validateInput(password));
     onChange(password);
   };

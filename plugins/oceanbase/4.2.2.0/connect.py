@@ -35,6 +35,10 @@ from Crypto.PublicKey import RSA
 from enum import Enum
 from os import path
 from datetime import datetime
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import pad
+from const import RSA_KEY_SIZE
 if sys.version_info.major == 2:
     import MySQLdb as mysql
 else:
@@ -42,6 +46,8 @@ else:
 
 from _errno import EC_FAIL_TO_CONNECT, EC_SQL_EXECUTE_FAILED
 from _stdio import SafeStdio
+
+
 
 class OcsResponse(object):
     def __init__(self, code, data, type):
@@ -206,6 +212,28 @@ class OcsStatusResponse(OcsResponse):
 
         
 class OcsCursor(SafeStdio):
+
+    class Header:
+        auth: str
+        ts: str
+        uri: str
+        keys: bytes
+        def __init__(self, auth, ts, uri, keys):
+            self.auth = auth
+            self.ts = ts
+            self.uri = uri
+            self.keys = keys
+
+        def serialize_struct(self):
+            return json.dumps({
+                'auth': self.auth,
+                'ts': self.ts,
+                'uri': self.uri,
+                'keys': base64.b64encode(self.keys).decode('utf-8')
+            })
+
+
+
     HEADERS = {'content-type': 'application/json'}
 
     def __init__(self, ip, port, homepath = None, password = None, stdio=None):
@@ -216,12 +244,32 @@ class OcsCursor(SafeStdio):
         self.homepath = homepath
         self.socket_file = 'obshell.' + str(port) + '.sock'
         self._auth_header = None
+        self._version = ""
+        self.aes_key = get_random_bytes(16)
+        self.aes_iv = get_random_bytes(16)
 
     @staticmethod
     def _encrypt(context, encrypt_key):
         key = RSA.import_key(base64.b64decode(encrypt_key))
         cipher = PKCS1_cipher.new(key)
         return base64.b64encode(cipher.encrypt(bytes(context.encode('utf8')))).decode('utf8')
+
+    @staticmethod
+    def rsa_encrypt(context, encrypt_key):
+        key = RSA.import_key(base64.b64decode(encrypt_key))
+        cipher = PKCS1_cipher.new(key)
+        data_to_encrypt = bytes(context.encode('utf8'))
+        max_chunk_size = int(RSA_KEY_SIZE / 8) - 11
+        chunks = [data_to_encrypt[i:i + max_chunk_size] for i in range(0, len(data_to_encrypt), max_chunk_size)]
+        encrypted_chunks = [cipher.encrypt(chunk) for chunk in chunks]
+        encrypted = b''.join(encrypted_chunks)
+        encoded_encrypted_chunks = base64.b64encode(encrypted).decode('utf-8')
+        return encoded_encrypted_chunks
+
+    @staticmethod
+    def aes_encrypt(self, data):
+        cipher = AES.new(self.aes_key, AES.MODE_CBC, self.aes_iv)
+        return base64.b64encode(cipher.encrypt(pad(bytes(data.encode('utf8')), AES.block_size))).decode('utf8')
 
     @property
     def auth_header(self):
@@ -231,25 +279,46 @@ class OcsCursor(SafeStdio):
             self._auth_header = self._encrypt(auth_json, encrypt_key)
         return self._auth_header
 
-    def _make_headers(self, headers=None, safe=None):
+    @property
+    def version(self):
+        if self._version != "":
+            return self._version
+        status = requests.get(self._make_url('/api/v1/status'), headers=self._make_headers())
+        if status.status_code == 200:
+            self._version = status.json()['data']['version']
+            return self._version
+        else :
+            self.stdio.warn('get obshell version failed')
+            return None
+
+    def _make_headers(self, headers=None, safe=None, uri=None):
         request_headers = copy.deepcopy(self.HEADERS)
         if safe is True :
-            request_headers['X-OCS-Auth'] = self.auth_header
+            # request_headers['X-OCS-Auth'] = self.auth_header
+            if self.version >= '4.2.3':
+                header = self.Header(auth=self.password, ts=str(int(datetime.now().timestamp()) + 100000), uri=uri, keys=self.aes_key+self.aes_iv)
+                request_headers['X-OCS-Header'] = self.rsa_encrypt(header.serialize_struct(), self._get_secrets())
+            else:
+                request_headers['X-OCS-Auth'] = self.auth_header
         if headers:
             request_headers.update(headers)
         return request_headers
 
     def _make_url(self, url):
-        return 'http://{ip}:{port}/{url}'.format(ip=self.ip, port=self.port, url=url)
+        return 'http://{ip}:{port}{url}'.format(ip=self.ip, port=self.port, url=url)
 
     def _request(self, method, url, data=None, headers=None, params=None, safe=None, *args, **kwargs):
         try: 
             if data is not None:
                 data = json.dumps(data)
+            else:
+                data = json.dumps({})
+            if safe and self.version >= '4.2.3':
+                data = self.aes_encrypt(self, data)
             self.stdio.verbose('send request to obshell: method: {}, url: {}, data: {}, headers: {}, params: {}'.format(method, url, data, headers, params))
-            resp = requests.request(method, url, data=data, headers=self._make_headers(headers, safe), params=params, *args, **kwargs)
+            resp = requests.request(method, self._make_url(url), data=data, headers=self._make_headers(headers, safe, url), params=params, *args, **kwargs)
         except Exception as e:
-            # self.stdio.error('request error: {}'.format(e))
+            self.stdio.error('request error: {}'.format(e))
             return None
         parsed_resp = self._response_parser(resp)
         if parsed_resp.code != 200:
@@ -294,14 +363,14 @@ class OcsCursor(SafeStdio):
     
     # get the public key from ocs agent
     def _get_secrets(self):
-        resp = self._request('GET', self._make_url('api/v1/secret'))
+        resp = self._request('GET', '/api/v1/secret')
         return resp.public_key if resp else None
     
     def request(self, method, url, data=None, headers=None, params=None, *args, **kwargs):
-        return self._request(method, self._make_url(url), data, headers, params, *args, **kwargs)
+        return self._request(method, url, data, headers, params, *args, **kwargs)
     
     def safe_request(self, method, url, data=None, headers=None, params=None, *args, **kwargs):
-        return self._request(method, self._make_url(url), data, headers, params, safe=True, *args, **kwargs)
+        return self._request(method, url, data, headers, params, safe=True, *args, **kwargs)
     
     def query_dag_util_succeed(self, _dag):
         dag = _dag
@@ -325,51 +394,51 @@ class OcsCursor(SafeStdio):
 
     # normal route
     def info_request(self):
-        resp = self.request('GET', 'api/v1/info')
+        resp = self.request('GET', '/api/v1/info')
         return resp.info if resp and resp.type == 'InfoDTO' else None
 
     def status_request(self):
-        resp = self.request('GET', 'api/v1/status')
+        resp = self.request('GET', '/api/v1/status')
         return resp.status if resp and resp.type == 'StatusDTO' else None
 
     def secret_request(self):
-        return self.request('GET', 'api/v1/secret')
+        return self.request('GET', '/api/v1/secret')
 
     # ob routes
     def ob_init_request(self):
-        resp = self.safe_request('POST', 'api/v1/ob/init')
+        resp = self.safe_request('POST', '/api/v1/ob/init')
         return self.query_dag_util_finish(resp.dag) if resp else False
     
     def ob_stop_request(self, type = 'GLOBAL', target = None):
-        resp = self.safe_request('POST', 'api/v1/ob/stop', data = {'scope': {'type': type, 'target': target}, 'force': True})
+        resp = self.safe_request('POST', '/api/v1/ob/stop', data = {'scope': {'type': type, 'target': target}, 'force': True})
         return self.query_dag_util_finish(resp.dag) if resp else False
     
     def ob_start_request(self, type = 'GLOBAL', target = None):
-        resp = self.safe_request('POST', 'api/v1/ob/start', data = {'scope': {'type': type, 'target': target}})
+        resp = self.safe_request('POST', '/api/v1/ob/start', data = {'scope': {'type': type, 'target': target}})
         return self.query_dag_util_finish(resp.dag) if resp else False
     
     def ob_info_request(self, data):
-        resp = self.safe_request('POST', 'api/v1/ob/info', data=data)
+        resp = self.safe_request('POST', '/api/v1/ob/info', data=data)
         return resp
 
     # agent admin routes  
     def agent_join_request(self, ip, port, zone):
-        resp = self.safe_request('POST', 'api/v1/agent', data={'agentInfo': {'ip': ip, 'port': port}, 'zoneName': zone})
+        resp = self.safe_request('POST', '/api/v1/agent', data={'agentInfo': {'ip': ip, 'port': port}, 'zoneName': zone})
         return self.query_dag_util_finish(resp.dag) if resp else False
     
     def agent_remove_request(self, ip, port):
-        resp = self.safe_request('DELETE', 'api/v1/agent', data={'ip': ip, 'port': port})
+        resp = self.safe_request('DELETE', '/api/v1/agent', data={'ip': ip, 'port': port})
         return self.query_dag_util_finish(resp.dag) if resp else False
     
     def agent_remove_by_socket(self, ssh_client, ip, port):
-        resp = self._curl_socket(ssh_client, 'DELETE', 'api/v1/agent', data={'ip': ip, 'port': port})
+        resp = self._curl_socket(ssh_client, 'DELETE', '/api/v1/agent', data={'ip': ip, 'port': port})
         return self.query_dag_util_finish(resp.dag) if resp else False
     
     # obcluster routes
     def obcluster_config_request(self, cluster_id, cluster_name, rs_list):
         encrypt_key = self._get_secrets()
         encrypt_password = self._encrypt(self.password, encrypt_key)
-        resp = self.safe_request('POST', 'api/v1/obcluster/config', data={'clusterId': cluster_id, 'clusterName': cluster_name, 'rootPwd': encrypt_password, 'rsList': rs_list})
+        resp = self.safe_request('POST', '/api/v1/obcluster/config', data={'clusterId': cluster_id, 'clusterName': cluster_name, 'rootPwd': encrypt_password, 'rsList': rs_list})
         return self.query_dag_util_finish(resp.dag) if resp else False
 
     # observer routes
@@ -377,41 +446,47 @@ class OcsCursor(SafeStdio):
         # 把serverconfig中的int类型的value全部转换成string类型
         for key in server_config:
             server_config[key] = str(server_config[key])
-        resp = self.safe_request('PUT', 'api/v1/observer/config', data={'observerConfig': server_config, 'restart': restart, 'scope': {'type': 'SERVER', 'target': agent_list}})
+        resp = self.safe_request('PUT', '/api/v1/observer/config', data={'observerConfig': server_config, 'restart': restart, 'scope': {'type': 'SERVER', 'target': agent_list}})
         return self.query_dag_util_finish(resp.dag) if resp else False
 
     # def observer_patch_config_request(self, server_config, servers, restart = False):
-    #     resp = self.safe_request('POST', 'api/v1/observer/config', data={'observerConfig': server_config, 'restart': restart, 'scope': {'type': 'SERVER', 'target': servers}})
+    #     resp = self.safe_request('POST', '/api/v1/observer/config', data={'observerConfig': server_config, 'restart': restart, 'scope': {'type': 'SERVER', 'target': servers}})
     #     return self.query_dag_util_succeed(resp.dag) if resp else False
 
     def observer_scale_out_request(self, ip, port, zone, server_config):
-        resp = self.safe_request('POST', 'api/v1/ob/scale_out', data={'agentInfo': {'ip': ip, 'port': port}, 'obConfigs': server_config,'zone': zone})
+        resp = self.safe_request('POST', '/api/v1/ob/scale_out', data={'agentInfo': {'ip': ip, 'port': port}, 'obConfigs': server_config,'zone': zone})
         return self.query_dag_util_finish(resp.dag) if resp else False
 
     # upgrade routes
     def pkg_upload_request(self, data = None):
-        return self.safe_request('POST', 'api/v1/upgrade/pkg/upload', data=data)
+        return self.safe_request('POST', '/api/v1/upgrade/pkg/upload', data=data)
 
     def params_backup_request(self, data = None):
-        return self.safe_request('POST', 'api/v1/upgrade/params/backup', data=data)
+        return self.safe_request('POST', '/api/v1/upgrade/params/backup', data=data)
 
     # task routes
     def get_dag_request(self, id):
-        resp = self.safe_request('GET', 'api/v1/task/dag/%s' % id)
+        resp = self.safe_request('GET', '/api/v1/task/dag/%s' % id)
         return resp.dag if resp else None
 
     def dag_request(self, dag, operator):
-        resp = self.safe_request('POST', 'api/v1/task/dag/%s' % dag.id, data={'operator': operator})
+        resp = self.safe_request('POST', '/api/v1/task/dag/%s' % dag.id, data={'operator': operator})
         if not resp:
             return False
         return self.query_dag_util_finish(dag) 
         
     def get_agent_last_maintenance_dag_request(self):
-        resp = self.request('GET', 'api/v1/task/dag/maintain/agent')
+        if self.version >='4.2.3':
+            resp = self.safe_request('GET', '/api/v1/task/dag/maintain/agent')
+        else:
+            resp = self.request('GET', '/api/v1/task/dag/maintain/agent')
         return resp.dag if resp else None
 
     def get_ob_last_maintenance_dag_request(self):
-        resp = self.request('GET', 'api/v1/task/dag/maintain/ob')
+        if self.version >= '4.2.3':
+            resp = self.safe_request('GET', '/api/v1/task/dag/maintain/ob')
+        else :
+            resp = self.request('GET', '/api/v1/task/dag/maintain/ob')
         return resp.dag if resp else None
 
 def get_ocs_cursor(plugin_context, *args, **kwargs):
@@ -524,15 +599,15 @@ def connect(plugin_context, target_server=None, retry_times=101, connect_all=Fal
         for key, value in kwargs.items():
             plugin_context.set_variable(key, value)
         return plugin_context.return_true(**kwargs)
-    
+
     ocs_cursor = get_ocs_cursor(plugin_context, *args, **kwargs)
+    stdio = plugin_context.stdio
     if not ocs_cursor:
         stdio.stop_loading('fail')
         return plugin_context.return_false()
 
     count = retry_times
     cluster_config = plugin_context.cluster_config
-    stdio = plugin_context.stdio
     if target_server:
         servers = [target_server]
         server_config = cluster_config.get_server_conf(target_server)

@@ -35,6 +35,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCS1_signature
 from Crypto.Cipher import PKCS1_OAEP as PKCS1_cipher
 
+from _errno import EC_SQL_EXECUTE_FAILED
+
+
 PRI_KEY_FILE = '.ocp-express'
 PUB_KEY_FILE = '.ocp-express.pub'
 
@@ -44,35 +47,7 @@ if sys.version_info.major == 2:
 else:
     import pymysql as mysql
 from _stdio import SafeStdio
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G']
-    units_num = len(units) - 1
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-        limit = 1024
-    else:
-        div = 1024
-        limit = 1024
-        format = '%d%s'
-    while idx < units_num and size >= limit:
-        size /= div
-        idx += 1
-    return format % (size, units[idx])
+from _types import Capacity, CapacityWithB
 
 
 class Cursor(SafeStdio):
@@ -107,6 +82,22 @@ class Cursor(SafeStdio):
             self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password), database=self.database,
                                cursorclass=mysql.cursors.DictCursor)
             self.cursor = self.db.cursor()
+    
+    def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):
+        try:
+            stdio.verbose('execute sql: %s. args: %s' % (sql, args))
+            self.cursor.execute(sql, args)
+            if not execute_func:
+                return self.cursor
+            return getattr(self.cursor, execute_func)()
+        except Exception as e:
+            getattr(stdio, exc_level)(EC_SQL_EXECUTE_FAILED.format(sql=sql))
+            if raise_exception is None:
+                raise_exception = self._raise_exception
+            if raise_exception:
+                stdio.exception('')
+                raise e
+            return False
 
 
 def generate_key(client, key_dir, stdio):
@@ -297,6 +288,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    added_components = plugin_context.cluster_config.get_deploy_added_components()
 
     if not start_env:
         start_env = prepare_parameters(cluster_config, stdio)
@@ -330,11 +322,11 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         port = server_config['port']
         pid_path = os.path.join(home_path, 'run/ocp-express.pid')
         pids = client.execute_command("cat %s" % pid_path).stdout.strip()
-        bootstrap_flag = os.path.join(home_path, '.bootstrapped')
+        bootstrap_flag = client.execute_command('ls %s'%os.path.join(home_path, '.bootstrapped'))
         if pids and all([client.execute_command('ls /proc/%s' % pid) for pid in pids.split('\n')]):
             server_pid[server] = pids
             continue
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % bootstrap_flag):
+        if getattr(options, 'without_parameter', False) and bootstrap_flag:
             use_parameter = False
         else:
             use_parameter = True
@@ -359,9 +351,16 @@ def start(plugin_context, start_env=None, *args, **kwargs):
                 server_ip = connect_info[0]
                 server_port = connect_info[-1]
                 try:
-                    Cursor(ip=server_ip, port=server_port, user=jdbc_username, password=jdbc_password, database=database, stdio=stdio)
+                    ob_cursor = Cursor(ip=server_ip, port=server_port, user=jdbc_username, password=jdbc_password, database=database, stdio=stdio)
                     jdbc_url = 'jdbc:oceanbase://{}:{}/{}'.format(server_ip, server_port, database)
                     connected = True
+                    if 'ocp-express' in added_components:
+                        if ob_cursor.execute("select * from config_properties limit 1", exc_level='verbose'):
+                                if not ob_cursor.execute("update config_properties set `value`=NULL, default_value=NULL where `key`='ocp.version' or `key`='ocp.version.full'", exc_level='verbose'):
+                                    stdio.verbose("failed to update 'ocp.version' and 'ocp.version.full' to NULL in config_properties table")
+                        if ob_cursor.execute("select * from iam_user limit 1", exc_level='verbose'):
+                            if not ob_cursor.execute("update  iam_user set need_change_password=true where id='100'", exc_level='verbose'):
+                                stdio.verbose("failed to update 'need_change_password' to true in iam_user table")   
                     break
                 except:
                     time.sleep(1)
@@ -378,12 +377,13 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         else:
             public_key_str = ""
         memory_size = server_config['memory_size']
-        jvm_memory_option = "-Xms{0} -Xmx{0}".format(format_size(parse_size(memory_size) * 0.5, 0).lower())
+        jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(Capacity(memory_size).btyes * 0.5, 0)).lower())
         extra_options = {
             "ocp.iam.encrypted-system-password": system_password
         }
         extra_options_str = ' '.join(["-D{}={}".format(k, v) for k, v in extra_options.items()])
         java_bin = server_config['java_bin']
+        client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
         cmd = '{java_bin} -jar {jvm_memory_option} -DJDBC_URL={jdbc_url} -DJDBC_USERNAME={jdbc_username} -DJDBC_PASSWORD={jdbc_password} ' \
               '-DPUBLIC_KEY={public_key} {extra_options_str} {home_path}/lib/ocp-express-server.jar --port={port}'.format(
                 java_bin=java_bin,
@@ -405,7 +405,12 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             cmd += ' --bootstrap --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
             for key in server_config:
                 if key not in exclude_keys and key in config_mapper:
+                    if key == 'logging_file_total_size_cap':
+                        cmd += ' --with-property=ocp.logging.file.total.size.cap:{}'.format(CapacityWithB(server_config[key]))
+                        continue
                     cmd += ' --with-property={}:{}'.format(config_mapper[key], server_config[key])
+        elif not bootstrap_flag:
+            cmd += ' --bootstrap --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
         client.execute_command("cd {}; bash -c '{} > /dev/null 2>&1 &'".format(home_path, cmd))
         ret = client.execute_command("ps -aux | grep '%s' | grep -v grep | awk '{print $2}' " % cmd)
         if ret:
@@ -424,7 +429,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
     stdio.start_loading("ocp-express program health check")
     failed = []
     servers = cluster_config.servers
-    count = 200
+    count = 300
     while servers and count:
         count -= 1
         tmp_servers = []
@@ -464,6 +469,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         return plugin_context.return_false()
     else:
         stdio.stop_loading('succeed')
+        plugin_context.set_variable('start_env', start_env)
         plugin_context.return_true(need_bootstrap=True)
 
     return False

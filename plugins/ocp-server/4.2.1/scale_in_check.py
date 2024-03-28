@@ -24,5 +24,5 @@ from __future__ import absolute_import, division, print_function
 def scale_in_check(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-    stdio.error("Not support component `%s`".format(cluster_config.name))
+    stdio.error("Not support component {}".format(cluster_config.name))
     return plugin_context.return_false()

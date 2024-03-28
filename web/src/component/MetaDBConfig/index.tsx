@@ -1,19 +1,22 @@
 import { intl } from '@/utils/intl';
-import { Space, Button } from 'antd';
-import { ProCard, ProForm } from '@ant-design/pro-components';
-import { useModel } from 'umi';
-import { useRef, useState } from 'react';
 import type { EditableFormInstance } from '@ant-design/pro-components';
+import { ProCard, ProForm } from '@ant-design/pro-components';
+import { Button, Space } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { useModel } from 'umi';
 
-import CustomFooter from '../CustomFooter';
-import OBProxyConfig from './OBProxyConfig';
-import ClusterConfig from './ClusterConfig';
-import UserConfig from './UserConfig';
-import NodeConfig from './NodeConfig';
-import DataBaseNodeConfig from './DataBaseNodeConfig';
 import { PARAMETER_TYPE } from '@/constant/configuration';
-import { formValidScorllHelper } from './helper';
+import type { RulesDetail } from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
+import { parameterValidator } from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
+import { getPasswordRules } from '@/utils/helper';
+import CustomFooter from '../CustomFooter';
 import ExitBtn from '../ExitBtn';
+import ClusterConfig from './ClusterConfig';
+import DataBaseNodeConfig from './DataBaseNodeConfig';
+import { formValidScorllHelper } from './helper';
+import NodeConfig from './NodeConfig';
+import OBProxyConfig from './OBProxyConfig';
+import UserConfig from './UserConfig';
 
 interface MetaDBConfig {
   setCurrent: React.Dispatch<React.SetStateAction<number>>;
@@ -76,6 +79,10 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
     useState<API.DBConfig[]>(initDBConfigData);
   const finalValidate = useRef<boolean>(false);
   const tableFormRef = useRef<EditableFormInstance<API.DBConfig>>();
+  const [parameterRules, setParameterRules] = useState<RulesDetail>({
+    rules: [() => ({ validator: parameterValidator })],
+    targetColumn: 'obproxy_sys_password',
+  });
   const formatParameters = (dataSource: any) => {
     if (dataSource) {
       const parameterKeys = Object.keys(dataSource);
@@ -166,6 +173,11 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
   };
 
   const [form] = ProForm.useForm();
+  const passwordFormValue = ProForm.useWatch(
+    ['obproxy', 'parameters', 'obproxy_sys_password', 'params'],
+    form,
+  );
+
   const getInitialParameters = (
     currentComponent: string,
     dataSource: API.MoreParameter[],
@@ -252,6 +264,20 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
     launch_user: launch_user || undefined,
   };
 
+  useEffect(() => {
+    if (!passwordFormValue?.adaptive) {
+      setParameterRules({
+        rules: getPasswordRules('ob'),
+        targetColumn: 'obproxy_sys_password',
+      });
+    } else {
+      setParameterRules({
+        rules: [() => ({ validator: parameterValidator })],
+        targetColumn: 'obproxy_sys_password',
+      });
+    }
+  }, [passwordFormValue]);
+
   return (
     <ProForm
       form={form}
@@ -274,7 +300,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
 
           <ClusterConfig form={form} />
         </ProCard>
-        <OBProxyConfig form={form} />
+        <OBProxyConfig form={form} parameterRules={parameterRules} />
       </Space>
       <CustomFooter>
         <ExitBtn />

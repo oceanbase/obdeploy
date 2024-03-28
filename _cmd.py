@@ -32,17 +32,22 @@ from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 from core import ObdHome
 from _stdio import IO, FormtatText
 from _lock import LockMode
+from _types import Capacity
 from tool import DirectoryUtil, FileUtil, NetUtil, COMMAND_ENV
 from _errno import DOC_LINK_MSG, LockError
 import _environ as ENV
 from ssh import LocalClient
-from const import *
+from const import (
+    CONST_OBD_HOME, CONST_OBD_INSTALL_PATH, CONST_OBD_INSTALL_PRE, 
+    VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS,
+    COMP_OCEANBASE_DIAGNOSTIC_TOOL
+)
 
 
 ROOT_IO = IO(1)
 
 OBD_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
-OBDIAG_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), 'oceanbase-diagnostic-tool')
+OBDIAG_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), COMP_OCEANBASE_DIAGNOSTIC_TOOL)
 COMMAND_ENV.load(os.path.join(OBD_HOME_PATH, '.obd_environ'), ROOT_IO)
 ROOT_IO.default_confirm = COMMAND_ENV.get(ENV.ENV_DEFAULT_CONFIRM, '0') == '1'
 
@@ -187,6 +192,8 @@ class ObdCommand(BaseCommand):
         version_fobj = FileUtil.open(version_path, 'a+', stdio=ROOT_IO)
         version_fobj.seek(0)
         version = version_fobj.read()
+        if not COMMAND_ENV.get(ENV.ENV_OBD_ID):
+            COMMAND_ENV.set(ENV.ENV_OBD_ID, uuid())
         if VERSION != version:
             for part in ['plugins', 'config_parser', 'optimize', 'mirror/remote']:
                 obd_part_dir = os.path.join(self.OBD_PATH, part)
@@ -630,8 +637,8 @@ class RepositoryListCommand(ObdCommand):
     def show_repo(self, repos, name=None):
         ROOT_IO.print_list(
             repos,
-            ['name', 'version', 'release', 'arch', 'md5', 'tags'],
-            lambda x: [x.name, x.version, x.release, x.arch, x.md5, ', '.join(x.tags)],
+            ['name', 'version', 'release', 'arch', 'md5', 'tags', 'size'],
+            lambda x: [x.name, x.version, x.release, x.arch, x.md5, ', '.join(x.tags), Capacity(x.size, 2).value],
             title='%s Local Repository List' % name if name else 'Local Repository List'
         )
 
@@ -749,7 +756,7 @@ class WebCommand(ObdCommand):
         url = '/#/updateWelcome' if self.cmds and self.cmds[0] in ('upgrade', 'update') else ''
 
         ROOT_IO.print('start OBD WEB in 0.0.0.0:%s' % self.opts.port)
-        ROOT_IO.print('please open http://{0}:{1}{2}'.format(NetUtil.get_host_ip(),  self.opts.port, url))
+        ROOT_IO.print('please open http://{0}:{1}{2}'.format(NetUtil.get_host_ip(), self.opts.port, url))
         try:
             COMMAND_ENV.set(ENV.ENV_DISABLE_PARALLER_EXTRACT, True, stdio=obd.stdio)
             OBDWeb(obd, None, self.OBD_INSTALL_PATH).start(self.opts.port)
@@ -1543,13 +1550,17 @@ class CommandsCommand(ObdCommand):
             return self._show_help()
 
 
-class ToolCommand(HiddenMajorCommand):
+class ToolCommand(MajorCommand):
 
     def __init__(self):
         super(ToolCommand, self).__init__('tool', 'Tools')
         self.register_command(DbConnectCommand())
         self.register_command(CommandsCommand())
         self.register_command(DoobaCommand())
+        self.register_command(ToolListCommand())
+        self.register_command(ToolInstallCommand())
+        self.register_command(ToolUninstallCommand())
+        self.register_command(ToolUpdateCommand())
 
 
 class BenchMajorCommand(MajorCommand):
@@ -1616,6 +1627,8 @@ class ObdiagCommand(MajorCommand):
         self.register_command(ObdiagGatherCommand())
         self.register_command(ObdiagAnalyzeCommand())
         self.register_command(ObdiagCheckCommand())
+        self.register_command(ObdiagRcaCommand())
+        self.register_command(ObdiagUpdateSceneCommand())
 
 
 class ObdiagDeployCommand(ObdCommand):
@@ -1627,8 +1640,8 @@ class ObdiagDeployCommand(ObdCommand):
         self.parser.undefine_warn = False
 
     def _do_command(self, obd):
-        obd.set_options(self.opts)
-        return obd.obdiag_deploy()
+        ROOT_IO.print("Use 'obd tool install %s' instead" % COMP_OCEANBASE_DIAGNOSTIC_TOOL)
+        return obd.install_tool(COMP_OCEANBASE_DIAGNOSTIC_TOOL)
 
 
 class ObdiagGatherMirrorCommand(ObdCommand):
@@ -1658,6 +1671,24 @@ class ObdiagGatherCommand(MajorCommand):
         self.register_command(ObdiagGatherClogCommand())
         self.register_command(ObdiagGatherPlanMonitorCommand())
         self.register_command(ObdiagGatherObproxyLogCommand())
+        self.register_command(ObdiagGatherSceneCommand())
+
+
+class ObdiagGatherSceneCommand(MajorCommand):
+    
+    def __init__(self):
+        super(ObdiagGatherSceneCommand, self).__init__('scene', 'Gather scene diagnostic info')
+        self.register_command(ObdiagGatherSceneListCommand())
+        self.register_command(ObdiagGatherSceneRunCommand())
+
+
+class ObdiagRcaCommand(MajorCommand):
+    
+    def __init__(self):
+        super(ObdiagRcaCommand, self).__init__('rca', 'root cause analysis of oceanbase problem')
+        self.register_command(ObdiagRcaListCommand())
+        self.register_command(ObdiagRcaRunCommand())
+
 
 class ObdiagGatherAllCommand(ObdiagGatherMirrorCommand):
 
@@ -1803,11 +1834,9 @@ class ObdiagGatherPlanMonitorCommand(ObdiagGatherMirrorCommand):
 
     def __init__(self):
         super(ObdiagGatherPlanMonitorCommand, self).__init__('plan_monitor', 'Gather ParalleSQL information')
-        self.parser.add_option('-c', '--component', type='string', help="Component name to connect.", default='oceanbase-ce')
         self.parser.add_option('--trace_id', type='string', help='sql trace id')
         self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
-        self.parser.add_option('-u', '--user', type='string', help='The username used by database connection. [root]',default='root')
-        self.parser.add_option('-p', '--password', type='string', help='The password used by database connection.',default='')
+        self.parser.add_option('--env', type='string', help='env, eg: "{env1=xxx, env2=xxx}"')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1831,6 +1860,54 @@ class ObdiagGatherObproxyLogCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
         self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+
+
+class ObdiagGatherSceneListCommand(ObdCommand):
+
+    def __init__(self):
+        super(ObdiagGatherSceneListCommand, self).__init__('list', 'root cause analysis of oceanbase problem list')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherSceneListCommand, self).init(cmd, args)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def _do_command(self, obd):
+        return obd.obdiag_offline_func("gather_scene_list", self.opts)
+
+
+class ObdiagGatherSceneRunCommand(ObdCommand):
+
+    def __init__(self):
+        super(ObdiagGatherSceneRunCommand, self).__init__('run', 'root cause analysis of oceanbase problem')
+        self.parser.add_option('--scene', type='string', help="Specify the scene to be gather")
+        self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
+        self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
+        self.parser.add_option('--env', type='string', help='env, eg: "{env1=xxx, env2=xxx}"')
+        self.parser.add_option('--dis_update', type='string', help='The type is bool, assigned any value representing true', default='true')
+        self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
+    
+    def init(self, cmd, args):
+        super(ObdiagGatherSceneRunCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def _do_command(self, obd):
+        if len(self.cmds) > 0:
+            return obd.obdiag_online_func(self.cmds[0], "gather_scene_run", self.opts)
+        else:
+            return self._show_help()
+
 
 class ObdiagAnalyzeMirrorCommand(ObdCommand):
     
@@ -1909,7 +1986,8 @@ class ObdiagCheckCommand(ObdCommand):
     def __init__(self):
         super(ObdiagCheckCommand, self).__init__('check', 'check oceanbase cluster')
         self.parser.add_option('--cases', type='string', help="The name of the check task set that needs to be executed")
-        self.parser.add_option('--report_path', type='string', help='ouput report path', default='./check_report/')
+        self.parser.add_option('--store_dir', type='string', help='ouput report path', default='./check_report/')
+        self.parser.add_option('--dis_update', type='string', help='The type is bool, assigned any value representing true', default='true')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
     
     def init(self, cmd, args):
@@ -1921,6 +1999,143 @@ class ObdiagCheckCommand(ObdCommand):
     def _do_command(self, obd):
         if len(self.cmds) > 0:
             return obd.obdiag_online_func(self.cmds[0], "checker", self.opts)
+        else:
+            return self._show_help()
+
+class ObdiagRcaListCommand(ObdCommand):
+    
+    def __init__(self):
+        super(ObdiagRcaListCommand, self).__init__('list', 'root cause analysis of oceanbase problem list')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
+    
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def _do_command(self, obd):
+        return obd.obdiag_offline_func("rca_list", self.opts)
+
+
+class ObdiagRcaRunCommand(ObdCommand):
+    
+    def __init__(self):
+        super(ObdiagRcaRunCommand, self).__init__('run', 'to run root cause analysis of oceanbase problem')
+        self.parser.add_option('--scene', type='string', help="The name of the rca scene set that needs to be executed")
+        self.parser.add_option('--store_dir', type='string', help='ouput result path', default='./rca/')
+        self.parser.add_option('--parameters', type='string', help='parameters')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
+    
+    def init(self, cmd, args):
+        super(ObdiagRcaRunCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) > 0:
+            return obd.obdiag_online_func(self.cmds[0], "rca_run", self.opts)
+        else:
+            return self._show_help()
+
+
+class ObdiagUpdateSceneCommand(ObdCommand):
+    
+    def __init__(self):
+        super(ObdiagUpdateSceneCommand, self).__init__('update', 'update obdiag scenes')
+        self.parser.add_option('--file', type='string', help="obdiag update cheat file path")
+        self.parser.add_option('--force', type='string', help='Force Update')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
+    
+    def init(self, cmd, args):
+        super(ObdiagUpdateSceneCommand, self).init(cmd, args)
+        self.parser.set_usage('%s [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        return obd.obdiag_offline_func("update_scene", self.opts)
+
+
+class ToolListCommand(ObdCommand):
+
+    def __init__(self):
+        super(ToolListCommand, self).__init__('list', 'list tool')
+
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return self._show_help()
+        else:
+            return obd.list_tools()
+
+
+class ToolInstallCommand(ObdCommand):
+
+    def __init__(self):
+        super(ToolInstallCommand, self).__init__('install', 'install tool')
+        self.parser.add_option('-V', '--version', type='string', help="The version of tool.")
+        self.parser.add_option('-p', '--prefix', type='string', help="The install prefix path of tool.")
+        self.parser.add_option('-y', '--assumeyes', action='store_true', help="answer yes for all questions", default=False)
+        self.parser.add_option('-f', '--force', action='store_true', help="Force install if the tool is already present and conflicts between tools.", default=False)
+
+    def init(self, cmd, args):
+        super(ToolInstallCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <tool name> [options]' % self.prev_cmd)
+        return self
+    
+    def _do_command(self, obd):
+        if self.cmds:
+            if self.opts.assumeyes:
+                ROOT_IO.default_confirm = True
+            res = obd.install_tool(self.cmds[0])
+            return res
+        else:
+            return self._show_help()
+
+
+class ToolUninstallCommand(ObdCommand):
+
+    def __init__(self):
+        super(ToolUninstallCommand, self).__init__('uninstall', 'uninstall tool')
+        self.parser.add_option('-y', '--assumeyes', action='store_true', help="answer yes for all questions", default=False)
+        self.parser.add_option('-f', '--force', action='store_true', help="Force uninstall if the tool is already required by other tools.", default=False)
+
+    def init(self, cmd, args):
+        super(ToolUninstallCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <tool name> [options]' % self.prev_cmd)
+        return self
+    
+    def _do_command(self, obd):
+        if self.cmds:
+            if self.opts.assumeyes:
+                ROOT_IO.default_confirm = True
+            res = obd.uninstall_tool(self.cmds[0])
+            return res
+        else:
+            return self._show_help()
+
+
+class ToolUpdateCommand(ObdCommand):
+
+    def __init__(self):
+        super(ToolUpdateCommand, self).__init__('update', 'update tool')
+        self.parser.add_option('-V', '--version', type='string', help="The version of tool.")
+        self.parser.add_option('-p', '--prefix', type='string', help="The install prefix path of tool.")
+        self.parser.add_option('-y', '--assumeyes', action='store_true', help="answer yes for all questions", default=False)
+        self.parser.add_option('-f', '--force', action='store_true', help="Force install if the tool is already present and conflicts between tools.", default=False)
+
+    def init(self, cmd, args):
+        super(ToolUpdateCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <tool name> [options]' % self.prev_cmd)
+        return self
+    
+    def _do_command(self, obd):
+        if self.cmds:
+            if self.opts.assumeyes:
+                ROOT_IO.default_confirm = True
+            res = obd.update_tool(self.cmds[0])
+            return res
         else:
             return self._show_help()
 

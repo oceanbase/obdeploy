@@ -1,9 +1,9 @@
 test:
   system_config:
   - name: proxy_mem_limited
-    value: format_size(min(max(threads * (8 << 10), 2 << 30), 4 << 30), 0)
+    value: Capacity(min(max(threads * (8 << 10), 2 << 30), 4 << 30), 0)
     expression: true
-    condition: "lambda n, o: parse_size(n) > parse_size(o)"
+    condition: "lambda n, o: Capacity(n).btyes > Capacity(o).btyes"
   - name: enable_prometheus
     value: false
     value_type: BOOL

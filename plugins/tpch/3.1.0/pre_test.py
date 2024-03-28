@@ -30,24 +30,7 @@ except:
     import subprocess
 from ssh import LocalClient
 from tool import DirectoryUtil
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G']
-    units_num = len(units) - 1
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-        limit = 1024
-    else:
-        div = 1024
-        limit = 1024
-        format = '%d%s'
-    while idx < units_num and size >= limit:
-        size /= div
-        idx += 1
-    return format % (size, units[idx])
+from _types import Capacity
 
 
 def pre_test(plugin_context, cursor, *args, **kwargs):
@@ -141,7 +124,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     if get_option('test_only'):
         return plugin_context.return_true(
             max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
-            tenant_id=tenant_meta['tenant_id'], format_size=format_size
+            tenant_id=tenant_meta['tenant_id'], format_size=Capacity
         )
 
     if not remote_tbl_dir:
@@ -198,7 +181,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     return plugin_context.return_true(
         obclient_bin=obclient_bin, host=host, port=port, user=user, password=password, database=mysql_db,
         max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
-        tenant_id=tenant_meta['tenant_id'], format_size=format_size
+        tenant_id=tenant_meta['tenant_id'], format_size=Capacity
     )
 
 

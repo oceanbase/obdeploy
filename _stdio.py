@@ -670,11 +670,11 @@ class IO(object):
         return self.get_input_stream().read(blocked)
 
     def confirm(self, msg):
+        if self.default_confirm:
+            self.verbose("%s and then auto confirm yes" % msg)
+            return True
         msg = '%s [y/n]: ' % msg
         self.print(msg, end='')
-        if self.default_confirm:
-            self.verbose("default confirm: True")
-            return True
         if self.isatty() and not self.syncing:
             while True:
                 try:
@@ -686,6 +686,7 @@ class IO(object):
                 except Exception as e:
                     if not e:
                         return False
+                self.print(msg, end='')
         else:
             self.verbose("isatty: %s, syncing: %s, auto confirm: False" % (self.isatty(), self.syncing))
             return False

@@ -196,7 +196,7 @@ export default function Guide() {
   };
 
   return (
-    <div>
+    <div className={styles.guideContainer}>
       <Banner
         title={intl.formatMessage({
           id: 'OBD.pages.Guide.WelcomeToTheOceanbaseDeployment',

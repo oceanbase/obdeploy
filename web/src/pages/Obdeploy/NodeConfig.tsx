@@ -822,6 +822,7 @@ export default function NodeConfig() {
                     id: 'OBD.pages.components.NodeConfig.PleaseSelect',
                     defaultMessage: '请选择',
                   })}
+                  validateFirst
                   rules={[
                     {
                       required: true,

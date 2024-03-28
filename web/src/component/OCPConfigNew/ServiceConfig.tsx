@@ -9,15 +9,13 @@ import {
 } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useModel, getLocale } from 'umi';
-import { useUpdateEffect } from 'ahooks';
-import { copyText } from '@/utils/helper';
-import {
-  generateRandomPassword as generatePassword,
-  passwordRules,
-  siteReg,
-} from '@/utils';
+import { siteReg } from '@/utils';
 import styles from './index.less';
 import CustomPasswordInput from '../CustomPasswordInput';
+import {
+  OCP_PASSWORD_ERROR_REASON,
+  OCP_PASSWORD_ERROR_REASON_OLD,
+} from '@/utils/helper';
 import { ocpAddonAfter } from '@/constant/configuration';
 import { MsgInfoType } from './index';
 
@@ -45,8 +43,12 @@ export default function ServiceConfig({
     'unchecked' | 'fail' | 'success'
   >('unchecked');
   const { ocpConfigData } = useModel('global');
-  const { isSingleOcpNode, deployUser, useRunningUser } =
+  const { isSingleOcpNode, ocpVersionInfo, deployUser, useRunningUser } =
     useModel('ocpInstallData');
+  //ocp版本小于4.2.2密码使用旧规则，反之使用最新的密码规则
+  const isLowVersion =
+    Number(ocpVersionInfo?.version.split('.').reduce((pre, cur) => pre + cur)) <
+    422;
   const { components = {} } = ocpConfigData;
   const { ocpserver = {} } = components;
   const [adminPassword, setAdminPassword] = useState<string>(
@@ -55,10 +57,11 @@ export default function ServiceConfig({
 
   const ip =
     form.getFieldValue(['ocpserver', 'servers']) || ocpserver.servers || [];
-  const defaultSiteUrl =
-    (ocpserver.ocp_site_url || isSingleOcpNode === true) && ip.length
-      ? `http://${ip[0]}:8080`
-      : '';
+  const defaultSiteUrl = ocpserver.ocp_site_url
+    ? ocpserver.ocp_site_url
+    : isSingleOcpNode === true && ip.length
+    ? `http://${ip[0]}:8080`
+    : '';
   const [siteUrl, setSiteUrl] = useState<string>(defaultSiteUrl);
   const setPassword = (password: string) => {
     form.setFieldValue(['ocpserver', 'admin_password'], password);
@@ -122,6 +125,8 @@ export default function ServiceConfig({
         onChange={setPassword}
         msgInfo={adminMsgInfo}
         setMsgInfo={setAdminMsgInfo}
+        useFor="ocp"
+        useOldRuler={isLowVersion}
         name={['ocpserver', 'admin_password']}
         showCopyBtn
         label={
@@ -132,11 +137,23 @@ export default function ServiceConfig({
             })}
 
             <Tooltip
-              title={intl.formatMessage({
-                id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeTo.2',
-                defaultMessage:
-                  "密码需满足：长度为 8~32 个字符，支持字母、数字和特殊字符，且至少包含大、小写字母、数字和特殊字符各 2 个，支持的特殊字符为~!@#%^&*_-+=`|(){}[]:;',.?/",
-              })}
+              title={
+                isLowVersion
+                  ? intl.formatMessage(
+                      {
+                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                      },
+                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
+                    )
+                  : intl.formatMessage(
+                      {
+                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                      },
+                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
+                    )
+              }
             >
               <QuestionCircleOutlined className="ml-10" />
             </Tooltip>

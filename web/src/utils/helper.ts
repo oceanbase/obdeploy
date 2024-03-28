@@ -11,6 +11,7 @@ import { intl } from '@/utils/intl'; //与UI无关的函数
 import { message } from 'antd';
 import { clone } from 'lodash';
 import copy from 'copy-to-clipboard';
+import { generateRandomPassword as oldGenerateRandomPassword } from '.';
 // 不用navigator.clipboard.writeText的原因：该接口需要在HTTPS环境下才能使用
 export function copyText(text: string) {
   let inputDom = document.createElement('input');
@@ -121,6 +122,268 @@ export const handleCopy = (content: string) => {
   );
 };
 
+export const SPECIAL_SYMBOLS_OB = '~!@#%^&*_-+=|(){}[]:;,.?/';
+// export const SPECIAL_SYMBOLS_OCP = '~!@#%^&*_-+=|(){}[]:;,.?/$`\'"<>';
+export const SPECIAL_SYMBOLS_OCP = '~^*{}[]_-+';
+const SPECIAL_SYMBOLS_REG_OB = /^[~!@#%^&*()_+\-=|{}\:[\];,.?\/]+$/;
+export const SPECIAL_SYMBOLS_REG_OCP = /^[~^*{}[\]_\-+]+$/;
+// const SPECIAL_SYMBOLS_REG_OCP = /^[~!@#%^&*()_\-+=|:{}[\];,.<>?\/$`'"\\]+$/;
+const REG_NUMBER = /^[0-9]$/;
+const REG_LOWER_CASE = /^[a-z]$/;
+const REG_UPPER_CASE = /^[A-Z]$/;
+
+export const passwordRangeCheck = (password: string, useFor: 'ob' | 'ocp') => {
+  if (!password) return false;
+  const passwordChar = password.split('');
+  const SPECIAL_SYMBOLS_REG =
+    useFor === 'ob' ? SPECIAL_SYMBOLS_REG_OB : SPECIAL_SYMBOLS_REG_OCP;
+  //检验内容是否超出范围
+  for (let char of passwordChar) {
+    if (
+      !SPECIAL_SYMBOLS_REG.test(char) &&
+      !REG_NUMBER.test(char) &&
+      !REG_LOWER_CASE.test(char) &&
+      !REG_UPPER_CASE.test(char)
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
+export const passwordSymbolsCheck = (
+  password: string,
+  useFor: 'ob' | 'ocp',
+) => {
+  let passwordChar = password.split(''),
+    haveSymbols = false,
+    haveNumber = false,
+    haveLowerCase = false,
+    haveUpperCaseReg = false;
+  const SPECIAL_SYMBOLS_REG =
+    useFor === 'ob' ? SPECIAL_SYMBOLS_REG_OB : SPECIAL_SYMBOLS_REG_OCP;
+
+  for (let char of passwordChar) {
+    if (SPECIAL_SYMBOLS_REG.test(char)) {
+      haveSymbols = true;
+    }
+    if (REG_NUMBER.test(char)) {
+      haveNumber = true;
+    }
+    if (REG_LOWER_CASE.test(char)) {
+      haveLowerCase = true;
+    }
+    if (REG_UPPER_CASE.test(char)) {
+      haveUpperCaseReg = true;
+    }
+  }
+  if (
+    [haveSymbols, haveNumber, haveLowerCase, haveUpperCaseReg].filter(
+      (val) => val === true,
+    ).length < 3
+  ) {
+    return false;
+  }
+  return true;
+};
+
+/**
+ *
+ * @param str 待校验密码
+ * @param type 校验类型 ob | ocp
+ * @returns Boolean 是否通过校验
+ */
+export const passwordCheck = (str: string, type: 'ob' | 'ocp') => {
+  const SPECIAL_SYMBOLS_REG =
+    type === 'ob' ? SPECIAL_SYMBOLS_REG_OB : SPECIAL_SYMBOLS_REG_OCP;
+  let strArr = str.split(''),
+    haveSymbols = false,
+    haveNumber = false,
+    haveLowerCase = false,
+    haveUpperCaseReg = false;
+  if (typeof str !== 'string') {
+    throw new Error('type error');
+  }
+
+  //检验长度
+  if (str.length < 8 || str.length > 32) {
+    return false;
+  }
+  //检验内容是否超出范围
+  for (let str of strArr) {
+    if (
+      !SPECIAL_SYMBOLS_REG.test(str) &&
+      !REG_NUMBER.test(str) &&
+      !REG_LOWER_CASE.test(str) &&
+      !REG_UPPER_CASE.test(str)
+    ) {
+      return false;
+    }
+  }
+  for (let str of strArr) {
+    if (SPECIAL_SYMBOLS_REG.test(str)) {
+      haveSymbols = true;
+    }
+    if (REG_NUMBER.test(str)) {
+      haveNumber = true;
+    }
+    if (REG_LOWER_CASE.test(str)) {
+      haveLowerCase = true;
+    }
+    if (REG_UPPER_CASE.test(str)) {
+      haveUpperCaseReg = true;
+    }
+  }
+  if (
+    [haveSymbols, haveNumber, haveLowerCase, haveUpperCaseReg].filter(
+      (val) => val === true,
+    ).length < 3
+  ) {
+    return false;
+  }
+  return true;
+};
+
+export const passwordCheckLowVersion = (pwd: string) => {
+  let strArr = pwd.split(''),
+    symbolsCount = 0,
+    numberCount = 0,
+    lowerCaseCount = 0,
+    upperCaseCount = 0;
+  if (typeof pwd !== 'string') {
+    throw new Error('type error');
+  }
+
+  //检验长度
+  if (pwd.length < 8 || pwd.length > 32) {
+    return false;
+  }
+
+  //检验内容是否超出范围
+  for (let str of strArr) {
+    if (
+      !SPECIAL_SYMBOLS_REG_OCP.test(str) &&
+      !REG_NUMBER.test(str) &&
+      !REG_LOWER_CASE.test(str) &&
+      !REG_UPPER_CASE.test(str)
+    ) {
+      return false;
+    }
+  }
+  for (let str of strArr) {
+    if (SPECIAL_SYMBOLS_REG_OCP.test(str)) {
+      symbolsCount += 1;
+    }
+    if (REG_NUMBER.test(str)) {
+      numberCount += 1;
+    }
+    if (REG_LOWER_CASE.test(str)) {
+      lowerCaseCount += 1;
+    }
+    if (REG_UPPER_CASE.test(str)) {
+      upperCaseCount += 1;
+    }
+  }
+  // 是否每种类型都有且数量大于等于2
+  if (
+    [symbolsCount, numberCount, lowerCaseCount, upperCaseCount].filter(
+      (count) => count >= 2,
+    ).length !== 4
+  ) {
+    return false;
+  }
+  return true;
+};
+
+export function generateRandomPassword(
+  type: 'ob' | 'ocp',
+  useOldRuler?: boolean,
+) {
+  if (useOldRuler) {
+    return oldGenerateRandomPassword();
+  }
+
+  const length = Math.floor(Math.random() * 25) + 8; // 生成8到32之间的随机长度
+  const characters =
+    type === 'ob'
+      ? `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789${SPECIAL_SYMBOLS_OB}`
+      : `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789${SPECIAL_SYMBOLS_OCP}`;
+
+  let password = '';
+  let haveUppercase = false;
+  let havetLowercase = false;
+  let haveNumber = false;
+  let haveSpecialChar = false;
+
+  // 生成随机密码
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    const randomChar = characters[randomIndex];
+    password += randomChar;
+
+    // 判断字符类型并增加相应计数器
+    if (/[A-Z]/.test(randomChar)) {
+      haveUppercase = true;
+    } else if (/[a-z]/.test(randomChar)) {
+      havetLowercase = true;
+    } else if (/[0-9]/.test(randomChar)) {
+      haveNumber = true;
+    } else {
+      haveSpecialChar = true;
+    }
+  }
+
+  // 检查计数器是否满足要求
+  if (
+    [haveSpecialChar, haveNumber, havetLowercase, haveUppercase].filter(
+      (val) => val === true,
+    ).length < 3
+  ) {
+    return generateRandomPassword(type); // 重新生成密码
+  }
+
+  return password;
+}
+export const OB_PASSWORD_ERROR_REASON = intl.formatMessage({
+  id: 'OBD.src.utils.helper.TheLengthIsToAnd.2',
+  defaultMessage:
+    '长度8~32  且至少包含 大写字母、小写字母、数字和特殊字符 ~!@#%^&*_-+=|(){}[]:;,.?/ 中的三种',
+});
+export const OCP_PASSWORD_ERROR_REASON = intl.formatMessage({
+  id: 'OBD.src.utils.helper.TheLengthIsToAnd.3',
+  defaultMessage:
+    '长度8~32  且至少包含 大写字母、小写字母、数字和特殊字符 ~^*{}[]_-+ 中的三种',
+});
+
+// ocp版本小于422部分密码采用老版本校验规则
+export const OCP_PASSWORD_ERROR_REASON_OLD = intl.formatMessage({
+  id: 'OBD.src.utils.helper.ItIsToCharactersIn',
+  defaultMessage:
+    '长度为 8~32 个字符，支持字母、数字和特殊字符，且至少包含大、小写字母、数字和特殊字符各 2 个，支持的特殊字符为~^*{}[]_-+',
+});
+
+export const getPasswordRules = (useFor: 'ob' | 'ocp') => [
+  {
+    required: true,
+    message: intl.formatMessage({
+      id: 'OBD.src.utils.EnterAPassword',
+      defaultMessage: '请输入密码',
+    }),
+  },
+  () => ({
+    validator(_: any, originValue: string | API.ParameterValue) {
+      let value =
+        typeof originValue === 'object' ? originValue.value! : originValue;
+      const REASON =
+        useFor === 'ob' ? OB_PASSWORD_ERROR_REASON : OCP_PASSWORD_ERROR_REASON;
+      if (!passwordCheck(value, useFor)) {
+        return Promise.reject(new Error(REASON));
+      }
+      return Promise.resolve();
+    },
+  }),
+];
+
 /**
  * 判断一个字符串或者数字是否有值,避免判断 0 为 false
  */
@@ -136,7 +399,7 @@ export const isExist = (val: string | number | undefined): boolean => {
 export const formatConfigData = (configData: any) => {
   let _config = clone(configData);
   Object.keys(_config?.components).forEach((compKey) => {
-    _config?.components[compKey]?.parameters?.forEach((parameter:any) => {
+    _config?.components[compKey]?.parameters?.forEach((parameter: any) => {
       parameter.isChanged = true;
     });
   });
