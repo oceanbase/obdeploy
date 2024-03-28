@@ -1,0 +1,9 @@
+- src_path: ./u01/obclient/bin
+  target_path: bin
+  type: dir
+- src_path: ./u01/obclient/include
+  target_path: include
+  type: dir
+- src_path: ./u01/obclient/lib
+  target_path: lib
+  type: dir

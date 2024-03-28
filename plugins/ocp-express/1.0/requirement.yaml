@@ -1,0 +1,3 @@
+openjdk-jre:
+  min_version: 1.8.0_161
+  max_version: 1.8.1
