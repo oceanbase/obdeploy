@@ -21,6 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import re
 from copy import deepcopy
 
 import _errno as err
@@ -93,6 +94,12 @@ def prepare_parameters(cluster_config):
     return env
 
 
+def password_check(password):
+    if not re.match(r'^[\w~^*{}\[\]_\-+]+$', password):
+        return False
+    return True
+
+
 def start_check(plugin_context, init_check_status=False, strict_check=False, work_dir_check=False, work_dir_empty_check=True, precheck=False, *args, **kwargs):
     def check_fail(item, error, suggests=[]):
         status = check_status[server][item]
@@ -145,6 +152,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         check_status[server] = {
             'port': err.CheckStatus(),
             'parameter': err.CheckStatus(),
+            'password': err.CheckStatus()
         }
         if work_dir_check:
              check_status[server]['dir'] = err.CheckStatus()
@@ -167,6 +175,12 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                     wait_2_pass()
                     continue
         check_pass('parameter')
+
+        # http_basic_auth_password check
+        http_basic_auth_password = server_config.get('http_basic_auth_password')
+        if http_basic_auth_password:
+            if not password_check(http_basic_auth_password):
+                critical('password', err.EC_COMPONENT_PASSWD_ERROR.format(ip=server.ip, component='obagent', key='http_basic_auth_password', rule='^[\w~^*{}\[\]_\-+]+$'), suggests=[err.SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD.format()])
 
         if work_dir_check:
             stdio.verbose('%s dir check' % server)

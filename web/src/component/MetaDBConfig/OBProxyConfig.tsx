@@ -14,8 +14,14 @@ import { getErrorInfo, ocpServersValidator } from '@/utils';
 import { formatMoreConfig } from '@/utils/helper';
 import useRequest from '@/utils/useRequest';
 import InputPort from '../InputPort';
-import styles from './indexZh.less';
-export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
+import styles from './index.less';
+export default function OBProxyConfig({
+  form,
+  parameterRules,
+}: {
+  form: FormInstance<any>;
+  parameterRules: any;
+}) {
   const {
     ocpConfigData,
     proxyMoreConfig,
@@ -219,6 +225,7 @@ export default function OBProxyConfig({ form }: { form: FormInstance<any> }) {
         </span>
       </div>
       <ConfigTable
+        parameterRules={parameterRules}
         dataSource={proxyMoreConfig}
         showVisible={isShowMoreConfig}
         loading={proxyMoreLoading}

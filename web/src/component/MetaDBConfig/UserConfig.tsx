@@ -8,7 +8,7 @@ import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 
 import { commonStyle } from '@/pages/constants';
 import { nameReg } from '@/utils';
-import styles from './indexZh.less';
+import styles from './index.less';
 
 export default function UserConfig({ form }: { form: FormInstance<any> }) {
   const { useRunningUser, setUseRunningUser,setDeployUser } =

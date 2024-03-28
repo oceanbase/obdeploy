@@ -1,0 +1,34 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+ocp-server-ce:
+  servers:
+  - 192.168.1.2
+  global:
+    home_path: /root/ocp
+    memory_size: 8G
+    port: 8080
+    soft_dir: /home/root/software # Directory used to store packages
+    log_dir: /home/root/logs # Directory used to temporary store downloaded logs
+    # admin_password: ****** # Password of ocp's admin user
+    jdbc_url: jdbc:oceanbase://192.168.1.2:2881/ocp_meta # Jdbc url of meta obcluster
+    # OCP meta tenant definition, including tenant name, cpu and memory
+    ocp_meta_tenant:
+      tenant_name: ocp_meta
+      max_cpu: 2.0
+      memory_size: 2G
+    # ocp_meta_username: root # User to use under ocp meta tenant
+    # ocp_meta_password: ****** # Password used to connect to ocp meta tenant
+    # ocp_meta_db: meta_database # Database used to store ocp meta data
+    # OCP monitor tenant definition, including tenant name, cpu and memory
+    ocp_monitor_tenant:
+      tenant_name: ocp_monitor
+      max_cpu: 2.0
+      memory_size: 2G
+    # ocp_monitor_username: root # User to use under ocp monitor tenant
+    # ocp_monitor_password: ****** # Password used to connect to ocp meta tenant
+    # ocp_monitor_db: monitor_database # Database used to store ocp meta data

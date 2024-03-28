@@ -35,7 +35,7 @@ class VersionNode(PackageInfo):
         version = version.split('_')
         release = version[1] if len(version) > 1 else self.RELEASE_NULL
         version = version[0]
-        super(VersionNode, self).__init__('', version, release, '', md5)
+        super(VersionNode, self).__init__('', version, release, '', md5, 0)
         self.next = []
         self.can_be_upgraded_to = []
         self.can_be_upgraded_to = []
@@ -196,7 +196,7 @@ def upgrade_route(plugin_context, current_repository, dest_repository, *args, **
     stdio = plugin_context.stdio
     repository_dir = dest_repository.repository_dir
 
-    if dest_repository.version >= Version("4.3"):
+    if dest_repository.version >= Version("4.4"):
         stdio.error('upgrade observer to version {} is not support, please upgrade obd first.'.format(dest_repository.version))
         return
 

@@ -20,35 +20,8 @@
 
 from __future__ import absolute_import, division, print_function
 
-import re
 import datetime
-
-def parse_size(size):
-    _bytes = 0
-    if isinstance(size, str):
-        size = size.strip()
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40}
-        match = re.match(r'^([1-9][0-9]*)\s*([B,K,M,G,T])$', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G', 'T', 'P']
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-    else:
-        div = 1024
-        format = '%d%s'
-    while idx < 5 and size >= 1024:
-        size /= 1024.0
-        idx += 1
-    return format % (size, units[idx])
+from _types import Capacity
 
 
 def list_tenant(plugin_context, cursor, relation_tenants={}, *args, **kwargs):
@@ -106,8 +79,8 @@ def list_tenant(plugin_context, cursor, relation_tenants={}, *args, **kwargs):
                                         'min_cpu', 'memory_size', 'max_iops', 'min_iops', 'log_disk_size',
                                         'iops_weight', 'tenant_role'],
             lambda x: [x['TENANT_NAME'], x['TENANT_TYPE'], x['COMPATIBILITY_MODE'], x['PRIMARY_ZONE'],
-                       x['MAX_CPU'], x['MIN_CPU'], format_size(x['MEMORY_SIZE']), x['MAX_IOPS'], x['MIN_IOPS'],
-                       format_size(x['LOG_DISK_SIZE']), x['IOPS_WEIGHT'], x['TENANT_ROLE']],
+                       x['MAX_CPU'], x['MIN_CPU'], str(Capacity(x['MEMORY_SIZE'])), x['MAX_IOPS'], x['MIN_IOPS'],
+                       str(Capacity(x['LOG_DISK_SIZE'])), x['IOPS_WEIGHT'], x['TENANT_ROLE']],
             title='tenant base info')
     else:
         stdio.stop_loading('fail')

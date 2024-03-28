@@ -251,24 +251,25 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
 
   const nextStep = async () => {
     let validatePromise: Promise<any>;
-    if (isSingleOcpNode === false) {
+    if (
+      isSingleOcpNode === false &&
+      !form.getFieldsValue()?.ocpserver?.ocp_site_url
+    ) {
       validatePromise = validateFields(rulePath);
     } else {
       validatePromise = validateFields();
     }
-    validatePromise
-      .then((result) => {
-        if(result.find((item:any)=>item.status === 'rejected'))
-        {
-          formValidScrollHelper(result)
-          return
-        }
-        setData(result[0].value);
-        setCurrent(current + 1);
-        setErrorVisible(false);
-        setErrorsList([]);
-        window.scrollTo(0, 0);
-      })
+    validatePromise.then((result) => {
+      if (result.find((item: any) => item.status === 'rejected')) {
+        formValidScrollHelper(result);
+        return;
+      }
+      setData(result[0].value);
+      setCurrent(current + 1);
+      setErrorVisible(false);
+      setErrorsList([]);
+      window.scrollTo(0, 0);
+    });
   };
   let home_path = undefined,
     log_dir = undefined,

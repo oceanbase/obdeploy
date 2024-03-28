@@ -1,0 +1,8 @@
+- src_path: ./u01/obclient/bin/obclient
+  target_path: bin/obclient
+  type: bin
+  mode: 755
+  require: libobclient
+- src_path: ./u01/obclient/bin
+  target_path: bin
+  type: dir

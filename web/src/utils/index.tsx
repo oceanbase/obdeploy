@@ -4,6 +4,7 @@ import { message, Modal, notification } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
 import RandExp from 'randexp';
 import { getLocale, history } from 'umi';
+import { SPECIAL_SYMBOLS_OCP } from './helper';
 
 export const handleResponseError = (desc: any, msg?: string | undefined) => {
   notification.error({
@@ -156,67 +157,6 @@ export const getRandomPassword = (isToken?: boolean) => {
   }
   return getRandomPassword(isToken);
 };
-
-// const statusCodeMessage = {
-//   400: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheErrorOccurredInThe',
-//     defaultMessage: '发出的请求有错误，服务器没有进行新建或修改数据的操作。',
-//   }),
-
-//   401: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheUserIsNotLogged',
-//     defaultMessage: '用户未登录，或者登录使用的用户名和密码错误。',
-//   }),
-
-//   403: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.YouDoNotHaveThe',
-//     defaultMessage: '没有权限进行对应操作，请联系管理员。',
-//   }),
-
-//   404: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheRequestIsForA',
-//     defaultMessage: '发出的请求针对的是不存在的记录，服务器没有进行操作。',
-//   }),
-
-//   405: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheRequestMethodCannotBe',
-//     defaultMessage: '请求方法不能被用于请求相应的资源，或者请求路径不正确。',
-//   }),
-//   406: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheRequestFormatIsNot',
-//     defaultMessage: '请求的格式不可得。',
-//   }),
-
-//   410: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheRequestedResourceIsPermanently',
-//     defaultMessage: '请求的资源被永久删除，且不会再得到的。',
-//   }),
-
-//   422: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.AValidationErrorOccursWhen',
-//     defaultMessage: '当创建一个对象时，发生一个验证错误。',
-//   }),
-
-//   500: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.AnErrorOccurredOnThe',
-//     defaultMessage: '服务器发生错误，请检查服务器。',
-//   }),
-
-//   502: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.GatewayError',
-//     defaultMessage: '网关错误。',
-//   }),
-//   503: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheServiceIsUnavailableAnd',
-//     defaultMessage: '服务不可用，服务器暂时过载或维护。',
-//   }),
-
-//   504: intl.formatMessage({
-//     id: 'ocp-express.src.util.request.TheGatewayTimedOut',
-//     defaultMessage: '网关超时。',
-//   }),
-// };
-
 /**
  * 异常处理程序
  * response 为浏览器的 Response 对象，而 data 才是后端实际返回的响应数据
@@ -437,7 +377,7 @@ export const serversValidator = (
 export function generateRandomPassword() {
   const length = Math.floor(Math.random() * 25) + 8; // 生成8到32之间的随机长度
   const characters =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~!@#%^&*_-+=`|(){}[]:;',.?/"; // 可用字符集合
+    `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789${SPECIAL_SYMBOLS_OCP}`; // 可用字符集合
 
   let password = '';
   let countUppercase = 0; // 大写字母计数器
@@ -475,63 +415,3 @@ export function generateRandomPassword() {
 
   return password;
 }
-export const passwordRules = [
-  {
-    required: true,
-    message: intl.formatMessage({
-      id: 'OBD.src.utils.EnterAPassword',
-      defaultMessage: '请输入密码',
-    }),
-  },
-  () => ({
-    validator(_: any, value: string) {
-      if (value.length >= 8 && value.length <= 32) {
-        return Promise.resolve();
-      }
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.src.utils.TheLengthShouldBeTo',
-            defaultMessage: '长度应为 8~32 个字符',
-          }),
-        ),
-      );
-    },
-  }),
-  () => ({
-    validator(_: any, value: string) {
-      const regex = /^[A-Za-z\d~!@#%^&*_\-+=`|(){}[\]:;',.?/]*$/;
-      if (regex.test(value)) {
-        return Promise.resolve();
-      }
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.src.utils.CanOnlyContainLettersNumbers.2',
-            defaultMessage:
-              "只能包含字母、数字和特殊字符~!@#%^&*_-+=`|(){}[]:;',.?/",
-          }),
-        ),
-      );
-    },
-  }),
-  () => ({
-    validator(_: any, value: string) {
-      if (
-        /^(?=.*[A-Z].*[A-Z])(?=.*[a-z].*[a-z])(?=.*\d.*\d)(?=.*[~!@#%^&*_\-+=`|(){}[\]:;',.?/].*[~!@#%^&*_\-+=`|(){}[\]:;',.?/])[A-Za-z\d~!@#%^&*_\-+=`|(){}[\]:;',.?/]{8,32}$/.test(
-          value,
-        )
-      ) {
-        return Promise.resolve();
-      }
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.src.utils.AtLeastUppercaseAndLowercase',
-            defaultMessage: '大小写字母、数字和特殊字符都至少包含 2 个',
-          }),
-        ),
-      );
-    },
-  }),
-];

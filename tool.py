@@ -71,7 +71,7 @@ else:
         pass
 
 
-__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict", "COMMAND_ENV", "TimeUtils")
+__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict", "COMMAND_ENV", "TimeUtils", "Cursor")
 
 _WINDOWS = os.name == 'nt'
 
@@ -231,7 +231,7 @@ class ConfigUtil(object):
         return pwd
 
     @staticmethod
-    def get_random_pwd_by_rule(lowercase_length=2, uppercase_length=2, digits_length=2, punctuation_length=2):
+    def get_random_pwd_by_rule(lowercase_length=2, uppercase_length=2, digits_length=2, punctuation_length=2, punctuation_chars='(._+@#%)'):
         pwd = ""
         for i in range(lowercase_length):
             pwd += random.choice(string.ascii_lowercase)
@@ -240,7 +240,7 @@ class ConfigUtil(object):
         for i in range(digits_length):
             pwd += random.choice(string.digits)
         for i in range(punctuation_length):
-            pwd += random.choice('(._+@#%)')
+            pwd += random.choice(punctuation_chars)
         pwd_list = list(pwd)
         random.shuffle(pwd_list)
         return ''.join(pwd_list)
@@ -322,11 +322,12 @@ class DirectoryUtil(object):
     def rm(path, stdio=None):
         stdio and getattr(stdio, 'verbose', print)('rm %s' % path)
         try:
-            if os.path.exists(path):
-                if os.path.islink(path):
-                    os.remove(path)
-                else:
-                    shutil.rmtree(path)
+            if os.path.islink(path):
+                os.remove(path)
+            elif os.path.exists(path):
+                shutil.rmtree(path)
+            else:
+                pass
             return True
         except Exception as e:
             stdio and getattr(stdio, 'exception', print)('')
@@ -584,6 +585,7 @@ def var_replace(string, var, pattern=_KEYCRE):
 
     return ''.join(done)
 
+
 class CommandEnv(SafeStdio):
 
     def __init__(self):
@@ -677,6 +679,7 @@ class NetUtil(object):
         ip = socket.gethostbyname(hostname)
         return ip
 
+
 COMMAND_ENV=CommandEnv()
 
 
@@ -747,6 +750,7 @@ class TimeUtils(SafeStdio):
             stdio.exception('%s parse time fialed, error:\n%s' % (since, e))
             format_from_time = TimeUtils.sub_minutes(format_to_time, 30)
         return format_from_time, format_to_time
+
 
 class Cursor(SafeStdio):
 
@@ -832,3 +836,4 @@ class Cursor(SafeStdio):
         if self.db:
             self.db.close()
             self.db = None
+

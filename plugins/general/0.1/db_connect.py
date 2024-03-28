@@ -92,13 +92,13 @@ def db_connect(plugin_context, *args, **kwargs):
         port = server_config.get("mysql_port")
     else:
         port = server_config.get("listen_port")
-    if not obclient_bin:
-        ret = local_execute_command('%s --help' % obclient_bin)
-        if not ret:
-            stdio.error(
-                '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
-                    ret.stderr, obclient_bin))
-            return
+    # check the obclien avaliable
+    ret = local_execute_command('%s --help' % obclient_bin)
+    if not ret:
+        stdio.error(
+            '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
+                ret.stderr, obclient_bin))
+        return
     if not password:
         connected = test_connect()
         if not connected:

@@ -20,6 +20,9 @@
 
 from __future__ import absolute_import, division, print_function
 
+# obd id
+ENV_OBD_ID = "OBD_ID"
+
 # obd dev mode. {0/1}
 ENV_DEV_MODE = "OBD_DEV_MODE"
 

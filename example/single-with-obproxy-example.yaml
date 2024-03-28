@@ -23,6 +23,7 @@ oceanbase-ce:
     # devname: eth0
     mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    obshell_port: 2886 # Operation and maintenance port for Oceanbase Database. The default value is 2886. This parameter is valid only when the version of oceanbase-ce is 4.2.2.0 or later.
     zone: zone1
     # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
     memory_limit: 64G # The maximum running memory for an observer

@@ -37,8 +37,6 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     dev_mode = plugin_context.dev_mode
     stdio = plugin_context.stdio
     upgrade_repositories = kwargs.get('upgrade_repositories')
-    sys_cursor = kwargs.get('sys_cursor')
-    metadb_cursor = kwargs.get('metadb_cursor')
 
     cur_repository = upgrade_repositories[0]
     dest_repository = upgrade_repositories[-1]
@@ -69,7 +67,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     if not init_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, upgrade=True, *args, **kwargs):
         return plugin_context.return_false()
 
-    if not start_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, sys_cursor1=sys_cursor, cursor=metadb_cursor, without_parameter=True, *args, **kwargs):
+    if not start_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, without_parameter=True, *args, **kwargs):
         return plugin_context.return_false()
 
     ret = connect_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)

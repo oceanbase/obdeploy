@@ -642,6 +642,9 @@ class ClusterConfig(object):
     
     def get_deploy_changed_components(self):
         return self._deploy_config.changed_components
+
+    def get_deploy_removed_components(self):
+        return self._deploy_config.removed_components
         
     def get_depend_config(self, name, server=None, with_default=True):
         if name not in self._depends:
@@ -1052,7 +1055,7 @@ class DeployConfig(SafeStdio):
         self._load()
         self._added_components = []
         self._changed_components = []
-        self._removed_components = []
+        self._removed_components = set()
         self._do_not_dump = False
         self._mem_mode = False
 
@@ -1256,7 +1259,6 @@ class DeployConfig(SafeStdio):
         ret = True
         src_data = deepcopy(self._src_data) if dryrun else self._src_data
         component_map = deepcopy(self.components) if dryrun else self.components
-        removed_components = deepcopy(self._removed_components) if dryrun else self._removed_components
         for del_comp in components:
             if del_comp not in component_map:
                 self.stdio.error(err.EC_COMPONENT_NOT_EXISTS.format(component=del_comp))
@@ -1264,7 +1266,7 @@ class DeployConfig(SafeStdio):
                 continue
             del component_map[del_comp]
             del src_data[del_comp]
-            removed_components.append(del_comp)
+            self.removed_components.add(del_comp)
         for comp_name in component_map:
             for del_comp in components:
                 if del_comp in component_map[comp_name].depends:
@@ -1521,7 +1523,7 @@ class Deploy(object):
     def use_model(self, name, repository, dump=True):
         self.deploy_info.components[name] = {
             'hash': repository.hash,
-            'version': repository.version,
+            'version': repository.version
         }
         return self.dump_deploy_info() if dump else True
 

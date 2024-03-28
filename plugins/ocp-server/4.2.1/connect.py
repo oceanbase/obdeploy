@@ -39,16 +39,17 @@ class OcpServerCursor(object):
         def __bool__(self):
             return self.code == 200
 
-    def __init__(self, ip, port, username=None, password=None):
+    def __init__(self, ip, port, username=None, password=None, component_name=None, base_url=None):
+        self.auth = None
         self.ip = ip
         self.port = port
         self.username = username
         self.password = password
-        self.url_prefix = "http://{ip}:{port}/".format(ip=self.ip, port=self.port)
+        self.url_prefix = "http://{ip}:{port}".format(ip=self.ip, port=self.port) if not base_url else base_url.strip('/')
+        self.component_name = component_name
         if self.username:
             self.auth = HTTPBasicAuth(username=username, password=password)
-        else:
-            self.auth = None
+
 
     def status(self, stdio=None):
         ocp_status_ok = False
@@ -58,7 +59,7 @@ class OcpServerCursor(object):
         while time.time() - now < check_wait_time:
             stdio.verbose("query ocp to check...")
             count += 1
-            resp = self._request('GET', 'api/v2/time', stdio=stdio)
+            resp = self._request('GET', '/api/v2/time', stdio=stdio)
             try:
                 if resp.code == 200 or count >= 10:
                     ocp_status_ok = True
@@ -74,29 +75,59 @@ class OcpServerCursor(object):
             return True
 
     def info(self, stdio=None):
-        resp = self._request('GET', 'api/v2/info', stdio=stdio)
+        resp = self._request('GET', '/api/v2/info', stdio=stdio)
         if resp.code == 200:
             return resp.content
 
-    def task_over_precheck(self, data, stdio=None):
-        resp = self._request('POST', 'api/v2/ob/clusters/takeOverPreCheck', data=data, stdio=stdio)
+    def take_over_precheck(self, data, stdio=None):
+        resp = self._request('POST', '/api/v2/ob/clusters/takeOverPreCheck', data=data, stdio=stdio)
         if resp.code == 200:
             return resp.content
 
-    def compute_host_types(self, data, stdio=None):
-        resp = self._request('POST', 'api/v2/compute/hostTypes', data=data, stdio=stdio)
+    def get_host_types(self, stdio=None):
+        resp = self._request('GET', '/api/v2/compute/hostTypes', stdio=stdio)
         if resp.code == 200:
             return resp.content
 
-    def profiles_credentials(self, data, stdio=None):
-        resp = self._request('POST', 'api/v2/profiles/me/credentials', data=data, stdio=stdio)
+    def create_host_type(self, data, stdio=None):
+        resp = self._request('POST', '/api/v2/compute/hostTypes', data=data, stdio=stdio)
         if resp.code == 200:
             return resp.content
+        else:
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to create host type: %s" % msg)
 
-    def task_over(self, data, stdio=None):
-        resp = self._request('POST', 'api/v2/ob/clusters/takeOver', data=data, stdio=stdio)
+    def list_credentials(self, stdio=None):
+        resp = self._request('GET', '/api/v2/profiles/me/credentials', stdio=stdio)
         if resp.code == 200:
             return resp.content
+        else:
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to query credentials: %s" % msg)
+
+    def create_credential(self, data, stdio=None):
+        resp = self._request('POST', '/api/v2/profiles/me/credentials', data=data, stdio=stdio)
+        if resp.code == 200:
+            return resp.content
+        else:
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to create credential: %s" % msg)
+
+    def take_over(self, data, stdio=None):
+        resp = self._request('POST', '/api/v2/ob/clusters/takeOver', data=data, stdio=stdio)
+        if resp.code == 200:
+            return resp.content
+        else:
+            msg = resp.content
+            if 'error' in resp.content and 'message' in resp.content['error']:
+                msg = resp.content['error']['message']
+            raise Exception("failed to do take over: %s" % msg)
 
     def _request(self, method, api, data=None, retry=5, stdio=None):
         url = self.url_prefix + api
@@ -116,7 +147,7 @@ class OcpServerCursor(object):
             return_code = 500
             content = str(e)
         if return_code != 200:
-            stdio.verbose("request ocp-server failed: %s" % content)
+            stdio.verbose("request %s failed: %s" % (self.component_name, content))
         try:
             content = json.loads(content.decode())
         except:
@@ -131,20 +162,27 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         return plugin_context.return_true(**kwargs)
     
     cluster_config = plugin_context.cluster_config
+    options = plugin_context.options
     stdio = plugin_context.stdio
-    if target_server:
+    address = getattr(options, 'address', '')
+    user = getattr(options, 'user', '')
+    password = getattr(options, 'password', '')
+    servers = cluster_config.servers
+    if address:
+        stdio.start_loading('Connect to {}'.format(address))
+    elif target_server:
         servers = [target_server]
-        stdio.start_loading('Connect to ocp-server ({})'.format(target_server))
+        stdio.start_loading('Connect to {} ({})'.format(cluster_config.name, target_server))
     else:
         servers = cluster_config.servers
-        stdio.start_loading('Connect to ocp-server')
+        stdio.start_loading('Connect to %s' % cluster_config.name)
     cursors = {}
     for server in servers:
         config = cluster_config.get_server_conf(server)
-        username = 'admin'
-        password = config['admin_password']
-        stdio.verbose('connect ocp-server ({}:{} by user {})'.format(server.ip, config['port'], username))
-        cursor = OcpServerCursor(ip=server.ip, port=config['port'], username=username, password=password)
+        username = 'admin' if not address else user
+        password = config['admin_password'] if not address else password
+        stdio.verbose('connect {} ({}:{} by user {})'.format(cluster_config.name, server.ip, config['port'], username))
+        cursor = OcpServerCursor(ip=server.ip, port=config['port'], username=username, password=password, component_name=cluster_config.name, base_url=address)
         if cursor.status(stdio=stdio):
             cursors[server] = cursor
     if not cursors:

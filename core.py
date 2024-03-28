@@ -25,7 +25,7 @@ import os
 import time
 from optparse import Values
 from copy import deepcopy, copy
-import requests
+from collections import defaultdict
 
 import tempfile
 from subprocess import call as subprocess_call
@@ -37,12 +37,14 @@ from _rpm import Version
 from _mirror import MirrorRepositoryManager, PackageInfo
 from _plugin import PluginManager, PluginType, InstallPlugin, PluginContextNamespace
 from _deploy import DeployManager, DeployStatus, DeployConfig, DeployConfigStatus, Deploy, ClusterStatus
+from _tool import Tool, ToolManager
 from _repository import RepositoryManager, LocalPackage, Repository
 import _errno as err
 from _lock import LockManager, LockMode
 from _optimize import OptimizeManager
 from _environ import ENV_REPO_INSTALL_MODE, ENV_BASE_DIR
-from const import OB_OFFICIAL_WEBSITE
+from _types import Capacity
+from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT
 from ssh import LocalClient
 
 
@@ -61,6 +63,7 @@ class ObdHome(object):
         self._plugin_manager = None
         self._lock_manager = None
         self._optimize_manager = None
+        self._tool_manager = None
         self.stdio = None
         self._stdio_func = None
         self.ssh_clients = {}
@@ -110,6 +113,12 @@ class ObdHome(object):
         if not self._optimize_manager:
             self._optimize_manager = OptimizeManager(self.home_path, stdio=self.stdio)
         return self._optimize_manager
+    
+    @property
+    def tool_manager(self):
+        if not self._tool_manager:
+            self._tool_manager = ToolManager(self.home_path, self.repository_manager, self.lock_manager, self.stdio)
+        return self._tool_manager
 
     def _global_ex_lock(self):
         self.lock_manager.global_ex_lock()
@@ -345,10 +354,12 @@ class ObdHome(object):
                     self._call_stdio(msg_lv, 'No such %s plugin for %s-%s' % (script_name, repository.name, repository.version))
         return plugins
 
-    def search_images(self, component_name, version, release=None, disable=[], usable=[], release_first=False, print_match=True):
+    def search_images(self, component_name, version=None, min_version=None, max_version=None, release=None, disable=[], 
+                      usable=[], release_first=False, print_match=True):
         matchs = {}
         usable_matchs = []
-        for pkg in self.mirror_manager.get_pkgs_info(component_name, version=version, release=release):
+        for pkg in self.mirror_manager.get_pkgs_info(component_name, version=version, min_version=min_version, 
+                                                     max_version=max_version, release=release):
             if pkg.md5 in disable:
                 self._call_stdio('verbose', 'Disable %s' % pkg.md5)
             else:
@@ -391,6 +402,7 @@ class ObdHome(object):
                 errors.append('No such component name: {}'.format(component))
                 continue
             config = deploy_config.components[component]
+            
             # First, check if the component exists in the repository. If exists, check if the version is available. If so, use the repository directly.
             self._call_stdio('verbose', 'Get %s repository' % component)
             repository = self.repository_manager.get_repository(name=component, version=config.version, tag=config.tag, release=config.release, package_hash=config.package_hash)
@@ -399,7 +411,7 @@ class ObdHome(object):
             if not config.tag:
                 self._call_stdio('verbose', 'Search %s package from mirror' % component)
                 pkg = self.mirror_manager.get_best_pkg(
-                    name=component, version=config.version, md5=config.package_hash, release=config.release, fuzzy_match=fuzzy_match, only_info=only_info)
+                    name=component, version=config.version, md5=config.package_hash, release=config.release, fuzzy=fuzzy_match, only_info=only_info)
             else:
                 pkg = None
             if repository or pkg:
@@ -791,23 +803,28 @@ class ObdHome(object):
             repositories.append(repository)
         return install_plugins
 
-    def install_lib_for_repositories(self, repositories):
+    def install_lib_for_repositories(self, need_libs):
         all_data = []
-        temp_repositories = repositories
-        while temp_repositories:
+        temp_libs = need_libs
+        while temp_libs:
             data = {}
             temp_map = {}
-            repositories = temp_repositories
-            temp_repositories = []
-            for repository in repositories:
-                lib_name = '%s-libs' % repository.name
-                if lib_name in data:
-                    temp_repositories.append(repository)
-                    continue
-                data[lib_name] = {'global': {
-                    'version': repository.version
-                }}
-                temp_map[lib_name] = repository
+            libs = temp_libs
+            temp_libs = []
+            for lib in libs:
+                repository = lib['repository']
+                for requirement in lib['requirement']:
+                    lib_name = requirement.name
+                    if lib_name in data:
+                        # To avoid remove one when require different version of same lib
+                        temp_libs.append(lib)
+                        continue
+                    data[lib_name] = {
+                        'version': requirement.version,
+                        'min_version': requirement.min_version,
+                        'max_version': requirement.max_version,
+                    }
+                    temp_map[lib_name] = repository
             all_data.append((data, temp_map))
         try:
             repositories_lib_map = {}
@@ -1088,14 +1105,17 @@ class ObdHome(object):
 
         generate_consistent_config = getattr(self.options, 'generate_consistent_config', False)
         component_num = len(repositories)
+        # reverse sort repositories by dependency, so that oceanbase will be the last one to proceed
+        repositories = self.sort_repository_by_depend(repositories, deploy_config)
+        repositories.reverse()
+
         for repository in repositories:
             ret = self.call_plugin(gen_config_plugins[repository], repository, generate_consistent_config=generate_consistent_config)
             if ret:
                 component_num -= 1
-                
         if component_num == 0 and deploy_config.dump():
             return True
-        
+
         self.deploy_manager.remove_deploy_config(name)
         return False
 
@@ -1138,10 +1158,15 @@ class ObdHome(object):
         mock_ocp_repository = Repository("ocp-server-ce", "/")
         mock_ocp_repository.version = "4.2.1"
         repositories = [mock_ocp_repository]
+        connect_plugin = self.plugin_manager.get_best_py_script_plugin('connect', mock_ocp_repository.name, mock_ocp_repository.version)
         takeover_precheck_plugins = self.search_py_script_plugin(repositories, "takeover_precheck")
         self._call_stdio('verbose', 'successfully get takeover precheck plugin.')
         takeover_plugins = self.search_py_script_plugin(repositories, "takeover")
         self._call_stdio('verbose', 'successfully get takeover plugin.')
+
+        ret = self.call_plugin(connect_plugin, mock_ocp_repository)
+        if not ret or not ret.get_return('connect'):
+            return False
 
         # do take over cluster by  call takeover precheck plugins
         self._call_stdio('print', 'precheck for export obcluster to ocp.')
@@ -1160,7 +1185,7 @@ class ObdHome(object):
             return False
         self.set_deploy(None)
         self.set_repositories(None)
-        takeover_ret = self.call_plugin(takeover_plugins[mock_ocp_repository], mock_ocp_repository, cluster_config=cluster_config, deploy_config = deploy_config, clients=ssh_clients)
+        takeover_ret = self.call_plugin(takeover_plugins[mock_ocp_repository], mock_ocp_repository, cluster_config=cluster_config, deploy_config=deploy_config, clients=ssh_clients)
         if not takeover_ret:
             return False
         else:
@@ -1256,17 +1281,17 @@ class ObdHome(object):
 
     def sort_repository_by_depend(self, repositories, deploy_config):
         sorted_repositories = []
-        sorted_componets = {}
+        sorted_components = {}
         while repositories:
             temp_repositories = []
             for repository in repositories:
                 cluster_config = deploy_config.components.get(repository.name)
-                for componet_name in cluster_config.depends:
-                    if componet_name not in sorted_componets:
+                for component_name in cluster_config.depends:
+                    if component_name not in sorted_components:
                         temp_repositories.append(repository)
                         break
                 else:
-                    sorted_componets[repository.name] = 1
+                    sorted_components[repository.name] = 1
                     sorted_repositories.append(repository)
             if len(temp_repositories) == len(repositories):
                 sorted_repositories += temp_repositories
@@ -1356,9 +1381,6 @@ class ObdHome(object):
                 self._call_stdio('error', 'Deploy "%s" is %s. You could not deploy an %s cluster.' % (name, deploy_info.status.value, deploy_info.status.value))
                 return False
 
-        if 'ocp-server' in getattr(self.options, 'components', ''):
-            self._call_stdio('error', 'Not support ocp-server.')
-            return
         components = set()
         for component_name in getattr(self.options, 'components', '').split(','):
             if component_name:
@@ -1584,13 +1606,15 @@ class ObdHome(object):
     def install_repository_to_servers(self, components, cluster_config, repository, ssh_clients, unuse_lib_repository=False):
         install_repo_plugin = self.plugin_manager.get_best_py_script_plugin('install_repo', 'general', '0.1')
         install_plugins = self.search_plugins([repository], PluginType.INSTALL)
+        need_libs = []
         if not install_plugins:
             return False
         install_plugin = install_plugins[repository]
         check_file_map = install_plugin.file_map(repository)
+        requirement_map = install_plugin.requirement_map(repository)
         ret = self.call_plugin(install_repo_plugin, repository, obd_home=self.home_path, install_repository=repository,
                                install_plugin=install_plugin, check_repository=repository,
-                               check_file_map=check_file_map,
+                               check_file_map=check_file_map, requirement_map=requirement_map,
                                msg_lv='error' if unuse_lib_repository else 'warn')
         if not ret:
             return False
@@ -1599,7 +1623,11 @@ class ObdHome(object):
         elif unuse_lib_repository:
             return False
         self._call_stdio('print', 'Try to get lib-repository')
-        repositories_lib_map = self.install_lib_for_repositories([repository])
+        need_libs.append({
+            'repository': repository,
+            'requirement': ret.get_return('requirements')
+        })
+        repositories_lib_map = self.install_lib_for_repositories(need_libs)
         if repositories_lib_map is False:
             self._call_stdio('error', 'Failed to install lib package for local')
             return False
@@ -1616,26 +1644,34 @@ class ObdHome(object):
         install_repo_plugin = self.plugin_manager.get_best_py_script_plugin('install_repo', 'general', '0.1')
         check_file_maps = {}
         need_lib_repositories = []
+        need_libs = []
         for repository in repositories:
             cluster_config = deploy_config.components[repository.name]
             install_plugin = install_plugins[repository]
             check_file_map = check_file_maps[repository] = install_plugin.file_map(repository)
+
+            requirement_map = install_plugin.requirement_map(repository)
             target_servers = cluster_config.added_servers if cluster_config.added_servers else None
             ret = self.call_plugin(install_repo_plugin, repository, obd_home=self.home_path, install_repository=repository,
                                    install_plugin=install_plugin, check_repository=repository, check_file_map=check_file_map,
+                                   requirement_map = requirement_map,
                                    target_servers=target_servers,
                                    msg_lv='error' if deploy_config.unuse_lib_repository else 'warn')
             if not ret:
                 return False
             if not ret.get_return('checked'):
                 need_lib_repositories.append(repository)
+                need_libs.append({
+                    'repository': repository,
+                    'requirement': ret.get_return('requirements')
+                })
 
         if need_lib_repositories:
             if deploy_config.unuse_lib_repository:
                 # self._call_stdio('print', 'You could try using -U to work around the problem')
                 return False
             self._call_stdio('print', 'Try to get lib-repository')
-            repositories_lib_map = self.install_lib_for_repositories(need_lib_repositories)
+            repositories_lib_map = self.install_lib_for_repositories(need_libs)
             if repositories_lib_map is False:
                 self._call_stdio('error', 'Failed to install lib package for local')
                 return False
@@ -1644,10 +1680,12 @@ class ObdHome(object):
                 check_file_map = check_file_maps[need_lib_repository]
                 lib_repository = repositories_lib_map[need_lib_repository]['repositories']
                 install_plugin = repositories_lib_map[need_lib_repository]['install_plugin']
+                requirement_map = install_plugins[need_lib_repository].requirement_map(need_lib_repository)
                 target_servers = cluster_config.added_servers if cluster_config.added_servers else None
                 ret = self.call_plugin(install_repo_plugin, need_lib_repository, obd_home=self.home_path, install_repository=lib_repository,
                                        install_plugin=install_plugin, check_repository=need_lib_repository, target_servers=target_servers,
-                                       check_file_map=check_file_map, msg_lv='error')
+                                       check_file_map=check_file_map, requirement_map=requirement_map, msg_lv='error')
+
                 if not ret or not ret.get_return('checked'):
                     self._call_stdio('error', 'Failed to install lib package for cluster servers')
                     return False
@@ -2044,6 +2082,7 @@ class ObdHome(object):
         self._call_stdio('start_loading', 'Search plugins')
         start_check_plugins = self.search_py_script_plugin(repositories, 'start_check', no_found_act='warn')
         create_tenant_plugins = self.search_py_script_plugin(repositories, 'create_tenant', no_found_act='ignore')
+        tenant_optimize_plugins = self.search_py_script_plugin(repositories, 'tenant_optimize', no_found_act='ignore')
         start_plugins = self.search_py_script_plugin(repositories, 'start')
         connect_plugins = self.search_py_script_plugin(repositories, 'connect')
         bootstrap_plugins = self.search_py_script_plugin(repositories, 'bootstrap')
@@ -2130,10 +2169,16 @@ class ObdHome(object):
                     if self.get_namespace(repository.name).get_variable("create_tenant_options"):
                         if not self.call_plugin(create_tenant_plugins[repository], repository):
                             return False
-                        
+                        if repository in tenant_optimize_plugins:
+                            if not self.call_plugin(tenant_optimize_plugins[repository], repository):
+                                return False
                     if deploy_config.auto_create_tenant:
-                        create_tenant_options = Values({"variables": "ob_tcp_invited_nodes='%'", "create_if_not_exists": True})
-                        self.call_plugin(create_tenant_plugins[repository], repository, create_tenant_options=create_tenant_options)
+                        create_tenant_options = [Values({"variables": "ob_tcp_invited_nodes='%'", "create_if_not_exists": True})]
+                        if not self.call_plugin(create_tenant_plugins[repository], repository, create_tenant_options=create_tenant_options):
+                            return False
+                        if repository in tenant_optimize_plugins:
+                            if not self.call_plugin(tenant_optimize_plugins[repository], repository):
+                                return False
 
             if not start_all:
                 component_num -= 1
@@ -2181,6 +2226,7 @@ class ObdHome(object):
             
         connect_plugins = self.search_py_script_plugin(repositories, 'connect')
         create_tenant_plugins = self.search_py_script_plugin(repositories, 'create_tenant', no_found_act='ignore')
+        tenant_optimize_plugins = self.search_py_script_plugin(repositories, 'tenant_optimize', no_found_act='ignore')
         self._call_stdio('stop_loading', 'succeed')
 
         # Get the client
@@ -2192,6 +2238,9 @@ class ObdHome(object):
 
             if not self.call_plugin(create_tenant_plugins[repository], repository):
                 return False
+
+            if repository in tenant_optimize_plugins:
+                self.call_plugin(tenant_optimize_plugins[repository], repository)
         return True
 
     def get_component_repositories(self, deploy_info, components):
@@ -3483,7 +3532,7 @@ class ObdHome(object):
         files = {}
         success = True
         repo_path = attrs['path']
-        info = PackageInfo(name=attrs['name'], version=attrs['version'], release=None, arch=None, md5=None)
+        info = PackageInfo(name=attrs['name'], version=attrs['version'], release=None, arch=None, md5=None, size=None)
         for item in plugin.file_list(info):
             path = os.path.join(repo_path, item.src_path)
             path = os.path.normcase(path)
@@ -3504,7 +3553,10 @@ class ObdHome(object):
 
         self._call_stdio('start_loading', 'Package')
         try:
-            pkg = LocalPackage(repo_path, attrs['name'], attrs['version'], files, getattr(self.options, 'release', None), getattr(self.options, 'arch', None))
+            release = getattr(self.options, 'release', None)
+            arch = getattr(self.options, 'arch', None)
+            size = getattr(self.options, 'size', None)
+            pkg = LocalPackage(repo_path, attrs['name'], attrs['version'], files, release, arch, size)
             self._call_stdio('stop_loading', 'succeed')
         except:
             self._call_stdio('exception', 'Package failed')
@@ -4188,7 +4240,7 @@ class ObdHome(object):
             self._call_stdio('critical', 'OBD upgrade plugin not found')
             return False
         pkg = self.mirror_manager.get_best_pkg(name=component_name)
-        if not (pkg and pkg > PackageInfo(component_name, version, pkg.release, pkg.arch, '')):
+        if not (pkg and pkg > PackageInfo(component_name, version, pkg.release, pkg.arch, '', 0)):
             self._call_stdio('print', 'No updates detected. OBD is already up to date.')
             return False
         
@@ -4512,6 +4564,19 @@ class ObdHome(object):
 
         sync_config_plugin = self.plugin_manager.get_best_py_script_plugin('sync_cluster_config', 'general', '0.1')
         self.call_plugin(sync_config_plugin, repository)
+        
+        # Check whether obclient is avaliable
+        ret = LocalClient.execute_command('%s --help' % opts.obclient_bin)
+        if not ret:
+            # install obclient
+            tool_name = COMP_OBCLIENT
+            if not self.tool_manager.is_tool_install(tool_name):
+                if not self.install_tool(tool_name):
+                    self._call_stdio('error', '%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % opts.obclient_bin)
+                    return
+            tool = self.tool_manager.get_tool_config_by_name(tool_name)
+            opts.obclient_bin = os.path.join(tool.config.path, 'bin/obclient')
+            
         db_connect_plugin = self.plugin_manager.get_best_py_script_plugin('db_connect', 'general', '0.1')
         return self.call_plugin(db_connect_plugin, repository)
 
@@ -4709,16 +4774,18 @@ class ObdHome(object):
                 target_repository = repository
                 break
         if fuction_type in ['gather_plan_monitor']:
-            setattr(opts, 'connect_cluster', True)          
+            setattr(opts, 'connect_cluster', True)
 
-        diagnostic_component_name = 'oceanbase-diagnostic-tool'
-        diagnostic_component_version = '1.5'
-        deployed = self.obdiag_deploy(auto_deploy=True, version=diagnostic_component_version)
-        if deployed:
-            generate_config_plugin = self.plugin_manager.get_best_py_script_plugin('generate_config', diagnostic_component_name, diagnostic_component_version)
+        diagnostic_component_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
+        deployed = self.obdiag_deploy(fuction_type)
+        tool = self.tool_manager.get_tool_config_by_name(diagnostic_component_name)
+        if deployed and tool:
+            generate_config_plugin = self.plugin_manager.get_best_py_script_plugin('generate_config', diagnostic_component_name, tool.config.version)
             self.call_plugin(generate_config_plugin, target_repository, deploy_config=deploy_config)
             self._call_stdio('generate_config', 'succeed')
-            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, diagnostic_component_name, diagnostic_component_version)
+            scene_config_plugin = self.plugin_manager.get_best_py_script_plugin('scene_config', diagnostic_component_name, tool.config.version)
+            self.call_plugin(scene_config_plugin, target_repository)
+            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, diagnostic_component_name, tool.config.version)
             return self.call_plugin(obdiag_plugin, target_repository)
         else:
             self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
@@ -4726,55 +4793,55 @@ class ObdHome(object):
 
 
     def obdiag_offline_func(self, fuction_type, opts):
-        component_name = 'oceanbase-diagnostic-tool'
-        pkg = self.mirror_manager.get_best_pkg(name=component_name)
+        tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
+        pkg = self.mirror_manager.get_best_pkg(name=tool_name)
         if not pkg:
-            self._call_stdio('critical', '%s package not found' % component_name)
+            self._call_stdio('critical', '%s package not found' % tool_name)
             return False
         repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
-        deployed = self.obdiag_deploy(auto_deploy=True, version=repository.version)
-        if deployed:
-            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, component_name, repository.version)
+        deployed = self.obdiag_deploy(fuction_type)
+        tool = self.tool_manager.get_tool_config_by_name(tool_name)
+        if deployed and tool:
+            scene_config_plugin = self.plugin_manager.get_best_py_script_plugin('scene_config', tool_name, repository.version)
+            self.call_plugin(scene_config_plugin, repository, clients={})
+            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, tool_name, repository.version)
             return self.call_plugin(obdiag_plugin, repository, clients={})
         else:
             self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
             return False
-
-
-    def obdiag_deploy(self, auto_deploy=False, install_prefix=None, version=None):
-        self._global_ex_lock()
-        component_name = 'oceanbase-diagnostic-tool'
-        if install_prefix is None:
-            install_prefix = os.path.join(os.getenv('HOME'), component_name)
+        
+    def obdiag_deploy(self, fuction_type):
+        component_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
+        # obdiag pre check
         pkg = self.mirror_manager.get_best_pkg(name=component_name)
         if not pkg:
             self._call_stdio('critical', '%s package not found' % component_name)
             return False
-        plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, component_name, pkg.version)
-        self._call_stdio('print', 'obdiag plugin : %s' % plugin)
         repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
-        check_plugin = self.plugin_manager.get_best_py_script_plugin('pre_check', component_name, pkg.version)
+        pre_check_plugin = self.plugin_manager.get_best_py_script_plugin('pre_check', component_name, pkg.version)
+        if not pre_check_plugin:
+            self._call_stdio('info', '%s pre_check plugin not found' % component_name)
+            return True
         obd = self.fork()
         obd.set_deploy(deploy=None)
-        ret = obd.call_plugin(check_plugin, repository, clients={}, obdiag_path = install_prefix, obdiag_new_version = pkg.version, version_check = True)
-        if ret.get_return('obdiag_found'):
-            if ret.get_return('version_status'):
-                self._call_stdio('print', 'No updates detected. obdiag is already up to date.')
-                return True
-            else:
-                if not auto_deploy:
-                    if not self._call_stdio('confirm', 'Found a higher version\n%s\nDo you want to use it?' % pkg):
-                        return False
-        self._call_stdio('start_loading', 'Get local repositories and plugins')
-        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
-        plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, component_name, pkg.version)
-        repository.load_pkg(pkg, plugin)
-        src_path = os.path.join(repository.repository_dir, component_name)
-        if FileUtil.symlink(src_path, install_prefix, self.stdio):
-            self._call_stdio('stop_loading', 'succeed')
-            self._call_stdio('print', 'Deploy obdiag successful.\nCurrent version : %s. \nPath of obdiag : %s' % (pkg.version, install_prefix))
+        ret = obd.call_plugin(pre_check_plugin, repository, clients={})
+        if not ret.get_return('checked'):
+            self._call_stdio('error', 'Get the pre check return of the tool %s failed' % component_name)
+            return False
+        # obdiag install
+        if not self.tool_manager.is_tool_install(component_name):
+            return self.install_tool(component_name, force=True)
+        else:
+            # try to update obdiag to latest version
+            tool = self.tool_manager.get_tool_config_by_name(component_name)
+            obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, component_name, tool.config.version)
+            if not obdiag_plugin:
+                self._call_stdio('warn', 'The obdiag version %s is not support command "obd obdiag %s", please update it' % (tool.config.version, fuction_type))
+            if not self.update_tool(component_name):
+                if not obdiag_plugin:
+                    self._call_stdio('error', 'Update the obdiag version %s failed, please update it' % (tool.config.version))
+                    return False
             return True
-        return False
 
     def get_repositories_utils(self, repositories):
         all_data = []
@@ -4831,9 +4898,263 @@ class ObdHome(object):
             utils_repository = repositories_utils_map[temp_repository]['repositories']
             install_plugin = repositories_utils_map[temp_repository]['install_plugin']
             check_file_map = check_file_maps[repository] = install_plugin.file_map(repository)
+            requirement_map = install_plugin.requirement_map(repository)
             ret = self.call_plugin(install_repo_plugin, repository, obd_home=self.home_path, install_repository=utils_repository,
                         install_plugin=install_plugin, check_repository=repository, check_file_map=check_file_map,
-                        msg_lv='error' if unuse_utils_repository else 'warn')
+                        requirement_map=requirement_map, msg_lv='error' if unuse_utils_repository else 'warn')
             if not ret:
                 return False
+        return True
+
+    def print_tools(self, tools, title):
+        if tools:
+            self._call_stdio('print_list', tools, 
+                ['Name', 'Arch', 'Version', 'Install Path', 'Install Size'], 
+                lambda x: [x.name, x.config.arch, x.config.version, x.config.path, Capacity(x.config.size, 2).value], 
+                title=title,
+            )
+        else:
+            self._call_stdio('print', 'No tools have been installed')
+    
+    def list_tools(self):
+        self._call_stdio('verbose', 'Get tool list')
+        tools = self.tool_manager.get_tool_list()
+        self.print_tools(tools, 'Tool List')
+        return True
+    
+    def check_requirement(self, tool_name, repository, package, file_map, requirement_map, install_path):
+        obd = self.fork()
+        obd.set_deploy(deploy=None)
+        check_requirement_plugin = self.plugin_manager.get_best_py_script_plugin('check_requirement', tool_name, package.version)
+        if not check_requirement_plugin:
+            self._call_stdio('verbose', '%s check_requirement plugin not found' % tool_name)
+            return True
+        ret = obd.call_plugin(check_requirement_plugin,
+                repository,
+                clients={},
+                file_map = file_map,
+                requirement_map = requirement_map)
+        if not ret.get_return('checked'):
+            for requirement in ret.get_return('requirements'):
+                if not self.install_requirement(requirement.name, requirement.version, os.path.join(install_path, 'lib')):
+                    self._call_stdio('error', 'Install the requirement %s failed' % requirement.name)
+                    return False
+        return True
+    
+    def install_requirement(self, tool_name, version, install_path):
+        pkg = self.mirror_manager.get_best_pkg(name=tool_name, version=version)
+        if not pkg:
+            package_info = '%s-%s' % (tool_name, version) if version else tool_name
+            self._call_stdio('critical', 'No such package: %s' % package_info)
+            return False
+        
+        plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, tool_name, pkg.version)
+        if not plugin:
+            self._call_stdio('critical', 'Not support requirement %s of version %s' % (tool_name, pkg.version))
+            return False
+        
+        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
+        
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        if not repository.load_pkg(pkg, plugin):
+            self._call_stdio('error', 'Failed to extract file from %s' % pkg.path)
+            return False
+        self._call_stdio('stop_loading', 'succeed')
+        
+        self._call_stdio('start_loading', 'install requirement')
+        if not self.tool_manager.install_requirement(repository, install_path):
+            return False
+        self._call_stdio('stop_loading', 'succeed')
+        
+        file_map = plugin.file_map(pkg)
+        requirement_map = plugin.requirement_map(pkg)
+        if file_map and requirement_map:
+            if not self.check_requirement(tool_name, repository, pkg, file_map, requirement_map, install_path):
+                self._call_stdio('critical', 'Check the requirement of tool %s failed' % tool_name)
+                return False
+        return True
+        
+    def _install_tool(self, tool_name, version, force, install_path):
+        pkg = self.mirror_manager.get_best_pkg(name=tool_name, version=version, only_info=True)
+        if not pkg:
+            package_info = '%s-%s' % (tool_name, version) if version else tool_name
+            self._call_stdio('critical', 'No such package: %s' % package_info)
+            return False
+    
+        plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, tool_name, pkg.version)
+        if not plugin:
+            self._call_stdio('critical', 'Not support tool %s of version %s' % (tool_name, pkg.version))
+            return False
+        
+        pkg = self.mirror_manager.get_best_pkg(name=tool_name, version=version)
+        if not pkg:
+            package_info = '%s-%s' % (tool_name, version) if version else tool_name
+            self._call_stdio('critical', 'No such package: %s' % package_info)
+            return False
+        
+        if not self._call_stdio('confirm', 'Found a avaiable version\n%s\nDo you want to use it?' % pkg):
+            return False
+            
+        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
+        
+        tool = self.tool_manager.create_tool_config(tool_name)
+        
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        if not repository.load_pkg(pkg, plugin):
+            self._call_stdio('error', 'Failed to extract file from %s' % pkg.path)
+            self.tool_manager.remove_tool_config(tool_name)
+            return False
+        self._call_stdio('stop_loading', 'succeed')
+        
+        self._call_stdio('start_loading', 'install tool')
+        if not self.tool_manager.install_tool(tool, repository, install_path):
+            self.tool_manager.remove_tool_config(tool_name)
+            return False
+        self._call_stdio('stop_loading', 'succeed')
+        
+        file_map = plugin.file_map(pkg)
+        requirement_map = plugin.requirement_map(pkg)
+        if file_map and requirement_map:
+            if not self.check_requirement(tool_name, repository, pkg, file_map, requirement_map, install_path):
+                self._call_stdio('critical', 'Check the requirement of tool %s failed' % tool_name)
+                self.tool_manager.remove_tool_config(tool_name)
+                return False
+        if not tool.save_config(pkg.version, repository.hash, install_path):
+            self._call_stdio('error', 'Failed to save tool config to %s' % tool.config_path)
+            self.tool_manager.remove_tool_config(tool_name)
+            return False
+        return True
+    
+    def install_tool(self, tool_name, force=None, version=None, install_prefix=None):
+        self._call_stdio('verbose', 'Try to install %s', tool_name)
+        self._global_ex_lock()
+        if not self.tool_manager.is_belong_tool(tool_name):
+            self._call_stdio('error', 'The tool %s is not supported' % tool_name)
+            self._call_stdio('print', 'The tool install only support %s' % self.tool_manager.get_support_tool_list())
+            return False
+        tool_name = self.tool_manager.get_tool_offical_name(tool_name)
+        if not tool_name:
+            return False
+        
+        if self.tool_manager.is_tool_install(tool_name):
+            self._call_stdio('print', 'The tool %s is already installed' % tool_name)
+            return True
+        
+        if not version:
+            version = getattr(self.options, 'version', None)
+        if not install_prefix:
+            install_prefix = self.options.prefix \
+                if getattr(self.options, 'prefix', None) is not None else os.getenv('HOME')
+        force = self.options.force if getattr(self.options, 'force', None) is not None else force
+
+        install_path = os.path.abspath(os.path.join(install_prefix, tool_name))
+        
+        if not self._install_tool(tool_name, version, force, install_path):
+            self.tool_manager.remove_tool_config(tool_name)
+            return False
+        
+        tool = self.tool_manager.get_tool_config_by_name(tool_name)
+        self.print_tools([tool], 'Installed Tool')
+        self._call_stdio('print', 'Install tool %s completely.', tool_name)
+        
+        return True
+    
+    def uninstall_tool(self, tool_name):
+        self._call_stdio('verbose', 'Try to uninstall %s', tool_name)
+        self._global_ex_lock()
+        force = self.options.force if getattr(self.options, 'force', None) is not None else False
+        
+        if not self.tool_manager.is_belong_tool(tool_name):
+            self._call_stdio('error', 'The tool %s is not supported' % tool_name)
+            return False
+        tool_name = self.tool_manager.get_tool_offical_name(tool_name)
+        if not tool_name:
+            return False
+        tool = self.tool_manager.get_tool_config_by_name(tool_name)
+        if not tool:
+            self._call_stdio('error', 'The tool %s is not installed' % tool_name)
+            return False
+        
+        self.print_tools([tool], 'Uninstall Tool')
+        if not self._call_stdio('confirm', 'Uninstall tool %s\nIs this ok ' % tool_name):
+            return False
+        if not self.tool_manager.uninstall_tool(tool):
+            self._call_stdio('error', 'Uninstall the tool %s failed' % tool_name)
+            return False
+        self.tool_manager.remove_tool_config(tool_name)
+        self._call_stdio('print', 'Uninstall tool %s completely' % tool_name)
+        return True
+
+    def _update_tool(self, tool, version, force, install_path):
+        pkg = self.mirror_manager.get_best_pkg(name=tool.name, version=version)
+        if not pkg:
+            package_info = '%s-%s' % (tool.name, version) if version else tool.name
+            self._call_stdio('critical', 'No such package: %s' % package_info)
+            return False
+        
+        plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, tool.name, pkg.version)
+        if not plugin:
+            self._call_stdio('critical', 'Not support tool %s of version %s' % (tool.name, pkg.version))
+            return False
+        
+        if self.tool_manager.check_if_avaliable_update(tool, pkg):
+            if not self._call_stdio('confirm', 'Found a avaiable version\n%s\nDo you want to use it?' % pkg):
+                return False
+        else:
+            self._call_stdio('print', 'The tool %s is already installed the latest version %s' % (tool.name, tool.config.version))
+            return True
+            
+        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
+        
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        if not repository.load_pkg(pkg, plugin):
+            self._call_stdio('error', 'Failed to extract file from %s' % pkg.path)
+            return False
+        self._call_stdio('stop_loading', 'succeed')
+        
+        self._call_stdio('start_loading', 'install tool')
+        if not self.tool_manager.update_tool(tool, repository, install_path):
+            self.tool_manager.remove_tool_config(tool.name)
+            return False
+        self._call_stdio('stop_loading', 'succeed')
+        
+        file_map = plugin.file_map(pkg)
+        requirement_map = plugin.requirement_map(pkg)
+        if file_map and requirement_map:
+            if not self.check_requirement(tool.name, repository, pkg, file_map, requirement_map, install_path):
+                self._call_stdio('critical', 'Check the requirement of tool %s failed' % tool.name)
+                return False
+        if not tool.save_config(pkg.version, repository.hash, install_path):
+            self._call_stdio('error', 'Failed to save tool config to %s' % tool.config_path)
+            return False
+        
+        self.print_tools([tool], 'Updated tool')
+        self._call_stdio('print', 'Update tool %s completely.', tool.name)
+        return True
+
+    def update_tool(self, tool_name, force=False, version=None, install_prefix=None):
+        self._call_stdio('verbose', 'Try to update %s', tool_name)
+        self._global_ex_lock()
+        if not self.tool_manager.is_belong_tool(tool_name):
+            self._call_stdio('error', 'The tool %s is not supported' % tool_name)
+            self._call_stdio('print', 'The tool update only support %s' % self.tool_manager.get_support_tool_list())
+            return False
+        tool_name = self.tool_manager.get_tool_offical_name(tool_name)
+        if not tool_name:
+            return False
+        tool = self.tool_manager.get_tool_config_by_name(tool_name)
+        if not tool:
+            self._call_stdio('error', 'The tool %s is not installed' % tool_name)
+            return False
+        if not version:
+            version = getattr(self.options, 'version', None)
+        if not install_prefix:
+            previous_parent_path = os.path.dirname(tool.config.path) if tool.config.path else os.getenv('HOME')
+            install_prefix = self.options.prefix \
+                if getattr(self.options, 'prefix', None) is not None else previous_parent_path
+        force = self.options.force if getattr(self.options, 'force', None) is not None else force
+        
+        install_path = os.path.abspath(os.path.join(install_prefix, tool_name))
+        if not self._update_tool(tool, version, force, install_path):
+            return False
         return True

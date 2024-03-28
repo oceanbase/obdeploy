@@ -112,17 +112,10 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
                 yaml.dump(data, f)
             except:
                 stdio.error('path %s dump obdiag config %s failed.\n' % (config_path, data))
-
-    def copy_check_config():
-        obdiag_install_dir = get_option('obdiag_dir')
-        init_shell_path = os.path.join(obdiag_install_dir, 'init.sh')
-        init_command = 'sh {0}'.format(init_shell_path)
-        LocalClient.execute_command(init_command, None, None, None)
     
     def run():
         config_data = get_obdiag_config()
         write_obdiag_config(config_data)
-        copy_check_config()
 
     try:
         if run():

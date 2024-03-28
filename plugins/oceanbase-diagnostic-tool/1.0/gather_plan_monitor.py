@@ -44,6 +44,8 @@ def gather_plan_monitor(plugin_context, *args, **kwargs):
         )
         if store_dir_option:
             cmd = cmd + r" --store_dir {store_dir_option}".format(store_dir_option=store_dir_option)
+        if env_option:
+            cmd = cmd + r" --env {env_option}".format(env_option=env_option)
         return cmd
 
     def run():
@@ -57,6 +59,10 @@ def gather_plan_monitor(plugin_context, *args, **kwargs):
     store_dir_option = os.path.abspath(get_option('store_dir'))
     obdiag_install_dir = get_option('obdiag_dir')
     trace_id = get_option('trace_id')
+    env_option = get_option('env')
+    if not trace_id:
+        stdio.error("failed get --trace_id option, example: obd obdiag gather plan_monitor {0} --trace_id <trace_id> ".format(plugin_context.deploy_name))
+        return plugin_context.return_false() 
 
     ret = local_execute_command('%s --help' % obdiag_bin)
     if not ret:

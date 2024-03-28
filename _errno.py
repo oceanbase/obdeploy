@@ -138,6 +138,7 @@ EC_COMPONENT_NOT_EXISTS = OBDErrorCodeTemplate(1021, 'Component {component} is n
 EC_COMPONENT_REMOVE_DEPENDS = OBDErrorCodeTemplate(1022, 'Component {component1} still depends by {component2}, could not remove')
 EC_COMPONENT_FAILED_TO_MERGE_CONFIG = OBDErrorCodeTemplate(1023, 'Failed to merge config: {message}')
 EC_COMPONENT_NO_REMAINING_COMPS = OBDErrorCodeTemplate(1024, 'The cluster will have no remaining components. If you are absolutely sure about DELETING ALL COMPONENTS, please use "obd cluster destroy <deploy>" command to completely destroy the cluster')
+EC_COMPONENT_PASSWD_ERROR = OBDErrorCodeTemplate(1025, '({ip}) {component} {key} invalid. (Rule: {rule})')
 
 WC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) The recommended number of {key} is {need} (Current value: {now})')
 WC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) The recommended value of fs.aio-max-nr is 1048576 (Current value: {current})')
@@ -178,9 +179,11 @@ EC_TPCC_RUN_TEST_FAILED = OBDErrorCodeTemplate(3003, 'Failed to run TPC-C benchm
 # obagent
 EC_OBAGENT_RELOAD_FAILED = OBDErrorCodeTemplate(4000, 'Fail to reload {server}')
 EC_OBAGENT_SEND_CONFIG_FAILED = OBDErrorCodeTemplate(4001, 'Fail to send config file to {server}')
+
 # obproxy
 EC_OBPROXY_NEED_CONFIG = OBDErrorCodeTemplate(4100, '{server} need config "rs_list" or "obproxy_config_server_url"')
 EC_OBPROXY_START_FAILED = OBDErrorCodeTemplate(4101, 'failed to start {server} obproxy: {stderr}')
+EC_OBPROXY_ID_OVER_LIMIT = OBDErrorCodeTemplate(4102, 'When the value of client_session_id_version is set to {id}, the valid range of proxy_id is {limit}')
 # grafana
 EC_GRAFANA_DEFAULT_PWD = OBDErrorCodeTemplate(4200, "{server} grafana admin password should not be 'admin'")
 EC_GRAFANA_PWD_LESS_5 = OBDErrorCodeTemplate(4201, "{server} grafana admin password length should not be less than 5")
@@ -195,7 +198,6 @@ EC_OCP_EXPRESS_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4304, 'OCP express {o
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant. (Avail: {avail}, Need: {need})')
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant.')
 EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM = OBDErrorCodeTemplate(4305, 'There is not enough memory for ocp meta tenant')
-EC_OCP_EXPRESS_ADMIN_PASSWD_ERROR = OBDErrorCodeTemplate(4306, '({ip}) ocp-express admin_passwd invalid.(Current :{current})')
 
 
 # ocp-server
@@ -218,6 +220,8 @@ EC_OCP_SERVER_NOT_ENOUGH_MEMORY_AVAILABLE = OBDErrorCodeTemplate(4364, '({ip}) n
 EC_OCP_SERVER_NOT_ENOUGH_MEMORY_CACHED = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Buff/Cache: {cached}, Need: {need})')
 EC_OCP_SERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Need: {need})')
 EC_OCP_SERVER_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4365, '({ip}) {disk} not enough disk space. (Avail: {avail}, Need: {need})')
+
+
 
 WC_OCP_EXPRESS_FAILED_TO_GET_DISK_INFO = OBDErrorCodeTemplate(4303, '({ip}) failed to get disk information, skip disk space check')
 WC_OCP_SERVER_FAILED_TO_GET_DISK_INFO = OBDErrorCodeTemplate(4365, '({ip}) failed to get disk information, skip disk space check')
@@ -286,13 +290,15 @@ SUG_OCP_EXPRESS_REDUCE_DISK = OBDErrorSuggestionTemplate('Please reduce the `log
 SUG_OCP_EXPRESS_COMP_VERSION = OBDErrorSuggestionTemplate('Please use {comp} with version {version} or above')
 SUG_OCP_EXPRESS_REDUCE_META_DB_MEM = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_memory_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_memory_size')])
 SUG_OCP_EXPRESS_REDUCE_META_DB_LOG_DISK = OBDErrorSuggestionTemplate('Please reduce the `ocp_meta_tenant_log_disk_size`', fix_eval=[FixEval(FixEval.DEL, 'ocp_meta_tenant_log_disk_size')])
-SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD_ERROR = OBDErrorSuggestionTemplate('Please edit the `admin_passwd`, must be 8 to 32 characters in length, and must contain at least two digits, two uppercase letters, two lowercase letters, and two of the following special characters:~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_passwd')], auto_fix=True)
+SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD = OBDErrorSuggestionTemplate('Please edit the `admin_passwd`, must be 8 to 32 characters in length, and must contain at least two digits, two uppercase letters, two lowercase letters, and two of the following special characters:~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_passwd')], auto_fix=True)
 SUG_RESTART_OR_RELOAD = OBDErrorSuggestionTemplate('Please restart or reload the cluster manually')
 SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR = OBDErrorSuggestionTemplate('Please ensure that the `jdbc_url` in the `config.yaml` configuration file is set correctly to establish a successful connection with your database')
 SUG_OCP_SERVER_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.')
 SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION = OBDErrorSuggestionTemplate('Please install java with version {version}. If java is already installed, please set `java_bin` to the expected java binary path')
 SUG_OCP_SERVER_REDUCE_MEM = OBDErrorSuggestionTemplate('Please reduce the `memory_size`', fix_eval=[FixEval(FixEval.DEL, 'memory_size')])
 SUG_OCP_SERVER_REDUCE_DISK = OBDErrorSuggestionTemplate('Please reduce the `logging_file_total_size_cap`', fix_eval=[FixEval(FixEval.DEL, 'logging_file_total_size_cap')])
+SUG_OCP_SERVER_EDIT_ADMIN_PASSWD_ERROR = OBDErrorSuggestionTemplate('Please edit the `admin_password`, must be 8 to 32 characters in length, containing at least 3 types from digits, lowercase letters, uppercase letters and the following special characters: ~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_password')], auto_fix=True)
 SUG_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.')
 SUG_OB_SYS_USERNAME = OBDErrorSuggestionTemplate('Please delete the "ob_sys_username" parameter.')
 SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" component.''')
+SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)

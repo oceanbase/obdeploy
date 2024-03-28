@@ -1813,11 +1813,21 @@
   need_redeploy: false
   description_en: Production mode switch, default True. Adjust the memory_limit and __min_full_resource_pool_memory The lower bound of memory is adjusted to 16G and 2147483648
   description_local: 生产模式开关, 默认开启。开启后调整memory limit 和 __min_full_resource_pool_memory 下界调整为 16G 和 2147483648
+- name: ocp_monitor_tenant
+  require: false
+  type: DICT
+  default:
+    tenant_name: ocp_monitor
+    max_cpu: 1
+    memory_size: 2147483648
+  need_redeploy: true
+  description_en: The tenant specifications for ocp monitor db
+  description_local: ocp 的监控数据库使用的租户定义
 - name: ocp_meta_tenant
   require: false
   type: DICT
   default:
-    tenant_name: ocp
+    tenant_name: ocp_meta
     max_cpu: 1
     memory_size: 2147483648
   need_redeploy: true
@@ -1850,27 +1860,75 @@
   need_redeploy: true
   description_en: The tenant log disk size for ocp meta db
   description_local: ocp express的元数据库使用的租户日志磁盘大小
+- name: ocp_monitor_tenant_max_cpu
+  name_local: OCP 监控数据库租户的CPU数
+  essential: true
+  require: false
+  type: INT
+  default: 1
+  need_redeploy: true
+  description_en: The tenant cpu count for ocp monitor db
+  description_local: ocp 监控数据库使用的CPU数量
+- name: ocp_monitor_tenant_memory_size
+  name_local: OCP 监控数据库租户内存
+  essential: true
+  require: false
+  type: CAPACITY_MB
+  default: 2G
+  need_redeploy: true
+  description_en: The tenant memory size for ocp monitor db
+  description_local: ocp 监控数据库使用的租户内存大小
+- name: ocp_monitor_tenant_log_disk_size
+  name_local: OCP 监控数据库租户日志磁盘大小
+  essential: true
+  require: false
+  type: CAPACITY_MB
+  default: 6656M
+  need_redeploy: true
+  description_en: The tenant log disk size for ocp monitor db
+  description_local: ocp 监控数据库使用的租户日志磁盘大小
 - name: ocp_meta_db
   require: false
   type: SAFE_STRING
-  default: ocp_express
+  default: ocp_meta
   need_redeploy: true
   description_en: The database name for ocp meta db
-  description_local: ocp express的元数据库使用的数据库名
+  description_local: ocp 的元数据库使用的数据库名
 - name: ocp_meta_username
   require: false
   type: SAFE_STRING
   default: meta
   need_redeploy: true
-  description_en: The database name for ocp meta db
-  description_local: ocp express的元数据库使用的数据库名
+  description_en: The user name for ocp meta db
+  description_local: ocp 的元数据库使用的用户名
 - name: ocp_meta_password
   require: false
   type: STRING
   default: oceanbase
   need_redeploy: true
-  description_en: The database name for ocp meta db
-  description_local: ocp express的元数据库使用的数据库名
+  description_en: The password for ocp meta db
+  description_local: ocp 的元数据库使用的密码
+- name: ocp_monitor_db
+  require: false
+  type: SAFE_STRING
+  default: ocp_monitor
+  need_redeploy: true
+  description_en: The database name for ocp monitor db
+  description_local: ocp 的监控数据库使用的数据库名
+- name: ocp_monitor_username
+  require: false
+  type: SAFE_STRING
+  default: monitor
+  need_redeploy: true
+  description_en: The user name for ocp meta db
+  description_local: ocp 的监控数据库使用的用户名
+- name: ocp_monitor_password
+  require: false
+  type: STRING
+  default: oceanbase
+  need_redeploy: true
+  description_en: The password for ocp monitor db
+  description_local: ocp 的监控数据库使用的密码
 - name: ocp_agent_monitor_password
   require: false
   type: STRING

@@ -30,7 +30,7 @@ from glob import glob
 from copy import deepcopy, copy
 
 from _manager import Manager
-from _rpm import Version
+from _rpm import Version, get_prefix_version, add_sub_version
 from ssh import ConcurrentExecutor
 from tool import ConfigUtil, DynamicLoading, YamlLoader, FileUtil
 from _types import *
@@ -613,6 +613,7 @@ class InstallPlugin(Plugin):
         FILE = 0
         DIR = 1
         BIN = 2
+        JAR = 3
 
     class InstallMethod(Enum):
 
@@ -621,16 +622,33 @@ class InstallPlugin(Plugin):
 
     class FileItem(object):
 
-        def __init__(self, src_path, target_path, _type, install_method):
+        def __init__(self, src_path, target_path, _type, install_method, require):
             self.src_path = src_path
             self.target_path = target_path
             self.type = _type if _type else InstallPlugin.FileItemType.FILE
             self.install_method = install_method or InstallPlugin.InstallMethod.ANY
+            self.require = require
+    
+    class RequirementItem(object):
+
+        def __init__(self, name, version, min_version, max_version):
+            self.name = name
+            self.version = version
+            self.min_version = min_version
+            self.max_version = max_version
+            
+        def __hash__(self):
+            return hash(tuple(sorted(self.__dict__.items())))
+
+        def __eq__(self, other):
+            return self.__dict__ == other.__dict__
 
     PLUGIN_TYPE = PluginType.INSTALL
     FILES_MAP_YAML = 'file_map.yaml'
     FLAG_FILE = FILES_MAP_YAML
+    REQUIREMENT_YAML = 'requirement.yaml'
     _KEYCRE = re.compile(r"\$(\w+)")
+    _VERSION_KEYCRE = re.compile(r"\$version(\[(\d+)\])?")
 
     def __init__(self, component_name, plugin_path, version, dev_mode):
         super(InstallPlugin, self).__init__(component_name, plugin_path, version, dev_mode)
@@ -638,6 +656,9 @@ class InstallPlugin(Plugin):
         self._file_map = {}
         self._file_map_data = None
         self._check_value = None
+        self.requirement_path = os.path.join(self.plugin_path, self.REQUIREMENT_YAML)
+        self._requirement = {}
+        self._requirement_data = None
 
     @classmethod
     def var_replace(cls, string, var):
@@ -650,7 +671,6 @@ class InstallPlugin(Plugin):
             if not m:
                 done.append(string)
                 break
-
             varname = m.group(1).lower()
             replacement = var.get(varname, m.group())
 
@@ -673,6 +693,16 @@ class InstallPlugin(Plugin):
             with open(self.file_map_path, 'rb') as f:
                 self._file_map_data = yaml.load(f)
         return self._file_map_data
+    
+    @property
+    def requirement_data(self):
+        if self._requirement_data is None:
+            if os.path.exists(self.requirement_path):
+                with open(self.requirement_path, 'rb') as f:
+                    self._requirement_data = yaml.load(f)
+            else:
+                self._requirement_data = {}
+        return self._requirement_data
 
     def file_map(self, package_info):
         var = {
@@ -697,6 +727,7 @@ class InstallPlugin(Plugin):
                         ConfigUtil.get_value_from_dict(data, 'target_path', k),
                         getattr(InstallPlugin.FileItemType, ConfigUtil.get_value_from_dict(data, 'type', 'FILE').upper(), None),
                         getattr(InstallPlugin.InstallMethod, ConfigUtil.get_value_from_dict(data, 'install_method', 'ANY').upper(), None),
+                        ConfigUtil.get_value_from_dict(data, 'require', None),
                     )
                 self._file_map[key] = file_map
             except:
@@ -706,8 +737,70 @@ class InstallPlugin(Plugin):
     def file_list(self, package_info):
         file_map = self.file_map(package_info)
         return [file_map[k] for k in file_map]
+    
+    def version_replace(cls, string, main_componentt_version):
+        """
+        replace the version when configure the "$version" variable in requirement.yaml
 
-
+        :param string: the "version config" from requirement.yaml
+        :param main_componentt_version: the main component version
+        :return: the replaced version and offset
+        """
+        if not main_componentt_version:
+            return string, 0
+        m = cls._VERSION_KEYCRE.search(string)
+        if not m:
+            return string, 0
+        
+        if not m.group(2):
+            return main_componentt_version, 0
+        
+        return get_prefix_version(Version(main_componentt_version), m.group(2)), m.group(2)
+    
+    def requirement_map(self, package_info):
+        var = {
+            'name': package_info.name,
+            'version': package_info.version,
+            'release': package_info.release,
+            'arch': package_info.arch,
+            'md5': package_info.md5,
+        }
+        key = str(var)
+        if not self._requirement.get(key):
+            try:
+                requirement_map = {}
+                if self.requirement_data:
+                    for component_name in self.requirement_data:
+                        value = self.requirement_data[component_name]
+                        # Once the version is configured and then obd find the package is equal to the version
+                        version = ConfigUtil.get_value_from_dict(value, 'version', transform_func=Version)
+                        min_version = max_version = None
+                        if not version:
+                            min_version = ConfigUtil.get_value_from_dict(value, 'min_version', transform_func=Version)
+                            max_version = ConfigUtil.get_value_from_dict(value, 'max_version', transform_func=Version)
+                        else:
+                            version_replace, offset = self.version_replace(version, var['version'])
+                            if version_replace != version:
+                                if offset == 0:
+                                    version = version_replace
+                                else:
+                                    version = None
+                                    min_version = version_replace
+                                    max_version = add_sub_version(Version(version_replace), offset, 1)
+                        requirement_map[component_name] = InstallPlugin.RequirementItem(
+                            component_name,
+                            str(version) if version else None,
+                            str(min_version) if min_version else None,
+                            str(max_version) if max_version else None,
+                        )
+                self._requirement[key] = requirement_map
+            except:
+                pass
+        return self._requirement[key]
+        
+    def requirement_list(self, package_info):
+        requirement_map = self.requirement_map(package_info)
+        return [requirement_map[k] for k in requirement_map]
 
 
 class ComponentPluginLoader(object):

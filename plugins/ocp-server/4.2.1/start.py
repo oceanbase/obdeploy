@@ -29,11 +29,8 @@ from copy import deepcopy
 from const import CONST_OBD_HOME
 from optparse import Values
 
-from tool import Cursor, FileUtil, YamlLoader
-from _rpm import Version
-from _plugin import PluginManager
-from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
-from _deploy import DeployStatus
+from tool import Cursor
+from _types import Capacity, CapacityWithB
 
 
 OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
@@ -93,34 +90,6 @@ CONFIG_MAPPER = {
     }
 
 
-def parse_size(size):
-    _bytes = 0
-    if isinstance(size, str):
-        size = size.strip()
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40}
-        match = re.match(r'^(0|[1-9][0-9]*)\s*([B,K,M,G,T])$', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G', 'T', 'P']
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-    else:
-        div = 1024
-        format = '%d%s'
-    while idx < 5 and size >= 1024:
-        size /= 1024.0
-        idx += 1
-    return format % (size, units[idx])
-
-
 def exec_sql_in_tenant(sql, cursor, tenant, password, mode, retries=10, args=None):
     user = 'SYS' if mode == 'oracle' else 'root'
     tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password)
@@ -169,7 +138,6 @@ def get_ocp_depend_config(cluster_config, stdio):
     depend_observer = False
     depend_info = {}
     ob_servers_conf = {}
-    root_servers = []
     for comp in ["oceanbase", "oceanbase-ce"]:
         ob_zones = {}
         if comp in cluster_config.depends:
@@ -180,7 +148,14 @@ def get_ocp_depend_config(cluster_config, stdio):
                 if 'server_ip' not in depend_info:
                     depend_info['server_ip'] = ob_server.ip
                     depend_info['mysql_port'] = ob_server_conf['mysql_port']
-                    depend_info['root_password'] = ob_server_conf['root_password']
+                    depend_info['meta_tenant'] = ob_server_conf['ocp_meta_tenant']['tenant_name']
+                    depend_info['meta_user'] = ob_server_conf['ocp_meta_username']
+                    depend_info['meta_password'] = ob_server_conf['ocp_meta_password']
+                    depend_info['meta_db'] = ob_server_conf['ocp_meta_db']
+                    depend_info['monitor_tenant'] = ob_server_conf['ocp_monitor_tenant']['tenant_name']
+                    depend_info['monitor_user'] = ob_server_conf['ocp_monitor_username']
+                    depend_info['monitor_password'] = ob_server_conf['ocp_monitor_password']
+                    depend_info['monitor_db'] = ob_server_conf['ocp_monitor_db']
                 zone = ob_server_conf['zone']
                 if zone not in ob_zones:
                     ob_zones[zone] = ob_server
@@ -195,23 +170,26 @@ def get_ocp_depend_config(cluster_config, stdio):
             break
 
     for server in cluster_config.servers:
-        server_config = deepcopy(cluster_config.get_server_conf_with_default(server))
-        original_server_config = cluster_config.get_original_server_conf(server)
+        default_server_config = deepcopy(cluster_config.get_server_conf_with_default(server))
+        server_config = deepcopy(cluster_config.get_server_conf(server))
+        original_server_config = cluster_config.get_original_server_conf_with_global(server)
         missed_keys = get_missing_required_parameters(original_server_config)
         if missed_keys:
             if 'jdbc_url' in missed_keys and depend_observer:
-                server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'],
-                                                                               depend_info['mysql_port'],
-                                                                               server_config['ocp_meta_db'])
-                server_config['jdbc_username'] = '%s@%s' % (
-                    server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'])
-                server_config['jdbc_password'] = server_config['ocp_meta_password']
-                server_config['root_password'] = depend_info.get('root_password', '')
-        env[server] = server_config
+                default_server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'], depend_info['mysql_port'], depend_info['meta_db'] if not original_server_config.get('ocp_meta_db', None) else original_server_config['ocp_meta_db']) if not original_server_config.get('jdbc_url', None) else original_server_config['jdbc_url']
+                default_server_config['ocp_meta_username'] = depend_info['meta_user'] if not original_server_config.get('ocp_meta_username', None) else original_server_config['ocp_meta_username']
+                default_server_config['ocp_meta_tenant']['tenant_name'] = depend_info['meta_tenant'] if not original_server_config.get('ocp_meta_tenant', None) else original_server_config['ocp_meta_tenant']['tenant_name']
+                default_server_config['ocp_meta_password'] = depend_info['meta_password'] if not original_server_config.get('ocp_meta_password', None) else original_server_config['ocp_meta_password']
+                default_server_config['ocp_meta_db'] = depend_info['meta_db'] if not original_server_config.get('ocp_meta_db', None) else original_server_config['ocp_meta_db']
+                default_server_config['ocp_monitor_username'] = depend_info['monitor_user'] if not original_server_config.get('ocp_monitor_username', None) else original_server_config['ocp_monitor_username']
+                default_server_config['ocp_monitor_tenant']['tenant_name'] = depend_info['monitor_tenant'] if not original_server_config.get('ocp_monitor_tenant', None) else original_server_config['ocp_monitor_tenant']['tenant_name']
+                default_server_config['ocp_monitor_password'] = depend_info['monitor_password'] if not original_server_config.get('ocp_monitor_password', None) else original_server_config['ocp_monitor_password']
+                default_server_config['ocp_monitor_db'] = depend_info['monitor_db'] if not original_server_config.get('ocp_monitor_db', None) else original_server_config['ocp_monitor_db']
+        env[server] = default_server_config
     return env
 
 
-def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_parameter=False, *args, **kwargs):
+def start(plugin_context, start_env=None, source_option='start', without_parameter=False, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -223,7 +201,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
         if value is None:
             return value
         try:
-            parsed_value = parse_size(value)
+            parsed_value = Capacity(value).btyes
         except:
             stdio.exception("")
             raise Exception("Invalid option {}: {}".format(key, value))
@@ -233,121 +211,55 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
 
-    def _ocp_lib(client, home_path, soft_dir='', stdio=None):
-        stdio.verbose('cp rpm & pos')
-        OBD_HOME = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
-        for rpm in glob(os.path.join(OBD_HOME, 'mirror/local/*ocp-agent-*.rpm')):
-            name = os.path.basename(rpm)
-            client.put_file(rpm, os.path.join(home_path, 'ocp-server/lib/', name))
-            if soft_dir:
-                client.put_file(rpm, os.path.join(soft_dir, name))
-
     def start_cluster(times=0):
-        jdbc_host = jdbc_port = jdbc_url = jdbc_username = jdbc_password = jdbc_public_key = cursor = monitor_user = monitor_tenant = monitor_memory_size = monitor_max_cpu = monitor_password = monitor_db = tenant_plugin = ''
-        for server in cluster_config.servers:
-            server_config = start_env[server]
-            # check meta db connect before start
-            jdbc_url = server_config['jdbc_url']
-            jdbc_username = server_config['jdbc_username']
-            jdbc_password = server_config['jdbc_password']
-            root_password = server_config.get('root_password', '')
-            cursor = get_option('metadb_cursor', '')
-            cursor = kwargs.get('metadb_cursor', '') if cursor == '' else cursor
-            matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
-            stdio.verbose('metadb connect check')
-            if matched:
-                jdbc_host = matched.group(1)
-                jdbc_port = matched.group(2)[1:]
-                jdbc_database = matched.group(3)
-                password = root_password if root_password else jdbc_password
-                retries = 10
-                while not cursor and retries and not cluster_config.get_component_attr("meta_tenant"):
-                    try:
-                        retries -= 1
-                        time.sleep(2)
-                        cursor = Cursor(ip=jdbc_host, port=jdbc_port, user='root@sys', password=password, stdio=stdio)
-                    except:
-                        pass
+        jdbc_host = jdbc_port = jdbc_url = jdbc_username = jdbc_password = jdbc_public_key = meta_user = meta_tenant = meta_password = monitor_user = monitor_tenant = monitor_password = monitor_db = ''
+        server_config = start_env[cluster_config.servers[0]]
+        # check meta db connect before start
+        jdbc_url = server_config['jdbc_url']
+        jdbc_username = "{0}@{1}".format(server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'])
+        jdbc_password = server_config['ocp_meta_password']
+        meta_user = server_config['ocp_meta_username']
+        meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
+        meta_password = server_config['ocp_meta_password']
+        monitor_user = server_config['ocp_monitor_username']
+        monitor_tenant = server_config['ocp_monitor_tenant']['tenant_name']
+        monitor_password = server_config['ocp_monitor_password']
+        monitor_db = server_config['ocp_monitor_db']
+
+        matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
+        stdio.verbose('metadb connect check')
+        if matched:
+            jdbc_host = matched.group(1)
+            jdbc_port = matched.group(2)[1:]
+        else:
+            stdio.error("jdbc_url is not valid")
+            return False
 
         global_config = cluster_config.get_global_conf()
         site_url = global_config.get('ocp_site_url', '')
         soft_dir = global_config.get('soft_dir', '')
-        meta_user = global_config.get('ocp_meta_username', 'root')
-        meta_tenant = global_config.get('ocp_meta_tenant')['tenant_name']
-        meta_max_cpu = global_config['ocp_meta_tenant'].get('max_cpu', 2)
-        meta_memory_size = global_config['ocp_meta_tenant'].get('memory_size', '2G')
-        meta_password = global_config.get('ocp_meta_password', '')
-        meta_db = global_config.get('ocp_meta_db', 'meta_database')
-        if global_config.get('ocp_monitor_tenant'):
-            monitor_user = global_config.get('ocp_monitor_username', 'root')
-            monitor_tenant = global_config['ocp_monitor_tenant']['tenant_name']
-            monitor_max_cpu = global_config['ocp_monitor_tenant'].get('max_cpu', 2)
-            monitor_memory_size = global_config['ocp_monitor_tenant'].get('memory_size', '4G')
-            monitor_password = global_config.get('ocp_monitor_password', '')
-            monitor_db = global_config.get('ocp_monitor_db', 'monitor_database')
-        if not times and deploy_status == DeployStatus.STATUS_DEPLOYED and not cluster_config.get_component_attr("meta_tenant"):
-            setattr(options, 'tenant_name', meta_tenant)
-            setattr(options, 'max_cpu', meta_max_cpu)
-            setattr(options, 'memory_size', parse_size(meta_memory_size))
-            setattr(options, 'database', meta_db)
-            setattr(options, 'db_username', meta_user)
-            setattr(options, 'db_password', '')
-            setattr(options, 'create_if_not_exists', True)
-            setattr(options, "variables", "ob_tcp_invited_nodes='%'")
-            sql = 'select ob_version() as ob_version;'
-            res = cursor.fetchone(sql)
-            if not res:
-                error('fail to get ob version')
-            version = Version(res['ob_version'])
-            stdio.verbose('meta version: %s' % version)
-            stdio.verbose('Search create_tenant plugin for oceanbase-ce-%s' % version)
-            tenant_plugin = PluginManager(kwargs.get('local_home_path')).get_best_py_script_plugin('create_tenant', 'oceanbase-ce', version)
-            stdio.verbose('Found for %s oceanbase-ce-%s' % (tenant_plugin, version))
-            if not tenant_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
-                return plugin_context.return_false()
-            cluster_config.update_component_attr("meta_tenant", meta_tenant, save=True)
-            meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, '', stdio)
-            if meta_user != 'root':
-                sql = f"""ALTER USER root IDENTIFIED BY %s"""
-                meta_cursor.execute(sql, args=[meta_password], raise_exception=False, exc_level='verbose')
-            sql = f"""ALTER USER {meta_user} IDENTIFIED BY %s"""
+
+        meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, meta_password, stdio)
+        if meta_user != 'root':
+            sql = f"""ALTER USER root IDENTIFIED BY %s"""
             meta_cursor.execute(sql, args=[meta_password], raise_exception=False, exc_level='verbose')
-            meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, str(meta_password), stdio)
-            plugin_context.set_variable('meta_cursor', meta_cursor)
+        plugin_context.set_variable('meta_cursor', meta_cursor)
 
-        if not times and deploy_status == DeployStatus.STATUS_DEPLOYED and not cluster_config.get_component_attr("monitor_tenant"):
-            setattr(options, 'tenant_name', monitor_tenant)
-            setattr(options, 'max_cpu', monitor_max_cpu)
-            setattr(options, 'memory_size', parse_size(monitor_memory_size))
-            setattr(options, 'database', monitor_db)
-            setattr(options, 'db_username', monitor_user)
-            setattr(options, 'db_password', '')
-            setattr(options, "variables", "ob_tcp_invited_nodes='%'")
-            if not tenant_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor):
-                return plugin_context.return_false()
-            cluster_config.update_component_attr("monitor_tenant", monitor_tenant, save=True)
-            monitor_cursor = Cursor(jdbc_host, jdbc_port, monitor_user, monitor_tenant, '', stdio)
-            if monitor_user != 'root':
-                sql = f"""ALTER USER root IDENTIFIED BY %s"""
-                monitor_cursor.execute(sql, args=[monitor_password], raise_exception=False, exc_level='verbose')
-            sql = f"""ALTER USER {monitor_user} IDENTIFIED BY %s"""
+        monitor_cursor = Cursor(jdbc_host, jdbc_port, monitor_user, monitor_tenant, monitor_password, stdio)
+        if monitor_user != 'root':
+            sql = f"""ALTER USER root IDENTIFIED BY %s"""
             monitor_cursor.execute(sql, args=[monitor_password], raise_exception=False, exc_level='verbose')
-
-        if meta_tenant not in jdbc_username:
-            jdbc_username = meta_user + '@' + meta_tenant
-            jdbc_url = jdbc_url.rsplit('/', 1)[0] + '/' + meta_db
-            jdbc_password = meta_password
+        plugin_context.set_variable('monitor_cursor', monitor_cursor)
 
         server_pid = {}
         success = True
         node_num = 1
-        stdio.start_loading("Start ocp-server")
+        stdio.start_loading("Start %s" % cluster_config.name)
         for server in cluster_config.servers:
             client = clients[server]
             server_config = start_env[server]
             home_path = server_config['home_path']
             launch_user = server_config.get('launch_user', None)
-            _ocp_lib(client, home_path, soft_dir, stdio)
             system_password = server_config["system_password"]
             port = server_config['port']
             pid_path = os.path.join(home_path, 'run/ocp-server.pid')
@@ -362,12 +274,13 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
                 jvm_memory_option = "-Xms{0} -Xmx{1}".format(memory_xms, memory_xmx)
             else:
                 memory_size = server_config.get('memory_size', '1G')
-                jvm_memory_option = "-Xms{0} -Xmx{0}".format(format_size(parse_size(memory_size), 0).lower())
+                jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(memory_size)).lower())
             extra_options = {
                 "ocp.iam.encrypted-system-password": system_password
             }
             extra_options_str = ' '.join(["-D{}={}".format(k, v) for k, v in extra_options.items()])
             java_bin = server_config['java_bin']
+            client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
             cmd = f'{java_bin} -Dfile.encoding=UTF-8 -jar {jvm_memory_option} {extra_options_str} {home_path}/lib/ocp-server.jar --bootstrap'
             jar_cmd = copy.deepcopy(cmd)
             if "log_dir" not in server_config:
@@ -392,6 +305,9 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
                                f' --with-property=ocp.monitordb.password:\'{monitor_password}\'' \
                                f' --with-property=ocp.monitordb.database:{monitor_db}'
                     if key not in EXCLUDE_KEYS and key in CONFIG_MAPPER:
+                        if key == 'logging_file_total_size_cap':
+                            cmd += ' --with-property=ocp.logging.file.total.size.cap:{}'.format(CapacityWithB(server_config[key]))
+                            continue
                         cmd += ' --with-property={}:{}'.format(CONFIG_MAPPER[key], server_config[key])
                 if site_url:
                     cmd += ' --with-property=ocp.site.url:{}'.format(site_url)
@@ -431,7 +347,7 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
             stdio.stop_loading('fail')
             return plugin_context.return_false()
 
-        stdio.start_loading("ocp-server program health check")
+        stdio.start_loading("%s program health check" % cluster_config.name)
         failed = []
         servers = server_pid.keys()
         count = 40
@@ -458,15 +374,15 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
                     if any(pids_stat.values()):
                         for pid in pids_stat:
                             if pids_stat[pid]:
-                                stdio.verbose('%s ocp-server[pid: %s] started', server, pid)
+                                stdio.verbose('%s %s[pid: %s] started', server, cluster_config.name, pid)
                         continue
                     if all([stat is False for stat in pids_stat.values()]):
-                        failed.append('failed to start {} ocp-server'.format(server))
+                        failed.append('failed to start {} {}'.format(server, cluster_config.name))
                     elif count:
                         tmp_servers.append(server)
-                        stdio.verbose('failed to start %s ocp-server, remaining retries: %d' % (server, count))
+                        stdio.verbose('failed to start %s %s, remaining retries: %d' % (server, cluster_config.name, count))
                     else:
-                        failed.append('failed to start {} ocp-server'.format(server))
+                        failed.append('failed to start {} {}'.format(server, cluster_config.name))
             servers = tmp_servers
             if servers and count:
                 time.sleep(15)
@@ -496,15 +412,15 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
                 if pid and client.execute_command('sudo ' + cmd if launch_user else cmd):
                     cmd = 'ls /proc/{}/fd'.format(pid)
                     if client.execute_command('sudo ' + cmd if launch_user else cmd):
-                        stdio.verbose('{} ocp-server[pid: {}] stopping...'.format(server, pid))
+                        stdio.verbose('{} {}[pid: {}] stopping...'.format(server, cluster_config.name, pid))
                         cmd = 'kill -9 {}'.format(pid)
                         client.execute_command('sudo ' + cmd if launch_user else cmd)
                         return True
                     else:
-                        stdio.verbose('failed to stop ocp-server[pid:{}] in {}, permission deny'.format(pid, server))
+                        stdio.verbose('failed to stop {}[pid:{}] in {}, permission deny'.format(cluster_config.name, pid, server))
                         success = False
                 else:
-                    stdio.verbose('{} ocp-server is not running'.format(server))
+                    stdio.verbose('{} {} is not running'.format(server, cluster_config.name))
             if not success:
                 stdio.stop_loading('fail')
                 return plugin_context.return_true()
@@ -539,13 +455,15 @@ def start(plugin_context, start_env=None, cursor='', sys_cursor1='', without_par
 
     if not without_parameter and not get_option('without_parameter', ''):
         if not start_cluster():
-            stdio.error('start ocp-server failed')
+            stdio.error('start %s failed' % cluster_config.name)
             return plugin_context.return_false()
         if not stop_cluster():
-            stdio.error('stop ocp-server failed')
+            stdio.error('stop %s failed' % cluster_config.name)
             return plugin_context.return_false()
     if not start_cluster(1):
-        stdio.error('start ocp-server failed')
+        stdio.error('start %s failed' % cluster_config.name)
         return plugin_context.return_false()
     time.sleep(20)
-    return plugin_context.return_true()
+    plugin_context.set_variable('start_env', start_env)
+
+    return plugin_context.return_true(need_bootstrap=True)

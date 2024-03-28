@@ -2,7 +2,7 @@
 
 python_bin='python'
 W_DIR=`pwd`
-VERSION=${VERSION:-'1.3.3'}
+VERSION=${VERSION:-'2.7.0'}
 
 
 function python_version()

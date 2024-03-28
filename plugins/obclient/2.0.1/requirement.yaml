@@ -1,0 +1,2 @@
+libobclient:
+  version: $version

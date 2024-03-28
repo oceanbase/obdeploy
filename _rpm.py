@@ -44,7 +44,7 @@ class Version(str):
 
     @property
     def __cmp_value__(self):
-        return [(int(_i), _s) for _i, _s in re.findall('(\d+)([^\.]*)', self.__str__())]
+        return [(int(_i), _s) for _i, _s in re.findall('(\d+)([^\._]*)', self.__str__())]
 
     def __eq__(self, value):
         if value is None:
@@ -71,6 +71,7 @@ class Version(str):
             return False
         return self.__eq__(value) or self.__lt__(value)
 
+
 class Release(Version):
 
     @property
@@ -84,12 +85,13 @@ class Release(Version):
 
 class PackageInfo(object):
 
-    def __init__(self, name, version, release, arch, md5):
+    def __init__(self, name, version, release, arch, md5, size):
         self.name = name
         self.set_version(version)
         self.set_release(release)
         self.arch = arch
         self.md5 = md5
+        self.size = size
 
     def set_version(self, version):
         self.version = Version(str(version) if version else '')
@@ -142,11 +144,12 @@ class Package(PackageInfo):
                 version = rpm.headers.get('version').decode(),
                 release = rpm.headers.get('release').decode(),
                 arch = rpm.headers.get('arch').decode(),
-                md5 = rpm.headers.get('md5').decode()
+                md5 = rpm.headers.get('md5').decode(),
+                size = rpm.headers.get('size')
             )
 
     def __str__(self):
-        return 'name: %s\nversion: %s\nrelease:%s\narch: %s\nmd5: %s' % (self.name, self.version, self.release, self.arch, self.md5)
+        return 'name: %s\nversion: %s\nrelease:%s\narch: %s\nmd5: %s\nsize: %s' % (self.name, self.version, self.release, self.arch, self.md5, self.size)
 
     def __hash__(self):
         return hash(self.path)
@@ -157,4 +160,39 @@ class Package(PackageInfo):
 
     def open(self):
         return rpmfile.open(self.path)
+
+
+def get_version_from_array(array):
+        version = ''
+        for _i, _s in array:
+            version=version + str(_i) + _s
+        return Version(version)
+    
+def add_sub_version(version, offset=1, add=1):
+    """
+    add the version by offset and add value
+
+    :param version: version
+    :param offset: the offset number of the version
+    :param add: the add value
+    :return: the new version after adding
+    """
+    version_array = version.__cmp_value__
+    version_array[offset-1] = (version_array[offset-1][0] + add, version_array[offset-1][1])
+    return get_version_from_array(version_array)
+
+def get_prefix_version(version, offset=0):
+    """
+    get prefix sub version
+
+    :param version: version
+    :param offset: the offset number of the version
+    :return: the new version after geting prefix
+    """
+    if not offset:
+        return version
+    if offset >= len(version.__cmp_value__):
+        return version
+    version_array = version.__cmp_value__[:offset]
+    return get_version_from_array(version_array)[:-1]
     

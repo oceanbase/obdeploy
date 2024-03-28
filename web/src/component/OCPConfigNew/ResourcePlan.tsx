@@ -5,8 +5,6 @@ import { Alert, Row, Col, message } from 'antd';
 import { useState } from 'react';
 import { useModel } from 'umi';
 
-import { generateRandomPassword as generatePassword } from '@/utils';
-import { copyText } from '@/utils/helper';
 import CustomPasswordInput from '../CustomPasswordInput';
 import { resourceMap } from '@/pages/constants';
 import styles from './index.less';
@@ -226,6 +224,7 @@ export default function ResourcePlan({
             form={form}
             onChange={handleSetTenantPassword}
             value={tenantPassword}
+            useFor='ob'
             name={['ocpserver', 'meta_tenant', 'password']}
             label={intl.formatMessage({
               id: 'OBD.component.OCPConfigNew.ResourcePlan.Password',
@@ -303,6 +302,7 @@ export default function ResourcePlan({
             form={form}
             onChange={handleSetMonitorPassword}
             value={monitorPassword}
+            useFor='ob'
             name={['ocpserver', 'monitor_tenant', 'password']}
             label={intl.formatMessage({
               id: 'OBD.component.OCPConfigNew.ResourcePlan.Password',

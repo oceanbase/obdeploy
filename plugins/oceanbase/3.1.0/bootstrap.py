@@ -36,8 +36,8 @@ def bootstrap(plugin_context, *args, **kwargs):
         InnerConfigItem('$_zone_idc'): 'idc'
     }
     has_obproxy = False
-    for componet_name in ['obproxy', 'obproxy-ce']:
-        if componet_name in added_components and componet_name in be_depend:
+    for component_name in ['obproxy', 'obproxy-ce']:
+        if component_name in added_components and component_name in be_depend:
             has_obproxy = True
             break
     for server in cluster_config.servers:

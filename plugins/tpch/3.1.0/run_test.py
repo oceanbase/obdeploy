@@ -30,19 +30,7 @@ except:
     import subprocess
 from ssh import LocalClient
 
-
 stdio = None
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1<<10, "M": 1<<20, "G": 1<<30, "T": 1<<40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
 
 
 def exec_cmd(cmd):

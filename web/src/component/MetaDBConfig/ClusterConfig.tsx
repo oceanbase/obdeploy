@@ -1,23 +1,24 @@
 import { oceanbaseAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
+import { getErrorInfo } from '@/utils';
 import {
+  formatMoreConfig,
   generateRandomPassword as generatePassword,
-  getErrorInfo,
-  passwordRules,
-} from '@/utils';
-import { formatMoreConfig } from '@/utils/helper';
+  getPasswordRules,
+} from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
 import { DownOutlined, RightOutlined } from '@ant-design/icons';
 import { ProFormText } from '@ant-design/pro-components';
-import { useUpdateEffect } from 'ahooks';
 import { Button, Row, Space } from 'antd';
+import { useUpdateEffect } from 'ahooks';
 import { FormInstance } from 'antd/lib/form';
 import { useState } from 'react';
 import { useModel } from 'umi';
 import InputPort from '../InputPort';
-import styles from './indexZh.less';
+import styles from './index.less';
+
 
 export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
@@ -141,7 +142,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   };
 
   const generateRandomPassword = () => {
-    const password = generatePassword();
+    const password = generatePassword('ob');
     setPassword(password);
   };
 
@@ -168,7 +169,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
             id: 'OBD.component.MetaDBConfig.ClusterConfig.RootSysPassword',
             defaultMessage: 'root@sys 密码',
           })}
-          rules={passwordRules}
+          rules={getPasswordRules('ob')}
           fieldProps={{
             style: { width: 328 },
             autoComplete: 'new-password',
@@ -186,7 +187,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
 
         <Button
           onClick={generateRandomPassword}
-          style={{ borderRadius: '6px', margin: '0 0 24px 8px' }}
+          style={{ borderRadius: '6px', margin: '22px 0 0 8px' }}
         >
           {intl.formatMessage({
             id: 'OBD.component.MetaDBConfig.ClusterConfig.RandomlyGenerated',

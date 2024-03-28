@@ -1,8 +1,12 @@
 import InputPort from '@/component/InputPort';
 import { PARAMETER_TYPE } from '@/constant/configuration';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import { getErrorInfo, getRandomPassword } from '@/utils';
-import { formatMoreConfig } from '@/utils/helper';
+import { getErrorInfo } from '@/utils';
+import {
+  formatMoreConfig,
+  generateRandomPassword,
+  getPasswordRules,
+} from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
 import { QuestionCircleOutlined } from '@ant-design/icons';
@@ -12,6 +16,7 @@ import {
   ProFormRadio,
   ProFormText,
 } from '@ant-design/pro-components';
+import { useUpdateEffect } from 'ahooks';
 import { Form, message, Row, Space, Switch, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
 import { getLocale, useModel } from 'umi';
@@ -19,7 +24,8 @@ import { commonStyle, onlyComponentsKeys, pathRule } from '../../constants';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 import TooltipInput from '../TooltipInput';
-import ConfigTable from './ConfigTable';
+import type { RulesDetail } from './ConfigTable';
+import ConfigTable, { parameterValidator } from './ConfigTable';
 import Footer from './Footer';
 import { getParamstersHandler } from './helper';
 import Parameter from './Parameter';
@@ -62,6 +68,24 @@ export default function ClusterConfig() {
     obagent = {},
   } = components;
   const [form] = ProForm.useForm();
+  const proxyPasswordFormValue = ProForm.useWatch(
+    ['obproxy', 'parameters', 'obproxy_sys_password', 'params'],
+    form,
+  );
+  const authPasswordFormValue = ProForm.useWatch(
+    ['obagent', 'parameters', 'http_basic_auth_password', 'params'],
+    form,
+  );
+  const [proxyParameterRules, setProxyParameterRules] = useState<RulesDetail>({
+    rules: [() => ({ validator: parameterValidator })],
+    targetTable: 'obproxy-ce',
+    targetColumn: 'obproxy_sys_password',
+  });
+  const [authParameterRules, setAuthParameterRules] = useState<RulesDetail>({
+    rules: [() => ({ validator: parameterValidator })],
+    targetTable: 'obagent',
+    targetColumn: 'http_basic_auth_password',
+  });
   const [currentMode, setCurrentMode] = useState(
     oceanbase?.mode || 'PRODUCTION',
   );
@@ -156,18 +180,6 @@ export default function ClusterConfig() {
     if (values?.oceanbase?.mode) {
       setCurrentMode(values?.oceanbase?.mode);
     }
-  };
-
-  const portValidator = (_: any, value: number) => {
-    if (value < 1024 || value > 65535) {
-      return Promise.reject(
-        intl.formatMessage({
-          id: 'OBD.component.InputPort.ThePortNumberCanOnly',
-          defaultMessage: '端口号只支持 1024~65535 范围',
-        }),
-      );
-    }
-    return Promise.resolve();
   };
 
   const getInitialParameters = (
@@ -342,7 +354,38 @@ export default function ClusterConfig() {
     }
   }, []);
 
-  const initPassword = getRandomPassword();
+  useUpdateEffect(() => {
+    if (!proxyPasswordFormValue?.adaptive) {
+      setProxyParameterRules({
+        rules: getPasswordRules('ob'),
+        targetTable: 'obproxy-ce',
+        targetColumn: 'obproxy_sys_password',
+      });
+    } else {
+      setProxyParameterRules({
+        rules: [() => ({ validator: parameterValidator })],
+        targetTable: 'obproxy-ce',
+        targetColumn: 'obproxy_sys_password',
+      });
+    }
+  }, [proxyPasswordFormValue]);
+  useUpdateEffect(() => {
+    if (!authPasswordFormValue?.adaptive) {
+      setAuthParameterRules({
+        rules: getPasswordRules('ocp'),
+        targetTable: 'obagent',
+        targetColumn: 'http_basic_auth_password',
+      });
+    } else {
+      setAuthParameterRules({
+        rules: [() => ({ validator: parameterValidator })],
+        targetTable: 'obagent',
+        targetColumn: 'http_basic_auth_password',
+      });
+    }
+  }, [authPasswordFormValue]);
+
+  const initPassword = generateRandomPassword('ob');
 
   const initialValues = {
     oceanbase: {
@@ -476,27 +519,12 @@ export default function ClusterConfig() {
                   onVisibleChange: setPasswordVisible,
                 },
               }}
+              validateFirst
               placeholder={intl.formatMessage({
                 id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
                 defaultMessage: '请输入',
               })}
-              rules={[
-                {
-                  required: true,
-                  message: intl.formatMessage({
-                    id: 'OBD.pages.components.ClusterConfig.PleaseEnter',
-                    defaultMessage: '请输入',
-                  }),
-                },
-                {
-                  pattern: /^[0-9a-zA-Z~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/,
-                  message: intl.formatMessage({
-                    id: 'OBD.pages.components.ClusterConfig.OnlyEnglishNumbersAndSpecial',
-                    defaultMessage:
-                      '仅支持英文、数字和特殊字符（~!@#%^&*_-+=|(){}[]:;,.?/），长度在 8-32 个字符之内',
-                  }),
-                },
-              ]}
+              rules={getPasswordRules('ob')}
             />
 
             <Row>
@@ -659,6 +687,7 @@ export default function ClusterConfig() {
                 dataSource={componentsMoreConfig}
                 loading={componentsMoreLoading}
                 customParameter={<Parameter />}
+                parameterRules={[proxyParameterRules, authParameterRules]}
               />
             </ProCard>
           </ProCard>

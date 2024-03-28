@@ -86,7 +86,14 @@ class ServiceInfoHandler(BaseHandler):
                     if 'server_ip' not in depend_info:
                         depend_info['server_ip'] = ob_server.ip
                         depend_info['mysql_port'] = ob_server_conf['mysql_port']
-                        depend_info['root_password'] = ob_server_conf['root_password']
+                        depend_info['meta_tenant'] = ob_server_conf['ocp_meta_tenant']['tenant_name']
+                        depend_info['meta_user'] = ob_server_conf['ocp_meta_username']
+                        depend_info['meta_password'] = ob_server_conf['ocp_meta_password']
+                        depend_info['meta_db'] = ob_server_conf['ocp_meta_db']
+                        depend_info['monitor_tenant'] = ob_server_conf['ocp_monitor_tenant']['tenant_name']
+                        depend_info['monitor_user'] = ob_server_conf['ocp_monitor_username']
+                        depend_info['monitor_password'] = ob_server_conf['ocp_monitor_password']
+                        depend_info['monitor_db'] = ob_server_conf['ocp_monitor_db']
                     zone = ob_server_conf['zone']
                     if zone not in ob_zones:
                         ob_zones[zone] = ob_server
@@ -102,13 +109,23 @@ class ServiceInfoHandler(BaseHandler):
 
         for server in cluster_config.servers:
             server_config = copy.deepcopy(cluster_config.get_server_conf_with_default(server))
-            original_server_config = cluster_config.get_original_server_conf(server)
+            original_server_config = cluster_config.get_original_server_conf_with_global(server)
             missed_keys = self.get_missing_required_parameters(original_server_config)
             if missed_keys:
                 if 'jdbc_url' in missed_keys and depend_observer:
-                    server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'],
-                                                                                   depend_info['mysql_port'],
-                                                                                   server_config['ocp_meta_db'])
+                    if not server_config.get('ocp_meta_tenant', None):
+                        server_config['ocp_meta_tenant'] = {}
+                    if not server_config.get('ocp_monitor_tenant', None):
+                        server_config['ocp_monitor_tenant'] = {}
+                    server_config['jdbc_url'] = 'jdbc:oceanbase://{}:{}/{}'.format(depend_info['server_ip'], depend_info['mysql_port'], depend_info['meta_db'] if not original_server_config.get('ocp_meta_db', None) else original_server_config['ocp_meta_db']) if not original_server_config.get('jdbc_url', None) else original_server_config['jdbc_url']
+                    server_config['ocp_meta_username'] = depend_info['meta_user'] if not original_server_config.get('ocp_meta_username', None) else original_server_config['ocp_meta_username']
+                    server_config['ocp_meta_tenant']['tenant_name'] = depend_info['meta_tenant'] if not original_server_config.get('ocp_meta_tenant', None) else original_server_config['ocp_meta_tenant']['tenant_name']
+                    server_config['ocp_meta_password'] = depend_info['meta_password'] if not original_server_config.get('ocp_meta_password', None) else original_server_config['ocp_meta_password']
+                    server_config['ocp_meta_db'] = depend_info['meta_db'] if not original_server_config.get('ocp_meta_db', None) else original_server_config['ocp_meta_db']
+                    server_config['ocp_monitor_username'] = depend_info['monitor_user'] if not original_server_config.get('ocp_monitor_username', None) else original_server_config['ocp_monitor_username']
+                    server_config['ocp_monitor_tenant']['tenant_name'] = depend_info['monitor_tenant'] if not original_server_config.get('ocp_monitor_tenant', None) else original_server_config['ocp_monitor_tenant']['tenant_name']
+                    server_config['ocp_monitor_password'] = depend_info['monitor_password'] if not original_server_config.get('ocp_monitor_password', None) else original_server_config['ocp_monitor_password']
+                    server_config['ocp_monitor_db'] = depend_info['monitor_db'] if not original_server_config.get('ocp_monitor_db', None) else original_server_config['ocp_monitor_db']
                     server_config['jdbc_username'] = '%s@%s' % (
                         server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'])
                     server_config['jdbc_password'] = server_config['ocp_meta_password']
@@ -234,7 +251,11 @@ class ServiceInfoHandler(BaseHandler):
                 metadb_copy.password = ''
                 return metadb_copy
             return metadb
+        if deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            raise Exception ("previous deploy is not running")
         deploy_config = deploy.deploy_config
+        repositories = self.obd.load_local_repositories(deploy.deploy_info, False)
+        self.obd.search_param_plugin_and_apply(repositories, deploy_config)
         if const.OCP_SERVER in deploy_config.components:
             cluster_config = deploy_config.components[const.OCP_SERVER]
         elif const.OCP_SERVER_CE in deploy_config.components:

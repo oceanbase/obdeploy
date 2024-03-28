@@ -443,7 +443,7 @@
   type: STRING
   default: ''
   need_restart: false
-  description_en: password pf obproxy sys user
+  description_en: password of obproxy sys user
 - name: observer_sys_password
   type: STRING
   default: ''

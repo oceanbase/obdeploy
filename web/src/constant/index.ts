@@ -1,16 +1,6 @@
 import moment from 'moment';
-// import {
-//   getNameValidateMessage,
-//   getChineseNameValidateMessage,
-//   getUsernameValidateMessage,
-//   getDatabaseNameValidateMessage,
-//   getMySQLDbUserNameValidateMessage,
-//   getOracleDbUserNameValidateMessage,
-//   getSpaceValidateMessage,
-// } from '@/constant/component';
 import { MICROSECOND } from '@/constant/must-ignore';
 import { intl } from '@/utils/intl';
-// import { showTotal } from '@/utils';
 
 export const ALL = '__OCP_ALL_CONSTANT_VALUE__';
 
@@ -20,85 +10,6 @@ export const WILDCARD = '*';
 // OB 官网链接
 export const OB_SITE_LINK = 'https://www.oceanbase.com';
 
-/* 正则表达式 */
-
-// // 通用名称正则校验: 以英文字母开头、英文或数字结尾，可包含英文、数字和下划线，且长度为 2 ~ 32
-// export const NAME_REGEXP = /^[a-zA-Z]{1,1}[a-zA-Z0-9_]{0,30}[a-zA-Z0-9]{1,1}$/;
-// export const NAME_RULE = {
-//   pattern: NAME_REGEXP,
-//   message: getNameValidateMessage(),
-// };
-
-// // 支持中文名称正则校验: 可包含中文、英文、数字、下划线、中横线，且长度为 2 ~ 32
-// export const CHINESE_NAME_REGEXP = /^[a-zA-Z0-9\-_\u4e00-\u9fa5]{2,32}$/;
-// export const CHINESE_NAME_RULE = {
-//   pattern: CHINESE_NAME_REGEXP,
-//   message: getChineseNameValidateMessage(),
-// };
-
-// // 合法名称正则校验，不限制长度，可结合 getTextLength() 搭配使用
-// export const VALID_NAME_REGEXP = /^[a-zA-Z][a-zA-Z0-9_]*$/;
-// export const VALID_NAME_RULE = {
-//   pattern: VALID_NAME_REGEXP,
-//   message: intl.formatMessage({
-//     id: 'ocp-express.src.constant.ItMustStartWithA',
-//     defaultMessage: '以英文字母开头，可包含英文、数字和下划线',
-//   }),
-// };
-
-// // database 命名规则
-// export const DATABASE_NAME_RULE = {
-//   pattern: /^[a-z]{1,1}[a-z0-9_]{1,127}$/,
-//   message: getDatabaseNameValidateMessage(),
-// };
-
-// // MySQLdbuser 命名规则
-// export const DATABASE_USER_NAME_RULE = {
-//   pattern: /^[a-z]{1,1}[a-z0-9_]{1,63}$/,
-//   message: getMySQLDbUserNameValidateMessage(),
-// };
-
-// // Oracle dbuUser 命名规则
-// export const ORACLE_DATABASE_USER_NAME_RULE = {
-//   pattern: /^[a-zA-Z]{1,1}[a-zA-Z0-9_]{1,29}$/,
-//   message: getOracleDbUserNameValidateMessage(30),
-// };
-
-// // Oracle dbRole 命名规则
-// export const ORACLE_DATABASE_ROLE_NAME_RULE = {
-//   pattern: /^[a-zA-Z]{1,1}[a-zA-Z0-9_]{1,29}$/,
-//   message: getOracleDbUserNameValidateMessage(30),
-// };
-
-// // 用户名称正则校验: 以英文字母开头、英文或数字结尾，可包含英文、数字、点号、中划线和下划线，且长度为 4 ~ 48
-// export const USERNAME_REGEXP = /^[a-zA-Z]{1,1}[a-zA-Z0-9.\-_]{2,46}[a-zA-Z0-9]{1,1}$/;
-// export const USERNAME_RULE = {
-//   pattern: USERNAME_REGEXP,
-//   message: getUsernameValidateMessage(),
-// };
-
-// // 特殊字符支持 ~!@#%^&*_\-+=|(){}[]:;,.?/
-// export const PASSWORD_REGEX =
-//   /^(?=(.*[a-z]){2,})(?=(.*[A-Z]){2,})(?=(.*\d){2,})(?=(.*[~!@#%^&*_\-+=|(){}\[\]:;,.?/]){2,})[A-Za-z\d~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/;
-
-// // 校验空格
-// export const SPACE_REGEX = /^[^\s]*$/;
-// // export const SPACE_RULE = {
-// //   pattern: SPACE_REGEX,
-// //   message: getSpaceValidateMessage(),
-// // };
-
-// export const BOOLEAN_LIST = [
-//   {
-//     label: intl.formatMessage({ id: 'ocp-express.src.constant.Is', defaultMessage: '是' }),
-//     value: true,
-//   },
-
-//   {
-//     label: intl.formatMessage({ id: 'ocp-express.src.constant.No', defaultMessage: '否' }),
-//     value: false,
-//   },
-// ];
 
 export const SMLL_FORM_ITEM_LAYOUT = {
   labelCol: {

@@ -20,12 +20,22 @@
 
 from __future__ import absolute_import, division, print_function
 
+import re
 import _errno as err
+from tool import Cursor
 
 global_ret = True
 
 
 def destroy(plugin_context, *args, **kwargs):
+
+    def clean_database(cursor, database):
+        ret = cursor.execute("drop database {0}".format(database))
+        if not ret:
+            global global_ret
+            global_ret = False
+        cursor.execute("create database if not exists {0}".format(database))
+
     def clean(path):
         client = clients[server]
         ret = client.execute_command('sudo rm -fr %s/*' % path, timeout=-1)
@@ -40,7 +50,10 @@ def destroy(plugin_context, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     global global_ret
-    stdio.start_loading('ocp-server work dir cleaning')
+    removed_components = cluster_config.get_deploy_removed_components()
+    clean_data = (not cluster_config.depends or len(removed_components) > 0 and len(removed_components.intersection({"oceanbase", "oceanbase-ce"})) == 0) and stdio.confirm("Would you like to clean meta data")
+    
+    stdio.start_loading('ocp-server cleaning')
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         stdio.verbose('%s work path cleaning', server)
@@ -51,13 +64,28 @@ def destroy(plugin_context, *args, **kwargs):
             path = server_config.get(key)
             if path:
                 clean(path)
-    if global_ret:
-        # if ocp depends on oceanbase, then clean tenant info
-        if 'oceanbase-ce' in cluster_config.depends or 'oceanbase' in cluster_config.depends:
-            cluster_config.update_component_attr("meta_tenant", "", save=True)
-            cluster_config.update_component_attr("monitor_tenant", "", save=True)
+
+    if clean_data:
+        jdbc_host, jdbc_port = "", 0
+        matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", cluster_config.get_global_conf_with_default()['jdbc_url'])
+        if matched:
+            jdbc_host = matched.group(1)
+            jdbc_port = matched.group(2)[1:]
         else:
-            stdio.warn('OCP successfully destroyed, please check and delete the tenant manually')
+            stdio.error("failed to parse jdbc_url")
+        global_conf = cluster_config.get_global_conf_with_default()
+        stdio.verbose("clean metadb")
+        try:
+            meta_cursor = Cursor(jdbc_host, jdbc_port, user=global_conf['ocp_meta_username'], tenant=global_conf['ocp_meta_tenant']['tenant_name'], password=global_conf['ocp_meta_password'], stdio=stdio)
+            clean_database(meta_cursor, global_conf['ocp_meta_db'])
+            stdio.verbose("clean monitordb")
+            monitor_cursor = Cursor(jdbc_host, jdbc_port, user=global_conf['ocp_monitor_username'], tenant=global_conf['ocp_monitor_tenant']['tenant_name'], password=global_conf['ocp_monitor_password'], stdio=stdio)
+            clean_database(monitor_cursor, global_conf['ocp_monitor_db'])
+        except Exception:
+            stdio.error("failed to clean meta and monitor data")
+            global_ret = False
+
+    if global_ret:
         stdio.stop_loading('succeed')
         return plugin_context.return_true()
     else:

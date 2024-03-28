@@ -181,6 +181,7 @@ def start(plugin_context, start_obshell=True, *args, **kwargs):
             not_cmd_opt = [
                 'home_path', 'obconfig_url', 'root_password', 'proxyro_password',
                 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc', 'production_mode',
+                'ocp_monitor_tenant', 'ocp_monitor_username', 'ocp_monitor_password', 'ocp_monitor_db',
                 'ocp_meta_tenant', 'ocp_meta_username', 'ocp_meta_password', 'ocp_meta_db', 'ocp_agent_monitor_password','ocp_root_password','obshell_port'
             ]
             get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]

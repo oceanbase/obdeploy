@@ -21,41 +21,12 @@
 from __future__ import absolute_import, division, print_function
 
 import os
-import re
 import subprocess
 
 from ssh import LocalClient
+from _types import Capacity
 
 stdio = None
-
-
-def parse_size(size):
-    _bytes = 0
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40}
-        match = re.match(r'(0|[1-9][0-9]*)\s*([B,K,M,G,T])', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G']
-    units_num = len(units) - 1
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-        limit = 1024
-    else:
-        div = 1024
-        limit = 1024
-        format = '%d%s'
-    while idx < units_num and size >= limit:
-        size /= div
-        idx += 1
-    return format % (size, units[idx])
 
 
 def pre_test(plugin_context, cursor, *args, **kwargs):
@@ -137,7 +108,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     if ret:
         server_num = ret.get("server_num", server_num)
     return plugin_context.return_true(
-        max_cpu=max_cpu, threads=threads, parse_size=parse_size, tenant=tenant_name, tenant_id=tenant_meta['tenant_id'],
-        format_size=format_size, server_num=server_num, obclient_bin=obclient_bin, host=host, port=port, user=user,
+        max_cpu=max_cpu, threads=threads, Capacity=Capacity, tenant=tenant_name, tenant_id=tenant_meta['tenant_id'],
+        format_size=Capacity, server_num=server_num, obclient_bin=obclient_bin, host=host, port=port, user=user,
         password=password, database=mysql_db
     )

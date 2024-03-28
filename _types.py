@@ -25,7 +25,7 @@ import uuid
 import traceback
 
 
-__all__ = ("Moment", "Time", "Capacity", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String", "Path", "SafeString", "PathList", "SafeStringList", "DBUrl", "WebUrl", "OBUser")
+__all__ = ("Moment", "Time", "Capacity", "CapacityWithB", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String", "Path", "SafeString", "PathList", "SafeStringList", "DBUrl", "WebUrl", "OBUser")
 
 
 class Null(object):
@@ -33,7 +33,9 @@ class Null(object):
     def __init__(self):
         pass
 
+
 class ConfigItemType(object):
+
     TYPE_STR = None
     NULL = Null()
 
@@ -92,6 +94,7 @@ class ConfigItemType(object):
             return False
         return self.__eq__(value) or self.__lt__(value)
 
+
 class Moment(ConfigItemType):
 
     def _format(self):
@@ -111,6 +114,7 @@ class Moment(ConfigItemType):
 
 
 class Time(ConfigItemType):
+
     UNITS = {
         'ns': 0.000000001,
         'us': 0.000001,
@@ -139,32 +143,102 @@ class Time(ConfigItemType):
             self._value = 0
 
 
+class DecimalValue:
+
+    def __init__(self, value, precision=None):
+        if isinstance(value, str):
+            self.value = float(value)
+        else:
+            self.value = value
+        self.precision = precision
+
+    def __repr__(self):
+        if self.precision is not None:
+            return "%.*f" % (self.precision, self.value)
+        return str(self.value)
+
+    def __add__(self, other):
+        if isinstance(other, DecimalValue):
+            return DecimalValue(self.value + other.value, self.precision if self.precision is not None else other.precision)
+        return DecimalValue(self.value + other, self.precision)
+
+    def __sub__(self, other):
+        if isinstance(other, DecimalValue):
+            return DecimalValue(self.value - other.value, self.precision if self.precision is not None else other.precision)
+        return DecimalValue(self.value - other, self.precision)
+
+    def __mul__(self, other):
+        if isinstance(other, DecimalValue):
+            return DecimalValue(self.value * other.value, self.precision if self.precision is not None else other.precision)
+        return DecimalValue(self.value * other, self.precision)
+
+    def __truediv__(self, other):
+        if isinstance(other, DecimalValue):
+            return DecimalValue(self.value / other.value, self.precision if self.precision is not None else other.precision)
+        return DecimalValue(self.value / other, self.precision)
+
+
 class Capacity(ConfigItemType):
-    UNITS = {"B": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40, 'P': 1 << 50}
+
+    UNITS = {"B": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40, "P": 1 << 50}
+
+    LENGTHS = {"B": 4, "K": 8, "M": 12, "G": 16, "T": 20, "P": 24}
+    
+    def __init__(self, s, precision = 0):
+        self.precision = precision
+        super(Capacity, self).__init__(s)
+
+    def __str__(self):
+        return str(self.value)
+
+    @property
+    def btyes(self):
+        return self._value
 
     def _format(self):
         if self._origin:
-            self._origin = str(self._origin).strip()
-            if self._origin.isdigit():
+            if not isinstance(self._origin, str) or self._origin.strip().isdigit():
+                self._origin = int(float(self._origin))
                 n = self._origin
-                unit = self.UNITS['M']
+                unit = self.UNITS['B']
+                for u in self.LENGTHS:
+                    if len(str(self._origin)) < self.LENGTHS[u]:
+                        break
+                else:
+                    u = 'P'
             else:
-                r = re.match('^(\d+)(\w)(I?B)?$', self._origin.upper())
-                n, u, _ = r.groups()
+                groups = re.match("^(\d+)\s*([BKMGTP])((IB)|B)?\s*$", self._origin.upper())
+                if not groups:
+                    raise ValueError("Invalid capacity string: %s" % self._origin)
+                n, u, _, _ = groups.groups()
                 unit = self.UNITS.get(u.upper())
             if unit:
                 self._value = int(n) * unit
+                self.value = str(DecimalValue(self._value, self.precision) / self.UNITS[u]) + u
             else:
                 raise Exception('Invalid Value')
         else:
             self._value = 0
+            self.value = str(DecimalValue(0, self.precision))
+
+
+class CapacityWithB(Capacity):
+
+    def __init__(self, s):
+        super(CapacityWithB, self).__init__(s, precision=0)
+
+    def _format(self):
+        super(CapacityWithB, self)._format()
+        self.value = self.value + 'B'
 
 
 class CapacityMB(Capacity):
+
     def _format(self):
         super(CapacityMB, self)._format()
         if isinstance(self._origin, str) and self._origin.isdigit():
             self.value = self._origin + 'M'
+            self._value *= self.UNITS['M']
         if not self._origin:
             self.value = '0M'
 
@@ -263,25 +337,34 @@ class String(ConfigItemType):
     def _format(self):
         self.value = self._value = str(self._origin) if self._origin else ''
 
+
 # this type is used to ensure the parameter is a valid oceanbase user
 class OBUser(ConfigItemType):
+
     OB_USER_PATTERN = re.compile("^[a-zA-Z0-9_\.-]+(@[a-zA-Z0-9_\.-]+)?(#[a-zA-Z0-9_\.-]+)?$")
+    
     def _format(self):
         if not self.OB_USER_PATTERN.match(str(self._origin)):
             raise Exception("%s is not a valid config" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
+
 # this type is used to ensure the parameter not containing special characters to inject command
 class SafeString(ConfigItemType):
+
     SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+
     def _format(self):
         if not self.SAFE_STRING_PATTERN.match(str(self._origin)):
             raise Exception("%s is not a valid config" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
+
 # this type is used to ensure the parameter not containing special characters to inject command
 class SafeStringList(ConfigItemType):
+
     SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+
     def _format(self):
         if self._origin:
             self._origin = str(self._origin).strip()
@@ -292,9 +375,12 @@ class SafeStringList(ConfigItemType):
         else:
             self._value = []
 
+
 # this type is used to ensure the parameter is a valid path by checking it's only certaining certain characters and not crossing path
 class Path(ConfigItemType):
+
     PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+
     def _format(self):
         parent_path = "/{0}".format(uuid.uuid4().hex)
         absolute_path = "/".join([parent_path, str(self._origin)])
@@ -304,9 +390,12 @@ class Path(ConfigItemType):
             raise Exception("%s is not a valid path" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
+
 # this type is used to ensure the parameter is a valid path by checking it's only certaining certain characters and not crossing path
 class PathList(ConfigItemType):
+
     PATH_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+
     def _format(self):
         parent_path = "/{0}".format(uuid.uuid4().hex)
         if self._origin:
@@ -320,17 +409,23 @@ class PathList(ConfigItemType):
         else:
             self._value = []
 
+
 # this type is used to ensure the parameter is a valid database connection url
 class DBUrl(ConfigItemType):
+
     DBURL_PATTERN = re.compile("^jdbc:(mysql|oceanbase):(\/\/)([a-zA-Z0-9_.-]+)(:[0-9]{1,5})?\/([a-zA-Z0-9_\-]+)(\?[a-zA-Z0-9_&;=.-]*)?$")
+
     def _format(self):
         if not self.DBURL_PATTERN.match(str(self._origin)):
             raise Exception("%s is not a valid config" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
+
 # this type is used to ensure the parameter is a valid web url
 class WebUrl(ConfigItemType):
+
     WEBURL_PATTERN = re.compile("^(https?:\/\/)?([\da-z_.-]+)(:[0-9]{1,5})?([\/\w \.-]*)*\/?(?:\?[\w&=_.-]*)?$")
+
     def _format(self):
         if not self.WEBURL_PATTERN.match(str(self._origin)):
             raise Exception("%s is not a valid config" % self._origin)

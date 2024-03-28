@@ -47,14 +47,14 @@ def checker(plugin_context, *args, **kwargs):
 
     def get_obdiag_cmd():
         base_commond = r"{install_dir}/obdiag check".format(install_dir=obdiag_install_dir)
+        cmd=base_commond
+        options_dict = vars(options)
         # check options
-        if cases:
-            cmd = r"{base} --cases {cases}".format(
-                base=base_commond,
-                cases=cases,
-            )
-        else:
-            cmd = r"{base}".format(base=base_commond)
+        for option, value in options_dict.items():
+            if value is not None:
+                if option is "obdiag_dir":
+                    continue
+                cmd += ' --{}={}'.format(option, value)
         return cmd
 
     def run():

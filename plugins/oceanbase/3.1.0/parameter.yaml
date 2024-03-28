@@ -306,7 +306,7 @@
   name_local: 数据文件大小
   require: false
   essential: true
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 0
   min_value: 0M
   max_value: NULL
@@ -347,7 +347,7 @@
   description_local: SQL审计数据可占用内存限制
 - name: cache_wash_threshold
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 4GB
   min_value: 0B
   max_value: NULL
@@ -477,7 +477,7 @@
   description_local: 系统可以使用的最小CPU配额，将会预留
 - name: memory_reserved
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 500M
   min_value: 10M
   max_value: NULL
@@ -597,7 +597,7 @@
   description_local: 负载均衡的时候，是否允许配置的资源权重生效
 - name: multiblock_read_size
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 128K
   min_value: 0K
   max_value: 2M
@@ -627,7 +627,7 @@
   description_local: 因磁盘满等原因导致某个节点数据迁入失败时，暂停迁入时长
 - name: tablet_size
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 128M
   min_value: NULL
   max_value: NULL
@@ -756,7 +756,7 @@
   description_local: 数据块缓存在缓存系统中的优先级
 - name: syslog_io_bandwidth_limit
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 30MB
   min_value: NULL
   max_value: NULL
@@ -838,7 +838,7 @@
   description_local: 事务日志的磁盘IO最大可用的磁盘利用率
 - name: px_task_size
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 2M
   min_value: 2M
   max_value: NULL
@@ -1388,7 +1388,7 @@
   description_local: 控制租户CPU调度中每次预留多少比例的空闲token数给租户
 - name: stack_size
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 1M
   min_value: 512K
   max_value: 20M
@@ -1410,7 +1410,7 @@
   name_local: 最大运行内存
   require: false
   essential: true
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 0
   min_value: NULL
   max_value: NULL
@@ -1422,7 +1422,7 @@
 - name: system_memory
   name_local: 集群系统内存
   essential: true
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 30G
   min_value: 0M
   max_value: NULL
@@ -1621,7 +1621,7 @@
   description_local: 单个节点迁入数据最大并发数
 - name: rootservice_memory_limit
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 2G
   min_value: 2G
   max_value: NULL
@@ -1631,7 +1631,7 @@
   description_local: RootService最大内存限制
 - name: plan_cache_low_watermark
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 1500M
   min_value: NULL
   max_value: NULL
@@ -1713,7 +1713,7 @@
   description_local: 控制内存大页的行为,"true"表示在操作系统开启内存大页并且有空闲大页时，数据库总是申请内存大页，否则申请普通内存页, "false"表示数据库不使用大页, "only"表示数据库总是分配大页
 - name: dtl_buffer_size
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 64K
   min_value: 4K
   max_value: 2M
@@ -2074,7 +2074,7 @@
   description_local: 手工合并开关
 - name: memory_chunk_cache_size
   require: false
-  type: CAPACITY
+  type: CAPACITY_MB
   default: 0M
   min_value: 0M
   max_value: NULL

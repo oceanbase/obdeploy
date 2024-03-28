@@ -26,6 +26,7 @@ from optparse import Values
 
 from _deploy import InnerConfigItem
 
+## start generating ocp and ocp-express tenant info from this version, ocp releases with ob from 4.2.1 packaged in ocp-all-in-one
 def bootstrap(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
@@ -127,25 +128,39 @@ def bootstrap(plugin_context, *args, **kwargs):
         stdio.verbose(sql)
         raise_cursor.execute(sql, [value])
 
-    has_ocp = 'ocp-express' in added_components and 'ocp-express' in be_depend
-    if any([key in global_conf for key in ["ocp_meta_tenant", "ocp_meta_db", "ocp_meta_username", "ocp_meta_password"]]):
-        has_ocp = True
-    if has_ocp:
-        global_conf_with_default = deepcopy(cluster_config.get_global_conf_with_default())
-        original_global_conf = cluster_config.get_original_global_conf()
-        ocp_meta_tenant_prefix = 'ocp_meta_tenant_'
+    # check the requirements of ocp meta and monitor tenant
+    global_conf_with_default = deepcopy(cluster_config.get_global_conf_with_default())
+    original_global_conf = cluster_config.get_original_global_conf()
+
+    ocp_tenants = []
+    tenants_componets_map = {
+        "meta": ["ocp-express", "ocp-server", "ocp-server-ce"],
+        "monitor": ["ocp-server", "ocp-server-ce"],
+    }
+    ocp_tenant_keys = ['tenant', 'db', 'username', 'password']
+    for tenant in tenants_componets_map:
+        components = tenants_componets_map[tenant]
+        prefix = "ocp_%s_" % tenant
+        if not any([component in added_components and component in be_depend for component in components]):
+            for key in ocp_tenant_keys:
+                config_key = prefix + key
+                if config_key in global_conf:
+                    break
+            else:
+                continue
+        # set create tenant variable
         for key in global_conf_with_default:
-            if key.startswith(ocp_meta_tenant_prefix) and original_global_conf.get(key, None):
-                global_conf_with_default['ocp_meta_tenant'][key.replace(ocp_meta_tenant_prefix, '', 1)] = global_conf_with_default[key]
-        tenant_info = global_conf_with_default["ocp_meta_tenant"]
+            if key.startswith(prefix) and original_global_conf.get(key, None):
+                global_conf_with_default[prefix + 'tenant'][key.replace(prefix, '', 1)] = global_conf_with_default[key]
+        tenant_info = global_conf_with_default[prefix + "tenant"]
         tenant_info["variables"] = "ob_tcp_invited_nodes='%'"
         tenant_info["create_if_not_exists"] = True
-        tenant_info["database"] = global_conf_with_default["ocp_meta_db"]
-        tenant_info["db_username"] = global_conf_with_default["ocp_meta_username"]
-        tenant_info["db_password"] = global_conf_with_default.get("ocp_meta_password", "")
-        tenant_info["ocp_root_password"] = global_conf_with_default.get("ocp_root_password", "")
-        tenant_options = Values(tenant_info)
-        plugin_context.set_variable("create_tenant_options", tenant_options)
+        tenant_info["database"] = global_conf_with_default[prefix + "db"]
+        tenant_info["db_username"] = global_conf_with_default[prefix + "username"]
+        tenant_info["db_password"] = global_conf_with_default.get(prefix + "password", "")
+        tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = global_conf_with_default.get(prefix + "password", "")
+        ocp_tenants.append(Values(tenant_info))
+        plugin_context.set_variable("create_tenant_options", ocp_tenants)
 
     # wait for server online
     all_server_online = False

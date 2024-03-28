@@ -19,36 +19,7 @@
 
 
 from __future__ import absolute_import, division, print_function
-
-import re
-
-
-def parse_size(size):
-    _bytes = 0
-    if isinstance(size, str):
-        size = size.strip()
-    if not isinstance(size, str) or size.isdigit():
-        _bytes = int(size)
-    else:
-        units = {"B": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40}
-        match = re.match(r'^([1-9][0-9]*)\s*([B,K,M,G,T])$', size.upper())
-        _bytes = int(match.group(1)) * units[match.group(2)]
-    return _bytes
-
-
-def format_size(size, precision=1):
-    units = ['B', 'K', 'M', 'G', 'T', 'P']
-    idx = 0
-    if precision:
-        div = 1024.0
-        format = '%.' + str(precision) + 'f%s'
-    else:
-        div = 1024
-        format = '%d%s'
-    while idx < 5 and size >= 1024:
-        size /= 1024.0
-        idx += 1
-    return format % (size, units[idx])
+from _types import Capacity
 
 
 def list_tenant(plugin_context, cursor, *args, **kwargs):
@@ -79,8 +50,8 @@ def list_tenant(plugin_context, cursor, *args, **kwargs):
         stdio.print_list(tenant_infos, ['tenant_name', 'zone_list', 'primary_zone', 'max_cpu', 'min_cpu', 'max_memory',
                                         'min_memory', 'max_iops', 'min_iops', 'max_disk_size', 'max_session_num'],
                          lambda x: [x['tenant_name'], x['zone_list'], x['primary_zone'], x['max_cpu'], x['min_cpu'],
-                                    format_size(x['max_memory']), format_size(x['min_memory']), x['max_iops'],
-                                    x['min_iops'], format_size(x['max_disk_size']), x['max_session_num']],
+                                    str(Capacity(x['max_memory'])), str(Capacity(x['min_memory'])), x['max_iops'],
+                                    x['min_iops'], str(Capacity(x['max_disk_size'])), x['max_session_num']],
                          title='tenant')
         stdio.stop_loading('succeed')
         return plugin_context.return_true()

@@ -35,7 +35,7 @@ class VersionNode(PackageInfo):
         version = version.split('_')
         release = version[1] if len(version) > 1 else self.RELEASE_NULL
         version = version[0]
-        super(VersionNode, self).__init__('', version, release, '', md5)
+        super(VersionNode, self).__init__('', version, release, '', md5, 0)
         self.next = []
         self.can_be_upgraded_to = []
         self.can_be_upgraded_to = []

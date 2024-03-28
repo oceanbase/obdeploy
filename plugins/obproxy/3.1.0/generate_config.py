@@ -20,7 +20,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-import hashlib
+from collections import defaultdict
 
 from tool import ConfigUtil
 
@@ -62,6 +62,14 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
         if 'proxy_mem_limited' not in global_config:
             generate_configs['global']['proxy_mem_limited'] = '500M'
             cluster_config.update_global_conf('proxy_mem_limited', '500M', False)
+
+    # write required memory into resource namespace
+    resource = plugin_context.namespace.get_variable("required_resource")
+    if resource is None:
+        resource = defaultdict(lambda: defaultdict(dict))
+        plugin_context.namespace.set_variable("required_resource", resource)
+    for server in cluster_config.servers:
+        resource[cluster_config.name]['memory'][server.ip] = cluster_config.get_global_conf_with_default()['proxy_mem_limited']
 
     if auto_depend:
         for depend in ['oceanbase', 'oceanbase-ce']:
