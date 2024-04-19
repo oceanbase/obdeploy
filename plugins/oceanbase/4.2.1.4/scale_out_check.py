@@ -51,7 +51,7 @@ def scale_out_check(plugin_context, *args, **kwargs):
         add_plugin('bootstrap', plugins)
     if (COMP_OB_CE in added_components or COMP_OB in added_components) and not cluster_config.added_servers:
         plugin_context.set_variable('need_bootstrap', True)
-        
+
     plugin_context.stdio.verbose('scale_out_check plugins: %s' % plugins)
     plugin_context.stdio.verbose('added_components: %s' % added_components)
     return plugin_context.return_true(plugins=plugins)

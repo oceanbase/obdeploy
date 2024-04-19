@@ -134,6 +134,8 @@ class AllowUndefinedOptionParser(OptionParser):
             else:
                 raise e
 
+    def print_usage(self, file=None):
+        print(self.format_help(OptionHelpFormatter()), file=file)
 
 class BaseCommand(object):
 
@@ -721,6 +723,29 @@ class ClusterExportToOCPCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterTakeoverCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTakeoverCommand, self).__init__('takeover', 'Takeover oceanbase cluster')
+        self.parser.remove_option('-h')
+        self.parser.add_option('--help', action='callback', callback=self._show_help, help='Show help and exit.')
+        self.parser.add_option('-h', '--host', type='string', help="db connection host, default: 127.0.0.1", default='127.0.0.1')
+        self.parser.add_option('-P', '--mysql-port', type='int', help="mysql port, default: 2881", default=2881)
+        self.parser.add_option('-p', '--root-password', type='string', help="password of root@sys user, default: ''", default='')
+        self.parser.add_option('--ssh-user', type='string', help="ssh user, default: current user")
+        self.parser.add_option('--ssh-password', type='string', help="ssh password, default: ''", default='')
+        self.parser.add_option('--ssh-port', type='int', help="ssh port, default: 22")
+        self.parser.add_option('-t', '--ssh-timeout', type='int', help="ssh connection timeout (second), default: 30")
+        self.parser.add_option('--ssh-key-file', type='string', help="ssh key file")
+
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.takeover(self.cmds[0])
+        else:
+            return self._show_help()
+
+
 class DemoCommand(ClusterMirrorCommand):
 
     def __init__(self):
@@ -1248,6 +1273,7 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(ClusterTenantCommand())
         self.register_command(ClusterScaleoutCommand())
         self.register_command(ClusterComponentMajorCommand())
+        self.register_command(ClusterTakeoverCommand())
 
 
 class TestMirrorCommand(ObdCommand):

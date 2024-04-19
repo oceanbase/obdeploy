@@ -566,7 +566,7 @@ class SshClient(SafeStdio):
             identity_option += '-i {key_filename} '.format(key_filename=self.config.key_filename)
         if self.config.port:
             identity_option += '-p {}'.format(self.config.port)
-        cmd = 'yes | rsync -a -W -e "ssh {identity_option}" {source} {target}'.format(
+        cmd = 'yes | rsync -a -W -L -e "ssh {identity_option}" {source} {target}'.format(
             identity_option=identity_option,
             source=source,
             target=target
@@ -688,12 +688,14 @@ class SshClient(SafeStdio):
 
     def _client_get_file(self, local_path, remote_path, stdio=None):
         try:
-            self.sftp.get(remote_path, local_path)
-            stat = self.sftp.stat(remote_path)
+            res = self.execute_command('realpath {}'.format(remote_path))
+            remote_real_path = res.stdout.strip()
+            self.sftp.get(remote_real_path, local_path)
+            stat = self.sftp.stat(remote_real_path)
             os.chmod(local_path, stat.st_mode)
             return True
         except Exception as e:
-            stdio.exception('get %s from %s@%s:%s failed: %s' % (local_path, self.config.username, self.config.host, remote_path, e))
+            stdio.exception('get %s from %s@%s:%s failed: %s' % (local_path, self.config.username, self.config.host, remote_real_path, e))
         return False
 
     def get_dir(self, local_dir, remote_dir, stdio=None):
@@ -734,7 +736,7 @@ class SshClient(SafeStdio):
         has_failed = False
         if DirectoryUtil.mkdir(local_dir, stdio=stdio):
             try:
-                ret = self.execute_command('find %s -type f' % remote_dir)
+                ret = self.execute_command('find %s -type f -o -type l' % remote_dir)
                 if not ret:
                     stdio.verbose(ret.stderr)
                     has_failed = True

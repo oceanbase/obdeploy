@@ -8,6 +8,7 @@ import {
   CloseCircleFilled,
 } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
+import { useUpdateEffect } from 'ahooks';
 import { useModel, getLocale } from 'umi';
 import { siteReg } from '@/utils';
 import styles from './index.less';
@@ -98,7 +99,7 @@ export default function ServiceConfig({
     }
   }, [isSingleOcpNode]);
 
-  useEffect(() => {
+  useUpdateEffect(() => {
     form.setFieldsValue({
       ocpserver: {
         home_path:

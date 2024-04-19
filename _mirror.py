@@ -48,38 +48,55 @@ from tool import timeout
 
 
 _ARCH = getArchList()
-_RELEASE = None
-SUP_MAP = {
-    'ubuntu': {'16': 7},
-    'debian': {'9': 7},
-    'opensuse-leap': {'15': 7},
-    'sles': {'15.2': 7},
-    'fedora': {'33': 7},
-    'uos': {'20': 8},
-    'anolis': {'23': 7},
-    'openEuler': {'22.03': 7},
-    'kylin': {'V10': 8},
-    'alinux': {'2': 7, '3': 8}
-}
-_SERVER_VARS = {
-    'basearch': getBaseArch(),
-}
-with FileUtil.open('/etc/os-release') as f:
-    for line in f.readlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            k, v = line.split('=', 1)
-            _SERVER_VARS[k] = v.strip('"').strip("'")
-        except:
-            pass
-    if 'VERSION_ID' in _SERVER_VARS:
-        m = re.match('\d+', _SERVER_VARS['VERSION_ID'])
-        if m:
-            _RELEASE = m.group(0)
-_SERVER_VARS['releasever'] = _RELEASE
+_NO_LSE = 'amd64' in _ARCH and LocalClient.execute_command("grep atomics /proc/cpuinfo").stdout.strip() == ''
 
+def get_use_centos_release(stdio=None):
+    _RELEASE = None
+    SUP_MAP = {
+        'ubuntu': {'16': 7},
+        'debian': {'9': 7},
+        'opensuse-leap': {'15': 7},
+        'sles': {'15.2': 7},
+        'fedora': {'33': 7},
+        'uos': {'20': 8},
+        'anolis': {'23': 7},
+        'openEuler': {'22.03': 7},
+        'kylin': {'V10': 8},
+        'alinux': {'2': 7, '3': 8}
+    }
+    _SERVER_VARS = {
+        'basearch': getBaseArch(),
+    }
+    with FileUtil.open('/etc/os-release') as f:
+        for line in f.readlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                k, v = line.split('=', 1)
+                _SERVER_VARS[k] = v.strip('"').strip("'")
+            except:
+                pass
+        if 'VERSION_ID' in _SERVER_VARS:
+            m = re.match('\d+', _SERVER_VARS['VERSION_ID'])
+            if m:
+                _RELEASE = m.group(0)
+    _SERVER_VARS['releasever'] = _RELEASE
+
+    server_vars = deepcopy(_SERVER_VARS)
+    linux_id = server_vars.get('ID')
+    if linux_id in SUP_MAP:
+        version_id = server_vars.get('VERSION_ID', '')
+        sorted_versions = sorted([Version(key) for key in SUP_MAP[linux_id]], reverse=True)
+        for version in sorted_versions:
+            if Version(version_id) >= version:
+                server_vars['releasever'] = SUP_MAP[linux_id][str(version)]
+                break
+        else:
+            server_vars['releasever'] = SUP_MAP[linux_id][str(version)]
+        stdio and getattr(stdio, 'warn', print)('Use centos %s remote mirror repository for %s %s' % (server_vars['releasever'], linux_id, server_vars.get('VERSION_ID')))
+    use_release = server_vars.get('releasever')
+    return use_release, server_vars
 
 
 class MirrorRepositoryType(Enum):
@@ -567,10 +584,14 @@ class RemoteMirrorRepository(MirrorRepository):
         if max_version and Version(info_version) > Version(max_version):
             return [0 ,]
         if release and info.release != release:
-            raise Exception ('break')
             return [0 ,]
 
-        c = [len(name) / len(info.name), info]
+        if _NO_LSE:
+            lse_score = 'nonlse' in info.release
+        else:
+            lse_score = True
+
+        c = [len(name) / len(info.name), lse_score, info]
         return c
 
     @staticmethod
@@ -979,22 +1000,10 @@ class MirrorRepositoryManager(Manager):
     def get_remote_mirrors(self, is_enabled=True):
         self._lock()
         mirrors = []
-        server_vars = deepcopy(_SERVER_VARS)
-        linux_id = server_vars.get('ID')
-        if linux_id in SUP_MAP:
-            version_id = server_vars.get('VERSION_ID', '')
-            sorted_versions = sorted([Version(key) for key in SUP_MAP[linux_id]], reverse=True)
-            for version in sorted_versions:
-               if Version(version_id) >= version:
-                    server_vars['releasever'] = SUP_MAP[linux_id][str(version)]
-                    break
-            else:
-                server_vars['releasever'] = SUP_MAP[linux_id][str(version)]
-            self.stdio and getattr(self.stdio, 'warn', print)('Use centos %s remote mirror repository for %s %s' % (
-            server_vars['releasever'], linux_id, server_vars.get('VERSION_ID')))
         for mirror_section in self._get_sections():
             if is_enabled is not None and is_enabled != mirror_section.is_enabled:
                 continue
+            _, server_vars = get_use_centos_release(self.stdio)
             mirrors.append(mirror_section.get_mirror(server_vars, self.stdio))
         return mirrors
 

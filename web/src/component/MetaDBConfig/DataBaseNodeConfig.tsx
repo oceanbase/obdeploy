@@ -151,7 +151,7 @@ export default function DataBaseNodeConfig({
           },
           {
             validator: (_: any, value: string[]) =>{
-              return serversValidator(_, value, allOBServer, 'OBServer',allZoneOBServer,finalValidate)
+              return serversValidator(_, value, 'OBServer')
             }
           },
         ],
