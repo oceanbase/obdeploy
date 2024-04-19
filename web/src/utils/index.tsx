@@ -230,24 +230,6 @@ export const ocpServersValidator = (_: any, value: string[]) => {
   );
 };
 
-const checkIsRepeatByAllServers = (allZoneServers: any, id: string) => {
-  let currentServers: string[] = [],
-    otherServers: string[] = [];
-  Object.keys(allZoneServers).forEach((key) => {
-    if (id === key) {
-      currentServers = [...allZoneServers[key]];
-    } else {
-      otherServers = [...otherServers, ...allZoneServers[key]];
-    }
-  });
-  for (let server of currentServers) {
-    if (otherServers.includes(server)) {
-      return true;
-    }
-  }
-  return false;
-};
-
 export const validateErrors = async (
   errorFileds: any[],
   form: FormInstance<any>,
@@ -267,111 +249,36 @@ export const validateErrors = async (
   }
 };
 
-const checkIp = (value: string[], type: 'OBServer' | 'OBProxy'): ResultType => {
-  let response: ResultType = { success: false, msg: '' };
-
+export const serversValidator = (_: any, value: string[], type: string) => {
+  let validtor = true;
   if (value && value.length) {
     value.some((item) => {
-      response.success = serverReg.test(item.trim());
+      validtor = serverReg.test(item.trim());
       return !serverReg.test(item.trim());
     });
   }
-  if (!response.success) {
-    response.msg =
-      type === 'OBServer'
-        ? intl.formatMessage({
-            id: 'OBD.src.utils.EnterTheCorrectIpAddress',
-            defaultMessage: '请输入正确的 IP 地址',
-          })
-        : intl.formatMessage({
-            id: 'OBD.src.utils.SelectTheCorrectObproxyNode',
-            defaultMessage: '请选择正确的 OBProxy 节点',
-          });
+  if (validtor) {
+    return Promise.resolve();
   }
-  return response;
-};
-
-const checkIsRepeatByPreServers = (
-  preAllServers: string[],
-  inputServer: string,
-) => {
-  if (preAllServers.includes(inputServer)) {
-    return true;
-  }
-  return false;
-};
-
-const checkRepeat = (
-  finalValidate,
-  allZoneServers,
-  id,
-  inputServer,
-  preAllServers,
-  type,
-) => {
-  let response: ResultType = { msg: '', success: true };
-  if (type === 'OBProxy') return response;
-  if (finalValidate.current) {
-    response.success = !checkIsRepeatByAllServers(allZoneServers, id);
+  if (type === 'OBServer') {
+    return Promise.reject(
+      new Error(
+        intl.formatMessage({
+          id: 'OBD.pages.components.NodeConfig.EnterTheCorrectIpAddress',
+          defaultMessage: '请输入正确的 IP 地址',
+        }),
+      ),
+    );
   } else {
-    response.success = !checkIsRepeatByPreServers(preAllServers, inputServer);
+    return Promise.reject(
+      new Error(
+        intl.formatMessage({
+          id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
+          defaultMessage: '请选择正确的 OBProxy 节点',
+        }),
+      ),
+    );
   }
-  if (!response.success) {
-    response.msg = intl.formatMessage({
-      id: 'OBD.src.utils.DoNotEnterDuplicateNodes',
-      defaultMessage: '禁止输入重复节点',
-    });
-  }
-  return response;
-};
-
-type ResultType = {
-  success: boolean;
-  msg: string;
-};
-
-const resultHandlePipeline = (...results: ResultType[]): ResultType => {
-  for (let result of results) {
-    if (!result.success) {
-      return result;
-    }
-  }
-  return {
-    success: true,
-    msg: '',
-  };
-};
-
-export const serversValidator = (
-  _: any,
-  value: string[],
-  preAllServers: string[],
-  type: 'OBServer' | 'OBProxy',
-  allZoneServers?: any,
-  finalValidate?: any,
-) => {
-  let result: ResultType = {
-      success: false,
-      msg: '',
-    },
-    inputServer = value[value.length - 1];
-  let id = _.field?.split('.')[0];
-
-  result = resultHandlePipeline(
-    checkIp(value, type),
-    checkRepeat(
-      finalValidate,
-      allZoneServers,
-      id,
-      inputServer,
-      preAllServers,
-      type,
-    ),
-  );
-
-  if (!result.success) return Promise.reject(new Error(result.msg));
-
-  return Promise.resolve();
 };
 
 export function generateRandomPassword() {

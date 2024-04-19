@@ -25,7 +25,7 @@ import type {
 } from '@ant-design/pro-components';
 import { getObdInfo } from '@/services/ob-deploy-web/Info';
 import useRequest from '@/utils/useRequest';
-import { handleQuit, getErrorInfo, serverReg, serversValidator,validateErrors } from '@/utils';
+import { handleQuit, getErrorInfo, serverReg, serversValidator } from '@/utils';
 import { commonStyle, pathRule } from '../constants';
 import { getAllServers } from '@/utils/helper';
 import ServerTags from './ServerTags';
@@ -482,14 +482,7 @@ export default function NodeConfig() {
           },
           {
             validator: (_: any, value: string[]) =>
-              serversValidator(
-                _,
-                value,
-                allOBServer,
-                'OBServer',
-                allZoneOBServer,
-                finalValidate
-              ),
+              serversValidator(_, value, 'OBServer'),
           },
         ],
       },
@@ -833,7 +826,7 @@ export default function NodeConfig() {
                     },
                     {
                       validator: (_: any, value: string[]) =>
-                        serversValidator(_, value, allOBServer, 'OBProxy'),
+                        serversValidator(_, value, 'OBProxy'),
                     },
                   ]}
                   options={formatOptions(allOBServer)}

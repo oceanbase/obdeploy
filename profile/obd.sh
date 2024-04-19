@@ -70,7 +70,7 @@ function _obd_complete_func
   prev=${!#}
 
   all_cmds["obd"]="mirror cluster test update repo demo web obdiag display-trace"
-  all_cmds["obd cluster"]="autodeploy tenant component start deploy redeploy restart reload destroy stop edit-config export-to-ocp list display upgrade chst check4ocp reinstall scale_out"
+  all_cmds["obd cluster"]="autodeploy tenant component start deploy redeploy restart reload destroy stop edit-config takeover export-to-ocp list display upgrade chst check4ocp reinstall scale_out"
   all_cmds["obd cluster *"]="_obd_reply_deploy_names"
   all_cmds["obd cluster tenant"]="create drop show create-standby switchover failover decouple"
   all_cmds["obd cluster tenant *"]="_obd_reply_deploy_names"

@@ -51,10 +51,17 @@ COMP_OBCLIENT = "obclient"
 COMP_OCEANBASE_DIAGNOSTIC_TOOL = "oceanbase-diagnostic-tool"
 COMP_OBDIAG = "obdiag"
 COMP_JRE = 'openjdk-jre'
+
+# ocp
 COMP_OCP_EXPRESS = 'ocp-express'
 COMP_OCP_SERVER = 'ocp-server'
 COMP_OCP_SERVER_CE = 'ocp-server-ce'
 COMPS_OCP = [COMP_OCP_SERVER, COMP_OCP_SERVER_CE]
+
+# ob
+COMP_OB = "oceanbase"
+COMP_OB_CE = "oceanbase-ce"
+COMPS_OB = [COMP_OB, COMP_OB_CE]
 
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'

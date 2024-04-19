@@ -1000,7 +1000,7 @@ class ObdHome(object):
         self._call_stdio('stop_loading', 'succeed')
         return status
 
-    def search_components_from_mirrors_and_install(self, deploy_config, components=None):
+    def search_components_from_mirrors_and_install(self, deploy_config, components=None, raise_exception=True):
         # Check the best suitable mirror for the components
         errors = []
         self._call_stdio('verbose', 'Search best suitable repository')
@@ -1013,7 +1013,7 @@ class ObdHome(object):
         if not errors:
             pkgs, repositories, errors = self.search_components_from_mirrors(deploy_config, only_info=False, components=components)
         if errors:
-            self._call_stdio('error', '\n'.join(errors))
+            raise_exception and self._call_stdio('error', '\n'.join(errors))
             return repositories, None
 
         # Get the installation plugins. Install locally
@@ -3511,10 +3511,10 @@ class ObdHome(object):
 
         return True
 
-    def create_repository(self):
+    def create_repository(self, options=None):
         force = getattr(self.options, 'force', False)
         necessary = ['name', 'version', 'path']
-        attrs = self.options.__dict__
+        attrs = self.options.__dict__ if options is None else options
         success = True
         for key in necessary:
             if key not in attrs or not attrs[key]:
@@ -5158,3 +5158,147 @@ class ObdHome(object):
         if not self._update_tool(tool, version, force, install_path):
             return False
         return True
+
+    def takeover(self, name):
+        host = getattr(self.options, 'host')
+        mysql_port = getattr(self.options, 'mysql_port')
+        root_password = getattr(self.options, 'root_password')
+        ssh_user = getattr(self.options, 'ssh_user')
+        ssh_password = getattr(self.options, 'ssh_password')
+        ssh_key_file = getattr(self.options, 'ssh_key_file')
+        ssh_port = getattr(self.options, 'ssh_port')
+        ssh_timeout = getattr(self.options, 'ssh_timeout')
+
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        if deploy:
+            deploy_info = deploy.deploy_info
+            if deploy_info.status not in [DeployStatus.STATUS_CONFIGURED, DeployStatus.STATUS_DESTROYED]:
+                self._call_stdio('error', 'The deployment {} has exited. Please modify the deploy name and take over again.'.format(name))
+                return False
+
+        self._call_stdio('verbose', 'get plugins by mocking an oceanbase repository.')
+        # search and get all related plugins using a mock ocp repository
+        mock_oceanbase_ce_repository = Repository("oceanbase-ce", "/")
+        mock_oceanbase_ce_repository.version = "3.1.0"
+        configs = OrderedDict()
+        component_name = 'oceanbase-ce'
+        global_config = {}
+        configs[component_name] = {
+            'servers': [host],
+            'global': global_config
+        }
+
+        user = dict()
+        if ssh_user:
+            user['username'] = ssh_user
+        if ssh_password:
+            user['password'] = ssh_password
+        if ssh_key_file:
+            user['key_file'] = ssh_key_file
+        if ssh_port:
+            user['port'] = ssh_port
+        if ssh_timeout:
+            user['timeout'] = ssh_timeout
+        if user:
+            configs['user'] = user
+
+        global_config['mysql_port'] = mysql_port
+        global_config['root_password'] = root_password
+        with tempfile.NamedTemporaryFile(suffix=".yaml", mode='w') as tf:
+            yaml_loader = YamlLoader()
+            yaml_loader.dump(configs, tf)
+            deploy_config = DeployConfig(
+                tf.name, yaml_loader=YamlLoader(self.stdio),
+                config_parser_manager=self.deploy_manager.config_parser_manager,
+                inner_config=None,
+                stdio=self.stdio
+            )
+            deploy_config.allow_include_error()
+            connect_plugin = self.plugin_manager.get_best_py_script_plugin('connect', mock_oceanbase_ce_repository.name, mock_oceanbase_ce_repository.version)
+            ssh_clients = self.get_clients(deploy_config, [mock_oceanbase_ce_repository])
+            ret = self.call_plugin(connect_plugin, mock_oceanbase_ce_repository, cluster_config=deploy_config.components[component_name], clients=ssh_clients, stdio=self.stdio)
+            if not ret or not ret.get_return('connect'):
+                self._call_stdio('error', 'Failed to connect to OceanBase, Please check the database connection information.')
+                return False
+            cursor = ret.get_return('cursor')
+            ret = cursor.fetchone('select version() as version', raise_exception=True)
+            if ret is False:
+                return False
+            version = ret.get("version").split("-v")[-1]
+            mock_oceanbase_ce_repository.version = version
+            takeover_plugins = self.search_py_script_plugin([mock_oceanbase_ce_repository], "takeover")
+            if not takeover_plugins:
+                self._call_stdio('error', 'The current OceanBase version:%s does not support takeover, takeover plugin not found.' % version)
+                return False
+            # do take over cluster by call takeover precheck plugins
+            prepare_ret = self.call_plugin(takeover_plugins[mock_oceanbase_ce_repository], mock_oceanbase_ce_repository,
+                cursor=cursor,
+                user_config=configs.get('user', None),
+                name=name,
+                clients=ssh_clients,
+                obd_home=self.home_path,
+                stdio=self.stdio)
+            if not prepare_ret:
+                return False
+        try:
+            self.deploy = self.deploy_manager.get_deploy_config(name)
+            deploy_config = self.deploy.deploy_config
+            cluster_config = deploy_config.components[component_name]
+            version = cluster_config.version
+            release = cluster_config.release
+            repositories, _ = self.search_components_from_mirrors_and_install(deploy_config, raise_exception=False)
+            repository = repositories[0] if repositories else None
+            if not repository:
+                self._call_stdio('verbose', 'Cannot find the image of oceanbase-ce version: %s, release: %s" ' % (version, release))
+                ssh_clients = self.get_clients(deploy_config, [mock_oceanbase_ce_repository])
+                tmp_dir = '{}/tmp_takeover'.format(self.deploy.config_dir)
+                for server in cluster_config.servers:
+                    ssh_client = ssh_clients[server]
+                    server_config = cluster_config.get_server_conf(server)
+                    home_path = server_config['home_path']
+                    plugin = self.plugin_manager.get_best_plugin(PluginType.INSTALL, component_name, version)
+                    if not plugin:
+                        self._call_stdio('error', 'Cannot find the plugin for {}'.format(component_name))
+                        return False
+                    LocalClient.execute_command('rm -rf {}'.format(tmp_dir))
+                    for file_map in plugin.file_map_data:
+                        if file_map['type'] == 'bin':
+                            self._call_stdio('start_loading', 'Get %s from %s' % (home_path, file_map['target_path']))
+                            ret = ssh_client.get_file('{}/{}'.format(tmp_dir, file_map['target_path']), '{}/{}'.format(home_path, file_map['target_path']), stdio=self.stdio)
+                            self._call_stdio('stop_loading', 'succeed')
+                        elif file_map['type'] == 'dir':
+                            ret = ssh_client.get_dir('{}/{}'.format(tmp_dir, file_map['target_path']), '{}/{}'.format(home_path, file_map['target_path']), stdio=self.stdio)
+                        if not ret:
+                            self._call_stdio('error', 'Cannot get the bin file from server: %s' % server)
+                    break
+
+                # create mirror by bin file
+                self._call_stdio('start_loading', 'Create mirror')
+                options = dict()
+                options['name'] = component_name
+                options['version'] = version
+                options['path'] = tmp_dir
+                options['force'] = True
+                setattr(self.options, 'release', release)
+                setattr(self.options, 'force', True)
+                if not self.create_repository(options):
+                    self._call_stdio('error', 'Failed to create mirror')
+                    return False
+                LocalClient.execute_command('rm -rf {}'.format(tmp_dir))
+                self._call_stdio('stop_loading', 'succeed')
+                repository = self.repository_manager.get_repository(component_name, version, release=release)
+
+            self.repositories = [repository]
+            self.deploy.deploy_info.components['oceanbase-ce']['md5'] = repository.md5
+            self.deploy.deploy_info.status = DeployStatus.STATUS_RUNNING
+            self.deploy.dump_deploy_info()
+            display_plugins = self.search_py_script_plugin([repository], 'display')
+            if not self.call_plugin(display_plugins[repository], repository):
+                return False
+            return True
+        except:
+            self.deploy_manager.remove_deploy_config(name)
+            self._call_stdio('stop_loading', 'failed')
+            self._call_stdio('error', 'Failed to takeover OceanBase cluster' )
+            return False
