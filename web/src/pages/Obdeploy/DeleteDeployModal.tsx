@@ -102,8 +102,9 @@ export default function DeleteDeployModal({
                 if(selectedConfig.includes(key) && components[key]){
                   newSelectedConfig.push(key)
                 }else if(key === 'ocpexpress' && components[key]){
-                  // todo:同步为ocpexpress
                   newSelectedConfig.push('ocp-express')
+                }else if(key === 'obconfigserver' && components[key]){
+                  newSelectedConfig.push('ob-configserver')
                 }
               })
               

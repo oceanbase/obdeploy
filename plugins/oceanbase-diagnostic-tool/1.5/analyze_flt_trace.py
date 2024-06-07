@@ -33,11 +33,11 @@ def analyze_flt_trace(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
+        command = r"{install_dir}/obdiag".format(install_dir=obdiag_install_dir)
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
-        base_commond=r"cd {install_dir} && ./obdiag analyze flt_trace --flt_trace_id {trace_id}".format(install_dir=obdiag_install_dir, trace_id=flt_trace_id)
+        base_commond=r"{install_dir}/obdiag analyze flt_trace --flt_trace_id {trace_id}".format(install_dir=obdiag_install_dir, trace_id=flt_trace_id)
         cmd = base_commond
         if files_option_path:
             cmd = r"{base} --files {files_option_path}".format(

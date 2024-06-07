@@ -39,12 +39,8 @@ BUILD_TIME = '<B_TIME>'
 
 # obdeploy home path
 CONST_OBD_HOME = "OBD_HOME"
-# obdeploy install pre path
-CONST_OBD_INSTALL_PRE = "OBD_INSTALL_PRE"
-# obdeploy install path
-CONST_OBD_INSTALL_PATH = "OBD_INSTALL_PATH"
 # obdeploy forbidden variable
-FORBIDDEN_VARS = (CONST_OBD_HOME, CONST_OBD_INSTALL_PRE, CONST_OBD_INSTALL_PATH)
+FORBIDDEN_VARS = (CONST_OBD_HOME)
 
 # tool variable
 COMP_OBCLIENT = "obclient"
@@ -65,5 +61,9 @@ COMPS_OB = [COMP_OB, COMP_OB_CE]
 
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
+
+# component files type
+PKG_RPM_FILE = 'rpm'
+PKG_REPO_FILE = 'repository'
 
 RSA_KEY_SIZE = 512

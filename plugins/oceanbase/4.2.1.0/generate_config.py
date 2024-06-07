@@ -50,7 +50,7 @@ def get_system_memory(memory_limit, min_pool_memory, generate_config_mini):
     return max(system_memory, min_pool_memory)
 
 
-def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
+def generate_config(plugin_context, generate_config_mini=False, auto_depend=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
     if return_generate_keys:
         generate_keys = []
         if not only_generate_password:
@@ -65,6 +65,8 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
     
     cluster_config = plugin_context.cluster_config
     original_global_conf = cluster_config.get_original_global_conf()
+    if not original_global_conf.get('appname'):
+        cluster_config.update_global_conf('appname', plugin_context.deploy_name)
     if original_global_conf.get('cluster_id') is None:
         cluster_config.update_global_conf('cluster_id', round(time.time()) % 4294901759, False)
     if generate_password:
@@ -519,6 +521,10 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                 for server in servers:
                     del generate_configs[server][key]
 
+
+    if auto_depend and 'ob-configserver' in plugin_context.components:
+        cluster_config.add_depend_component('ob-configserver')
+
     # merge_generate_config
     merge_config = {}
     generate_global_config = generate_configs['global']
@@ -562,6 +568,8 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
 
     # summit_config
     summit_config()
+
+
 
     if success:
         stdio.stop_loading('succeed')

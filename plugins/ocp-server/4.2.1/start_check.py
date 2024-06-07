@@ -23,6 +23,7 @@ from __future__ import absolute_import, division, print_function
 import re
 import os
 import time
+import copy
 import datetime
 
 from copy import deepcopy
@@ -67,9 +68,9 @@ def get_mount_path(disk, _path):
     return _mount_path
 
 
-def get_disk_info_by_path(path, client, stdio):
+def get_disk_info_by_path(ocp_user, path, client, stdio):
     disk_info = {}
-    ret = client.execute_command('df --block-size=1024 {}'.format(path))
+    ret = client.execute_command(execute_cmd(ocp_user, 'df --block-size=1024 {}'.format(path)))
     if ret:
         for total, used, avail, puse, path in re.findall(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
             disk_info[path] = {'total': int(total) << 10, 'avail': int(avail) << 10, 'need': 0}
@@ -77,12 +78,12 @@ def get_disk_info_by_path(path, client, stdio):
     return disk_info
 
 
-def get_disk_info(all_paths, client, stdio):
+def get_disk_info(all_paths, client, ocp_user, stdio):
     overview_ret = True
-    disk_info = get_disk_info_by_path('', client, stdio)
+    disk_info = get_disk_info_by_path(ocp_user, '', client, stdio)
     if not disk_info:
         overview_ret = False
-        disk_info = get_disk_info_by_path('/', client, stdio)
+        disk_info = get_disk_info_by_path(ocp_user, '/', client, stdio)
         if not disk_info:
             disk_info['/'] = {'total': 0, 'avail': 0, 'need': 0}
     all_path_success = {}
@@ -90,7 +91,7 @@ def get_disk_info(all_paths, client, stdio):
         all_path_success[path] = False
         cur_path = path
         while cur_path not in disk_info:
-            disk_info_for_current_path = get_disk_info_by_path(cur_path, client, stdio)
+            disk_info_for_current_path = get_disk_info_by_path(ocp_user, cur_path, client, stdio)
             if disk_info_for_current_path:
                 disk_info.update(disk_info_for_current_path)
                 all_path_success[path] = True
@@ -157,8 +158,8 @@ def get_ocp_depend_config(cluster_config, stdio):
         env[server] = default_server_config
     return env
 
-def execute_cmd(server_config, cmd):
-    return cmd if not server_config.get('launch_user', None) else 'sudo ' + cmd
+def execute_cmd(ocp_user, cmd):
+    return cmd if not ocp_user else 'sudo ' + cmd
 
 
 def start_check(plugin_context, init_check_status=False, work_dir_check=False, work_dir_empty_check=True, strict_check=False, precheck=False, 
@@ -226,9 +227,11 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             'time check': err.CheckStatus(),
             'launch user': err.CheckStatus(),
             'sudo nopasswd': err.CheckStatus(),
-            'tenant': err.CheckStatus(),
             'clockdiff': err.CheckStatus(),
-            'admin_password': err.CheckStatus()
+            'admin_password': err.CheckStatus(),
+            'tenant cpu': err.CheckStatus(),
+            'tenant mem': err.CheckStatus(),
+            'tenant clog': err.CheckStatus()
         }
         if work_dir_check:
             check_status[server]['dir'] = err.CheckStatus()
@@ -273,6 +276,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             critical('sudo nopasswd', err.EC_OCP_SERVER_SUDO_NOPASSWD.format(ip=str(server), user=client.config.username),
                      [err.SUG_OCP_SERVER_SUDO_NOPASSWD.format(ip=str(server), user=client.config.username)])
         server_config = env[server]
+        ocp_user = server_config.get('launch_user', '')
         missed_keys = get_missing_required_parameters(server_config)
         if missed_keys:
             stdio.error(err.EC_NEED_CONFIG.format(server=server, component=cluster_config.name, miss_keys=missed_keys))
@@ -280,14 +284,14 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
         home_path = server_config['home_path']
         if not precheck:
             remote_pid_path = '%s/run/ocp-server.pid' % home_path
-            remote_pid = client.execute_command(execute_cmd(server_config, 'cat %s' % remote_pid_path)).stdout.strip()
+            remote_pid = client.execute_command(execute_cmd(ocp_user, 'cat %s' % remote_pid_path)).stdout.strip()
             if remote_pid:
-                if client.execute_command(execute_cmd(server_config, 'ls /proc/%s' % remote_pid)):
+                if client.execute_command(execute_cmd(ocp_user, 'ls /proc/%s' % remote_pid)):
                     stdio.verbose('%s is running, skip' % server)
                     wait_2_pass()
                     continue
 
-        if not cluster_config.depends and not precheck:
+        if not cluster_config.depends:
             # check meta db connect before start
             jdbc_url = server_config['jdbc_url']
             matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
@@ -300,11 +304,16 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 jdbc_database = matched.group(3)
                 connected = False
                 retries = 10
+                if jdbc_url:
+                    username = server_config['jdbc_username']
+                    password = server_config['jdbc_password']
+                else:
+                    username = "{0}@{1}".format(server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'])
+                    password = server_config['ocp_meta_password']
                 while not connected and retries:
                     retries -= 1
                     try:
-                        cursor = Cursor(ip=jdbc_host, port=jdbc_port, user="{0}@{1}".format(server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name']), password=server_config['ocp_meta_password'],
-                                        stdio=stdio)
+                        cursor = Cursor(ip=jdbc_host, port=jdbc_port, user=username, password=password, stdio=stdio)
                         connected = True
                         stdio.verbose('check cursor passed')
                     except:
@@ -328,12 +337,78 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 if not abs((now - ob_time).total_seconds()) < 180:
                     critical('time check', err.EC_OCP_SERVER_TIME_SHIFT.format(server=server))
 
+            if cursor:
+                stdio.verbose('tenant check ')
+                zone_obs_num = {}
+                sql = "select zone, count(*) num from oceanbase.DBA_OB_SERVERS where status = 'active' group by zone"
+                res = cursor.fetchall(sql)
+                if res is False:
+                    return
+
+                for row in res:
+                    zone_obs_num[str(row['zone'])] = row['num']
+                zone_list = zone_obs_num.keys()
+                if isinstance(zone_list, str):
+                    zones = zone_list.replace(';', ',').split(',')
+                else:
+                    zones = zone_list
+                zone_list = "('%s')" % "','".join(zones)
+
+                min_unit_num = min(zone_obs_num.items(), key=lambda x: x[1])[1]
+                unit_num = get_option('unit_num', min_unit_num)
+                if unit_num > min_unit_num:
+                    return error('resource pool unit num is bigger than zone server count')
+
+                sql = "select count(*) num from oceanbase.DBA_OB_SERVERS where status = 'active' and start_service_time > 0"
+                count = 30
+                while count:
+                    num = cursor.fetchone(sql)
+                    if num is False:
+                        return
+                    num = num['num']
+                    if num >= unit_num:
+                        break
+                    count -= 1
+                    time.sleep(1)
+
+                sql = "SELECT * FROM oceanbase.GV$OB_SERVERS where zone in %s" % zone_list
+                servers_stats = cursor.fetchall(sql)
+                if servers_stats is False:
+                    return
+                cpu_available = servers_stats[0]['CPU_CAPACITY_MAX'] - servers_stats[0]['CPU_ASSIGNED_MAX']
+                mem_available = servers_stats[0]['MEM_CAPACITY'] - servers_stats[0]['MEM_ASSIGNED']
+                disk_available = servers_stats[0]['DATA_DISK_CAPACITY'] - servers_stats[0]['DATA_DISK_IN_USE']
+                log_disk_available = servers_stats[0]['LOG_DISK_CAPACITY'] - servers_stats[0]['LOG_DISK_ASSIGNED']
+                for servers_stat in servers_stats[1:]:
+                    cpu_available = min(servers_stat['CPU_CAPACITY_MAX'] - servers_stat['CPU_ASSIGNED_MAX'], cpu_available)
+                    mem_available = min(servers_stat['MEM_CAPACITY'] - servers_stat['MEM_ASSIGNED'], mem_available)
+                    disk_available = min(servers_stat['DATA_DISK_CAPACITY'] - servers_stat['DATA_DISK_IN_USE'], disk_available)
+                    log_disk_available = min(servers_stat['LOG_DISK_CAPACITY'] - servers_stat['LOG_DISK_ASSIGNED'], log_disk_available)
+
+                global_conf_with_default = copy.deepcopy(cluster_config.get_global_conf_with_default())
+                meta_db_memory_size = Capacity(global_conf_with_default['ocp_meta_tenant'].get('memory_size')).btyes
+                monitor_db_memory_size = Capacity(global_conf_with_default['ocp_monitor_tenant'].get('memory_size', 0)).btyes
+                meta_db_max_cpu = global_conf_with_default['ocp_meta_tenant'].get('max_cpu')
+                monitor_db_max_cpu = global_conf_with_default['ocp_monitor_tenant'].get('max_cpu', 0)
+                meta_db_log_disk_size = global_conf_with_default['ocp_meta_tenant'].get('log_disk_size', 0)
+                meta_db_log_disk_size = Capacity(meta_db_log_disk_size).btyes
+                monitor_db_log_disk_size = global_conf_with_default['ocp_monitor_tenant'].get('log_disk_size', 0)
+                monitor_db_log_disk_size = Capacity(monitor_db_log_disk_size).btyes
+                if meta_db_max_cpu and monitor_db_max_cpu:
+                    if int(meta_db_max_cpu) + int(monitor_db_max_cpu) > cpu_available:
+                        critical('tenant cpu', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='cpu', avail=cpu_available, need=int(meta_db_max_cpu) + int(monitor_db_max_cpu)))
+                if meta_db_memory_size and monitor_db_memory_size:
+                    if meta_db_memory_size + monitor_db_memory_size > mem_available:
+                        critical('tenant mem', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='memory', avail=Capacity(mem_available), need=Capacity(meta_db_memory_size + monitor_db_memory_size)))
+                if meta_db_log_disk_size and monitor_db_log_disk_size:
+                    if meta_db_log_disk_size + monitor_db_log_disk_size > log_disk_available:
+                        critical('tenant clog', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='log_disk_size', avail=Capacity(log_disk_available), need=Capacity(meta_db_log_disk_size + monitor_db_log_disk_size)))
+
         # user check
         stdio.verbose('user check ')
-        ocp_user = server_config.get('launch_user', '')
         if ocp_user:
             client = clients[server]
-            if not client.execute_command(execute_cmd(server_config, "id -u %s" % ocp_user)):
+            if not client.execute_command(execute_cmd(ocp_user, "id -u %s" % ocp_user)):
                 critical('launch user', err.EC_OCP_SERVER_LAUNCH_USER_NOT_EXIST.format(server=server, user=ocp_user))
 
         if work_dir_check:
@@ -365,9 +440,9 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                             critical('dir', check_dirs[path], suggests)
                         break
 
-                    if client.execute_command(execute_cmd(server_config, 'bash -c "[ -a %s ]"' % path)):
-                        is_dir = client.execute_command(execute_cmd(server_config, '[ -d {} ]'.format(path)))
-                        has_write_permission = client.execute_command(execute_cmd(server_config, '[ -w {} ]'.format(path)))
+                    if client.execute_command(execute_cmd(ocp_user, 'bash -c "[ -a %s ]"' % path)):
+                        is_dir = client.execute_command(execute_cmd(ocp_user, '[ -d {} ]'.format(path)))
+                        has_write_permission = client.execute_command(execute_cmd(ocp_user, '[ -w {} ]'.format(path)))
                         if is_dir and has_write_permission:
                             if empty_check:
                                 check_privilege_cmd = "ls %s" % path
@@ -422,7 +497,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 stdio.verbose('java check ')
                 java_bin = server_config.get('java_bin', '/usr/bin/java')
                 client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
-                ret = client.execute_command(execute_cmd(server_config, '{} -version'.format(java_bin)))
+                ret = client.execute_command(execute_cmd(ocp_user, '{} -version'.format(java_bin)))
                 stdio.verbose('java version %s' % ret)
                 if not ret:
                     critical('java', err.EC_OCP_SERVER_JAVA_NOT_FOUND.format(server=server), [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0')])
@@ -458,7 +533,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 clockdiff_bin = 'type -P clockdiff'
                 res = client.execute_command(clockdiff_bin).stdout
                 client.execute_command('sudo chmod u+s %s' % res)
-                client.execute_command("sudo setcap 'cap_net_raw+ep' %s" % res)
+                client.execute_command("sudo setcap 'cap_sys_nice+ep cap_net_raw+ep' %s" % res)
         except Exception as e:
             stdio.error(e)
             critical('clockdiff', err.EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS.format(server=server))
@@ -532,7 +607,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
         stdio.verbose('disk check ')
         for ip in servers_disk:
             client = servers_client[ip]
-            disk_info = get_disk_info(all_paths=servers_disk[ip], client=client, stdio=stdio)
+            disk_info = get_disk_info(all_paths=servers_disk[ip], client=client, ocp_user=ocp_user, stdio=stdio)
             if disk_info:
                 for path in servers_disk[ip]:
                     disk_needed = servers_disk[ip][path]

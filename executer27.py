@@ -33,7 +33,6 @@ import ConfigParser
 import socket
 import platform
 
-
 if __name__ == '__main__':
     defaultencoding = 'utf-8'
     if sys.getdefaultencoding() != defaultencoding:

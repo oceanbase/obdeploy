@@ -136,6 +136,13 @@ export const showConfigKeys = {
   obproxy: ['home_path', 'listen_port', 'prometheus_listen_port'],
   obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
   ocpexpress: ['home_path', 'port'],
+  obconfigserver: [
+    'home_path',
+    'listen_port',
+    'server_ip',
+    'log_localtime',
+    'log_compress',
+  ],
 };
 
 export const ocpAddonAfter = '/ocp';
@@ -148,6 +155,7 @@ export const OBD_COMMAND_UPGRADE = 'obd web upgrade'
 // 参数类型
 export const PARAMETER_TYPE = {
   number:'Integer',
+  numberLogogram:'int',
   string:'String',
   capacity:'Capacity',
   capacityMB:'CapacityMB',

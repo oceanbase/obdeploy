@@ -41,8 +41,10 @@ OBPROXY = 'obproxy'
 OCP_EXPRESS = 'ocpexpress'
 OCP_SERVER_CE = 'ocp-server-ce'
 OCP_SERVER = 'ocp-server'
-
 OBAGENT = 'obagent'
+OB_CONFIGSERVER = 'obconfigserver'
+
+no_generate_comps = ['ob-configserver']
 
 DESTROY_PLUGIN = "destroy"
 INIT_PLUGINS = ("init",)

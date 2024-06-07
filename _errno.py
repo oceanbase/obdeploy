@@ -166,6 +166,7 @@ EC_OBSERVER_PRODUCTION_MODE_LIMIT = OBDErrorCodeTemplate(2009, '({server}): when
 EC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory must be less than memory_limit/memory_limit_percentage.')
 EC_OBSERVER_GET_MEMINFO_FAIL = OBDErrorCodeTemplate(2011, "{server}: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
 EC_OBSERVER_FAIL_TO_START_OCS = OBDErrorCodeTemplate(2012, 'Failed to start {server} obshell')
+EC_OBSERVER_UNKONE_SCENARIO = OBDErrorCodeTemplate(2013, 'Unknown scenario: {scenario}')
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 
@@ -195,9 +196,8 @@ EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_AVAILABLE = OBDErrorCodeTemplate(4302, '({ip}) 
 EC_OCP_EXPRESS_NOT_ENOUGH_MEMORY_CACHED = OBDErrorCodeTemplate(4302, '({ip}) not enough memory. (Free: {free}, Buff/Cache: {cached}, Need: {need})')
 EC_OCP_EXPRESS_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4303, '({ip}) {disk} not enough disk space. (Avail: {avail}, Need: {need})')
 EC_OCP_EXPRESS_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4304, 'OCP express {ocp_express_version} needs to use {comp} with version {comp_version} or above')
-EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant. (Avail: {avail}, Need: {need})')
-EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK = OBDErrorCodeTemplate(4305, 'There is not enough log disk for ocp meta tenant.')
-EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM = OBDErrorCodeTemplate(4305, 'There is not enough memory for ocp meta tenant')
+EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK_AVAILABLE = OBDErrorCodeTemplate(4305, 'There is not enough log disk. (Avail: {avail}, Need: {need})')
+EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM = OBDErrorCodeTemplate(4305, 'There is not enough memory. (Avail: {avail}, Need: {need})')
 
 
 # ocp-server
@@ -220,6 +220,7 @@ EC_OCP_SERVER_NOT_ENOUGH_MEMORY_AVAILABLE = OBDErrorCodeTemplate(4364, '({ip}) n
 EC_OCP_SERVER_NOT_ENOUGH_MEMORY_CACHED = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Buff/Cache: {cached}, Need: {need})')
 EC_OCP_SERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Need: {need})')
 EC_OCP_SERVER_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4365, '({ip}) {disk} not enough disk space. (Avail: {avail}, Need: {need})')
+EC_OCP_SERVER_RESOURCE_NOT_ENOUGH = OBDErrorCodeTemplate(4366, 'There is not enough {resource}. (Avail: {avail}, need: {need})')
 
 
 
@@ -234,6 +235,7 @@ EC_OBC_CONNECTION_URL_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserv
 EC_OBC_DATABASE_TYPE_ERROR = OBDErrorCodeTemplate(4402, '{server} ob-configserver config error: database_type can only be set to `mysql` or `sqlite3`, and must be in lowercase. ')
 EC_OBC_SQLITE_PERMISSION_DENIED = OBDErrorCodeTemplate(4403, 'ob-configserver connect to sqlite failed: {ip}: {path}: permission denied.')
 EC_OBC_DATABASE_CONNECT_ERROR = OBDErrorCodeTemplate(4404, 'ob-configserver connect to mysql failed: {server}: failed url to connect to database: {url}')
+EC_OBC_MULTIPLE_SERVER_VIP_EMPTY_ERROR = OBDErrorCodeTemplate(4405, 'When you configure multiple ob-configserver servers, please set vip_address and vip_port.')
 
 # oblogproxy
 EC_OBLOGPROXY_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4501, 'OBLogProxy {oblogproxy_version} needs to use {comp} with version {comp_version} or above')
@@ -302,3 +304,4 @@ SUG_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "
 SUG_OB_SYS_USERNAME = OBDErrorSuggestionTemplate('Please delete the "ob_sys_username" parameter.')
 SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" component.''')
 SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)
+SUB_OBSERVER_UNKONE_SCENARIO = OBDErrorSuggestionTemplate('Please select a valid scenario from the options: {scenarios}')

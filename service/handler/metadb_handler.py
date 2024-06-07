@@ -399,9 +399,10 @@ class MetadbHandler(BaseHandler):
         if not check_pass:
             return
 
+        components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
         for repository in repositories:
             ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False,
-                generate_consistent_config=True, auto_depend=True)
+                generate_consistent_config=True, auto_depend=True, components=components)
             if ret is None:
                 raise Exception("generate config error")
             elif not ret and ret.get_return("exception"):

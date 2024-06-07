@@ -191,6 +191,9 @@ class OcpHandler(BaseHandler):
             if config_dict[key] and key in ('port', 'admin_password', 'memory_size', 'manage_info', 'home_path', 'soft_dir', 'log_dir', 'ocp_site_url', 'launch_user'):
                 ocp_config['global'][key] = config_dict[key]
 
+        if launch_user:
+            ocp_config['global']['launch_user'] = launch_user
+
         if config.metadb:
             ocp_config['global']['jdbc_url'] = 'jdbc:oceanbase://' + config_dict['metadb']['host'] + ':' + str(config_dict['metadb']['port']) + config_dict['metadb']['database']
             ocp_config['global']['jdbc_username'] = config_dict['metadb']['user']
@@ -471,9 +474,10 @@ class OcpHandler(BaseHandler):
         if not check_pass:
             return
 
+        components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
         for repository in repositories:
             ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False,
-                                       generate_consistent_config=True, auto_depend=True)
+                                       generate_consistent_config=True, auto_depend=True, components=components)
             if ret is None:
                 raise Exception("generate config error")
             elif not ret and ret.get_return("exception"):
@@ -497,7 +501,7 @@ class OcpHandler(BaseHandler):
                         java_check = False
             res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False,
                                        work_dir_check=True, precheck=True, java_check=java_check, clients=ssh_clients, 
-                                       sys_cursor=self.context['metadb_cursor'])
+                                       sys_cursor=self.context['metadb_cursor'], components=list(self.obd.deploy.deploy_config.components.keys()))
             if not res and res.get_return("exception"):
                 raise res.get_return("exception")
             log.get_logger().info('end start_check: %s' % repository.name)
@@ -956,9 +960,10 @@ class OcpHandler(BaseHandler):
         self.obd.set_repositories(repositories)
 
         gen_config_plugins = self.obd.search_py_script_plugin(repositories, 'generate_config')
+        components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
         for repository in repositories:
             ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False,
-                                       generate_consistent_config=True, auto_depend=True)
+                                       generate_consistent_config=True, auto_depend=True, components=components)
             if ret is None:
                 raise Exception("generate config error")
             elif not ret and ret.get_return("exception"):
@@ -1257,8 +1262,9 @@ class OcpHandler(BaseHandler):
         if len(repositories) != len(gen_config_plugins):
             raise Exception("param_check: config error, check stop!")
 
+        components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
         for repository in repositories:
-            ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False, generate_consistent_config=True, auto_depend=True)
+            ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False, generate_consistent_config=True, auto_depend=True, components=components)
             if ret is None:
                 raise Exception("generate config error")
             elif not ret and ret.get_return("exception"):

@@ -40,7 +40,7 @@ def get_system_memory(memory_limit):
     return str(Capacity(system_memory, 0))
 
 
-def generate_config(plugin_context, generate_config_mini=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
+def generate_config(plugin_context, generate_config_mini=False, auto_depend=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
     if return_generate_keys:
         generate_keys = []
         if not only_generate_password:
@@ -55,6 +55,8 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
 
     cluster_config = plugin_context.cluster_config
     original_global_conf = cluster_config.get_original_global_conf()
+    if not original_global_conf.get('appname'):
+        cluster_config.update_global_conf('appname', plugin_context.deploy_name)
     if original_global_conf.get('cluster_id') is None:
         cluster_config.update_global_conf('cluster_id', round(time.time()) % 4294901759, False)
     if generate_password:
@@ -192,7 +194,7 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
                     success = False
                     continue
             else:
-                memory_limit = server_config.get('memory_limit')
+                memory_limit = Capacity(server_config.get('memory_limit')).btyes
 
         auto_set_system_memory = False
         if not user_server_config.get('system_memory'):
@@ -381,6 +383,9 @@ def generate_config(plugin_context, generate_config_mini=False, generate_check=T
 
     # summit_config
     summit_config()
+
+    if auto_depend and 'ob-configserver' in plugin_context.components:
+        cluster_config.add_depend_component('ob-configserver')
 
     if success:
         stdio.stop_loading('succeed')

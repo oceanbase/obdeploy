@@ -58,6 +58,7 @@ export default () => {
   const [connectInfo, setConnectInfo] = useState<ConnectInfoType>();
   const [tableData, setTableData] = useState<TableDataType[]>(defaultTableData);
   const [deployUser, setDeployUser] = useState<string>();
+  const [needDestroy, setNeedDestroy] = useState<boolean>(false); // 升级时自己填写集群名needDestroy置为true
   return {
     obVersionInfo,
     setObVersionInfo,
@@ -95,5 +96,7 @@ export default () => {
     setTableData,
     deployUser,
     setDeployUser,
+    needDestroy,
+    setNeedDestroy,
   };
 };

@@ -65,7 +65,7 @@ class Exector(object):
     @property
     def cmd(self):
         if self._cmd is None:
-            self._cmd = '%s %%s -h %s -P %s -u %s %s' % (self._exector, self.host, self.port, self.user, "-p '%s'" % self.pwd if self.pwd else '')
+            self._cmd = '%s %%s -h %s -P %s -u %s %s' % (self._exector, self.host, self.port, self.user, '-p %s' % tool.ConfigUtil.passwd_format(self.pwd) if self.pwd else '')
         return self._cmd
 
     @host.setter
@@ -148,7 +148,6 @@ class Upgrader(object):
         self.unuse_lib_repository = unuse_lib_repository
         self.local_home_path = local_home_path
         self.exector_path = exector_path
-        self.components = plugin_context.components
         self.exector = None
         self.db = None
         self.cursor = None

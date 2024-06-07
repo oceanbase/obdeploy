@@ -281,7 +281,7 @@
   "OBD.pages.components.ExitPage.CopiedSuccessfully": "Copy successful",
   "OBD.pages.components.CheckInfo.Introduction": "Description",
   "OBD.pages.components.PreCheckStatus.AutomaticRepair": "Auto repair",
-  "OBD.pages.constants.Tools": "Tool",
+  "OBD.pages.constants.Tools": "Tools",
   "OBD.pages.components.NodeConfig.OnlyOneNodeCanBe": "Only one node can be selected or entered",
   "OBD.pages.components.NodeConfig.NodeConfigurationPreviousStep": "Node Configuration-Previous Step",
   "OBD.pages.components.NodeConfig.AreYouSureYouWant": "Are you sure to delete the configuration of this Zone?",
@@ -929,5 +929,16 @@
   "OBD.component.PreCheck.preCheck.NextStep": "Next Step",
   "OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet": "The password must be met: {OCPPASSWORDERROR}",
   "OBD.src.utils.helper.ItIsToCharactersIn": "It is 8 to 32 characters in length and supports letters, numbers, and special characters. It can contain at least 2 large, lowercase letters, numbers, and special characters. The supported special characters are ~^*{}[]_-+",
-  "OBD.src.utils.helper.TheLengthIsToAnd.3": "The length is 8 to 32 and contains at least three of uppercase letters, lowercase letters, numbers, and special characters ~^*{}[]_-+"
+  "OBD.src.utils.helper.TheLengthIsToAnd.3": "The length is 8 to 32 and contains at least three of uppercase letters, lowercase letters, numbers, and special characters ~^*{}[]_-+",
+  "OBD.pages.Obdeploy.CheckInfo.ObconfigserverServicePort": "OBConfigServer service port",
+  "OBD.Obdeploy.ClusterConfig.TheIpAddressFormatIs": "The ip address format is incorrect.",
+  "OBD.Obdeploy.ClusterConfig.ObconfigserverServicePort": "OBConfigserver service port",
+  "OBD.pages.Obdeploy.InstallConfig.OceanbaseConfigserverCanProvideOceanbase": "OceanBase Configserver can provide OceanBase metadata registration, storage, and query services, mainly realizing 1 to more access between OBProxy and OceanBase clusters.",
+  "OBD.pages.Obdeploy.NodeConfig.SelectTheCorrectComponenttextmapcomponentNode": "Select the correct {componentTextMapComponent} node.",
+  "OBD.pages.Obdeploy.NodeConfig.ObconfigserverNodes": "OBConfigServer nodes",
+  "OBD.pages.Obdeploy.NodeConfig.SelectOrEnterObConfigserver": "Select or enter OB ConfigServer nodes",
+  "OBD.pages.constants.ObConfigserverParameterName": "OB ConfigServer parameter name",
+  "OBD.Obdeploy.ClusterConfig.PleaseEnter": "Please enter",
+  "OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration": "It is a metadata registration, storage, and query service that provides OceanBase metadata. It mainly enables one to more and many to more access between OBProxy and OceanBase clusters.",
+  "OBD.src.utils.SelectTheCorrectObconfigserverNode": "Select the correct OBConfigServer node"
 }

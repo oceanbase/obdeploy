@@ -34,6 +34,8 @@ from glob import glob
 from enum import Enum
 from copy import deepcopy
 from xml.etree import cElementTree
+
+from _stdio import SafeStdio
 from ssh import LocalClient
 try:
     from ConfigParser import ConfigParser
@@ -105,9 +107,10 @@ class MirrorRepositoryType(Enum):
     REMOTE = 'remote'
 
 
-class MirrorRepository(object):
+class MirrorRepository(SafeStdio):
     
     MIRROR_TYPE = None
+    __VERSION_KEY__ = '__version__'
 
     def __init__(self, mirror_path, stdio=None):
         self.stdio = stdio
@@ -157,6 +160,16 @@ class MirrorRepository(object):
     def get_pkgs_info_with_score(self, **pattern):
         return []
 
+    def get_all_rpm_pkgs(self):
+        pkgs = set()
+        for file_path in glob(os.path.join(self.mirror_path, '*.rpm')):
+            try:
+                pkgs.add(Package(file_path))
+            except:
+                self.stdio.exception()
+                self.stdio.verbose("Failed to open rpm file: %s" % file_path)
+        return pkgs
+
 
 class RemotePackageInfo(PackageInfo):
 
@@ -166,6 +179,7 @@ class RemotePackageInfo(PackageInfo):
         self.checksum = (None,None) # type,value
         self.openchecksum = (None,None) # type,value
         self.time = (None, None)
+        self.package_size = None
         super(RemotePackageInfo, self).__init__(None, None, None, None, None, None)
         self._parser(elem)
 
@@ -216,6 +230,10 @@ class RemotePackageInfo(PackageInfo):
                 self.arch = child.text
             elif child_name == 'name':
                 self.name = child.text
+
+            elif child_name == 'size':
+                self.size = int(child.attrib.get('installed'))
+                self.package_size = int(child.attrib.get('package'))
 
 
 class RemoteMirrorRepository(MirrorRepository):
@@ -272,6 +290,7 @@ class RemoteMirrorRepository(MirrorRepository):
     REPO_AGE_FILE = '.rege_age'
     DB_CACHE_FILE = '.db'
     PRIMARY_REPOMD_TYPE = 'primary'
+    __VERSION__ = Version("1.0")
 
     def __init__(self, mirror_path, meta_data, stdio=None):
         self.baseurl = None
@@ -349,16 +368,22 @@ class RemoteMirrorRepository(MirrorRepository):
                 self.stdio and getattr(self.stdio, 'verbose', print)('load %s' % db_cacahe_path)
                 with open(db_cacahe_path, 'rb') as f:
                     self._db = pickle.load(f)
+                    if self.__VERSION__ > Version(self.db.get(self.__VERSION_KEY__, '0')):
+                        self._db = None
+                    else:
+                        del self._db[self.__VERSION_KEY__]
         except:
             pass
 
     def _dump_db_cache(self):
         if self._db:
+            data = deepcopy(self.db)
+            data[self.__VERSION_KEY__] = self.__VERSION__
             try:
                 db_cacahe_path = self.get_db_cache_file(self.mirror_path)
                 self.stdio and getattr(self.stdio, 'verbose', print)('dump %s' % db_cacahe_path)
                 with open(db_cacahe_path, 'wb') as f:
-                    pickle.dump(self._db, f)
+                    pickle.dump(data, f)
                 return True
             except:
                 self.stdio.exception('')
@@ -473,7 +498,7 @@ class RemoteMirrorRepository(MirrorRepository):
         file_name = pkg_info.location[1]
         file_path = os.path.join(self.mirror_path, file_name)
         self.stdio and getattr(self.stdio, 'verbose', print)('get RPM package by %s' % pkg_info)
-        if not os.path.exists(file_path) or os.stat(file_path)[8] < pkg_info.time[1]:
+        if not os.path.exists(file_path) or os.stat(file_path)[8] < pkg_info.time[1] or os.path.getsize(file_path) != pkg_info.package_size:
             base_url = pkg_info.location[0] if pkg_info.location[0] else self.baseurl
             url = '%s/%s' % (base_url, pkg_info.location[1])
             if not self.download_file(url, file_path, self.stdio):
@@ -594,6 +619,7 @@ class RemoteMirrorRepository(MirrorRepository):
         c = [len(name) / len(info.name), lse_score, info]
         return c
 
+
     @staticmethod
     def validate_repoid(repoid):
         """Return the first invalid char found in the repoid, or None."""
@@ -645,7 +671,6 @@ class LocalMirrorRepository(MirrorRepository):
 
     MIRROR_TYPE = MirrorRepositoryType.LOCAL
     _DB_FILE = '.db'
-    __VERSION_KEY__ = '__version__'
     __VERSION__ = Version("1.0")
 
     def __init__(self, mirror_path, stdio=None):
@@ -1173,3 +1198,22 @@ class MirrorRepositoryManager(Manager):
         except Exception as e:
             self.stdio.exception("Failed to save repository file")
             return False
+
+    def get_all_rpm_pkgs(self):
+        pkgs = list()
+        mirrors = self.get_mirrors()
+        for mirror in mirrors:
+            pkgs = pkgs + list(mirror.get_all_rpm_pkgs())
+        return pkgs
+
+    def delete_pkgs(self, pkgs):
+        if not pkgs:
+            return True
+        for pkg in pkgs:
+            if not pkg.path.startswith(self.path):
+                self.stdio.error("The path of the %s file does not start with %s." % (pkg.path, self.path))
+                return False
+            if not FileUtil.rm(pkg.path, self.stdio):
+                return False
+        return True
+

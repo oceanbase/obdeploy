@@ -38,9 +38,9 @@ from _errno import DOC_LINK_MSG, LockError
 import _environ as ENV
 from ssh import LocalClient
 from const import (
-    CONST_OBD_HOME, CONST_OBD_INSTALL_PATH, CONST_OBD_INSTALL_PRE, 
+    CONST_OBD_HOME,
     VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS,
-    COMP_OCEANBASE_DIAGNOSTIC_TOOL
+    COMP_OCEANBASE_DIAGNOSTIC_TOOL, PKG_RPM_FILE,PKG_REPO_FILE
 )
 
 
@@ -186,8 +186,8 @@ class BaseCommand(object):
 class ObdCommand(BaseCommand):
 
     OBD_PATH = OBD_HOME_PATH
-    OBD_INSTALL_PRE = os.environ.get(CONST_OBD_INSTALL_PRE, '/')
-    OBD_INSTALL_PATH = os.environ.get(CONST_OBD_INSTALL_PATH, os.path.join(OBD_INSTALL_PRE, 'usr/obd/'))
+    OBD_INSTALL_PRE = COMMAND_ENV.get(ENV.ENV_OBD_INSTALL_PRE, '/')
+    OBD_INSTALL_PATH = COMMAND_ENV.get(ENV.ENV_OBD_INSTALL_PATH, os.path.join(OBD_INSTALL_PRE, 'usr/obd/'))
 
     def init_home(self):
         version_path = os.path.join(self.OBD_PATH, 'version')
@@ -612,7 +612,23 @@ class MirrorAddRepoCommand(ObdCommand):
     def _do_command(self, obd):
         url = self.cmds[0]
         return obd.mirror_manager.add_repo(url)
-        
+
+
+class MirrorCleanPkgCommand(ObdCommand):
+
+    def __init__(self):
+        super(MirrorCleanPkgCommand, self).__init__('clean', 'After the list of files to be deleted is displayed, double confirm and then clean up them.')
+        self.parser.add_option('-y', '--confirm', action='store_true', help="confirm to clean up.")
+        self.parser.add_option('-c', '--components', type='string',  help="Clean up specified components. Separate multiple components with `,`.")
+        self.parser.add_option('-t', '--type', type='string', help="Specify the file types to be deleted as '%s or %s'." % (PKG_RPM_FILE, PKG_REPO_FILE))
+        self.parser.add_option('--hash', type='string', help="Repository's md5")
+
+    def _do_command(self, obd):
+        if self.opts.type and self.opts.type not in [PKG_RPM_FILE, PKG_REPO_FILE]:
+            ROOT_IO.error("Invalid type specified. Please specify '%s' or '%s'." % (PKG_RPM_FILE, PKG_REPO_FILE))
+            return False
+        return obd.clean_pkg(self.opts)
+
 
 class MirrorMajorCommand(MajorCommand):
 
@@ -625,6 +641,7 @@ class MirrorMajorCommand(MajorCommand):
         self.register_command(MirrorEnableCommand())
         self.register_command(MirrorDisableCommand())
         self.register_command(MirrorAddRepoCommand())
+        self.register_command(MirrorCleanPkgCommand())
 
 
 class RepositoryListCommand(ObdCommand):
@@ -750,7 +767,7 @@ class DemoCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(DemoCommand, self).__init__('demo', 'Quickly start')
-        self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas. [oceanbase-ce,obproxy-ce,obagent,prometheus,grafana]\nExample: \nstart oceanbase-ce: obd demo -c oceanbase-ce\n"
+        self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas. [oceanbase-ce,obproxy-ce,obagent,prometheus,grafana,ob-configserver]\nExample: \nstart oceanbase-ce: obd demo -c oceanbase-ce\n"
          + "start -c oceanbase-ce V3.2.3: obd demo -c oceanbase-ce --oceanbase-ce.version=3.2.3\n"
          + "start oceanbase-ce and obproxy-ce: obd demo -c oceanbase-ce,obproxy-ce", default='oceanbase-ce,obproxy-ce,obagent,prometheus,grafana')
         self.parser.allow_undefine = True
@@ -1113,6 +1130,7 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
         self.parser.add_option('--primary-zone', type='string', help="Tenant primary zone. [RANDOM].", default='RANDOM')
         self.parser.add_option('--locality', type='string', help="Tenant locality.")
         self.parser.add_option('-s', '--variables', type='string', help="Set the variables for the system tenant. [ob_tcp_invited_nodes='%'].", default="ob_tcp_invited_nodes='%'")
+        self.parser.add_option('-o', '--optimize', type='string', help="Specify scenario optimization when creating a tenant, the default is consistent with the cluster dimension.\n{express_oltp, complex_oltp, olap, htap, kv}\nSupported since version 4.3.")
 
     def _do_command(self, obd):
         if len(self.cmds) == 1:
@@ -1237,6 +1255,24 @@ class ClusterTenantListCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterTenantOptimizeCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantOptimizeCommand, self).__init__('optimize','Optimizing existing tenant scenarios')
+        self.parser.add_option('-o', '--optimize', type='string', help='Optimize scenarios,the default is consistent with the cluster dimension.\n{express_oltp, complex_oltp, olap, htap, kv}\nSupported since version 4.3.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantOptimizeCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.tenant_optimize(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+
 class ClusterTenantCommand(MajorCommand):
 
     def __init__(self):
@@ -1248,6 +1284,7 @@ class ClusterTenantCommand(MajorCommand):
         self.register_command(ClusterTenantSwitchoverCommand())
         self.register_command(ClusterTenantFailoverCommand())
         self.register_command(ClusterTenantDecoupleCommand())
+        self.register_command(ClusterTenantOptimizeCommand())
 
 
 class ClusterMajorCommand(MajorCommand):
@@ -1698,6 +1735,7 @@ class ObdiagGatherCommand(MajorCommand):
         self.register_command(ObdiagGatherPlanMonitorCommand())
         self.register_command(ObdiagGatherObproxyLogCommand())
         self.register_command(ObdiagGatherSceneCommand())
+        self.register_command(ObdiagGatherAshReportCommand())
 
 
 class ObdiagGatherSceneCommand(MajorCommand):
@@ -1862,7 +1900,7 @@ class ObdiagGatherPlanMonitorCommand(ObdiagGatherMirrorCommand):
         super(ObdiagGatherPlanMonitorCommand, self).__init__('plan_monitor', 'Gather ParalleSQL information')
         self.parser.add_option('--trace_id', type='string', help='sql trace id')
         self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
-        self.parser.add_option('--env', type='string', help='env, eg: "{env1=xxx, env2=xxx}"')
+        self.parser.add_option('--env', type='string', help='''env, eg: "{db_connect='-h127.0.0.1 -P2881 -utest@test -p****** -Dtest'}"''')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
 
 
@@ -1881,7 +1919,7 @@ class ObdiagGatherObproxyLogCommand(ObdiagGatherMirrorCommand):
         self.parser.add_option('--from', type='string', help="specify the start of the time range. format: yyyy-mm-dd hh:mm:ss")
         self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
         self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
-        self.parser.add_option('--scope', type='string', help="log type constrains, choices=[observer, election, rootservice, all]",default='all')
+        self.parser.add_option('--scope', type='string', help="log type constrains, choices=[obproxy, obproxy_limit, obproxy_stat, obproxy_digest, obproxy_slow, obproxy_diagnosis, obproxy_error, all]", default='all')
         self.parser.add_option('--grep', type='string', help="specify keywords constrain")
         self.parser.add_option('--encrypt', type='string', help="Whether the returned results need to be encrypted, choices=[true, false]", default="false")
         self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
@@ -1915,7 +1953,6 @@ class ObdiagGatherSceneRunCommand(ObdCommand):
         self.parser.add_option('--to', type='string', help="specify the end of the time range. format: yyyy-mm-dd hh:mm:ss")
         self.parser.add_option('--since', type='string',  help="Specify time range that from 'n' [d]ays, 'n' [h]ours or 'n' [m]inutes. before to now. format: <n> <m|h|d>. example: 1h.",default='30m')
         self.parser.add_option('--env', type='string', help='env, eg: "{env1=xxx, env2=xxx}"')
-        self.parser.add_option('--dis_update', type='string', help='The type is bool, assigned any value representing true', default='true')
         self.parser.add_option('--store_dir', type='string', help='the dir to store gather result, current dir by default.', default='./')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir",default=OBDIAG_HOME_PATH)
     
@@ -1934,6 +1971,41 @@ class ObdiagGatherSceneRunCommand(ObdCommand):
         else:
             return self._show_help()
 
+
+class ObdiagGatherAshReportCommand(ObdCommand):
+
+    def __init__(self):
+        super(ObdiagGatherAshReportCommand, self).__init__('ash', 'Gather ash report')
+        self.parser.add_option('--trace_id', type='string',
+                               help="The TRACE.ID of the SQL to be sampled, if left blank or filled with NULL, indicates that TRACE.ID is not restricted.")
+        self.parser.add_option('--sql_id', type='string',
+                               help="The SQL.ID, if left blank or filled with NULL, indicates that SQL.ID is not restricted.")
+        self.parser.add_option('--wait_class', type='string',
+                               help='Event types to be sampled.')
+        self.parser.add_option('--report_type', type='string',
+                               help='Report type, currently only supports text type.', default='TEXT')
+        self.parser.add_option('--from', type='string',
+                               help="specify the start of the time range. format: 'yyyy-mm-dd hh:mm:ss'")
+        self.parser.add_option('--to', type='string',
+                               help="specify the end of the time range. format: 'yyyy-mm-dd hh:mm:ss'")
+        self.parser.add_option('--store_dir', type='string',
+                               help='the dir to store gather result, current dir by default.', default='./')
+        self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
+
+    def init(self, cmd, args):
+        super(ObdiagGatherAshReportCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def _do_command(self, obd):
+        if len(self.cmds) > 0:
+            return obd.obdiag_online_func(self.cmds[0], "gather_ash", self.opts)
+        else:
+            return self._show_help()
 
 class ObdiagAnalyzeMirrorCommand(ObdCommand):
     
@@ -2013,7 +2085,6 @@ class ObdiagCheckCommand(ObdCommand):
         super(ObdiagCheckCommand, self).__init__('check', 'check oceanbase cluster')
         self.parser.add_option('--cases', type='string', help="The name of the check task set that needs to be executed")
         self.parser.add_option('--store_dir', type='string', help='ouput report path', default='./check_report/')
-        self.parser.add_option('--dis_update', type='string', help='The type is bool, assigned any value representing true', default='true')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
     
     def init(self, cmd, args):
@@ -2048,7 +2119,7 @@ class ObdiagRcaRunCommand(ObdCommand):
         super(ObdiagRcaRunCommand, self).__init__('run', 'to run root cause analysis of oceanbase problem')
         self.parser.add_option('--scene', type='string', help="The name of the rca scene set that needs to be executed")
         self.parser.add_option('--store_dir', type='string', help='ouput result path', default='./rca/')
-        self.parser.add_option('--parameters', type='string', help='parameters')
+        self.parser.add_option('--input_parameters', type='string', help='parameters')
         self.parser.add_option('--obdiag_dir', type='string', help="obdiag install dir", default=OBDIAG_HOME_PATH)
     
     def init(self, cmd, args):

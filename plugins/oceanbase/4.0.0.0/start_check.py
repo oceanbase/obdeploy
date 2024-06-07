@@ -208,12 +208,13 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             'aio': err.CheckStatus(),
             'net': err.CheckStatus(),
             'ntp': err.CheckStatus(),
-            'ocp meta db': err.CheckStatus()
+            'ocp tenant memory': err.CheckStatus(),
+            'ocp tenant disk': err.CheckStatus()
         }
         check_status[server].update(kernel_check_status)
         if work_dir_check:
              check_status[server]['dir'] = err.CheckStatus()
-             
+
     if init_check_status:
         return plugin_context.return_true(start_check_status=check_status)
 
@@ -663,19 +664,31 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                     critical('disk', err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=p, avail=str(Capacity(avail)), need=str(Capacity(need))), tmp_suggests + suggests)
 
     global_conf = cluster_config.get_global_conf()
-    has_ocp = 'ocp-express' in plugin_context.components
+    has_ocp = 'ocp-express' in plugin_context.components or 'ocp-server-ce' in plugin_context.components
     if not has_ocp and any([key.startswith('ocp_meta') for key in global_conf]):
         has_ocp = True
     if has_ocp and need_bootstrap and parameter_check:
         global_conf_with_default = copy.deepcopy(cluster_config.get_global_conf_with_default())
         original_global_conf = cluster_config.get_original_global_conf()
-        ocp_meta_tenant_prefix = 'ocp_meta_tenant_'
-        for key in global_conf_with_default:
-            if key.startswith(ocp_meta_tenant_prefix) and original_global_conf.get(key, None):
-                global_conf_with_default['ocp_meta_tenant'][key.replace(ocp_meta_tenant_prefix, '', 1)] = global_conf_with_default[key]
-        meta_db_memory_size = Capacity(global_conf_with_default['ocp_meta_tenant'].get('memory_size')).btyes
+        tenants_componets_map = {
+            "meta": ["ocp-express", "ocp-server", "ocp-server-ce"],
+            "monitor": ["ocp-server", "ocp-server-ce"],
+        }
+        tenant_memory = tenant_log_disk = memory_limit = system_memory = log_disk_size = sys_log_disk_size = 0
+        for tenant, component_list in tenants_componets_map.items():
+            prefix = "ocp_%s_tenant_" % tenant
+            tenant_key = "ocp_%s_tenant" % tenant
+            for key in global_conf_with_default:
+                if key.startswith(prefix) and not original_global_conf.get(key, None):
+                    global_conf_with_default['ocp_%s_tenant' % tenant][key.replace(prefix, '', 1)] = global_conf_with_default[key]
+            if set(list(plugin_context.components)) & set(component_list):
+                tenant_memory_default = global_conf_with_default[tenant_key].get('memory_size', '0')
+                tenant_memory += Capacity(original_global_conf.get(tenant_key, {}).get('memory_size', tenant_memory_default)).btyes
+                tenant_log_disk_default = global_conf_with_default[tenant_key].get('log_disk_size', '0')
+                tenant_log_disk += Capacity(original_global_conf.get(tenant_key, {}).get('log_disk_size', tenant_log_disk_default)).btyes
+
         servers_sys_memory = {}
-        if meta_db_memory_size:
+        if tenant_memory:
             sys_memory_size = None
             if 'sys_tenant' in global_conf and 'memory_size' in global_conf['sys_tenant']:
                 sys_memory_size = global_conf['sys_tenant']['memory_size']
@@ -690,32 +703,19 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                     system_memory = get_system_memory(memory_limit, min_pool_memory)
                 if not sys_memory_size:
                     sys_memory_size = servers_sys_memory[server] = max(min_pool_memory, min((memory_limit - system_memory) * 0.25, Capacity('16G').btyes))
-                if meta_db_memory_size + system_memory + sys_memory_size <= memory_limit:
+                if tenant_memory + system_memory + sys_memory_size <= memory_limit:
                     break
             else:
-                suggest = err.SUG_OCP_EXPRESS_REDUCE_META_DB_MEM.format()
-                suggest.auto_fix = True
-                if 'ocp_meta_tenant_memory_size' in global_generate_config:
-                    suggest.auto_fix = False
-                error('ocp meta db', err.EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_MEM.format(), [suggest])
+                critical('ocp tenant memory', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='mem', avail=Capacity(memory_limit - system_memory - sys_memory_size), need=Capacity(tenant_memory)))
 
-        meta_db_log_disk_size = global_conf_with_default['ocp_meta_tenant'].get('log_disk_size')
-        meta_db_log_disk_size = Capacity(meta_db_log_disk_size).btyes if meta_db_log_disk_size else meta_db_log_disk_size
-        if not meta_db_log_disk_size and meta_db_memory_size:
-            meta_db_log_disk_size = meta_db_memory_size * 3
-        if meta_db_log_disk_size:
+        if tenant_log_disk:
             for server in cluster_config.servers:
                 log_disk_size = servers_log_disk_size[server]
                 sys_log_disk_size = servers_sys_memory.get(server, 0)
-                if meta_db_log_disk_size + sys_log_disk_size <= log_disk_size:
+                if tenant_log_disk + sys_log_disk_size <= log_disk_size:
                     break
             else:
-                suggest = err.SUG_OCP_EXPRESS_REDUCE_META_DB_LOG_DISK.format()
-                suggest.auto_fix = True
-                if 'ocp_meta_tenant_log_disk_size' in global_generate_config:
-                    suggest.auto_fix = False
-                error('ocp meta db', err.EC_OCP_EXPRESS_META_DB_NOT_ENOUGH_LOG_DISK.format(), [suggest])
-
+                critical('ocp tenant disk', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='log_disk_size', avail=Capacity(log_disk_size - sys_log_disk_size), need=Capacity(tenant_log_disk)))
 
     if success:
         for ip in servers_net_interface:

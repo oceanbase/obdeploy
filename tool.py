@@ -836,4 +836,3 @@ class Cursor(SafeStdio):
         if self.db:
             self.db.close()
             self.db = None
-

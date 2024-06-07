@@ -50,6 +50,15 @@ export async function queryComponentParameters(
   )
   if(r.success){
     r.data?.items?.forEach((component)=>{
+      if(component.component=== 'ob-configserver'){
+        component.config_parameters.forEach((parameter)=>{
+          if(parameter.name === 'log_maxsize'){
+            parameter.default = '30MB';
+            parameter.type = 'CapacityMB';
+            parameter.unitDisable = true;
+          }
+        })
+      }
       component.config_parameters.forEach((parameter)=>{
         parameter.is_changed = false;
       })

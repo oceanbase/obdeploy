@@ -165,11 +165,15 @@ class ObVersionGraph(object):
 
 def format_route(routes, repository):
     route_res = []
+    from_version = repository.version
+    from_release = repository.release
     for i, node in enumerate(routes):
         require_from_binary = getattr(node, 'require_from_binary', False)
         if getattr(node, 'when_come_from', False):
-            require_from_binary = require_from_binary and (repository.version in node.when_come_from or '%s-%s' % (repository.version, repository.release.split('.')[0]) in node.when_come_from)
-
+            require_from_binary = require_from_binary and (from_version in node.when_come_from or '%s-%s' % (from_version, from_release.split('.')[0]) in node.when_come_from)
+            if require_from_binary:
+                from_version = node.version
+                from_release = node.release
         route_res.append({
                 'version': node.version,
                 'release': None if node.release == VersionNode.RELEASE_NULL else node.release,

@@ -32,8 +32,10 @@ def bootstrap(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     cursor = plugin_context.get_return('connect').get_return('cursor')
     added_components = cluster_config.get_deploy_added_components()
+    changed_components = cluster_config.get_deploy_changed_components()
     be_depend = cluster_config.be_depends
     global_conf = cluster_config.get_global_conf()
+    ocp_config = cluster_config.get_be_depend_config('ocp-server-ce', with_default=False)
     bootstrap = []
     floor_servers = {}
     zones_config = {}
@@ -99,11 +101,15 @@ def bootstrap(plugin_context, *args, **kwargs):
             stdio.stop_loading('succeed')
     
     has_obproxy = False
+    has_obproxy_scale_out = False
     for component_name in ['obproxy', 'obproxy-ce']:
         if component_name in added_components and component_name in be_depend:
             has_obproxy = True
             break
-    if has_obproxy or 'proxyro_password' in global_conf:
+        if component_name in changed_components:
+            has_obproxy_scale_out = True
+            break
+    if has_obproxy or ('proxyro_password' in global_conf and not has_obproxy_scale_out):
         value = global_conf['proxyro_password'] if global_conf.get('proxyro_password') is not None else ''
         sql = 'create user if not exists "proxyro" IDENTIFIED BY %s'
         raise_cursor.execute(sql, [value])
@@ -111,15 +117,15 @@ def bootstrap(plugin_context, *args, **kwargs):
         raise_cursor.execute(sql, [value])
 
     has_oblogproxy = "oblogproxy" in added_components and "oblogproxy" in be_depend
-    if has_oblogproxy or 'cdcro_password' in global_conf:
+    if has_oblogproxy or ('cdcro_password' in global_conf and 'oblogproxy' not in changed_components):
         value = global_conf['cdcro_password'] if global_conf.get('cdcro_password') is not None else ''
-        sql = 'create user "cdcro" IDENTIFIED BY %s'
+        sql = 'create user if not exists "cdcro" IDENTIFIED BY %s'
         raise_cursor.execute(sql, [value])
         sql = 'grant select on oceanbase.* to cdcro IDENTIFIED BY %s'
         raise_cursor.execute(sql, [value])
 
     has_obagent = "obagent" in added_components and "obagent" in be_depend
-    if has_obagent or 'ocp_agent_monitor_password' in global_conf:
+    if has_obagent or ('ocp_agent_monitor_password' in global_conf and 'obagent' not in changed_components):
         value = global_conf['ocp_agent_monitor_password'] if global_conf.get('ocp_agent_monitor_password') is not None else ''
         sql = 'create user if not exists "ocp_monitor" IDENTIFIED BY %s'
         stdio.verbose(sql)
@@ -151,6 +157,8 @@ def bootstrap(plugin_context, *args, **kwargs):
         # set create tenant variable
         for key in global_conf_with_default:
             if key.startswith(prefix) and original_global_conf.get(key, None):
+                if ocp_config and ocp_config.get(key, None):
+                    global_conf_with_default[key] = ocp_config[key]
                 global_conf_with_default[prefix + 'tenant'][key.replace(prefix, '', 1)] = global_conf_with_default[key]
         tenant_info = global_conf_with_default[prefix + "tenant"]
         tenant_info["variables"] = "ob_tcp_invited_nodes='%'"

@@ -86,6 +86,7 @@ export default function DeployConfig({
     setDeployMemory,
     tableData,
     setTableData,
+    setNeedDestroy
   } = useModel('ocpInstallData');
 
   const {
@@ -586,6 +587,14 @@ export default function DeployConfig({
         ...ocpConfigData,
         components: newComponents,
       };
+      if (
+        isUpdate &&
+        !clusterOption.some((option) => option.value === values?.appname)
+      ) {
+        setNeedDestroy(true);
+      }else{
+        setNeedDestroy(false);
+      }
       if (isUpdate && changeClusterName(values?.appname)) {
         try {
           const { success, data } = await getConnectInfoReq({

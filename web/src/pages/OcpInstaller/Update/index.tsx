@@ -33,6 +33,7 @@ const Update: React.FC = () => {
     setInstallStatus,
     installResult,
     setInstallResult,
+    needDestroy
   } = useModel('ocpInstallData');
   const { ocpConfigData, setOcpConfigData } = useModel('global');
   const [current, setCurrent] = useState(step ? Number(step) : -1);
@@ -487,7 +488,12 @@ const Update: React.FC = () => {
                         disabled={precheckOcpUpgradeLoading || preCheckLoading}
                         loading={precheckOcpUpgradeLoading || preCheckLoading}
                         onClick={() => {
-                          handleDestroyDeployment({ name: cluster_name });
+                          if(needDestroy){
+                            handleDestroyDeployment({ name: cluster_name });
+                          }else{
+                            refresh();
+                            setInstallStatus('RUNNING');
+                          }
                         }}
                       >
                         {intl.formatMessage({

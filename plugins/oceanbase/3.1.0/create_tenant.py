@@ -29,7 +29,7 @@ from _types import Capacity
 tenant_cursor = None
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, retries=10, args=[]):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, retries=10, args=[], stdio=None):
     global tenant_cursor
     if not tenant_cursor:
         user = 'SYS' if mode == 'oracle' else 'root'
@@ -37,8 +37,8 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, retries=10, args=[]):
         if not tenant_cursor and retries:
             retries -= 1
             time.sleep(2)
-            return exec_sql_in_tenant(sql, cursor, tenant, mode, retries=retries, args=args)
-    return tenant_cursor.execute(sql, args=args)
+            return exec_sql_in_tenant(sql, cursor, tenant, mode, retries=retries, args=args, stdio=stdio)
+    return tenant_cursor.execute(sql, args=args, stdio=stdio)
 
 
 def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args, **kwargs):
@@ -242,14 +242,14 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args,
             # create resource unit
             sql = 'create resource unit %s max_cpu %.1f, max_memory %d, max_iops %d, max_disk_size %d, max_session_num %d, min_cpu %.1f, min_memory %d, min_iops %d'
             sql = sql % (unit_name, max_cpu, max_memory, max_iops, max_disk_size, max_session_num, min_cpu, min_memory, min_iops)
-            res = cursor.execute(sql)
+            res = cursor.execute(sql, stdio=stdio)
             if res is False:
                 stdio.stop_loading('fail')
                 return
 
             # create resource pool
             sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
-            res = cursor.execute(sql)
+            res = cursor.execute(sql, stdio=stdio)
             if res is False:
                 stdio.stop_loading('fail')
                 return
@@ -273,7 +273,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args,
                 sql += "set %s, %s" % (variables, set_mode)
             else:
                 sql += "set %s" % set_mode
-            res = cursor.execute(sql)
+            res = cursor.execute(sql, stdio=stdio)
             if res is False:
                 stdio.stop_loading('fail')
                 return
@@ -283,7 +283,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args,
         database = get_option('database')
         if database:
             sql = 'create database {}'.format(database)
-            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode) and not create_if_not_exists:
+            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, stdio=stdio) and not create_if_not_exists:
                 stdio.error('failed to create database {}'.format(database))
                 return
 
@@ -296,7 +296,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args,
                     username=db_username)
             else:
                 error("Create user in oracle tenant is not supported")
-            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[db_password]):
+            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[db_password], stdio=stdio):
                 stdio.error('failed to create user {}'.format(db_username))
                 return
 

@@ -22,6 +22,7 @@ declare namespace API {
     ocpexpress?: any;
     obagent?: any;
     ocpserver?: any;
+    obconfigserver?:any;
   }
 
   interface MoreParameter extends API.Parameter {
@@ -36,6 +37,7 @@ declare namespace API {
     require?: boolean;
     type?: string;
     isChanged: boolean;
+    unitDisable?: boolean;
   }
 
   interface NewConfigParameter extends API.ConfigParameter {
@@ -53,6 +55,8 @@ declare namespace API {
     obproxy?: any;
     ocpexpress?: any;
     obagent?: any;
+    ['ocp-express']?: any;
+    ['ob-configserver']?: any;
   }
 
   interface ErrorInfo {

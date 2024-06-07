@@ -1806,6 +1806,8 @@
   description_en: 'the number of RDMA I/O threads for Libreasy. Range: [0, 8] in integer, 0 stands for RDMA being disabled.'
   description_local: Libreasy 的 RDMA I/O 线程数。
 - name: production_mode
+  name_local: 生产模式开关
+  essential: true
   require: true
   type: BOOL
   default: true
@@ -1820,7 +1822,7 @@
   require: false
   type: DICT
   default:
-    tenant_name: ocp
+    tenant_name: ocp_meta
     max_cpu: 1
     memory_size: 2147483648
   need_redeploy: true
@@ -1856,7 +1858,7 @@
 - name: ocp_meta_db
   require: false
   type: SAFE_STRING
-  default: ocp_express
+  default: ocp_meta
   need_redeploy: true
   description_en: The database name for ocp meta db
   description_local: ocp express的元数据库使用的数据库名
@@ -1939,3 +1941,12 @@
   need_redeploy: true
   description_en: The password for ocp monitor db
   description_local: ocp 的监控数据库使用的密码
+- name: cdcro_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: password of observer cdcro user
+  description_local: cdcro用户的密码

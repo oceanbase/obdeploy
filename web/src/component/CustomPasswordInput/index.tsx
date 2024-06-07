@@ -155,6 +155,16 @@ export default function CustomPasswordInput({
             defaultMessage: '请输入密码',
           }),
         },
+        {
+          validator:(_,value)=>{
+            let validateRes =  validateInput(value)
+            if( validateRes.validateStatus === 'success'){
+              return Promise.resolve()
+            }else{
+              return Promise.reject(new Error(validateRes.errorMsg!))
+            }
+          }
+        }
       ]}
       name={name}
       {...props}

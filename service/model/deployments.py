@@ -138,6 +138,14 @@ class ObClient(BaseModel):
     home_path: str = Body('', description='install obclient home path')
     servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
 
+class ObConfigserver(BaseModel):
+    component: str = Body('ob-configserver', description='ob-configserver component name,ex:ob-configserver')
+    version: str = Body(..., description='version')
+    release: str = Body(..., description='ob-configserver release no')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    home_path: str = Body('', description='install ob-configserver home path')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
+    listen_port: int = Body(..., description='server port')
 
 class ComponentConfig(BaseModel):
     oceanbase: OceanBase
@@ -145,6 +153,7 @@ class ComponentConfig(BaseModel):
     ocpexpress: Optional[OcpExpress]
     obagent: Optional[ObAgent]
     obclient: Optional[ObClient]
+    obconfigserver: Optional[ObConfigserver]
 
 
 class DeploymentConfig(BaseModel):

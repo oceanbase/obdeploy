@@ -392,16 +392,17 @@ class DefaultConfigParser(ConfigParser):
     @classmethod
     def merge_config(cls, component_name, config, new_config):
         unmergeable_keys = cls.META_KEYS + ['global', RsyncConfig.RSYNC, ENV]
+        for key in unmergeable_keys:
+            assert key not in new_config, Exception('{} is not allowed to be set in additional conf'.format(key))
         servers = cls._get_servers(config.get('servers', []))
         merge_servers = cls._get_servers(new_config.get('servers', []))
         for server in merge_servers:
             assert server not in servers, Exception('{} is already in cluster'.format(server))
-        new_config['servers'] = config.get('servers', []) + new_config.get('servers', [])
+        config['servers'] = config.get('servers', []) + new_config.get('servers', [])
         merge_server_names = [server.name for server in merge_servers]
-        for key in new_config:
-            assert key not in unmergeable_keys, Exception('{} is not allowed to be set in additional conf'.format(key))
-            assert key in merge_server_names or key == 'servers', Exception('{} is not allowed to be set'.format(key))
-            config[key] = new_config[key]
+        for key in merge_server_names:
+            if key in new_config:
+                config[key] = new_config[key]
         return cls.to_cluster_config(component_name, config, merge_servers)
 
     @classmethod
@@ -650,6 +651,16 @@ class ClusterConfig(object):
         if name not in self._depends:
             return None
         cluster_config = self._depends[name]
+        if with_default:
+            config = cluster_config.get_server_conf_with_default(server) if server else cluster_config.get_global_conf_with_default()
+        else:
+            config = cluster_config.get_server_conf(server) if server else cluster_config.get_global_conf()
+        return deepcopy(config)
+
+    def get_be_depend_config(self, name, server=None, with_default=True):
+        if name not in self._be_depends:
+            return None
+        cluster_config = self._be_depends[name]
         if with_default:
             config = cluster_config.get_server_conf_with_default(server) if server else cluster_config.get_global_conf_with_default()
         else:
@@ -1105,7 +1116,11 @@ class DeployConfig(SafeStdio):
     def added_components(self):
         if self._added_components:
             return self._added_components
+        elif self._changed_components or self._removed_components:
+            # It's means that the components have been changed, so must not be added
+            return []
         else:
+            # Maybe the deploy is new, so all components are added
             return self.components.keys()
         
     @property
@@ -1206,13 +1221,16 @@ class DeployConfig(SafeStdio):
                         self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(key))
                         ret = False
                     elif issubclass(type(source_data[key]), dict):
-                        if source_data[key].get('depends', []):
+                        new_depends = source_data[key].get('depends', [])
+                        if new_depends and new_depends != self.components[key].depends:
                             self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(message='depends:{}'.format(key)))
+                            ret = False
                         # temp _depends
                         depends[key] = self.components[key].depends
+                    
                     if not self._merge_component(key, source_data[key]):
-                            ret = False
-                            continue
+                        ret = False
+                    
                 for comp in depends:
                     conf = self.components[comp]
                     for name in depends[comp]:
@@ -1472,20 +1490,17 @@ class DeployConfig(SafeStdio):
             global_attr = deepcopy(src_conf['inner_config'][(ComponentInnerConfig.COMPONENT_GLOBAL_ATTRS)])
         try:
             merged_cluster_config = parser.merge_config(component_name, src_conf['config'], conf)
+            self._src_data[component_name] = src_conf['config']
+            self._set_component(merged_cluster_config)
         except Exception as e:
             self.stdio.exception(err.EC_COMPONENT_FAILED_TO_MERGE_CONFIG.format(message=str(e)))
             return False
-        self.update_component(merged_cluster_config)
+        
         cluster_config = self.components[component_name]
         for k in global_attr:
             v = global_attr.get(k)
             cluster_config.update_component_attr(k, v, save=False)
         self._changed_components.append(component_name)
-        
-        # 更新depends config
-        for comp in self.components:
-            if component_name in self.components[comp].depends:
-                self.components[comp].add_depend(component_name, merged_cluster_config)
         return True
 
     def change_component_config_style(self, component_name, style):

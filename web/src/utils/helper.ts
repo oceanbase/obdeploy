@@ -33,7 +33,7 @@ export function getTailPath() {
  *
  * @param dataSource 需要格式化的源数据
  * @param isSelectOcpexpress 是否选中/包含ocpexpress组件
- * @returns
+ * 筛选需要展示到页面的参数
  */
 export const formatMoreConfig = (
   dataSource: API.ParameterMeta[],
@@ -44,7 +44,7 @@ export const formatMoreConfig = (
       ? componentVersionTypeToComponent[item.component]
       : item.component;
     const componentConfig = componentsConfig[component];
-    // filter out existing parameters
+    
     let configParameter = item?.config_parameters.filter((parameter) => {
       let configKeys = { ...showConfigKeys };
       if (!isSelectOcpexpress) {
@@ -57,6 +57,7 @@ export const formatMoreConfig = (
         parameter.name,
       );
     });
+    
     const newConfigParameter: API.NewConfigParameter[] = configParameter.map(
       (parameterItem) => {
         let parameterValue: any;
@@ -68,6 +69,7 @@ export const formatMoreConfig = (
           auto: parameterItem.auto,
           require: parameterItem.require,
           isChanged: parameterItem.is_changed,
+          unitDisable: parameterItem.unitDisable
         };
         if (
           parameterItem.type === 'CapacityMB' ||

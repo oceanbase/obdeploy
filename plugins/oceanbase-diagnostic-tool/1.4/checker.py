@@ -42,7 +42,7 @@ def checker(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
+        command = r"{install_dir}/obdiag".format(install_dir=obdiag_install_dir)
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():

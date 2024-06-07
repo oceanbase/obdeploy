@@ -146,7 +146,7 @@ prometheus:
     #   - job_name: node
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: '******'
     #     metrics_path: /metrics/node/host
     #     scheme: http
     #     file_sd_configs:  # Set the targets to be collected by reading local files. The example is to collect targets corresponding to all yaml files in the 'targets' directory under $home_path.
@@ -155,7 +155,7 @@ prometheus:
     #   - job_name: ob_basic
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: '******'
     #     metrics_path: /metrics/ob/basic
     #     scheme: http
     #     file_sd_configs:
@@ -164,7 +164,7 @@ prometheus:
     #   - job_name: ob_extra
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: '******'
     #     metrics_path: /metrics/ob/extra
     #     scheme: http
     #     file_sd_configs:
@@ -173,7 +173,7 @@ prometheus:
     #   - job_name: agent
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: '******'
     #     metrics_path: /metrics/stat
     #     scheme: http
     #     file_sd_configs:
@@ -188,7 +188,7 @@ grafana:
     - prometheus
   global:
     home_path: /root/grafana
-    login_password: xxxxxxxxx # Grafana login password.
+    login_password: '******' # Grafana login password.
     # data_dir: # Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used).$data_dir can be empty. The default value is $home_path/data.
     # logs_dir: # Directory where grafana can store logs, can be empty. The default value is $data_dir/log.
     # plugins_dir: # Directory where grafana will automatically scan and look for plugins, can be empty. The default value is $data_dir/plugins.

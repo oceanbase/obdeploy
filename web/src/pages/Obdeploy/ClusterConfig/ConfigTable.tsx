@@ -11,7 +11,7 @@ const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 export type RulesDetail = {
-  targetTable?: 'oceanbase-ce' | 'obproxy-ce' | 'ocp-express' | 'obagent';
+  targetTable?: 'oceanbase-ce' | 'obproxy-ce' | 'ocp-express' | 'obagent' | 'ob-configserver';
   rules: any;
   targetColumn?: string;
 };
@@ -42,7 +42,7 @@ export const parameterValidator = (_: any, value?: API.ParameterValue) => {
 const getMoreColumns = (
   label: string,
   componentKey: string,
-  rulesDetail?: RulesDetail,
+  rulesList?: RulesDetail[],
 ) => {
   const columns: ColumnsType<API.NewConfigParameter> = [
     {
@@ -60,21 +60,23 @@ const getMoreColumns = (
       dataIndex: 'parameterValue',
       render: (parameterValue, record) => {
         const { defaultValue, defaultUnit } = record.parameterValue;
+        let rules = [() => ({ validator: parameterValidator })];
         const param = {
           defaultValue,
         };
         if (defaultUnit) param.defaultUnit = defaultUnit;
-
+        if (rulesList?.length) {
+          const targetRuleDetail = rulesList.find(
+            (item) => item.targetColumn === record.name,
+          );
+          if (targetRuleDetail) rules = targetRuleDetail.rules;
+        }
         return (
           <Form.Item
             validateFirst={true}
             className={styles.inlineFormItem}
             name={[componentKey, 'parameters', record.name || '', 'params']}
-            rules={
-              rulesDetail && rulesDetail.targetColumn === record.name
-                ? rulesDetail.rules
-                : [() => ({ validator: parameterValidator })]
-            }
+            rules={rules}
           >
             <Parameter {...param} />
           </Form.Item>
@@ -112,8 +114,9 @@ const getMoreColumns = (
 };
 /**
  *
- * @param parameterRules 用于动态自定义某些字段的校验规则 RulesDetail | RulesDetail[] 涉及到多个table需要传数组，rule需要通过targetTable字段映射到对应的table
- * @returns
+ * @param parameterRules 
+ * 用于动态自定义某些字段的校验规则 RulesDetail | RulesDetail[] 
+ * 涉及到多个table需要传数组，rule需要通过targetTable字段映射到对应的table
  */
 export default function ConfigTable({
   showVisible,
@@ -131,18 +134,17 @@ export default function ConfigTable({
             size="middle"
             style={{ minHeight: 50, marginTop: 16 }}
           >
+            {/* moreItem表示某一个组件,如 obproxy、ocp-express */}
             {dataSource.map((moreItem) => {
-              let rulesDetail: RulesDetail = { rules: [] };
+              // 每一项表示组件中的某一个参数的rules
+              let rulesList:RulesDetail[] = [];
               if (parameterRules) {
                 if (Array.isArray(parameterRules)) {
-                  rulesDetail = parameterRules.find(
-                    (item) => item.targetTable === moreItem.component,
-                  )!;
+                  rulesList = parameterRules.filter((item)=>item.targetTable === moreItem.component)
                 } else {
-                  rulesDetail = parameterRules;
+                  rulesList.push(parameterRules);
                 }
               }
-
               return (
                 <ProCard
                   className={styles.infoSubCard}
@@ -155,7 +157,7 @@ export default function ConfigTable({
                     columns={getMoreColumns(
                       moreItem.label,
                       moreItem.componentKey,
-                      rulesDetail,
+                      rulesList,
                     )}
                     rowKey="name"
                     dataSource={moreItem.configParameter}

@@ -4,6 +4,7 @@ import { Space, InputNumber, Input, Select } from 'antd';
 import { getLocale } from 'umi';
 import { changeUnit, isTakeUnit, takeNewUnit } from '@/constant/unit';
 import { PARAMETER_TYPE } from '@/constant/configuration';
+import { CONFIGSERVER_LOG_LEVEL } from '@/pages/constants';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 
@@ -80,8 +81,9 @@ const AdaptiveInput = ({
   unit,
   setUnit,
 }: AdaptiveInputProps) => {
-  const { type } = parameterValue;
-  if (type === 'int' || type === 'Integer') {
+  const { type, value } = parameterValue;
+  
+  if (type === PARAMETER_TYPE.numberLogogram || type === PARAMETER_TYPE.number) {
     return (
       <InputNumber
         placeholder={intl.formatMessage({
@@ -94,11 +96,13 @@ const AdaptiveInput = ({
         disabled={parameterValue?.adaptive}
         onBlur={onBlur}
         onChange={(value) =>
-          value !== null && setParameterValue({ 
-            ...parameterValue, 
-            value, 
-            isChanged: true 
-          })
+          {
+            setParameterValue({ 
+              ...parameterValue, 
+              value, 
+              isChanged: true 
+            })
+          }
         }
         value={parameterValue.value}
       />
@@ -152,7 +156,7 @@ const AdaptiveInput = ({
                 }
               }}
               dropdownMatchSelectWidth={false}
-              disabled={parameterValue?.adaptive}
+              disabled={parameterValue?.adaptive || parameterValue?.unitDisable}
               style={{ width: 65 }}
             >
               {unitOption.map((option) => (
@@ -167,7 +171,7 @@ const AdaptiveInput = ({
     );
   }
 
-  if (type === 'Boolean') {
+  if (type === PARAMETER_TYPE.boolean) {
     return (
       <Select
         defaultValue={parameterValue?.value || 'False'}
@@ -190,6 +194,29 @@ const AdaptiveInput = ({
           </Select.Option>
         ))}
       </Select>
+    );
+  }
+
+  if(value && CONFIGSERVER_LOG_LEVEL.includes(value)){
+    return (
+      <Select
+        defaultValue={value}
+        style={{ width: 126 }}
+        onChange={(value) =>
+          setParameterValue({
+            ...parameterValue,
+            value,
+            isChanged: true,
+          })
+        }
+        value={parameterValue.value}
+        dropdownMatchSelectWidth={false}
+        disabled={parameterValue?.adaptive}
+        options={CONFIGSERVER_LOG_LEVEL.map((level) => ({
+          value: level,
+          label: level,
+        }))}
+      />
     );
   }
 

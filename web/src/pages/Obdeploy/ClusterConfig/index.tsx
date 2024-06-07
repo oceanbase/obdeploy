@@ -1,7 +1,7 @@
 import InputPort from '@/component/InputPort';
 import { PARAMETER_TYPE } from '@/constant/configuration';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import { getErrorInfo } from '@/utils';
+import { getErrorInfo, serverReg } from '@/utils';
 import {
   formatMoreConfig,
   generateRandomPassword,
@@ -20,7 +20,15 @@ import { useUpdateEffect } from 'ahooks';
 import { Form, message, Row, Space, Switch, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
 import { getLocale, useModel } from 'umi';
-import { commonStyle, onlyComponentsKeys, pathRule } from '../../constants';
+import {
+  commonStyle,
+  configServerComponent,
+  obagentComponent,
+  obproxyComponent,
+  ocpexpressComponent,
+  onlyComponentsKeys,
+  pathRule,
+} from '../../constants';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 import TooltipInput from '../TooltipInput';
@@ -66,7 +74,9 @@ export default function ClusterConfig() {
     ocpexpress = {},
     obproxy = {},
     obagent = {},
+    obconfigserver = {},
   } = components;
+
   const [form] = ProForm.useForm();
   const proxyPasswordFormValue = ProForm.useWatch(
     ['obproxy', 'parameters', 'obproxy_sys_password', 'params'],
@@ -74,6 +84,14 @@ export default function ClusterConfig() {
   );
   const authPasswordFormValue = ProForm.useWatch(
     ['obagent', 'parameters', 'http_basic_auth_password', 'params'],
+    form,
+  );
+  const configserverAddressFormValue = ProForm.useWatch(
+    ['obconfigserver', 'parameters', 'vip_address', 'params'],
+    form,
+  );
+  const configserverPortFormValue = ProForm.useWatch(
+    ['obconfigserver', 'parameters', 'vip_port', 'params'],
     form,
   );
   const [proxyParameterRules, setProxyParameterRules] = useState<RulesDetail>({
@@ -86,6 +104,18 @@ export default function ClusterConfig() {
     targetTable: 'obagent',
     targetColumn: 'http_basic_auth_password',
   });
+  const [configserverAddressRules, setConfigserverAddressRules] =
+    useState<RulesDetail>({
+      rules: [],
+      targetTable: 'ob-configserver',
+      targetColumn: 'vip_address',
+    });
+  const [configserverPortRules, setConfigserverPortRules] =
+    useState<RulesDetail>({
+      rules: [],
+      targetTable: 'ob-configserver',
+      targetColumn: 'vip_port',
+    });
   const [currentMode, setCurrentMode] = useState(
     oceanbase?.mode || 'PRODUCTION',
   );
@@ -113,25 +143,32 @@ export default function ClusterConfig() {
 
   const setData = (dataSource: FormValues) => {
     let newComponents: API.Components = { ...components };
-    if (selectedConfig.includes('obproxy')) {
+    if (selectedConfig.includes(obproxyComponent)) {
       newComponents.obproxy = {
         ...(components.obproxy || {}),
         ...dataSource.obproxy,
         parameters: formatParameters(dataSource.obproxy?.parameters),
       };
     }
-    if (selectedConfig.includes('ocp-express') && !lowVersion) {
+    if (selectedConfig.includes(ocpexpressComponent) && !lowVersion) {
       newComponents.ocpexpress = {
         ...(components.ocpexpress || {}),
         ...dataSource.ocpexpress,
         parameters: formatParameters(dataSource.ocpexpress?.parameters),
       };
     }
-    if (selectedConfig.includes('obagent')) {
+    if (selectedConfig.includes(obagentComponent)) {
       newComponents.obagent = {
         ...(components.obagent || {}),
         ...dataSource.obagent,
         parameters: formatParameters(dataSource.obagent?.parameters),
+      };
+    }
+    if (selectedConfig.includes(configServerComponent)) {
+      newComponents.obconfigserver = {
+        ...(components.obconfigserver || {}),
+        ...dataSource.obconfigserver,
+        parameters: formatParameters(dataSource.obconfigserver?.parameters),
       };
     }
     newComponents.oceanbase = {
@@ -202,7 +239,8 @@ export default function ClusterConfig() {
             auto: item.auto,
             require: item.require,
             type: item.type,
-            isChanged: item.is_changed
+            isChanged: item.is_changed,
+            unitDisable: item?.unitDisable,
           },
         };
         dataSource?.some((dataItem) => {
@@ -248,15 +286,15 @@ export default function ClusterConfig() {
       oceanbase,
       errorHandle,
     );
-    
+
     if (res?.success) {
       const { data } = res,
-        isSelectOcpexpress = selectedConfig.includes('ocp-express');
+        isSelectOcpexpress = selectedConfig.includes(ocpexpressComponent);
       const newClusterMoreConfig = formatMoreConfig(
         data?.items,
         isSelectOcpexpress,
       );
-      
+
       setClusterMoreConfig(newClusterMoreConfig);
       form.setFieldsValue({
         oceanbase: {
@@ -306,6 +344,13 @@ export default function ClusterConfig() {
             parameters: getInitialParameters(
               obagent?.component,
               obagent?.parameters,
+              newComponentsMoreConfig,
+            ),
+          },
+          obconfigserver: {
+            parameters: getInitialParameters(
+              obconfigserver?.component,
+              obconfigserver.parameters,
               newComponentsMoreConfig,
             ),
           },
@@ -385,6 +430,81 @@ export default function ClusterConfig() {
     }
   }, [authPasswordFormValue]);
 
+  useUpdateEffect(() => {
+    if (
+      !configserverAddressFormValue?.adaptive ||
+      !configserverPortFormValue?.adaptive
+    ) {
+      // ip和端口可以都为空或者都不为空
+      if (
+        configserverAddressFormValue?.value ||
+        configserverPortFormValue?.value
+      ) {
+        setConfigserverAddressRules({
+          rules: [
+            {
+              required: true,
+              message: intl.formatMessage({
+                id: 'OBD.Obdeploy.ClusterConfig.PleaseEnter',
+                defaultMessage: '请输入',
+              }),
+            },
+            () => ({
+              validator: (_: any, param?: API.ParameterValue) => {
+                if (serverReg.test(param?.value || '')) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(
+                  intl.formatMessage({
+                    id: 'OBD.Obdeploy.ClusterConfig.TheIpAddressFormatIs',
+                    defaultMessage: 'ip格式错误',
+                  }),
+                );
+              },
+            }),
+          ],
+
+          targetTable: 'ob-configserver',
+          targetColumn: 'vip_address',
+        });
+        setConfigserverPortRules({
+          rules: [
+            () => ({
+              validator: (_: any, param?: API.ParameterValue) => {
+                if (!param?.value) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.Obdeploy.ClusterConfig.PleaseEnter',
+                      defaultMessage: '请输入',
+                    }),
+                  );
+                }
+                return Promise.resolve();
+              },
+            }),
+          ],
+          targetTable: 'ob-configserver',
+          targetColumn: 'vip_port',
+        });
+      } else {
+        setConfigserverAddressRules({
+          rules: [],
+          targetTable: 'ob-configserver',
+          targetColumn: 'vip_address',
+        });
+        setConfigserverPortRules({
+          rules: [],
+          targetTable: 'ob-configserver',
+          targetColumn: 'vip_port',
+        });
+        form.validateFields([
+          ['obconfigserver', 'parameters', 'vip_address', 'params'],
+          ['obconfigserver', 'parameters', 'vip_port', 'params'],
+        ]);
+      }
+    }
+  }, [configserverAddressFormValue, configserverPortFormValue]);
+
   const initPassword = generateRandomPassword('ob');
 
   const initialValues = {
@@ -416,6 +536,14 @@ export default function ClusterConfig() {
       parameters: getInitialParameters(
         obagent?.component,
         obagent?.parameters,
+        componentsMoreConfig,
+      ),
+    },
+    obconfigserver: {
+      listen_port: obconfigserver?.listen_port || 8080,
+      parameters: getInitialParameters(
+        obconfigserver?.component,
+        obconfigserver?.parameters,
         componentsMoreConfig,
       ),
     },
@@ -475,6 +603,7 @@ export default function ClusterConfig() {
                 },
               ]}
             />
+
             <a
               className={styles.viewRule}
               href={MODE_CONFIG_RULE}
@@ -561,6 +690,7 @@ export default function ClusterConfig() {
                   })}
                   fieldProps={{ style: commonStyle }}
                 />
+
                 <InputPort
                   name={['oceanbase', 'rpc_port']}
                   label={intl.formatMessage({
@@ -600,7 +730,7 @@ export default function ClusterConfig() {
               })}
               className="card-padding-bottom-24"
             >
-              {selectedConfig.includes('obproxy') && (
+              {selectedConfig.includes(obproxyComponent) && (
                 <Row>
                   <Space size="middle">
                     <InputPort
@@ -611,6 +741,7 @@ export default function ClusterConfig() {
                       })}
                       fieldProps={{ style: commonStyle }}
                     />
+
                     <InputPort
                       name={['obproxy', 'prometheus_listen_port']}
                       label={
@@ -636,7 +767,8 @@ export default function ClusterConfig() {
                   </Space>
                 </Row>
               )}
-              {selectedConfig.includes('obagent') && (
+
+              {selectedConfig.includes(obagentComponent) && (
                 <Row>
                   <Space size="middle">
                     <InputPort
@@ -647,6 +779,7 @@ export default function ClusterConfig() {
                       })}
                       fieldProps={{ style: commonStyle }}
                     />
+
                     <InputPort
                       name={['obagent', 'mgragent_http_port']}
                       label={intl.formatMessage({
@@ -658,18 +791,37 @@ export default function ClusterConfig() {
                   </Space>
                 </Row>
               )}
-              {selectedConfig.includes('ocp-express') && !lowVersion && (
-                <Row>
-                  <InputPort
-                    name={['ocpexpress', 'port']}
-                    label={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.PortOcpExpress',
-                      defaultMessage: 'OCP Express 端口',
-                    })}
-                    fieldProps={{ style: commonStyle }}
-                  />
-                </Row>
-              )}
+
+              {(selectedConfig.includes(ocpexpressComponent) ||
+                selectedConfig.includes(configServerComponent)) &&
+                !lowVersion && (
+                  <Row>
+                    <Space size="middle">
+                      {selectedConfig.includes(ocpexpressComponent) && (
+                        <InputPort
+                          name={['ocpexpress', 'port']}
+                          label={intl.formatMessage({
+                            id: 'OBD.pages.components.ClusterConfig.PortOcpExpress',
+                            defaultMessage: 'OCP Express 端口',
+                          })}
+                          fieldProps={{ style: commonStyle }}
+                        />
+                      )}
+
+                      {selectedConfig.includes(configServerComponent) && (
+                        <InputPort
+                          name={['obconfigserver', 'listen_port']}
+                          label={intl.formatMessage({
+                            id: 'OBD.Obdeploy.ClusterConfig.ObconfigserverServicePort',
+                            defaultMessage: 'OBConfigserver 服务端口',
+                          })}
+                          fieldProps={{ style: commonStyle }}
+                        />
+                      )}
+                    </Space>
+                  </Row>
+                )}
+
               <div className={styles.moreSwitch}>
                 {intl.formatMessage({
                   id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
@@ -687,7 +839,12 @@ export default function ClusterConfig() {
                 dataSource={componentsMoreConfig}
                 loading={componentsMoreLoading}
                 customParameter={<Parameter />}
-                parameterRules={[proxyParameterRules, authParameterRules]}
+                parameterRules={[
+                  proxyParameterRules,
+                  authParameterRules,
+                  configserverAddressRules,
+                  configserverPortRules,
+                ]}
               />
             </ProCard>
           </ProCard>

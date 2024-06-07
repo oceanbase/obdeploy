@@ -306,8 +306,16 @@ class OcsCursor(SafeStdio):
 
     def _make_url(self, url):
         return 'http://{ip}:{port}{url}'.format(ip=self.ip, port=self.port, url=url)
+    
+    # put new password to obshell
+    def update_password(self, password):
+        self.password = password
+        self._auth_header = None
+        # Invoke any API that requires the `safe_request` method to securely update passwords.
+        self.pkg_upload_request()
+        return
 
-    def _request(self, method, url, data=None, headers=None, params=None, safe=None, *args, **kwargs):
+    def _request(self, method, url, data=None, headers=None, params=None, safe=None, ignore_ConnectionError=False, *args, **kwargs):
         try: 
             if data is not None:
                 data = json.dumps(data)
@@ -318,6 +326,9 @@ class OcsCursor(SafeStdio):
             self.stdio.verbose('send request to obshell: method: {}, url: {}, data: {}, headers: {}, params: {}'.format(method, url, data, headers, params))
             resp = requests.request(method, self._make_url(url), data=data, headers=self._make_headers(headers, safe, url), params=params, *args, **kwargs)
         except Exception as e:
+            if ignore_ConnectionError and isinstance(e, requests.exceptions.ConnectionError):
+                self.stdio.verbose('Attempt to connect failed：{}'.format(self._make_url(url)))
+                return None
             self.stdio.error('request error: {}'.format(e))
             return None
         parsed_resp = self._response_parser(resp)
@@ -366,8 +377,8 @@ class OcsCursor(SafeStdio):
         resp = self._request('GET', '/api/v1/secret')
         return resp.public_key if resp else None
     
-    def request(self, method, url, data=None, headers=None, params=None, *args, **kwargs):
-        return self._request(method, url, data, headers, params, *args, **kwargs)
+    def request(self, method, url, data=None, headers=None, params=None, ignore_ConnectionError=False, *args, **kwargs):
+        return self._request(method, url, data, headers, params, ignore_ConnectionError=ignore_ConnectionError, *args, **kwargs)
     
     def safe_request(self, method, url, data=None, headers=None, params=None, *args, **kwargs):
         return self._request(method, url, data, headers, params, safe=True, *args, **kwargs)
@@ -397,8 +408,8 @@ class OcsCursor(SafeStdio):
         resp = self.request('GET', '/api/v1/info')
         return resp.info if resp and resp.type == 'InfoDTO' else None
 
-    def status_request(self):
-        resp = self.request('GET', '/api/v1/status')
+    def status_request(self, ignore_ConnectionError=False):
+        resp = self.request('GET', '/api/v1/status', ignore_ConnectionError=ignore_ConnectionError)
         return resp.status if resp and resp.type == 'StatusDTO' else None
 
     def secret_request(self):
@@ -459,7 +470,7 @@ class OcsCursor(SafeStdio):
 
     # upgrade routes
     def pkg_upload_request(self, data = None):
-        return self.safe_request('POST', '/api/v1/upgrade/pkg/upload', data=data)
+        return self.safe_request('POST', '/api/v1/upgrade/package', data=data)
 
     def params_backup_request(self, data = None):
         return self.safe_request('POST', '/api/v1/upgrade/params/backup', data=data)

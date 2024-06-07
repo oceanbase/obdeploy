@@ -406,8 +406,9 @@ export default function InstallProcess() {
                   })}
                 </>,
               ],
-              onCopy: () =>
-                handleCopy(JSON.stringify(connectInfo?.items, null, '\n')),
+              onCopy: () =>{
+                handleCopy(JSON.stringify(connectInfo.items, null, 4) || '')
+              },
             }}
           />
         </div>
@@ -489,7 +490,7 @@ export default function InstallProcess() {
               <Button
                 type="primary"
                 onClick={() =>
-                  handleCopy(JSON.stringify(connectInfo?.items, null, '\n'))
+                  handleCopy(JSON.stringify(connectInfo?.items, null, 4) || '')
                 }
                 data-aspm-click="c307514.d317299"
                 data-aspm-desc={intl.formatMessage({

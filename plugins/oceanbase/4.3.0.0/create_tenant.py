@@ -31,7 +31,7 @@ from _types import Capacity
 tenant_cursor_cache = defaultdict(dict)
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[]):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     # find tenant ip, port
@@ -52,8 +52,8 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
                 break
     if not tenant_cursor and retries:
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args)
-    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose') if tenant_cursor else False
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
+    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
 
 
 def dump_standby_relation(relation_tenants, cluster_configs, dump_relation_tenants, stdio):
@@ -345,7 +345,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
             if log_disk_size is not None:
                 sql += ', log_disk_size %d' % log_disk_size
 
-            res = cursor.execute(sql)
+            res = cursor.execute(sql, stdio=stdio)
             if res is False:
                 error()
                 return
@@ -353,7 +353,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
             # create resource pool
             sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
             try:
-                cursor.execute(sql, raise_exception=True)
+                cursor.execute(sql, raise_exception=True, stdio=stdio)
             except Exception as e:
                 stdio.exception('create resource pool failed, you can try again by using SQL "drop resource pool {}" to delete the resource pool, if you are certain that the resource pool is not being used. error info: {}'.format(pool_name, e))
                 return
@@ -380,7 +380,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
                 else:
                     sql += "set %s" % set_mode
                 try:
-                    cursor.execute(sql, raise_exception=True)
+                    cursor.execute(sql, raise_exception=True, stdio=stdio)
                 except Exception as e:
                     stdio.exception('Create error, error info:{}'.format(e))
                     return
@@ -389,13 +389,13 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
                 if root_password:
                     sql = "alter user root IDENTIFIED BY %s"
                     stdio.verbose(sql)
-                    if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[root_password]) and not create_if_not_exists:
+                    if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[root_password], stdio=stdio) and not create_if_not_exists:
                         stdio.error('failed to set root@{} password {}'.format(name))
                         return
                 database = get_option('database')
                 if database:
                     sql = 'create database {}'.format(database)
-                    if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '') and not create_if_not_exists:
+                    if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '', stdio=stdio) and not create_if_not_exists:
                         stdio.error('failed to create database {}'.format(database))
                         return
 
@@ -408,10 +408,10 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
                             username=db_username)
                     else:
                         error("Create user in oracle tenant is not supported")
-                    if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[db_password]):
+                    if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[db_password], stdio=stdio):
                         stdio.error('failed to create user {}'.format(db_username))
                         return
-                exec_sql_in_tenant(sql='show databases;', cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
+                exec_sql_in_tenant(sql='show databases;', cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '', stdio=stdio)
                 cursors.append(tenant_cursor)
             else:
                 # create standby tenant
@@ -427,7 +427,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
                     sql += ", locality = '%s'" % locality
 
                 try:
-                    cursor.execute(sql, raise_exception=True, exc_level='verbose')
+                    cursor.execute(sql, raise_exception=True, exc_level='verbose', stdio=stdio)
                 except Exception as e:
                     stdio.verbose('create standby tenant fail, clean and retry.  fail message:{}'.format(e))
                     # clean and retry create standby tenant
@@ -438,7 +438,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
                     if res:
                         # drop tenant
                         tenant_id = res['TENANT_ID']
-                        res = cursor.execute("drop tenant %s FORCE" % name, raise_exception=False)
+                        res = cursor.execute("drop tenant %s FORCE" % name, raise_exception=False, stdio=stdio)
                         if res is False:
                             error('Create standby tenant fail. message:{}'.format(e))
                             return
@@ -461,7 +461,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
 
                     # create again
                     try:
-                        cursor.execute(sql, raise_exception=True)
+                        cursor.execute(sql, raise_exception=True, stdio=stdio)
                     except Exception as e:
                         retry_message = 'After resolving this issue, you can clean up the environment by manually executing "obd cluster tenant drop {} -t {}", and then wait for a while before re-creating the standby tenant.'.format(standby_deploy_name, name)
                         error("create standby tenant failed, error: {}".format(e))

@@ -278,7 +278,7 @@
   require: true
   type: DICT
   default:
-    tenant_name: meta_tenant
+    tenant_name: ocp_meta
     max_cpu: 1
     memory_size: 2147483648
   need_redeploy: true
@@ -288,7 +288,7 @@
   require: false
   type: DICT
   default:
-    tenant_name: monitor_tenant
+    tenant_name: ocp_monitor
     max_cpu: 1
     memory_size: 2147483648
   need_redeploy: true
@@ -329,14 +329,14 @@
 - name: ocp_meta_db
   require: false
   type: SAFE_STRING
-  default: meta_database
+  default: ocp_meta
   need_redeploy: true
   description_en: The database name for ocp meta db
   description_local: ocp server的元数据库使用的数据库名
 - name: ocp_monitor_username
   require: false
   type: OB_USER
-  default: monitor_user
+  default: monitor
   need_restart: true
   description_en: The username for obagent monitor user
   description_local: obagent 监控用户的用户名
@@ -350,7 +350,7 @@
 - name: ocp_monitor_db
   require: false
   type: SAFE_STRING
-  default: monitor_database
+  default: ocp_monitor
   need_redeploy: true
   description_en: The database name for ocp meta db
   description_local: ocp server的监控数据库使用的数据库名

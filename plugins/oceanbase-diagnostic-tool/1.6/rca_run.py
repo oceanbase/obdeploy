@@ -33,11 +33,11 @@ def rca_run(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
+        command = r"{install_dir}/obdiag".format(install_dir=obdiag_install_dir)
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
-        base_commond=r"cd {install_dir} && ./obdiag rca run --scene={scene}".format(install_dir=obdiag_install_dir, scene=scene_option)
+        base_commond=r"{install_dir}/obdiag rca run --scene={scene}".format(install_dir=obdiag_install_dir, scene=scene_option)
         cmd = r"{base}".format(
             base=base_commond,
         )
@@ -60,7 +60,7 @@ def rca_run(plugin_context, *args, **kwargs):
     if not scene_option:
         stdio.error("failed get --scene option, example: obd obdiag rca run {0} --scene <scene_name> ".format(plugin_context.deploy_name))
         return plugin_context.return_false() 
-    parameters_option = get_option('parameters')
+    parameters_option = get_option('input_parameters')
     store_dir_option = os.path.abspath(get_option('store_dir'))
 
     ret = local_execute_command('%s --help' % obdiag_bin)

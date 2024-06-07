@@ -24,16 +24,11 @@ import copy
 import os
 import re
 import time
-from glob import glob
 from copy import deepcopy
-from const import CONST_OBD_HOME
-from optparse import Values
 
 from tool import Cursor
 from _types import Capacity, CapacityWithB
 
-
-OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
 
 PRI_KEY_FILE = '.ocp-server'
 PUB_KEY_FILE = '.ocp-server.pub'
@@ -313,6 +308,8 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
                     cmd += ' --with-property=ocp.site.url:{}'.format(site_url)
                 # set connection mode to direct to avoid obclient issue
                 cmd += ' --with-property=obsdk.ob.connection.mode:direct'
+                cmd += ' --with-property=ocp.iam.login.client.max-attempts:60'
+                cmd += ' --with-property=ocp.iam.login.client.lockout-minutes:1'
             if server_config['admin_password'] != '********':
                 admin_password = server_config['admin_password'].replace("'", """'"'"'""")
                 environ_variable += "export OCP_INITIAL_ADMIN_PASSWORD=\'%s\';" % admin_password
@@ -350,7 +347,7 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
         stdio.start_loading("%s program health check" % cluster_config.name)
         failed = []
         servers = server_pid.keys()
-        count = 40
+        count = 120
         while servers and count:
             count -= 1
             tmp_servers = []
@@ -463,7 +460,6 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
     if not start_cluster(1):
         stdio.error('start %s failed' % cluster_config.name)
         return plugin_context.return_false()
-    time.sleep(20)
     plugin_context.set_variable('start_env', start_env)
 
     return plugin_context.return_true(need_bootstrap=True)

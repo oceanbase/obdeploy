@@ -2,6 +2,9 @@ test:
   system_config:
   - name: enable_sql_audit
     value: false
+  - name: sleep
+    value: 5
+    optimizer: sleep
   - name: syslog_level
     value: PERF
   - name: enable_perf_event

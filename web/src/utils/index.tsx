@@ -269,6 +269,15 @@ export const serversValidator = (_: any, value: string[], type: string) => {
         }),
       ),
     );
+  } else if (type === 'OBConfigServer') {
+    return Promise.reject(
+      new Error(
+        intl.formatMessage({
+          id: 'OBD.src.utils.SelectTheCorrectObconfigserverNode',
+          defaultMessage: '请选择正确的 OBConfigServer 节点',
+        }),
+      ),
+    );
   } else {
     return Promise.reject(
       new Error(
@@ -283,8 +292,7 @@ export const serversValidator = (_: any, value: string[], type: string) => {
 
 export function generateRandomPassword() {
   const length = Math.floor(Math.random() * 25) + 8; // 生成8到32之间的随机长度
-  const characters =
-    `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789${SPECIAL_SYMBOLS_OCP}`; // 可用字符集合
+  const characters = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789${SPECIAL_SYMBOLS_OCP}`; // 可用字符集合
 
   let password = '';
   let countUppercase = 0; // 大写字母计数器

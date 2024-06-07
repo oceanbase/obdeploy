@@ -133,9 +133,19 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Fri Apr 19 2024 obd 2.9.0
+ - new features: support for graphical deployment of ConfigServer
+ - new features: supports custom production_mode, scenario configuration in graphical deployment of OceanBase
+ - new features: supports OCP, ConfigServer and Logproxy component changes
+ - new features: supports scenario-based optimization when creating a tenant
+ - new features: supports package cleanup
+ - new features: adapt to obdiag V2.1.0
+ - enhancements: optimize the pre-checking tenant resources when deploying OCP and OCP-Express
+ - bug fixes: fixed an issue where the custom run user was not effective when deploying OCP
+ - bug fixes: fixed an issue where incomplete installation package downloads were not re-downloaded during a second deployment
+ - bug fixes: fixed an issue where validation failed during takeover in specific scenarios
 * Fri Apr 19 2024 obd 2.8.0
  - new features: supports takeover of OceanBase_CE clusters
- - new features: supports custom production_mode configuration in web
  - bug fixes: fixed an issue where clicking the previous step after a blank screen deployment of OCP fails does not work as expected
  - bug fixes: fixed an issue ith failing to upgrade certain versions of OceanBase
 * Thu Mar 28 2024 obd 2.7.0

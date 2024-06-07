@@ -14,9 +14,15 @@ import { getLocale, useModel } from 'umi';
 import {
   allComponentsKeys,
   componentsConfig,
+  oceanbaseComponent,
+  obagentComponent,
+  configServerComponent,
+  ocpexpressComponentKey,
+  configServerComponentKey,
   modeConfig,
   obproxyComponent,
   onlyComponentsKeys,
+  componentVersionTypeToComponent,
 } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
@@ -29,6 +35,67 @@ interface ComponentsNodeConfig {
   key: string;
   isTooltip: boolean;
 }
+
+const obVersionCheck = (version: string) => {
+  const versionArr = version.split('.');
+  if (
+    (Number(versionArr[0]) === 4 && Number(versionArr[1]) >= 3) ||
+    Number(versionArr[0]) > 4
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const formatConfigData = (configData: API.DeploymentConfig) => {
+  const _configData = _.cloneDeep(configData);
+  Object.keys(_configData.components).forEach((key) => {
+    for (let i = 0; i < _configData.components[key].parameters.length; i++) {
+      const parameter = _configData.components[key].parameters[i];
+      // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
+      if (
+        (!parameter.adaptive && !isExist(parameter.value)) ||
+        parameter.adaptive ||
+        !parameter.isChanged
+      ) {
+        _configData.components[key].parameters?.splice(i--, 1);
+      }
+      if (parameter.key === 'ocp_meta_tenant_memory_size') {
+        parameter.value = changeParameterUnit(parameter).value;
+      }
+      delete parameter.isChanged;
+    }
+    if (key === configServerComponentKey) {
+      _configData.components[key]?.parameters?.forEach((parameter) => {
+        if (parameter.key === 'log_maxsize') {
+          parameter.type = 'Integer';
+          parameter.value = Number(parameter.value.split('MB')[0]);
+        }
+      });
+    }
+  });
+
+  // 前端硬编码 添加scenario参数
+  const scenario = {
+    adaptive: false,
+    auto: false,
+    description: '业务场景：如 htap, express_oltp, complex_oltp, olap, kv.',
+    key: 'scenario',
+    require: true,
+    type: 'String',
+    unitDisable: undefined,
+    value: 'htap',
+  };
+  const { parameters = [], version } = _configData.components.oceanbase;
+  if (
+    obVersionCheck(version) &&
+    (!parameters.length ||
+      !parameters.some((parameter) => parameter.key === 'scenario'))
+  ) {
+    _configData.components.oceanbase.parameters = [scenario, ...parameters];
+  }
+  return _configData;
+};
 
 export default function CheckInfo() {
   const {
@@ -48,9 +115,8 @@ export default function CheckInfo() {
     obproxy = {},
     ocpexpress = {},
     obagent = {},
+    obconfigserver = {},
   } = components;
-  const [showPwd, setShowPwd] = useState(false);
-
   const { run: handleCreateConfig, loading } = useRequest(
     createDeploymentConfig,
     {
@@ -66,25 +132,6 @@ export default function CheckInfo() {
       },
     },
   );
-
-  const formatConfigData = (configData: API.DeploymentConfig) => {
-    const _configData = _.cloneDeep(configData);
-    
-    Object.keys(_configData.components).forEach((key)=>{
-      for(let i = 0;i<_configData.components[key].parameters.length;i++){
-        const parameter = _configData.components[key].parameters[i]
-        if((!parameter.adaptive && !isExist(parameter.value)) || parameter.adaptive || !parameter.isChanged){
-          _configData.components[key].parameters?.splice(i--,1);
-        }
-        if(parameter.key === "ocp_meta_tenant_memory_size"){
-          parameter.value = changeParameterUnit(parameter).value
-        }
-        delete parameter.isChanged;
-      }
-    })
-    
-    return _configData;
-  };
 
   const prevStep = () => {
     setCurrentStep(3);
@@ -115,15 +162,12 @@ export default function CheckInfo() {
 
   const getComponentsNodeConfigList = () => {
     const componentsNodeConfigList: ComponentsNodeConfig[] = [];
-    //todo:待优化
-    let _selectedConfig = [...selectedConfig];
-    _selectedConfig.forEach((item, idx) => {
-      if (item === 'ocp-express') {
-        _selectedConfig[idx] = 'ocpexpress';
-      }
-    });
+    const tempSelectedConfig = selectedConfig.map(
+      (item) => componentVersionTypeToComponent[item] || item,
+    );
+
     let currentOnlyComponentsKeys = onlyComponentsKeys.filter(
-      (key) => key !== 'obagent' && _selectedConfig.includes(key),
+      (key) => key !== 'obagent' && tempSelectedConfig.includes(key),
     );
 
     if (lowVersion) {
@@ -294,7 +338,7 @@ export default function CheckInfo() {
       more: oceanbase?.parameters?.length
         ? [
             {
-              label: componentsConfig['oceanbase'].labelName,
+              label: componentsConfig[oceanbaseComponent].labelName,
               parameters: oceanbase?.parameters,
             },
           ]
@@ -305,7 +349,7 @@ export default function CheckInfo() {
   if (selectedConfig.length) {
     let content: any[] = [],
       more: any = [];
-    if (selectedConfig.includes('obproxy')) {
+    if (selectedConfig.includes(obproxyComponent)) {
       content = content.concat(
         {
           label: intl.formatMessage({
@@ -324,12 +368,12 @@ export default function CheckInfo() {
       );
       obproxy?.parameters?.length &&
         more.push({
-          label: componentsConfig['obproxy'].labelName,
+          label: componentsConfig[obproxyComponent].labelName,
           parameters: obproxy?.parameters,
         });
     }
 
-    if (selectedConfig.includes('obagent')) {
+    if (selectedConfig.includes(obagentComponent)) {
       content = content.concat(
         {
           label: intl.formatMessage({
@@ -348,7 +392,7 @@ export default function CheckInfo() {
       );
       obagent?.parameters?.length &&
         more.push({
-          label: componentsConfig['obagent'].labelName,
+          label: componentsConfig[obagentComponent].labelName,
           parameters: obagent?.parameters,
         });
     }
@@ -363,11 +407,25 @@ export default function CheckInfo() {
       });
       ocpexpress?.parameters?.length &&
         more.push({
-          label: componentsConfig['ocpexpress'].labelName,
+          label: componentsConfig[ocpexpressComponentKey].labelName,
           parameters: ocpexpress?.parameters,
         });
     }
 
+    if (selectedConfig.includes(configServerComponent)) {
+      content = content.concat({
+        label: intl.formatMessage({
+          id: 'OBD.pages.Obdeploy.CheckInfo.ObconfigserverServicePort',
+          defaultMessage: 'OBConfigServer 服务端口',
+        }),
+        value: obconfigserver?.listen_port,
+      });
+      obconfigserver?.parameters?.length &&
+        more.push({
+          label: componentsConfig[configServerComponentKey].labelName,
+          parameters: obconfigserver?.parameters,
+        });
+    }
     clusterConfigInfo.push({
       key: 'components',
       group: intl.formatMessage({

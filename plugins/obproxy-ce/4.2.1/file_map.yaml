@@ -1,0 +1,7 @@
+- src_path: ./home/admin/obproxy-$version/bin/obproxy
+  target_path: bin/obproxy
+  type: bin
+  mode: 755
+- src_path: ./home/admin/obproxy-$version/lib
+  target_path: lib
+  type: dir

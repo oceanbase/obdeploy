@@ -165,6 +165,7 @@ def start_check(plugin_context, init_check_status=False,  work_dir_check=False, 
             'port': err.CheckStatus(),
             'parameter': err.CheckStatus(),
             'database': err.CheckStatus(),
+            'vip': err.CheckStatus(),
         }
         if work_dir_check:
             check_status[server]['dir'] = err.CheckStatus()
@@ -173,6 +174,11 @@ def start_check(plugin_context, init_check_status=False,  work_dir_check=False, 
         return plugin_context.return_true(start_check_status=check_status)
 
     stdio.start_loading('Check before start ob-configserver')
+
+    global_config = cluster_config.get_global_conf()
+    if len(cluster_config.servers) > 1 and (not global_config.get('vip_address') or not global_config.get('vip_port')):
+        critical('vip', err.EC_OBC_MULTIPLE_SERVER_VIP_EMPTY_ERROR.format())
+
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf_with_default(server)
         home_path = server_config['home_path']

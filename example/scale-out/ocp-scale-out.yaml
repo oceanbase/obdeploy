@@ -1,0 +1,10 @@
+ocp-server-ce:
+  servers:
+  - name: server2
+    # Please don't use hostname, only IP can be supported
+    ip: 192.168.1.3
+  server2:
+    home_path: /root/ocp
+#    soft_dir: /home/root/software # Directory used to store packages
+#    log_dir: /home/root/logs # Directory used to temporary store downloaded logs
+#    port: 8080

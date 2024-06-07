@@ -929,5 +929,16 @@
   "OBD.component.PreCheck.preCheck.NextStep": "下一步",
   "OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet": "密码需满足：{OCPPASSWORDERROR}",
   "OBD.src.utils.helper.ItIsToCharactersIn": "长度为 8~32 个字符，支持字母、数字和特殊字符，且至少包含大、小写字母、数字和特殊字符各 2 个，支持的特殊字符为~^*{}[]_-+",
-  "OBD.src.utils.helper.TheLengthIsToAnd.3": "长度8~32  且至少包含 大写字母、小写字母、数字和特殊字符 ~^*{}[]_-+ 中的三种"
+  "OBD.src.utils.helper.TheLengthIsToAnd.3": "长度8~32  且至少包含 大写字母、小写字母、数字和特殊字符 ~^*{}[]_-+ 中的三种",
+  "OBD.pages.Obdeploy.CheckInfo.ObconfigserverServicePort": "OBConfigServer 服务端口",
+  "OBD.Obdeploy.ClusterConfig.TheIpAddressFormatIs": "ip格式错误",
+  "OBD.Obdeploy.ClusterConfig.ObconfigserverServicePort": "OBConfigserver 服务端口",
+  "OBD.pages.Obdeploy.InstallConfig.OceanbaseConfigserverCanProvideOceanbase": "OceanBase Configserver 可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。",
+  "OBD.pages.Obdeploy.NodeConfig.SelectTheCorrectComponenttextmapcomponentNode": "请选择正确的{{componentTextMapComponent}}节点",
+  "OBD.pages.Obdeploy.NodeConfig.ObconfigserverNodes": "OBConfigServer节点",
+  "OBD.pages.Obdeploy.NodeConfig.SelectOrEnterObConfigserver": "请选择或输入 OB ConfigServer 节点",
+  "OBD.pages.constants.ObConfigserverParameterName": "OB ConfigServer 参数名称",
+  "OBD.Obdeploy.ClusterConfig.PleaseEnter": "请输入",
+  "OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration": "是一个可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。",
+  "OBD.src.utils.SelectTheCorrectObconfigserverNode": "请选择正确的 OBConfigServer 节点"
 }

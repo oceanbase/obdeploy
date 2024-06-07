@@ -1803,6 +1803,8 @@
   description_en: 'the number of RDMA I/O threads for Libreasy. Range: [0, 8] in integer, 0 stands for RDMA being disabled.'
   description_local: Libreasy 的 RDMA I/O 线程数。
 - name: production_mode
+  name_local: 生产模式开关
+  essential: true
   require: true
   type: BOOL
   default: true
