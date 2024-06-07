@@ -64,6 +64,9 @@ export function getDocs(getLocale) {
   const OBPROXY_DOCS =
     getLocale() === 'zh-CN' ? OBPROXY_DOCS_CN : OBPROXY_DOCS_EN;
 
+  const OBCONFIGSERVER_DOCS =
+    'https://github.com/oceanbase/oceanbase/tree/master/tools/ob-configserver';
+
   //模式配置规则
   const MODE_CONFIG_RULE_CN =
     'https://www.oceanbase.com/docs/community-obd-cn-1000000000634883';
@@ -113,5 +116,6 @@ export function getDocs(getLocale) {
     DOCS_PRODUCTION,
     DOCS_SOP,
     RELEASE_RECORD,
+    OBCONFIGSERVER_DOCS,
   };
 }

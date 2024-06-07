@@ -1,0 +1,9 @@
+oblogproxy:
+  depends:
+    - oceanbase-ce
+  servers:
+    - 192.168.1.1
+  version: 2.0.0
+  global:
+    home_path: /root/oblogproxy
+    service_port: 2983   # External port. The default value is 2983.

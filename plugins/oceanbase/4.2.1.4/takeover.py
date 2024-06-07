@@ -138,12 +138,13 @@ def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwar
                 return error('Server %s:%s version is not match' % (server['ip'], server['mysql_port']))
 
         home_path = server['home_path']
-        for client in clients.values():
-            owner = client.execute_command("ls -ld %s/etc | awk '{print $3}'" % home_path).stdout.strip()
-            if owner != client.config.username:
-                return error('Server {}:{} owner is not match. The SSH user for takeover does not match the owner that OceanBase is running under, SSH user: {}, expected: {}.'.format(server['ip'], server['mysql_port'], ssh_user, owner))
-            bin_is_symbolic = client.execute_command('''[ -L "%s/bin/observer" ]''' % home_path).code == 0
-            break
+        for svr, client in clients.items():
+            if server['ip'] == svr.ip:
+                owner = client.execute_command("ls -ld %s/etc | awk '{print $3}'" % home_path).stdout.strip()
+                if owner != client.config.username:
+                    return error('Server {}:{} owner is not match. The SSH user for takeover does not match the owner that OceanBase is running under, SSH user: {}, expected: {}.'.format(server['ip'], server['mysql_port'], client.config.username, owner))
+                bin_is_symbolic = client.execute_command('''[ -L "%s/bin/observer" ]''' % home_path).code == 0
+                break
 
         ip = server['ip']
         rpc_port = server['rpc_port']

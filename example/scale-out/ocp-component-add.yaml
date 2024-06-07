@@ -1,0 +1,34 @@
+ocp-server-ce:
+  depends:
+    - oceanbase-ce
+  servers:
+  - 192.168.0.3
+  global:
+    home_path: /root/ocp
+#    soft_dir: /home/root/software # Directory used to store packages
+#    log_dir: /home/root/logs # Directory used to temporary store downloaded logs
+#    ocp_site_url: http://192.168.0.3:8080
+#    port: 8080
+#    admin_password: '********'
+#    memory_size: 4G
+#    ocp_meta_tenant:
+#      tenant_name: ocp_meta
+#      max_cpu: 2.0
+#      memory_size: 4G
+#    ocp_meta_username: root
+#    ocp_meta_password: '********'
+#    ocp_meta_db: meta_database
+#    ocp_meta_username: root # User to use under ocp meta tenant
+#    ocp_meta_password: ****** # Password used to connect to ocp meta tenant
+#    ocp_meta_db: meta_database # Database used to store ocp meta data
+#    OCP monitor tenant definition, including tenant name, cpu and memory
+#    ocp_monitor_tenant:
+#      tenant_name: ocp_monitor
+#      max_cpu: 2.0
+#      memory_size: 4G
+#    ocp_monitor_username: root
+#    ocp_monitor_password: '********'
+#    ocp_monitor_db: monitor_database
+#    ocp_monitor_username: root # User to use under ocp monitor tenant
+#    ocp_monitor_password: ****** # Password used to connect to ocp meta tenant
+#    ocp_monitor_db: monitor_database # Database used to store ocp meta data

@@ -7,18 +7,23 @@ export const obproxyComponent = 'obproxy';
 export const ocpexpressComponent = 'ocp-express';
 export const ocpComponent = 'ocpserver';
 export const obagentComponent = 'obagent';
+export const configServerComponent = 'ob-configserver';
 
 export const ocpexpressComponentKey = 'ocpexpress';
+export const configServerComponentKey = 'obconfigserver';
 
 export const componentVersionTypeToComponent = {
   'oceanbase-ce': oceanbaseComponent,
   'obproxy-ce': obproxyComponent,
+  'ob-configserver': configServerComponentKey,
+  'ocp-express': ocpexpressComponentKey,
 };
 
 export const onlyComponentsKeys = [
   obproxyComponent,
   ocpexpressComponentKey,
   obagentComponent,
+  configServerComponentKey,
 ];
 
 export const allComponentsKeys = [
@@ -26,6 +31,7 @@ export const allComponentsKeys = [
   obproxyComponent,
   ocpexpressComponentKey,
   obagentComponent,
+  configServerComponentKey,
 ];
 
 export const allComponentsName = [
@@ -33,6 +39,7 @@ export const allComponentsName = [
   obproxyComponent,
   ocpexpressComponent,
   obagentComponent,
+  configServerComponent,
 ];
 
 export const componentsConfig = {
@@ -117,6 +124,19 @@ export const componentsConfig = {
       defaultMessage: 'OCP 参数名称',
     }),
   },
+  [configServerComponentKey]: {
+    name: 'OBConfigServer',
+    showComponentName: 'OBConfigServer',
+    type: intl.formatMessage({
+      id: 'OBD.pages.constants.Tools',
+      defaultMessage: '工具',
+    }),
+    componentKey: configServerComponentKey,
+    labelName: intl.formatMessage({
+      id: 'OBD.pages.constants.ObConfigserverParameterName',
+      defaultMessage: 'OB ConfigServer 参数名称',
+    }),
+  },
 };
 
 export const modeConfig = {
@@ -169,6 +189,7 @@ export const resourceMap = {
       memory: 64,
     },
   ],
+
   monitorDB: [
     {
       hosts: 10,
@@ -196,6 +217,7 @@ export const resourceMap = {
       memory: 256,
     },
   ],
+
   OCP: [
     {
       hosts: 10,
@@ -224,3 +246,9 @@ export const resourceMap = {
     },
   ],
 };
+export const CONFIGSERVER_LOG_LEVEL = [
+  'debug',
+  'info',
+  'warn',
+  'error',
+];

@@ -28,9 +28,6 @@ from const import CONST_OBD_HOME
 from ssh import LocalClient
 
 
-OBD_INSTALL_PRE = os.environ.get('OBD_INSTALL_PRE', '/')
-
-
 def _clean(server, client, path, stdio=None):
     ret = client.execute_command('rm -fr %s' % path, timeout=-1)
     if not ret:

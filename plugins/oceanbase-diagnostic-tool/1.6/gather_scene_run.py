@@ -23,6 +23,8 @@ from ssh import LocalClient
 import os
 from tool import TimeUtils
 import _errno as err
+from datetime import datetime
+from _stdio import FormtatText
 
 
 def gather_scene_run(plugin_context, *args, **kwargs):
@@ -34,11 +36,11 @@ def gather_scene_run(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
+        command = r"{install_dir}/obdiag".format(install_dir=obdiag_install_dir)
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
-        base_commond=r"cd {install_dir} && ./obdiag gather scene run --scene={scene}".format(install_dir=obdiag_install_dir,scene=scene_option)
+        base_commond=r"{install_dir}/obdiag gather scene run --scene={scene}".format(install_dir=obdiag_install_dir,scene=scene_option)
         cmd = r"{base} --from {from_option} --to {to_option} ".format(
             base = base_commond,
             from_option = from_option,
@@ -47,15 +49,15 @@ def gather_scene_run(plugin_context, *args, **kwargs):
         if store_dir_option:
             cmd = cmd + r" --store_dir {store_dir_option}".format(store_dir_option=store_dir_option)
         if env_option:
-            cmd = cmd + r" --env '{env_option}'".format(env_option=env_option)
-        if dis_update_option:
-            cmd = cmd + r" --dis_update '{dis_update_option}'".format(dis_update_option=dis_update_option)
+            cmd = cmd + " --env \"{env_option}\"".format(env_option=env_option)
         return cmd
 
     def run():
         obdiag_cmd = get_obdiag_cmd()
         stdio.verbose('execute cmd: {}'.format(obdiag_cmd))
-        return LocalClient.run_command(obdiag_cmd, env=None, stdio=stdio)
+        run_result = LocalClient.run_command(obdiag_cmd, env=None, stdio=stdio)
+        stdio.warn(FormtatText.warning("\nGather all result stored in this directory: {0}\n".format(store_dir_option)))
+        return run_result
 
     options = plugin_context.options
     obdiag_bin = "obdiag"
@@ -68,8 +70,7 @@ def gather_scene_run(plugin_context, *args, **kwargs):
     if not scene_option:
         stdio.error("failed get --scene option, example: obd obdiag gather scene run {0} --scene <scene_name> ".format(plugin_context.deploy_name))
         return plugin_context.return_false() 
-    dis_update_option = get_option('dis_update')
-    store_dir_option = os.path.join(os.path.abspath(get_option('store_dir')), 'gather_scene')
+    store_dir_option = os.path.join(os.path.abspath(get_option('store_dir')), 'gather_scene_{0}'.format(datetime.now().strftime('%Y%m%d%H%M%S')))
     obdiag_install_dir = get_option('obdiag_dir')
     from_option, to_option, ok = TimeUtils.parse_time_from_to(from_time=from_option, to_time=to_option, stdio=stdio)
     if not ok:

@@ -57,3 +57,9 @@ ENV_DISABLE_RSA_ALGORITHMS = 'OBD_DISABLE_RSA_ALGORITHMS'
 
 # set local connection when using host ip. {0/1} 0 - no local connection. 1 - local connection.
 ENV_HOST_IP_MODE = "HOST_IP_MODE"
+
+# obdeploy install pre path. default /
+ENV_OBD_INSTALL_PRE = "OBD_INSTALL_PRE"
+
+# obdeploy install path. default /usr/obd/
+ENV_OBD_INSTALL_PATH = "OBD_INSTALL_PATH"

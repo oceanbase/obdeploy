@@ -48,7 +48,7 @@ def generate_config(plugin_context, auto_depend=False, generate_config_mini=Fals
         return plugin_context.return_false()
 
     if 'memory_size' not in global_config:
-        cluster_config.update_global_conf('memory_size', min_memory_size)
+        cluster_config.update_global_conf('memory_size', min_memory_size, False)
 
     # write required memory into resource namespace
     resource = plugin_context.namespace.get_variable("required_resource")

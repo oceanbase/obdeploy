@@ -1,38 +1,36 @@
+import { getObdInfo } from '@/services/ob-deploy-web/Info';
+import { getErrorInfo, handleQuit, serverReg, serversValidator } from '@/utils';
+import { getAllServers } from '@/utils/helper';
 import { intl } from '@/utils/intl';
-import { useEffect, useState, useRef } from 'react';
-import { useModel } from 'umi';
+import useRequest from '@/utils/useRequest';
+import { DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import type {
+  EditableFormInstance,
+  ProColumns,
+} from '@ant-design/pro-components';
 import {
-  Space,
-  Button,
-  Tooltip,
-  Select,
-  Popconfirm,
-  message,
-  Form,
-} from 'antd';
-import { QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons';
-import {
+  EditableProTable,
   ProCard,
   ProForm,
-  ProFormText,
-  ProFormSelect,
   ProFormDigit,
-  EditableProTable,
+  ProFormSelect,
+  ProFormText,
 } from '@ant-design/pro-components';
-import type {
-  ProColumns,
-  EditableFormInstance,
-} from '@ant-design/pro-components';
-import { getObdInfo } from '@/services/ob-deploy-web/Info';
-import useRequest from '@/utils/useRequest';
-import { handleQuit, getErrorInfo, serverReg, serversValidator } from '@/utils';
-import { commonStyle, pathRule } from '../constants';
-import { getAllServers } from '@/utils/helper';
-import ServerTags from './ServerTags';
-import TooltipInput from './TooltipInput';
-import { getLocale } from 'umi';
+import { Button, Form, Popconfirm, Select, Space, Tooltip } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { getLocale, useModel } from 'umi';
+import {
+  commonStyle,
+  configServerComponent,
+  obagentComponent,
+  obproxyComponent,
+  ocpexpressComponent,
+  pathRule,
+} from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
+import ServerTags from './ServerTags';
+import TooltipInput from './TooltipInput';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
@@ -61,7 +59,7 @@ export default function NodeConfig() {
     errorsList,
   } = useModel('global');
   const { components = {}, auth, home_path } = configData || {};
-  const { oceanbase = {}, ocpexpress = {}, obproxy = {} } = components;
+  const { oceanbase = {}, ocpexpress = {}, obproxy = {}, obconfigserver = {} } = components;
   const [form] = ProForm.useForm();
   const [editableForm] = ProForm.useForm();
   const finalValidate = useRef<boolean>(false);
@@ -138,22 +136,28 @@ export default function NodeConfig() {
 
   const setData = (dataSource: FormValues) => {
     let newComponents: API.Components = {};
-    if (selectedConfig.includes('obproxy')) {
+    if (selectedConfig.includes(obproxyComponent)) {
       newComponents.obproxy = {
         ...(components.obproxy || {}),
         ...dataSource.obproxy,
       };
     }
-    if (selectedConfig.includes('ocp-express') && !lowVersion) {
+    if (selectedConfig.includes(ocpexpressComponent) && !lowVersion) {
       newComponents.ocpexpress = {
         ...(components.ocpexpress || {}),
         ...dataSource?.ocpexpress,
       };
     }
-    if (selectedConfig.includes('obagent')) {
+    if (selectedConfig.includes(obagentComponent)) {
       newComponents.obagent = {
         ...(components.obagent || {}),
         servers: allOBServer,
+      };
+    }
+    if (selectedConfig.includes(configServerComponent)) {
+      newComponents.obconfigserver = {
+        ...(components.obconfigserver || {}),
+        ...dataSource?.obconfigserver,
       };
     }
     newComponents.oceanbase = {
@@ -163,6 +167,7 @@ export default function NodeConfig() {
         servers: item?.servers?.map((server) => ({ ip: server })),
       })),
     };
+    
     setConfigData({
       ...configData,
       components: newComponents,
@@ -225,86 +230,51 @@ export default function NodeConfig() {
     }
   };
 
-  useEffect(() => {
+  const getComponentServers = (
+    component: 'obproxy' | 'ocpexpress' | 'obconfigserver',
+  ): string[] => {
     const allServers = getAllServers(dbConfigData);
-    const allZoneServers: any = {};
-    dbConfigData.forEach((item) => {
-      allZoneServers[`${item.id}`] = item.servers || [];
-    });
-    const obproxyServers = form.getFieldValue(['obproxy', 'servers']);
-    const ocpexpressServers = form.getFieldValue(['ocpexpress', 'servers']);
-    const customOBproxyServers = obproxyServers?.filter(
+    const compoentServers = form.getFieldValue([component, 'servers']);
+    const componentTextMap = {
+      obproxy: 'OBProxy',
+      ocpexpress: 'OCP Express',
+      obconfigserver: 'OBConfigServer',
+    };
+    const customComponentServers = compoentServers?.filter(
       (item: string) =>
         !(allServers?.includes(item) || item === lastDeleteServer),
     );
-
-    const customOcpexpressServers = ocpexpressServers?.filter(
-      (item: string) =>
-        !(allServers?.includes(item) || item === lastDeleteServer),
-    );
-
-    let obproxyServersValue;
-    let ocpexpressServersValue;
+    let componentServerValue;
     if (allServers?.length) {
       const checkPass = serverReg.test(allServers[0]);
-      if (!obproxyServers?.length) {
-        obproxyServersValue = [allServers[0]];
+      if (!compoentServers?.length) {
+        componentServerValue = [allServers[0]];
       } else {
-        const newOBproxyServers: string[] = [];
-        obproxyServers?.forEach((item: string) => {
-          if (allServers?.includes(item)) {
-            newOBproxyServers.push(item);
-          }
-        });
-        if (newOBproxyServers?.length) {
-          obproxyServersValue = [...customOBproxyServers, ...newOBproxyServers];
-        } else if (customOBproxyServers?.length) {
-          obproxyServersValue = customOBproxyServers;
-        } else {
-          obproxyServersValue = [allServers[0]];
-          if (!checkPass) {
-            form.setFields([
-              {
-                name: ['obproxy', 'servers'],
-                errors: [
-                  intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
-                    defaultMessage: '请选择正确的 OBProxy 节点',
-                  }),
-                ],
-              },
-            ]);
-          }
-        }
-      }
-
-      if (!ocpexpressServers?.length) {
-        ocpexpressServersValue = [allServers[0]];
-      } else {
-        const newOcpexpressServers: string[] = [];
-        ocpexpressServers?.forEach((item: string) => {
-          if (allServers?.includes(item)) {
-            newOcpexpressServers.push(item);
-          }
-        });
-        if (newOcpexpressServers?.length) {
-          ocpexpressServersValue = [
-            ...customOcpexpressServers,
-            ...newOcpexpressServers,
+        const newComponentServers: string[] = compoentServers?.filter(
+          (item: string) => allServers?.includes(item),
+        );
+        if (newComponentServers?.length) {
+          componentServerValue = [
+            ...customComponentServers,
+            ...newComponentServers,
           ];
-        } else if (customOcpexpressServers?.length) {
-          ocpexpressServersValue = customOcpexpressServers;
+        } else if (customComponentServers?.length) {
+          componentServerValue = customComponentServers;
         } else {
-          ocpexpressServersValue = [allServers[0]];
+          componentServerValue = [allServers[0]];
           if (!checkPass) {
             form.setFields([
               {
-                name: ['ocpexpress', 'servers'],
+                name: [component, 'servers'],
                 errors: [
-                  intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
-                    defaultMessage: '请选择正确的 OCP Express 节点',
-                  }),
+                  intl.formatMessage(
+                    {
+                      id: 'OBD.pages.Obdeploy.NodeConfig.SelectTheCorrectComponenttextmapcomponentNode',
+                      defaultMessage:
+                        '请选择正确的{{componentTextMapComponent}}节点',
+                    },
+                    { componentTextMapComponent: componentTextMap[component] },
+                  ),
                 ],
               },
             ]);
@@ -312,24 +282,30 @@ export default function NodeConfig() {
         }
       }
     } else {
-      if (!customOBproxyServers?.length) {
-        obproxyServersValue = undefined;
+      if (!customComponentServers?.length) {
+        componentServerValue = undefined;
       } else {
-        obproxyServersValue = customOBproxyServers;
-      }
-      if (!customOcpexpressServers?.length) {
-        ocpexpressServersValue = undefined;
-      } else {
-        ocpexpressServersValue = customOcpexpressServers;
+        componentServerValue = customComponentServers;
       }
     }
+    return componentServerValue;
+  };
 
+  useEffect(() => {
+    const allServers = getAllServers(dbConfigData);
+    const allZoneServers: any = {};
+    dbConfigData.forEach((item) => {
+      allZoneServers[`${item.id}`] = item.servers || [];
+    });
     form.setFieldsValue({
       obproxy: {
-        servers: obproxyServersValue,
+        servers: getComponentServers('obproxy'),
       },
       ocpexpress: {
-        servers: ocpexpressServersValue,
+        servers: getComponentServers('ocpexpress'),
+      },
+      obconfigserver: {
+        servers: getComponentServers('obconfigserver'),
       },
     });
 
@@ -471,7 +447,7 @@ export default function NodeConfig() {
 
       dataIndex: 'servers',
       formItemProps: {
-        validateFirst:true,
+        validateFirst: true,
         rules: [
           {
             required: true,
@@ -559,6 +535,11 @@ export default function NodeConfig() {
   const initialValues: FormValues = {
     obproxy: {
       servers: obproxy?.servers?.length ? obproxy?.servers : undefined,
+    },
+    obconfigserver: {
+      servers: obconfigserver?.servers?.length
+        ? obconfigserver?.servers
+        : undefined,
     },
     auth: {
       user: auth?.user || undefined,
@@ -744,8 +725,9 @@ export default function NodeConfig() {
             }}
           />
         </ProCard>
-        {selectedConfig.includes('ocp-express') ||
-        selectedConfig.includes('obproxy') ? (
+        {selectedConfig.includes(ocpexpressComponent) ||
+        selectedConfig.includes(obproxyComponent) ||
+        selectedConfig.includes(configServerComponent) ? (
           <ProCard
             className={styles.pageCard}
             title={intl.formatMessage({
@@ -755,7 +737,7 @@ export default function NodeConfig() {
             bodyStyle={{ paddingBottom: '0' }}
           >
             <Space size={16}>
-              {selectedConfig.includes('ocp-express') && !lowVersion ? (
+              {selectedConfig.includes(ocpexpressComponent) && !lowVersion ? (
                 <ProFormSelect
                   mode="tags"
                   name={['ocpexpress', 'servers']}
@@ -802,7 +784,7 @@ export default function NodeConfig() {
                   options={formatOptions(allOBServer)}
                 />
               ) : null}
-              {selectedConfig.includes('obproxy') && (
+              {selectedConfig.includes(obproxyComponent) && (
                 <ProFormSelect
                   mode="tags"
                   name={['obproxy', 'servers']}
@@ -810,7 +792,7 @@ export default function NodeConfig() {
                     id: 'OBD.pages.components.NodeConfig.ObproxyNodes',
                     defaultMessage: 'OBProxy 节点',
                   })}
-                  fieldProps={{ style: { width: 504 }, maxTagCount: 3 }}
+                  fieldProps={{ style: { width: 425 }, maxTagCount: 3 }}
                   placeholder={intl.formatMessage({
                     id: 'OBD.pages.components.NodeConfig.PleaseSelect',
                     defaultMessage: '请选择',
@@ -827,6 +809,39 @@ export default function NodeConfig() {
                     {
                       validator: (_: any, value: string[]) =>
                         serversValidator(_, value, 'OBProxy'),
+                    },
+                  ]}
+                  options={formatOptions(allOBServer)}
+                />
+              )}
+
+              {selectedConfig.includes(configServerComponent) && (
+                <ProFormSelect
+                  mode="tags"
+                  name={['obconfigserver', 'servers']}
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.Obdeploy.NodeConfig.ObconfigserverNodes',
+                    defaultMessage: 'OBConfigServer节点',
+                  })}
+                  fieldProps={{
+                    style: { width: 305 },
+                  }}
+                  validateFirst
+                  placeholder={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                    defaultMessage: '请选择',
+                  })}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.Obdeploy.NodeConfig.SelectOrEnterObConfigserver',
+                        defaultMessage: '请选择或输入 OB ConfigServer 节点',
+                      }),
+                    },
+                    {
+                      validator: (_: any, value: string[]) =>
+                        serversValidator(_, value, 'OBConfigServer'),
                     },
                   ]}
                   options={formatOptions(allOBServer)}

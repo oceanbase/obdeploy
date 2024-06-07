@@ -30,9 +30,11 @@ def add_plugin(component_name, plugins):
 def scale_out_check(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     added_components = cluster_config.get_deploy_added_components()
+    changed_components = cluster_config.get_deploy_changed_components()
     be_depend = cluster_config.be_depends
     plugins = []
     plugin_context.set_variable('need_bootstrap', False)
+    need_restart = False
     if 'obagent' in added_components and 'obagent' in be_depend:
         add_plugin('generate_config', plugins)
         add_plugin('connect', plugins)
@@ -46,12 +48,25 @@ def scale_out_check(plugin_context, *args, **kwargs):
         add_plugin('connect', plugins)
         add_plugin('bootstrap', plugins)
         add_plugin('create_tenant', plugins)
+    if 'ocp-server-ce' in added_components and 'ocp-server-ce' in be_depend:
+        add_plugin('generate_config', plugins)
+        add_plugin('connect', plugins)
+        add_plugin('bootstrap', plugins)
+        add_plugin('create_tenant', plugins)
+    if 'oblogproxy' in added_components and 'oblogproxy' in be_depend:
+        add_plugin('generate_config', plugins)
+        add_plugin('connect', plugins)
+        add_plugin('bootstrap', plugins)
+    if 'ob-configserver' in added_components:
+        cluster_config.add_depend_component('ob-configserver')
+        need_restart = True
     if cluster_config.added_servers:
         add_plugin('connect', plugins)
         add_plugin('bootstrap', plugins)
     if (COMP_OB_CE in added_components or COMP_OB in added_components) and not cluster_config.added_servers:
         plugin_context.set_variable('need_bootstrap', True)
 
+    plugin_context.set_variable('scale_out', True)
     plugin_context.stdio.verbose('scale_out_check plugins: %s' % plugins)
     plugin_context.stdio.verbose('added_components: %s' % added_components)
-    return plugin_context.return_true(plugins=plugins)
+    return plugin_context.return_true(plugins=plugins, need_restart=need_restart)

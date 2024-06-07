@@ -13,6 +13,7 @@ import { message } from 'antd';
 
 import useRequest from '@/utils/useRequest';
 import PreCehckComponent from '@/component/PreCheck/preCheck';
+import { formatConfigData } from './CheckInfo';
 import NP from 'number-precision';
 
 export default function PreCheckStatus() {
@@ -232,7 +233,7 @@ export default function PreCheckStatus() {
       params = { ...newConfigData };
     }
     setLoading(true);
-    handleCreateConfig({ name: oceanbase?.appname }, { ...params });
+    handleCreateConfig({ name: oceanbase?.appname }, formatConfigData(params));
   };
 
   const { run: handleRecover, loading: recoverLoading } = useRequest(recover, {

@@ -78,6 +78,8 @@ class DeploymentHandler(BaseHandler):
             cluster_config[config.components.obagent.component] = self.generate_component_config(config, const.OBAGENT, ['monagent_http_port', 'mgragent_http_port'])
         if config.components.ocpexpress is not None:
             cluster_config[config.components.ocpexpress.component] = self.generate_component_config(config, const.OCP_EXPRESS, ['port'])
+        if config.components.obconfigserver is not None:
+            cluster_config[config.components.obconfigserver.component] = self.generate_component_config(config, const.OB_CONFIGSERVER, ['listen_port'])
         cluster_config_yaml_path = ''
         log.get_logger().info('dump config from path: %s' % cluster_config_yaml_path)
         with tempfile.NamedTemporaryFile(delete=False, prefix="obd", suffix="yaml", mode="w", encoding="utf-8") as f:
@@ -552,9 +554,10 @@ class DeploymentHandler(BaseHandler):
         if not check_pass:
             return
 
+        components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
         for repository in repositories:
             ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False,
-                                       generate_consistent_config=True, auto_depend=True)
+                                       generate_consistent_config=True, auto_depend=True, components=components)
             if ret is None:
                 raise Exception("generate config error")
             elif not ret and ret.get_return("exception"):

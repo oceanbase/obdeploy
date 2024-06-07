@@ -299,7 +299,7 @@ def pyScriptPluginExec(func):
                     target_servers = kwargs.get('target_servers')
                     if target_servers is not None:
                         cluster_config.servers = target_servers
-                        stdio.verbose('plugin %s target_servers: %s' % (self, target_servers))
+                        stdio and getattr(stdio, 'verbose', print)('plugin %s target_servers: %s' % (self, target_servers))
                         del kwargs['target_servers']
                 try:
                     ret = method(self.context, *arg, **kwargs)
@@ -313,12 +313,13 @@ def pyScriptPluginExec(func):
                 finally:
                     if target_servers:
                         cluster_config.servers = servers
-                        stdio.verbose('plugin %s restore servers: %s' % (self, servers))
+                        stdio and getattr(stdio, 'verbose', print)('plugin %s restore servers: %s' % (self, servers))
         end_time = time.time()
         run_result[method_name]['time'] = end_time - start_time
         self.context.set_variable('run_result', run_result)
         ret = self.context.get_return() if self.context else PluginReturn()
         self.after_do(stdio, *arg, **kwargs)
+        stdio and getattr(stdio, 'verbose', print)('plugin %s result: %s' % (self, ret.value))
         return ret
     return _new_func
 

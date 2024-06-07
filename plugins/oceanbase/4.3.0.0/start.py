@@ -133,6 +133,10 @@ def start(plugin_context, start_obshell=True, *args, **kwargs):
     else:
         scale_out = False
         need_bootstrap = True
+
+
+    scenario = cluster_config.get_global_conf_with_default().get('scenario')
+    need_bootstrap and stdio.print('cluster scenario: %s' % scenario)
     stdio.start_loading('Start observer')
     for server in cluster_config.original_servers:
         config = cluster_config.get_server_conf(server)
@@ -167,7 +171,6 @@ def start(plugin_context, start_obshell=True, *args, **kwargs):
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
-        scenario = server_config['scenario']
 
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path

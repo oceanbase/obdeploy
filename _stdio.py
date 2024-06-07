@@ -154,6 +154,7 @@ class SysStdin(object):
             try:
                 for line in sys.stdin:
                     return line
+                return ''
             except IOError:
                 return ''
             finally:
@@ -666,8 +667,11 @@ class IO(object):
 
     def read(self, msg='', blocked=False):
         if msg:
-            self._print(MsgLevel.INFO, msg)
-        return self.get_input_stream().read(blocked)
+            if self.syncing:
+                self.verbose(msg, end='')
+            else:
+                self._print(MsgLevel.INFO, msg, end='')
+        return self.get_input_stream().readline(not self.syncing and blocked)
 
     def confirm(self, msg):
         if self.default_confirm:
@@ -905,7 +909,7 @@ class SafeStdioMeta(type):
     def _init_wrapper_func(func):
         def wrapper(*args, **kwargs):
             setattr(args[0], "_wrapper_func", {})
-            func(*args, **kwargs)
+            safe_stdio_decorator(FAKE_IO)(func)(*args, **kwargs)
             if "stdio" in args[0].__dict__:
                 args[0].__dict__["stdio"] = get_stdio(args[0].__dict__["stdio"])
 

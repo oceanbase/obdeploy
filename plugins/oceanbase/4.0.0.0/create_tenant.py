@@ -30,7 +30,7 @@ from _types import Capacity
 tenant_cursor_cache = defaultdict(dict)
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[]):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     # find tenant ip, port
@@ -51,8 +51,8 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
                 break
     if not tenant_cursor and retries:
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args)
-    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose') if tenant_cursor else False
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
+    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
 
 
 def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, **kwargs):
@@ -254,14 +254,14 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
             if log_disk_size is not None:
                 sql += ', log_disk_size %d' % log_disk_size
 
-            res = cursor.execute(sql)
+            res = cursor.execute(sql, stdio=stdio)
             if res is False:
                 error()
                 return
 
             # create resource pool
             sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
-            res = cursor.execute(sql)
+            res = cursor.execute(sql, stdio=stdio)
             if res is False:
                 error()
                 return
@@ -285,7 +285,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
                 sql += "set %s, %s" % (variables, set_mode)
             else:
                 sql += "set %s" % set_mode
-            res = cursor.execute(sql)
+            res = cursor.execute(sql, stdio=stdio)
             if res is False:
                 error()
                 return

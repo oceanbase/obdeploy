@@ -124,6 +124,11 @@ export default function PreCehckComponent({
     }
   };
 
+  const handleAdvisement = (advisement: string | object | undefined) => {
+    if (typeof advisement === 'object') return '';
+    return advisement;
+  };
+
   useEffect(() => {
     const timelineContainer = document.getElementById('timeline-container');
     timelineContainer.onmousewheel = handleScrollTimeline; // ie , chrome
@@ -355,7 +360,7 @@ export default function PreCehckComponent({
           {showFailedList?.length ? (
             <div className={styles.failedContainer} id="failed-container">
               {showFailedList?.map((item, index) => {
-                let reason = '',responseReason = item?.description || item?.advisement as string
+                let reason = '',responseReason = item?.description || handleAdvisement(item?.advisement) as string
                 if (responseReason) {
                   const index = responseReason.indexOf(':');
                   reason = responseReason.substring(
@@ -379,7 +384,7 @@ export default function PreCehckComponent({
                       {item.name}
                     </Text>
                     <Tooltip
-                      title={item.description || item?.advisement}
+                      title={item.description || handleAdvisement(item?.advisement)}
                       overlayClassName="list-tooltip"
                     >
                       <Text ellipsis>
@@ -398,7 +403,7 @@ export default function PreCehckComponent({
                       </Text>
                     </Tooltip>
                     <Tooltip
-                      title={item.advisement?.description || item?.advisement}
+                      title={item.advisement?.description || handleAdvisement(item?.advisement)}
                       overlayClassName="list-tooltip"
                     >
                       <Text ellipsis>
@@ -425,7 +430,7 @@ export default function PreCehckComponent({
                             })}
                           </Tag>
                         )}{' '}
-                        {item.advisement?.description || item?.advisement}
+                        {item.advisement?.description || handleAdvisement(item?.advisement)}
                       </Text>
                       <br />
                       <a

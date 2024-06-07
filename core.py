@@ -34,17 +34,17 @@ from ssh import SshClient, SshConfig
 from tool import FileUtil, DirectoryUtil, YamlLoader, timeout, COMMAND_ENV, OrderedDict
 from _stdio import MsgLevel, FormtatText
 from _rpm import Version
-from _mirror import MirrorRepositoryManager, PackageInfo
+from _mirror import MirrorRepositoryManager, PackageInfo, RemotePackageInfo
 from _plugin import PluginManager, PluginType, InstallPlugin, PluginContextNamespace
 from _deploy import DeployManager, DeployStatus, DeployConfig, DeployConfigStatus, Deploy, ClusterStatus
 from _tool import Tool, ToolManager
-from _repository import RepositoryManager, LocalPackage, Repository
+from _repository import RepositoryManager, LocalPackage, Repository, RepositoryVO
 import _errno as err
 from _lock import LockManager, LockMode
 from _optimize import OptimizeManager
 from _environ import ENV_REPO_INSTALL_MODE, ENV_BASE_DIR
 from _types import Capacity
-from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT
+from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, PKG_REPO_FILE
 from ssh import LocalClient
 
 
@@ -187,7 +187,7 @@ class ObdHome(object):
         if self.deploy:
             args['deploy_name'] = self.deploy.name
             args['deploy_status'] = self.deploy.deploy_info.status
-            args['components'] = self.deploy.deploy_info.components
+            args['components'] = self.deploy.deploy_config.components.keys()
             args['cluster_config'] = self.deploy.deploy_config.components[repository.name]
             if "clients" not in kwargs:
                 args['clients'] = self.get_clients(self.deploy.deploy_config, self.repositories)
@@ -1535,9 +1535,10 @@ class ObdHome(object):
             return False
         self._call_stdio('stop_loading', 'succeed')
 
-        self._call_stdio('start_loading', 'Parameter check')
+        self._call_stdio('start_loading', 'Load param plugin')
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
+        self._call_stdio('stop_loading', 'succeed')
 
         # Generate password when password is None
         gen_config_plugins = self.search_py_script_plugin(repositories, 'generate_config')
@@ -1546,7 +1547,7 @@ class ObdHome(object):
                 self.call_plugin(gen_config_plugins[repository], repository, only_generate_password=True)
 
         # Parameter check
-        self._call_stdio('verbose', 'Cluster param configuration check')
+        self._call_stdio('start_loading', 'Parameter check')
         errors = self.deploy_param_check(repositories, deploy_config)
         if errors:
             self._call_stdio('stop_loading', 'fail')
@@ -1795,6 +1796,8 @@ class ObdHome(object):
             return False
         
         errors = []
+        need_start = []
+        need_reload = []
         for repository in all_repositories:
             namespace = self.get_namespace(repository.name)
             if repository not in scale_out_check_plugins:
@@ -1802,12 +1805,13 @@ class ObdHome(object):
             plugin_return = namespace.get_return(scale_out_check_plugins[repository].name)
             setattr(self.options, 'components', repository.name)
             if plugin_return.get_return('need_restart'):
-                setattr(self.options, 'display', None)
-                if not self._restart_cluster(deploy, repository):
-                    errors.append('failed to restart {}'.format(repository.name))
-            elif plugin_return.get_return('need_reload'):
-                if not self._reload_cluster(deploy, repository):
-                    errors.append('failed to reload {}'.format(repository.name))
+                need_start.append(repository)
+            if plugin_return.get_return('need_reload'):
+                need_reload.append(repository)
+
+        # todo: need_reload use need_start tips，supoort later
+        if need_start or need_reload:
+            self._call_stdio('print', 'Use `obd cluster restart %s --wp` to make changes take effect.' % name)
                     
         if errors:
             self._call_stdio('warn', err.WC_FAIL_TO_RESTART_OR_RELOAD_AFTER_SCALE_OUT.format(detail='\n -'.join(errors)))
@@ -1885,8 +1889,8 @@ class ObdHome(object):
             if repository in scale_out_check_plugins:
                 plugin_return = self.get_namespace(repository.name).get_return(scale_out_check_plugins[repository].name)
                 plugins_list = plugin_return.get_return('plugins', [])
-                for name in plugins_list:
-                    plugin =  self.search_py_script_plugin([repository], name)
+                for plugin_name in plugins_list:
+                    plugin = self.search_py_script_plugin([repository], plugin_name)
                     if repository in plugin:
                         succeed = succeed and self.call_plugin(plugin[repository], repository)
         if not succeed:
@@ -1909,6 +1913,8 @@ class ObdHome(object):
         deploy.dump_deploy_info()
 
         errors = []
+        need_start = []
+        need_reload = []
         for repository in all_repositories:
             namespace = self.get_namespace(repository.name)
             if repository not in scale_out_check_plugins:
@@ -1916,12 +1922,13 @@ class ObdHome(object):
             plugin_return = namespace.get_return(scale_out_check_plugins[repository].name)
             setattr(self.options, 'components', repository.name)
             if plugin_return.get_return('need_restart'):
-                setattr(self.options, 'display', None)
-                if not self._restart_cluster(deploy, repository):
-                    errors.append('failed to restart {}'.format(repository.name))
-            elif plugin_return.get_return('need_reload'):
-                if not self._reload_cluster(deploy, repository):
-                    errors.append('failed to reload {}'.format(repository.name))
+                need_start.append(repository)
+            if plugin_return.get_return('need_reload'):
+                need_reload.append(repository)
+
+        # todo: need_reload use need_start tips，supoort later
+        if need_start or need_reload:
+            self._call_stdio('print', 'Use `obd cluster restart %s --wp` to make changes take effect.' % name)
 
         if errors:
             self._call_stdio('warn', err.WC_FAIL_TO_RESTART_OR_RELOAD.format(action='added', detail='\n -'.join(errors)))
@@ -2017,10 +2024,10 @@ class ObdHome(object):
             setattr(self.options, 'components', repository.name)
             if plugin_return.get_return('need_restart'):
                 setattr(self.options, 'display', None)
-                if not self._restart_cluster(deploy, repository):
+                if not self._restart_cluster(deploy, [repository]):
                     errors.append('failed to restart {}'.format(repository.name))
             elif plugin_return.get_return('need_reload'):
-                if not self._reload_cluster(deploy, repository):
+                if not self._reload_cluster(deploy, [repository]):
                     errors.append('failed to reload {}'.format(repository.name))
     
         if errors:
@@ -2207,7 +2214,7 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Deploy status judge')
         if deploy_info.status != DeployStatus.STATUS_RUNNING:
@@ -2226,6 +2233,7 @@ class ObdHome(object):
             
         connect_plugins = self.search_py_script_plugin(repositories, 'connect')
         create_tenant_plugins = self.search_py_script_plugin(repositories, 'create_tenant', no_found_act='ignore')
+        scenario_check_plugins = self.search_py_script_plugin(repositories, 'scenario_check', no_found_act='ignore')
         tenant_optimize_plugins = self.search_py_script_plugin(repositories, 'tenant_optimize', no_found_act='ignore')
         self._call_stdio('stop_loading', 'succeed')
 
@@ -2233,6 +2241,10 @@ class ObdHome(object):
         ssh_clients = self.get_clients(deploy_config, repositories)
             
         for repository in create_tenant_plugins:
+            if repository in scenario_check_plugins:
+                if not self.call_plugin(scenario_check_plugins[repository], repository):
+                    return False
+
             if not self.call_plugin(connect_plugins[repository], repository):
                 return False
 
@@ -2499,6 +2511,49 @@ class ObdHome(object):
         for repository in print_standby_graph_plugins:
             if not self.call_plugin(print_standby_graph_plugins[repository], repository):
                 self._call_stdio('error', 'print standby tenant graph error.')
+                return False
+        return True
+
+    def tenant_optimize(self, deploy_name, tenant_name):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(deploy_name)
+        self.set_deploy(deploy)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % deploy_name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        self._call_stdio('verbose', 'Deploy status judge')
+        if deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('print', 'Deploy "%s" is %s' % (deploy_name, deploy_info.status.value))
+            return False
+        self._call_stdio('verbose', 'Get deploy config')
+        deploy_config = deploy.deploy_config
+
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        self.set_repositories(repositories)
+        # Check whether the components have the parameter plugins and apply the plugins
+        self.search_param_plugin_and_apply(repositories, deploy_config)
+
+        connect_plugins = self.search_py_script_plugin(repositories, 'connect')
+        scenario_check_plugins = self.search_py_script_plugin(repositories, 'scenario_check', no_found_act='ignore')
+        tenant_optimize_plugins = self.search_py_script_plugin(repositories, 'tenant_optimize', no_found_act='ignore')
+        if not tenant_optimize_plugins:
+            self._call_stdio('error', 'The %s %s does not support tenant optimize' % (repositories[0].name, repositories[0].version))
+            return False
+        self._call_stdio('stop_loading', 'succeed')
+
+        for repository in tenant_optimize_plugins:
+            if repository in scenario_check_plugins:
+                if not self.call_plugin(scenario_check_plugins[repository], repository):
+                    return False
+
+            if not self.call_plugin(connect_plugins[repository], repository):
+                return False
+
+            if not self.call_plugin(tenant_optimize_plugins[repository], repository, tenant_name=tenant_name):
                 return False
         return True
 
@@ -4906,6 +4961,44 @@ class ObdHome(object):
                 return False
         return True
 
+    def clean_pkg(self, opts):
+        filter_pkgs, filter_repositories = {}, {}
+        if opts.type != PKG_REPO_FILE:
+            downloaded_pkgs = self.mirror_manager.get_all_rpm_pkgs()
+            if not downloaded_pkgs:
+                self._call_stdio('print', 'There are no RPM files in the remote and local.')
+            else:
+                filter_pkgs = self.filter_pkgs(downloaded_pkgs, 'DELETE', hash=opts.hash, components=opts.components, max_version=True)
+        if opts.type != PKG_RPM_FILE:
+            repositories = self.repository_manager.get_repositories_view()
+            if not repositories:
+                self._call_stdio('print', 'There are no repositories.')
+            else:
+                filter_repositories = self.filter_pkgs(repositories, 'DELETE', hash=opts.hash, components=opts.components)
+        delete_pkgs, cant_delete_pkgs = filter_pkgs.get('delete', []), filter_pkgs.get('cant_delete', [])
+        delete_repositories, cant_delete_repositories = filter_repositories.get('delete', []), filter_repositories.get('cant_delete', [])
+        if delete_pkgs + delete_repositories:
+            self._call_stdio('print_list', delete_pkgs + delete_repositories, ['name', 'version', 'release', 'arch', 'md5', 'type'],
+                lambda x: [x.name, x.version, x.release, x.arch, x.md5, PKG_REPO_FILE if isinstance(x, RepositoryVO) else PKG_RPM_FILE],
+                title='Delete PKG Files List'
+            )
+        if cant_delete_pkgs + cant_delete_repositories:
+            self._call_stdio('print_list', cant_delete_pkgs + cant_delete_repositories, ['name', 'version', 'release', 'arch', 'md5', 'type', 'reason'],
+                lambda x: [x.name, x.version, x.release, x.arch, x.md5, PKG_REPO_FILE if isinstance(x, RepositoryVO) else PKG_RPM_FILE, x.reason],
+                title='Can`t Delete PKG Files List'
+            )
+        if not delete_pkgs + delete_repositories:
+            self._call_stdio('print', 'No Package need deleted')
+            return False
+        if not opts.confirm and not self._call_stdio('confirm', FormtatText.warning('Are you sure to delete the files listed above ?')):
+            return False
+        if not self.mirror_manager.delete_pkgs(delete_pkgs) or not self.repository_manager.delete_repositories(delete_repositories):
+            return False
+
+        self.stdio.print("Delete the files listed above successful!")
+        return True
+
+
     def print_tools(self, tools, title):
         if tools:
             self._call_stdio('print_list', tools, 
@@ -5302,3 +5395,108 @@ class ObdHome(object):
             self._call_stdio('stop_loading', 'failed')
             self._call_stdio('error', 'Failed to takeover OceanBase cluster' )
             return False
+
+    def filter_pkgs(self, pkgs, basic_condition, **pattern):
+        ret_pkgs = {}
+        if not pkgs:
+            self.stdio.verbose("filter pkgs failed, pkgs is empty.")
+            return ret_pkgs
+
+        used_pkgs = []
+        max_version_pkgs = []
+        hash_hit_pkgs = []
+        component_hit_pkgs = []
+        # no pattern,default hit
+        hit_pkgs = []
+
+        # filter pkgs by DeployStatus
+        for deploy in self.deploy_manager.get_deploy_configs():
+            if deploy.deploy_info.status != DeployStatus.STATUS_DESTROYED:
+                for component in deploy.deploy_config.components.values():
+                    for pkg in pkgs:
+                        if pkg.md5 == component.package_hash:
+                            used_pkgs.append(pkg)
+                            break
+
+        # filter pkgs by pattern.hash
+        if pattern.get('hash'):
+            md5s = list(set(pattern['hash'].split(',')))
+            for md5 in md5s:
+                check_hash = False
+                for pkg in pkgs:
+                    if pkg.md5 == md5:
+                        check_hash = True
+                        hash_hit_pkgs.append(pkg)
+                if not check_hash:
+                    self.stdio.print("There is no RPM file with the hash value of %s." % md5)
+
+        # filter pkgs by pattern.components
+        if pattern.get("components"):
+            components = list(set(pattern['components'].split(',')))
+            for component in components:
+                check_component_name = False
+                for pkg in pkgs:
+                    if pkg.name == component:
+                        check_component_name = True
+                        component_hit_pkgs.append(pkg)
+                if not check_component_name:
+                    self.stdio.print("There are no RPM files for the %s component." % check_component_name)
+
+        # filter pkgs by pattern.max_version
+        if pattern.get("max_version"):
+            version_sorted_components_map = {}
+            max_version_components_map = {}
+            for pkg in pkgs:
+                if pkg.name in version_sorted_components_map:
+                    version_sorted_components_map[pkg.name].append(str(pkg.version))
+                else:
+                    version_sorted_components_map[pkg.name] = [str(pkg.version)]
+            for component, versions in version_sorted_components_map.items():
+                max_version_components_map[component] = sorted(versions).pop()
+            for pkg in pkgs:
+                if max_version_components_map.get(pkg.name) and pkg.version == max_version_components_map.get(pkg.name):
+                    del max_version_components_map[pkg.name]
+                    max_version_pkgs.append(pkg)
+
+        # get all hit pkgs
+        if not pattern.get('hash') and not pattern.get('components'):
+            for pkg in pkgs:
+                hit_pkgs.append(pkg)
+
+        # filter libds pkgs and utils pkgs
+        for pkg in pkgs:
+            if pkg.name in ['oceanbase', 'oceanbase-ce'] and (pkg in hit_pkgs or pkg in hash_hit_pkgs or pkg in component_hit_pkgs):
+                for sub_pkg in pkgs:
+                    if (sub_pkg.name == '%s-libs' % pkg.name or sub_pkg.name == '%s-utils' % pkg.name) and sub_pkg.release == pkg.release:
+                        hit_pkgs.append(sub_pkg)
+                        hash_hit_pkgs.append(sub_pkg)
+                        component_hit_pkgs.append(sub_pkg)
+                        used_pkgs.append(sub_pkg)
+                        max_version_pkgs.append(sub_pkg)
+
+        # filter the pkg that meets the deletion criteria.
+        if basic_condition == 'DELETE':
+            delete_pkgs = []
+            cant_delete_pkgs = []
+            for pkg in pkgs:
+                if pkg in hit_pkgs or pkg in hash_hit_pkgs or pkg in component_hit_pkgs:
+                    if pkg not in used_pkgs:
+                        if pkg in hash_hit_pkgs or ((pkg in hit_pkgs or pkg in component_hit_pkgs) and pkg not in max_version_pkgs):
+                            delete_pkgs.append(pkg)
+                        elif pkg in max_version_pkgs and (pkg in hit_pkgs or pkg in component_hit_pkgs):
+                            cant_delete_pkgs.append(pkg)
+                    else:
+                        if pkg in hash_hit_pkgs or pkg in hit_pkgs or pkg in component_hit_pkgs:
+                            cant_delete_pkgs.append(pkg)
+
+            for pkg in cant_delete_pkgs:
+                if pkg in used_pkgs:
+                    setattr(pkg, "reason", "in use")
+                elif pkg in max_version_pkgs:
+                    setattr(pkg, "reason", "the latest version")
+                else:
+                    setattr(pkg, "reason", "other reason")
+
+            ret_pkgs = {'delete': delete_pkgs, 'cant_delete': cant_delete_pkgs}
+
+        return ret_pkgs

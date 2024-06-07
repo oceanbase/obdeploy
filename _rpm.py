@@ -20,6 +20,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import hashlib
 import os
 import re
 import sys
@@ -160,6 +161,7 @@ class Package(PackageInfo):
 
     def open(self):
         return rpmfile.open(self.path)
+
 
 
 def get_version_from_array(array):

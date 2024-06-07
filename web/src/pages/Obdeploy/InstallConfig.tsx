@@ -1,53 +1,57 @@
-import { intl } from '@/utils/intl';
-import { useEffect, useState, useRef } from 'react';
-import { useModel, history } from 'umi';
-import {
-  Space,
-  Button,
-  Tag,
-  Table,
-  Alert,
-  Tooltip,
-  Select,
-  Modal,
-  Spin,
-  message,
-} from 'antd';
-import { ProCard, ProForm, ProFormText } from '@ant-design/pro-components';
-import {
-  SafetyCertificateFilled,
-  InfoCircleOutlined,
-  CopyOutlined,
-} from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import useRequest from '@/utils/useRequest';
+import ErrorCompToolTip from '@/component/ErrorCompToolTip';
+import { selectOcpexpressConfig } from '@/constant/configuration';
 import {
   queryAllComponentVersions,
   queryComponentParameters,
 } from '@/services/ob-deploy-web/Components';
 import {
-  getDeployment,
   destroyDeployment,
+  getDeployment,
 } from '@/services/ob-deploy-web/Deployments';
 import { listRemoteMirrors } from '@/services/ob-deploy-web/Mirror';
-import { handleQuit, checkLowVersion, getErrorInfo } from '@/utils';
-import { formatMoreConfig } from '@/utils/helper';
-import NP from 'number-precision';
-import copy from 'copy-to-clipboard';
-import DeleteDeployModal from './DeleteDeployModal';
-import ErrorCompToolTip from '@/component/ErrorCompToolTip';
-import { getParamstersHandler } from './ClusterConfig/helper';
-import { selectOcpexpressConfig } from '@/constant/configuration';
 import {
-  commonStyle,
+  checkLowVersion,
+  clusterNameReg,
+  getErrorInfo,
+  handleQuit,
+} from '@/utils';
+import { formatMoreConfig } from '@/utils/helper';
+import { intl } from '@/utils/intl';
+import useRequest from '@/utils/useRequest';
+import {
+  CopyOutlined,
+  InfoCircleOutlined,
+  SafetyCertificateFilled,
+} from '@ant-design/icons';
+import { ProCard, ProForm, ProFormText } from '@ant-design/pro-components';
+import {
+  Alert,
+  Button,
+  message,
+  Modal,
+  Select,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import copy from 'copy-to-clipboard';
+import NP from 'number-precision';
+import { useEffect, useRef, useState } from 'react';
+import { getLocale, history, useModel } from 'umi';
+import {
   allComponentsName,
-  oceanbaseComponent,
-  obproxyComponent,
-  ocpexpressComponent,
+  commonStyle,
   obagentComponent,
+  obproxyComponent,
+  oceanbaseComponent,
+  ocpexpressComponent,
+  configServerComponent,
 } from '../constants';
-import { getLocale } from 'umi';
-import { clusterNameReg } from '@/utils';
+import { getParamstersHandler } from './ClusterConfig/helper';
+import DeleteDeployModal from './DeleteDeployModal';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
@@ -61,8 +65,6 @@ type rowDataType = {
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
-
-
 
 const mirrors = ['oceanbase.community.stable', 'oceanbase.development-kit'];
 
@@ -93,9 +95,10 @@ export default function InstallConfig() {
     OBD_DOCS,
     OCP_EXPRESS,
     OBAGENT_DOCS,
-    OBPROXY_DOCS 
+    OBPROXY_DOCS,
+    OBCONFIGSERVER_DOCS,
   } = useModel('global');
-  
+
   const { components, home_path } = configData || {};
   const { oceanbase } = components || {};
   const [existNoVersion, setExistNoVersion] = useState(false);
@@ -194,6 +197,27 @@ export default function InstallConfig() {
               '是一个监控采集框架。OBAgent 支持推、拉两种数据采集模式，可以满足不同的应用场景。',
           }),
           doc: OBAGENT_DOCS,
+        },
+      ],
+    },
+    {
+      group: intl.formatMessage({
+        id: 'OBD.pages.components.InstallConfig.Tools',
+        defaultMessage: '工具',
+      }),
+      key: 'configServerTool',
+      onlyAll: true,
+      content: [
+        {
+          key: configServerComponent,
+          name: 'OBConfigServer',
+          onlyAll: true,
+          desc: intl.formatMessage({
+            id: 'OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration',
+            defaultMessage:
+              '是一个可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。',
+          }),
+          doc: OBCONFIGSERVER_DOCS,
         },
       ],
     },
@@ -424,7 +448,7 @@ export default function InstallConfig() {
           package_hash: componentsVersionInfo?.[oceanbaseComponent]?.md5,
         },
       };
-      if (selectedConfig.includes('obproxy')) {
+      if (selectedConfig.includes(obproxyComponent)) {
         newComponents.obproxy = {
           ...(components?.obproxy || {}),
           component:
@@ -436,7 +460,7 @@ export default function InstallConfig() {
           package_hash: componentsVersionInfo?.[obproxyComponent]?.md5,
         };
       }
-      if (selectedConfig.includes('obagent')) {
+      if (selectedConfig.includes(obagentComponent)) {
         newComponents.obagent = {
           ...(components?.obagent || {}),
           component: obagentComponent,
@@ -445,13 +469,22 @@ export default function InstallConfig() {
           package_hash: componentsVersionInfo?.[obagentComponent]?.md5,
         };
       }
-      if (!lowVersion && selectedConfig.includes('ocp-express')) {
+      if (!lowVersion && selectedConfig.includes(ocpexpressComponent)) {
         newComponents.ocpexpress = {
           ...(components?.ocpexpress || {}),
           component: ocpexpressComponent,
           version: componentsVersionInfo?.[ocpexpressComponent]?.version,
           release: componentsVersionInfo?.[ocpexpressComponent]?.release,
           package_hash: componentsVersionInfo?.[ocpexpressComponent]?.md5,
+        };
+      }
+      if (selectedConfig.includes(configServerComponent)) {
+        newComponents.obconfigserver = {
+          ...(components?.obconfigserver || {}),
+          component: configServerComponent,
+          version: componentsVersionInfo?.[configServerComponent]?.version,
+          release: componentsVersionInfo?.[configServerComponent]?.release,
+          package_hash: componentsVersionInfo?.[configServerComponent]?.md5,
         };
       }
 
@@ -672,8 +705,8 @@ export default function InstallConfig() {
   };
 
   /**
-   * tip:如果选择OCP Express，则OBAgent则自动选择，无需提示
-   * 如果不选择 OBAgent, 则 OCP Express 则自动不选择，无需提示
+   * tip:如果选择 OCPExpress，则 OBAgent 则自动选择，无需提示
+   * 如果不选择 OBAgent, 则 OCPExpress 则自动不选择，无需提示
    */
   const handleSelect = (record: rowDataType, selected: boolean) => {
     if (!selected) {
@@ -714,7 +747,7 @@ export default function InstallConfig() {
         data?.items,
         isSelectOcpexpress,
       );
-      
+
       return newClusterMoreConfig;
     }
   };

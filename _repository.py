@@ -28,9 +28,12 @@ from glob import glob
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 
+from _deploy import DeployStatus
 from _rpm import Package, PackageInfo, Version
 from _arch import getBaseArch
 from _environ import ENV_DISABLE_PARALLER_EXTRACT
+from const import PKG_REPO_FILE
+from ssh import LocalClient
 from tool import DirectoryUtil, FileUtil, YamlLoader, COMMAND_ENV
 from _manager import Manager
 from _plugin import InstallPlugin
@@ -444,7 +447,6 @@ class Repository(PackageInfo):
             return DirectoryUtil.rm(self.repository_dir, self.stdio) and DirectoryUtil.mkdir(self.repository_dir, stdio=self.stdio)
         return True
 
-
 class RepositoryVO(object):
 
     def __init__(self, name, version, release, arch, md5, path, tags=[], size=0):
@@ -675,3 +677,14 @@ class RepositoryManager(Manager):
         except:
             pass
         return None
+
+    def delete_repositories(self, repositories):
+        if not repositories:
+            return True
+        for repository in repositories:
+            if not repository.path.startswith(self.path):
+                self.stdio.error("The path of the %s file does not start with %s." % (repository.path, self.path))
+                return False
+            if not DirectoryUtil.rm(repository.path, self.stdio):
+                return False
+        return True

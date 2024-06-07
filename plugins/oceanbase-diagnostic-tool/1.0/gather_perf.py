@@ -33,11 +33,11 @@ def gather_perf(plugin_context, *args, **kwargs):
         return value
 
     def local_execute_command(command, env=None, timeout=None):
-        command = r"cd {install_dir} && ./".format(install_dir=obdiag_install_dir) + command
+        command = r"{install_dir}/obdiag".format(install_dir=obdiag_install_dir)
         return LocalClient.execute_command(command, env, timeout, stdio)
 
     def get_obdiag_cmd():
-        base_commond=r"cd {install_dir} && ./obdiag gather perf".format(install_dir=obdiag_install_dir)
+        base_commond=r"{install_dir}/obdiag gather perf".format(install_dir=obdiag_install_dir)
         cmd = r"{base} --scope {scope_option} ".format(
             base = base_commond,
             scope_option = scope_option

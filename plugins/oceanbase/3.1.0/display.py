@@ -20,7 +20,33 @@
 
 from __future__ import absolute_import, division, print_function
 
+import re
 import time
+import uuid
+
+
+class Codec(object):
+
+    NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "oceanbase.com")
+
+    @staticmethod
+    def encoding_version(version):
+        version = re.match("(\d+).(\d+).(\d+).(\d+)", version)
+        if version is None:
+            raise ValueError("Invalid version")
+
+        ver = 0
+        for i, v in enumerate(version.groups()):
+            ver |= int(v) << (i * 8)
+        return "%08x" % ver
+    
+    @staticmethod
+    def encoding(cid, version):
+        ver = Codec.encoding_version(version)
+        code = "%08x-%s" % (cid, ver)
+        uid = uuid.uuid5(Codec.NAMESPACE, code)
+        count = sum(uid.bytes)
+        return "%s-%08x-%s" % (uid, cid + count, ver)
 
 
 def passwd_format(passwd):
@@ -51,7 +77,13 @@ def display(plugin_context, cursor, *args, **kwargs):
                         "password": password,
                         "cmd": cmd
                     }
-                    return plugin_context.return_true(info=info_dict)
+
+                    var = cursor.fetchone('select unix_timestamp(gmt_create) as gmt_create from oceanbase.__all_virtual_sys_variable limit 1',  raise_exception=True, exc_level='verbose')
+                    if var:
+                        cid = int(var['gmt_create'] * 1000)
+                        unique_id = Codec.encoding(cid, servers[0]['build_version'])
+                        stdio.print('cluster unique id: %s\n' % unique_id)
+                    return plugin_context.return_true(info=info_dict, unique_id=unique_id)
             except Exception as e:
                 code =  e.args[0]
                 if code != 1146 and code != 4012:
@@ -59,4 +91,5 @@ def display(plugin_context, cursor, *args, **kwargs):
                 time.sleep(3)
     except:
         stdio.stop_loading('fail', 'observer need bootstarp')
+    stdio.exception('')
     plugin_context.return_false()

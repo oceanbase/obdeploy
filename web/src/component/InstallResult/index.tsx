@@ -489,7 +489,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       <Button
                         type="primary"
                         onClick={() => {
-                          handleCopy(ocpInfo ? JSON.stringify(ocpInfo) : '');
+                          handleCopy(ocpInfo ? JSON.stringify(ocpInfo, null, 4) : '');
                         }}
                       >
                         {intl.formatMessage({
@@ -657,7 +657,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       <CopyOutlined
                         onClick={() =>
                           handleCopy(
-                            ocpInfo?.password ? JSON.stringify(ocpInfo) : '',
+                            ocpInfo?.password ? JSON.stringify(ocpInfo, null, 4) : '',
                           )
                         }
                       />

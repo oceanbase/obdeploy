@@ -72,7 +72,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
 
     ret = connect_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)
     if ret:
-        cursor = ret.get_return('cursor')
-        if display_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=cursor, *args, **kwargs):
+        meta_cursor = ret.get_return('cursor')
+        if display_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=meta_cursor, *args, **kwargs):
             return plugin_context.return_true()
     return plugin_context.return_false()

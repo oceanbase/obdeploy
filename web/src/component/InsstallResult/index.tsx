@@ -478,7 +478,7 @@ const InsstallResult: React.FC<InsstallResultProps> = ({
                               type="primary"
                               onClick={() => {
                                 copyText(
-                                  ocpInfo ? JSON.stringify(ocpInfo) : '',
+                                  ocpInfo ? JSON.stringify(ocpInfo, null, 4) : '',
                                 );
                               }}
                             >
