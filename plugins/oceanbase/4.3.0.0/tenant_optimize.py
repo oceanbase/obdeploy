@@ -116,7 +116,6 @@ def tenant_optimize(plugin_context, tenant_name='test', tenant_cursor=None, scen
             path = repository.repository_dir
             break
 
-    scenario = getattr(plugin_context.options, 'optimize', '')
     global_config = cluster_config.get_global_conf_with_default()
     if scenario:
         check_result = scenario_check(scenario)

@@ -427,9 +427,6 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
 
     ip_server_memory_info = {}
     for ip in servers_disk:
-        if not client.execute_command("[ -w /tmp/ ] || [ -w /tmp/obshell ]"):
-            critical("dir", err.EC_FAIL_TO_INIT_PATH.format(server=server, key='sock path', msg=err.InitDirFailedErrorMessage.PERMISSION_DENIED.format(path='/tmp/obshell')))
-
         ip_servers = servers_memory[ip]['servers'].keys()
         server_num = len(ip_servers)
         client = servers_clients[ip]
