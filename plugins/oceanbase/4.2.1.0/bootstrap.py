@@ -156,7 +156,7 @@ def bootstrap(plugin_context, *args, **kwargs):
                 continue
         # set create tenant variable
         for key in global_conf_with_default:
-            if key.startswith(prefix) and original_global_conf.get(key, None):
+            if key.startswith(prefix) and not original_global_conf.get(key, None):
                 if ocp_config and ocp_config.get(key, None):
                     global_conf_with_default[key] = ocp_config[key]
                 global_conf_with_default[prefix + 'tenant'][key.replace(prefix, '', 1)] = global_conf_with_default[key]

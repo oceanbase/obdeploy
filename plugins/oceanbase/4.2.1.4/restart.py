@@ -191,7 +191,6 @@ class Restart(object):
             for server in self.cluster_config.servers:
                 new_client = self.new_clients[server]
                 server_config = self.cluster_config.get_server_conf(server)
-                new_client.execute_command('[ -w {dir} ] || chmod +666 {dir}'.format(dir='/tmp/obshell'))
                 chown_cmd = 'sudo chown -R %s:' % new_client.config.username
                 for key in ['home_path', 'data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '.meta', 'log_obshell']:
                     if key in server_config:

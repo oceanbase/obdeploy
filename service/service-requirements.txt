@@ -1,6 +1,7 @@
 argparse==1.4.0
 pyyaml==6.0
 pymongo==4.2.0
+idna==2.10
 fastapi==0.87.0
 uvicorn==0.20.0
 asgi-correlation-id==3.2.1
