@@ -337,7 +337,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 if not abs((now - ob_time).total_seconds()) < 180:
                     critical('time check', err.EC_OCP_SERVER_TIME_SHIFT.format(server=server))
 
-            if cursor:
+            if cursor and cursor.user == 'root@sys':
                 stdio.verbose('tenant check ')
                 zone_obs_num = {}
                 sql = "select zone, count(*) num from oceanbase.DBA_OB_SERVERS where status = 'active' group by zone"
