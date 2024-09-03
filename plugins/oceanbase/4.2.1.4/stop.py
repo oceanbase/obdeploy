@@ -23,8 +23,25 @@ from __future__ import absolute_import, division, print_function
 import json
 import time
 import requests
+from urllib.parse import urlparse
 
 from tool import NetUtil
+
+
+def is_ob_configserver(obconfig_url, stdio):
+    parsed_url = urlparse(obconfig_url)
+    host = parsed_url.netloc
+    stdio.verbose('obconfig_url host: %s' % host)
+    url = '%s://%s/debug/pprof/cmdline' % (parsed_url.scheme, host)
+    try:
+        response = requests.get(url, allow_redirects=False)
+        if response.status_code == 404:
+            stdio.verbose('request %s status_code: 404' % url)
+            return False
+    except Exception:
+        stdio.verbose('Configserver url check failed: request %s failed' % url)
+        return None
+    return True
 
 
 def config_url(ocp_config_server, appname, cid):
@@ -71,14 +88,15 @@ def stop(plugin_context, *args, **kwargs):
     obconfig_url = global_config['obconfig_url'] if 'obconfig_url' in global_config else None
     stdio.start_loading('Stop observer')
     if obconfig_url and appname and cluster_id:
-        try:
-            cfg_url, cleanup_config_url_content, register_to_config_url = config_url(obconfig_url, appname, cluster_id)
-            stdio.verbose('post %s' % cleanup_config_url_content)
-            response = requests.post(cleanup_config_url_content)
-            if response.status_code != 200:
-                stdio.warn('%s status code %s' % (cleanup_config_url_content, response.status_code))
-        except:
-            stdio.warn('failed to clean up the configuration url content')
+        if not is_ob_configserver(obconfig_url, stdio):
+            try:
+                cfg_url, cleanup_config_url_content, register_to_config_url = config_url(obconfig_url, appname, cluster_id)
+                stdio.verbose('post %s' % cleanup_config_url_content)
+                response = requests.post(cleanup_config_url_content)
+                if response.status_code != 200:
+                    stdio.warn('%s status code %s' % (cleanup_config_url_content, response.status_code))
+            except:
+                stdio.warn('failed to clean up the configuration url content')
     servers = {}
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)

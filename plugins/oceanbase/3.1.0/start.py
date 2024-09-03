@@ -24,12 +24,36 @@ import json
 import time
 import requests
 from copy import deepcopy
+from urllib.parse import urlparse
 
 from _errno import EC_OBSERVER_FAIL_TO_START, EC_OBSERVER_FAIL_TO_START_WITH_ERR, EC_OBSERVER_FAILED_TO_REGISTER, EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS
 
 from collections import OrderedDict
 
 from tool import NetUtil
+
+def get_ob_configserver_cfg_url(obconfig_url, appname, stdio):
+    parsed_url = urlparse(obconfig_url)
+    host = parsed_url.netloc
+    stdio.verbose('obconfig_url host: %s' % host)
+    url = '%s://%s/debug/pprof/cmdline' % (parsed_url.scheme, host)
+    try:
+        response = requests.get(url, allow_redirects=False)
+        if response.status_code != 200:
+            stdio.verbose('request %s status_code: %s' % (url, str(response.status_code)))
+            return None
+    except Exception:
+        stdio.verbose('Configserver url check failed: request %s failed' % url)
+        return None
+
+    if obconfig_url[-1] == '?':
+        link_char = ''
+    elif obconfig_url.find('?') == -1:
+        link_char = '?'
+    else:
+        link_char = '&'
+    cfg_url = '%s%sAction=ObRootServiceInfo&ObCluster=%s' % (obconfig_url, link_char, appname)
+    return cfg_url
 
 
 def config_url(ocp_config_server, appname, cid):
@@ -87,9 +111,51 @@ class EnvVariables(object):
             else:
                 self.client.del_env(env_key)
 
+def construct_opts(server_config, param_list, rs_list_opt, cfg_url, cmd, need_bootstrap):
+    not_opt_str = OrderedDict({
+                'mysql_port': '-p',
+                'rpc_port': '-P',
+                'zone': '-z',
+                'nodaemon': '-N',
+                'appname': '-n',
+                'cluster_id': '-c',
+                'data_dir': '-d',
+                'devname': '-i',
+                'syslog_level': '-l',
+                'ipv6': '-6',
+                'mode': '-m',
+                'scn': '-f',
+                'local_ip': '-I'
+            })
+    not_cmd_opt = [
+        'home_path', 'obconfig_url', 'root_password', 'proxyro_password', 'scenario',
+        'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc', 'production_mode',
+        'ocp_monitor_tenant', 'ocp_monitor_username', 'ocp_monitor_password', 'ocp_monitor_db',
+        'ocp_meta_tenant', 'ocp_meta_username', 'ocp_meta_password', 'ocp_meta_db', 'ocp_agent_monitor_password', 'ocp_root_password', 'obshell_port'
+    ]
+    get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
 
-def start(plugin_context, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
+    opt_str = []
+    for key in param_list:
+        if key not in not_cmd_opt and key not in not_opt_str and not key.startswith('ocp_meta_tenant_'):
+            value = get_value(key)
+            opt_str.append('%s=%s' % (key, value))
+    if need_bootstrap:
+        if cfg_url:
+            opt_str.append('obconfig_url=\'%s\'' % cfg_url)
+        else:
+            cmd.append(rs_list_opt)
+
+    param_list['mysql_port'] = server_config['mysql_port']
+    for key in not_opt_str:
+        if key in param_list:
+            value = get_value(key)
+            cmd.append('%s %s' % (not_opt_str[key], value))
+    if len(opt_str) > 0:
+        cmd.append('-o %s' % ','.join(opt_str))
+
+def start(plugin_context, new_cluster_config=None, *args, **kwargs):
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -106,12 +172,14 @@ def start(plugin_context, *args, **kwargs):
         if not appname or not cluster_id:
             stdio.error('need appname and cluster_id')
             return
-        try:
-            cfg_url = init_config_server(obconfig_url, appname, cluster_id, getattr(options, 'force_delete', False), stdio)
-            if not cfg_url:
-                stdio.warn(EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS.format(appname, obconfig_url))
-        except:
-            stdio.warn(EC_OBSERVER_FAILED_TO_REGISTER.format())
+        cfg_url = get_ob_configserver_cfg_url(obconfig_url, appname, stdio)
+        if not cfg_url:
+            try:
+                cfg_url = init_config_server(obconfig_url, appname, cluster_id, getattr(options, 'force_delete', False), stdio)
+                if not cfg_url:
+                    stdio.warn(EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS.format(appname, obconfig_url))
+            except:
+                stdio.warn(EC_OBSERVER_FAILED_TO_REGISTER.format())
     elif 'ob-configserver' in cluster_config.depends and appname:
         obc_cluster_config = cluster_config.get_depend_config('ob-configserver')
         vip_address = obc_cluster_config.get('vip_address')
@@ -138,6 +206,17 @@ def start(plugin_context, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
 
+        param_config = {}
+        if new_cluster_config:
+            old_config = plugin_context.cluster_config.get_server_conf_with_default(server)
+            new_config = new_cluster_config.get_server_conf_with_default(server)
+            for key in new_config:
+                param_value = new_config[key]
+                if key not in old_config or old_config[key] != param_value:
+                    param_config[key] = param_value
+        else:
+            param_config = server_config
+
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
 
@@ -158,41 +237,7 @@ def start(plugin_context, *args, **kwargs):
 
         cmd = []
         if use_parameter:
-            not_opt_str = OrderedDict({
-                'mysql_port': '-p',
-                'rpc_port': '-P',
-                'zone': '-z',
-                'nodaemon': '-N',
-                'appname': '-n',
-                'cluster_id': '-c',
-                'data_dir': '-d',
-                'devname': '-i',
-                'syslog_level': '-l',
-                'ipv6': '-6',
-                'mode': '-m',
-                'scn': '-f'
-            })
-            not_cmd_opt = [
-                'home_path', 'obconfig_url', 'root_password', 'proxyro_password',
-                'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc',
-                'ocp_monitor_tenant', 'ocp_monitor_username', 'ocp_monitor_password', 'ocp_monitor_db',
-                'ocp_meta_tenant', 'ocp_meta_username', 'ocp_meta_password', 'ocp_meta_db', 'ocp_agent_monitor_password', 'ocp_root_password'
-            ]
-            get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
-            opt_str = []
-            for key in server_config:
-                if key not in not_cmd_opt and key not in not_opt_str:
-                    value = get_value(key)
-                    opt_str.append('%s=%s' % (key, value))
-            for key in not_opt_str:
-                if key in server_config:
-                    value = get_value(key)
-                    cmd.append('%s %s' % (not_opt_str[key], value))
-            if cfg_url:
-                opt_str.append('obconfig_url=\'%s\'' % cfg_url)
-            else:
-                cmd.append(rs_list_opt)
-            cmd.append('-o %s' % ','.join(opt_str))
+            construct_opts(server_config, param_config, rs_list_opt, cfg_url, cmd, need_bootstrap)
         else:
             cmd.append('-p %s' % server_config['mysql_port'])
 

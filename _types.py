@@ -47,7 +47,9 @@ class ConfigItemType(object):
             self._format()
             if self.value == self.NULL:
                 self.value = self._origin
-        except:
+        except Exception as e:
+            if str(e):
+                raise Exception("%s" % str(e))
             raise Exception("'%s' is not %s" % (self._origin, self._type_str))
 
     @property
@@ -108,7 +110,7 @@ class Moment(ConfigItemType):
                 if 0 <= h <= 23 and 0 <= m <= 60:
                     self._value = h * 60 + m
                 else:
-                    raise Exception('Invalid Value')
+                    raise Exception('Invalid Value(Please use the format like 20:00)')
         else:
             self._value = 0
 
@@ -138,7 +140,7 @@ class Time(ConfigItemType):
             if unit:
                 self._value = int(n) * unit
             else:
-                raise Exception('Invalid Value')
+                raise Exception('%s is Invalid Value(Please use the format like 20m、20h or 20s)'.format(self._origin))
         else:
             self._value = 0
 
@@ -182,8 +184,6 @@ class Capacity(ConfigItemType):
 
     UNITS = {"B": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40, "P": 1 << 50}
 
-    LENGTHS = {"B": 4, "K": 8, "M": 12, "G": 16, "T": 20, "P": 24}
-    
     def __init__(self, s, precision = 0):
         self.precision = precision
         super(Capacity, self).__init__(s)
@@ -192,7 +192,7 @@ class Capacity(ConfigItemType):
         return str(self.value)
 
     @property
-    def btyes(self):
+    def bytes(self):
         return self._value
 
     def _format(self):
@@ -201,15 +201,15 @@ class Capacity(ConfigItemType):
                 self._origin = int(float(self._origin))
                 n = self._origin
                 unit = self.UNITS['B']
-                for u in self.LENGTHS:
-                    if len(str(self._origin)) < self.LENGTHS[u]:
+                for u, v in sorted(self.UNITS.items(), key=lambda item: item[1], reverse=True):
+                    if n >= v:
+                        n /= v
                         break
-                else:
-                    u = 'P'
+                n = self._origin
             else:
                 groups = re.match("^(\d+)\s*([BKMGTP])((IB)|B)?\s*$", self._origin.upper())
                 if not groups:
-                    raise ValueError("Invalid capacity string: %s" % self._origin)
+                    raise ValueError("Invalid capacity string: %s(Please use the format like 20G/20GB/20GIB)" % self._origin)
                 n, u, _, _ = groups.groups()
                 unit = self.UNITS.get(u.upper())
             if unit:
@@ -258,7 +258,7 @@ class Dict(ConfigItemType):
     def _format(self):
         if self._origin:
             if not isinstance(self._origin, dict):
-                raise Exception("Invalid Value")
+                raise Exception("Invalid Value: {} is not a dict.".format(self._origin))
             self._value = self._origin
         else:
             self._value = self.value = {}
@@ -341,11 +341,11 @@ class String(ConfigItemType):
 # this type is used to ensure the parameter is a valid oceanbase user
 class OBUser(ConfigItemType):
 
-    OB_USER_PATTERN = re.compile("^[a-zA-Z0-9_\.-]+(@[a-zA-Z0-9_\.-]+)?(#[a-zA-Z0-9_\.-]+)?$")
+    OB_USER_PATTERN = re.compile("^[a-zA-Z0-9_.-]+(@[a-zA-Z0-9_.-]+)?(#[a-zA-Z0-9_.-]+)?$")
     
     def _format(self):
         if not self.OB_USER_PATTERN.match(str(self._origin)):
-            raise Exception("%s is not a valid config" % self._origin)
+            raise Exception("%s is not a valid config(Please use the format like root@sys#obcluster" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
 
@@ -356,7 +356,7 @@ class SafeString(ConfigItemType):
 
     def _format(self):
         if not self.SAFE_STRING_PATTERN.match(str(self._origin)):
-            raise Exception("%s is not a valid config" % self._origin)
+            raise Exception("%s is not a valid string(Support: a-z、A-Z、0-9、chinese characters、- _ : @ / .)" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
 
@@ -371,7 +371,7 @@ class SafeStringList(ConfigItemType):
             self._value = self._origin.split(';')
             for v in self._value:
                 if not self.SAFE_STRING_PATTERN.match(v):
-                    raise Exception("%s is not a valid config" % v)
+                    raise Exception("%s is not a valid string(Support: a-z、A-Z、0-9、chinese characters、- _ : @ / .)" % v)
         else:
             self._value = []
 
@@ -387,7 +387,7 @@ class Path(ConfigItemType):
         normalized_path = os.path.normpath(absolute_path)
 
         if not (self.PATH_PATTERN.match(str(self._origin)) and normalized_path.startswith(parent_path)):
-            raise Exception("%s is not a valid path" % self._origin)
+            raise Exception("%s is not a valid path(Support: a-z、A-Z、0-9、chinese characters、- _ : @ / .)" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
 
@@ -405,7 +405,7 @@ class PathList(ConfigItemType):
                 absolute_path = "/".join([parent_path, v])
                 normalized_path = os.path.normpath(absolute_path)
                 if not (self.PATH_PATTERN.match(v) and normalized_path.startswith(parent_path)):
-                    raise Exception("%s is not a valid path" % v)
+                    raise Exception("%s is not a valid path(Support: a-z、A-Z、0-9、chinese characters、- _ : @ / .)" % v)
         else:
             self._value = []
 
@@ -417,7 +417,7 @@ class DBUrl(ConfigItemType):
 
     def _format(self):
         if not self.DBURL_PATTERN.match(str(self._origin)):
-            raise Exception("%s is not a valid config" % self._origin)
+            raise Exception("%s is not a valid config(Please use the format like jdbc:mysql://root:123456@127.0.0.1:2883/test)" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
 
@@ -428,5 +428,5 @@ class WebUrl(ConfigItemType):
 
     def _format(self):
         if not self.WEBURL_PATTERN.match(str(self._origin)):
-            raise Exception("%s is not a valid config" % self._origin)
+            raise Exception("%s is not a valid config(Please use the format like https://127.0.0.1:8680/test)" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''

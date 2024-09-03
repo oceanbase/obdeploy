@@ -43,6 +43,7 @@ from ruamel.yaml import YAML, YAMLContextManager, representer
 
 from _errno import EC_SQL_EXECUTE_FAILED
 from _stdio import SafeStdio
+
 _open = open
 if sys.version_info.major == 2:
     import MySQLdb as mysql
@@ -836,3 +837,103 @@ class Cursor(SafeStdio):
         if self.db:
             self.db.close()
             self.db = None
+
+
+class Exector(SafeStdio):
+
+    def __init__(self, host, port, user, pwd, exector_path, stdio):
+        self._host = host
+        self._port = port
+        self._user = user
+        self._pwd = pwd
+        self._cmd = None
+        self.stdio = stdio
+        self._exector = os.path.join(exector_path, 'executer27/bin/executer')
+
+    @property
+    def host(self):
+        return self._host
+
+    @property
+    def port(self):
+        return self._port
+
+    @property
+    def user(self):
+        return self._user
+
+    @property
+    def pwd(self):
+        return self._pwd
+
+    @property
+    def exector(self):
+        return self._exector
+
+    @property
+    def cmd(self):
+        if self._cmd is None:
+            self._cmd = '%s %%s' % self._exector
+        return self._cmd
+
+    @host.setter
+    def host(self, value):
+        self._host = value
+        self._cmd = None
+
+    @port.setter
+    def port(self, value):
+        self._port = value
+        self._cmd = None
+
+    @user.setter
+    def user(self, value):
+        self._user = value
+        self._cmd = None
+
+    @pwd.setter
+    def pwd(self, value):
+        self._pwd = value
+        self._cmd = None
+
+    @exector.setter
+    def exector(self, exector_path):
+        self._exector = os.path.join(exector_path, 'bin/executer27')
+        self._cmd = None
+
+    def create_temp(self, repository, direct_upgrade=False):
+        tmp_path = os.path.join('/tmp', self.tmp_prefix, repository.md5)
+        if not os.path.exists(tmp_path):
+            relative_dir = 'etc/direct_upgrade' if direct_upgrade else 'etc'
+            script_dir = os.path.join(repository.repository_dir, relative_dir)
+            from ssh import LocalClient
+            LocalClient.put_dir(script_dir, tmp_path)
+        return tmp_path
+
+    def clear_temp(self):
+        tmp_path = os.path.join('/tmp', self.tmp_prefix)
+        DirectoryUtil.rm(tmp_path)
+
+    def exec_script(self, name, repository, can_skip=True, param=''):
+        path = os.path.join(repository.repository_dir, 'bin', name)
+        self.stdio.verbose('exec %s %s' % (repository, name))
+        try:
+            if os.path.exists(path):
+                cmd = '{} {}'.format(self.cmd.replace('%s', path, 1), param)
+                self.stdio.start_loading('Exec %s %s' % (repository, name))
+                from ssh import LocalClient
+                if LocalClient.execute_command(cmd, stdio=self.stdio):
+                    self.stdio.stop_loading('succeed')
+                    return True
+                else:
+                    self.stdio.stop_loading('fail')
+                    return False
+            else:
+                if can_skip:
+                    self.stdio.print('skip %s %s' % (repository, name))
+                    return True
+                else:
+                    self.stdio.error('No such file: %s' % path)
+                    return False
+        except:
+            pass

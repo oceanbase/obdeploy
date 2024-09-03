@@ -196,7 +196,7 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
         if value is None:
             return value
         try:
-            parsed_value = Capacity(value).btyes
+            parsed_value = Capacity(value).bytes
         except:
             stdio.exception("")
             raise Exception("Invalid option {}: {}".format(key, value))
@@ -207,12 +207,12 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
         stdio.stop_loading('fail')
 
     def start_cluster(times=0):
-        jdbc_host = jdbc_port = jdbc_url = jdbc_username = jdbc_password = jdbc_public_key = meta_user = meta_tenant = meta_password = monitor_user = monitor_tenant = monitor_password = monitor_db = ''
         server_config = start_env[cluster_config.servers[0]]
         # check meta db connect before start
         jdbc_url = server_config['jdbc_url']
         jdbc_username = "{0}@{1}".format(server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'])
         jdbc_password = server_config['ocp_meta_password']
+        jdbc_public_key = ''
         meta_user = server_config['ocp_meta_username']
         meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
         meta_password = server_config['ocp_meta_password']
@@ -234,14 +234,30 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
         site_url = global_config.get('ocp_site_url', '')
         soft_dir = global_config.get('soft_dir', '')
 
-        meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, meta_password, stdio)
-        if meta_user != 'root':
+        retries = 10
+        meta_cursor = monitor_cursor = ''
+        while retries:
+            retries -= 1
+            try:
+                meta_cursor = Cursor(jdbc_host, jdbc_port, meta_user, meta_tenant, meta_password, stdio)
+                meta_cursor.execute("show databases;", raise_exception=False, exc_level='verbose')
+                monitor_cursor = Cursor(jdbc_host, jdbc_port, monitor_user, monitor_tenant, monitor_password, stdio)
+                monitor_cursor.execute("show databases;", raise_exception=False, exc_level='verbose')
+                stdio.verbose(f'meta tenant and monitor tenant connect successful')
+                break
+            except:
+                stdio.verbose(f'meta tenant or monitor tenant connect failed, retrying({retries})')
+                if retries == 0:
+                    stdio.error('meta tenant or monitor tenant connect failed')
+                    return False
+                time.sleep(1)
+
+        if meta_cursor and meta_user != 'root':
             sql = f"""ALTER USER root IDENTIFIED BY %s"""
             meta_cursor.execute(sql, args=[meta_password], raise_exception=False, exc_level='verbose')
         plugin_context.set_variable('meta_cursor', meta_cursor)
 
-        monitor_cursor = Cursor(jdbc_host, jdbc_port, monitor_user, monitor_tenant, monitor_password, stdio)
-        if monitor_user != 'root':
+        if monitor_cursor and monitor_user != 'root':
             sql = f"""ALTER USER root IDENTIFIED BY %s"""
             monitor_cursor.execute(sql, args=[monitor_password], raise_exception=False, exc_level='verbose')
         plugin_context.set_variable('monitor_cursor', monitor_cursor)
@@ -256,7 +272,6 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
             home_path = server_config['home_path']
             launch_user = server_config.get('launch_user', None)
             system_password = server_config["system_password"]
-            port = server_config['port']
             pid_path = os.path.join(home_path, 'run/ocp-server.pid')
             pids = client.execute_command("cat %s" % pid_path).stdout.strip()
             if not times and pids and all([client.execute_command('ls /proc/%s' % pid) for pid in pids.split('\n')]):
@@ -310,18 +325,19 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
                 cmd += ' --with-property=obsdk.ob.connection.mode:direct'
                 cmd += ' --with-property=ocp.iam.login.client.max-attempts:60'
                 cmd += ' --with-property=ocp.iam.login.client.lockout-minutes:1'
-            if server_config['admin_password'] != '********':
-                admin_password = server_config['admin_password'].replace("'", """'"'"'""")
-                environ_variable += "export OCP_INITIAL_ADMIN_PASSWORD=\'%s\';" % admin_password
-            cmd += f' --with-property=ocp.file.local.built-in.dir:{home_path}/ocp-server/lib'
-            cmd += f' --with-property=ocp.log.download.tmp.dir:{home_path}/logs/ocp'
-            cmd += ' --with-property=ocp.file.local.dir:{}'.format(soft_dir) if soft_dir else f' --with-property=ocp.file.local.dir:{home_path}/data/files'
+            if not without_parameter and not get_option('without_parameter', ''):
+                if server_config['admin_password'] != '********':
+                    admin_password = server_config['admin_password'].replace("'", """'"'"'""")
+                    environ_variable += "export OCP_INITIAL_ADMIN_PASSWORD=\'%s\';" % admin_password
+                cmd += f' --with-property=ocp.file.local.built-in.dir:{home_path}/ocp-server/lib'
+                cmd += f' --with-property=ocp.log.download.tmp.dir:{home_path}/logs/ocp'
+                cmd += ' --with-property=ocp.file.local.dir:{}'.format(soft_dir) if soft_dir else f' --with-property=ocp.file.local.dir:{home_path}/data/files'
             real_cmd = environ_variable + cmd
             execute_cmd = "cd {}; {} > /dev/null 2>&1 &".format(home_path, real_cmd)
-            if server_config.get('launch_user'):
+            if launch_user:
                 cmd_file = os.path.join(home_path, 'cmd.sh')
                 client.write_file(execute_cmd, cmd_file)
-                execute_cmd = "chmod +x {0};sudo chown -R {1} {0};sudo su - {1} -c '{0}' &".format(cmd_file, server_config['launch_user'])
+                execute_cmd = "chmod +x {0};sudo chown -R {1} {0};sudo su - {1} -c '{0}' &".format(cmd_file, launch_user)
             client.execute_command(execute_cmd, timeout=3600)
             ret = client.execute_command(
                 "ps -aux | grep -F '%s' | grep -v grep | awk '{print $2}' " % jar_cmd)
@@ -423,25 +439,13 @@ def start(plugin_context, start_env=None, source_option='start', without_paramet
                 return plugin_context.return_true()
 
     cluster_config = plugin_context.cluster_config
-    deploy_status = plugin_context.deploy_status
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-    namespace = plugin_context.namespace
-    namespaces = plugin_context.namespaces
-    deploy_name = plugin_context.deploy_name
-    repositories = plugin_context.repositories
-    plugin_name = plugin_context.plugin_name
-
-    components = plugin_context.components
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-    cmds = plugin_context.cmds
     options = plugin_context.options
-    dev_mode = plugin_context.dev_mode
     stdio = plugin_context.stdio
-    create_if_not_exists = get_option('create_if_not_exists', True)
-    sys_cursor = kwargs.get('sys_cursor')
     global tenant_cursor
     tenant_cursor = None
 

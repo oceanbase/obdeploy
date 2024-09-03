@@ -21,6 +21,7 @@ declare namespace API {
     ocpexpress?: OcpExpress;
     obagent?: ObAgent;
     obclient?: ObClient;
+    ocpserver?: OcpServer;
   };
 
   type ConfigParameter = {
@@ -52,7 +53,7 @@ declare namespace API {
     need_restart?: boolean;
     /** Section section */
     section?: string;
-    is_changed?:boolean;
+    is_changed?: boolean;
   };
 
   type ConnectionInfo = {
@@ -71,6 +72,18 @@ declare namespace API {
   type createDeploymentConfigParams = {
     /** name */
     name: string;
+  };
+
+  type componentsDependsItems = {
+    component_name: string;
+    depends: string[];
+  }[];
+
+  type componentsDepends = {
+    /** Total */
+    total?: number;
+    /** Items */
+    items?: componentsDependsItems;
   };
 
   type DataListComponent_ = {
@@ -184,10 +197,11 @@ declare namespace API {
   };
 
   type InstallLog = {
-    /** Log install log */
-    log?: string;
-    /** Offset log offset */
-    offset?: number;
+    total: number;
+    items: {
+      component_name: string;
+      log: string;
+    }[];
   };
 
   type Mirror = {
@@ -293,6 +307,26 @@ declare namespace API {
     success?: boolean;
   };
 
+  type ComponentsDepends_ = {
+    /** Code */
+    code?: number;
+    data?: componentsDepends;
+    /** Msg */
+    msg?: string;
+    /** Success */
+    success?: boolean;
+  };
+
+  type CommondConfigPath = {
+    /** Code */
+    code?: number;
+    data?: { config_path: string };
+    /** Msg */
+    msg?: string;
+    /** Success */
+    success?: boolean;
+  };
+
   type OBResponseDataListComponent_ = {
     /** Code */
     code?: number;
@@ -347,6 +381,21 @@ declare namespace API {
     /** Code */
     code?: number;
     data?: DataListParameterMeta_;
+    /** Msg */
+    msg?: string;
+    /** Success */
+    success?: boolean;
+  };
+
+  type ScenarioType = { type: string; desc: string; value: string };
+
+  type OBResponseDataListScenarioType = {
+    /** Code */
+    code?: number;
+    data?: {
+      total: number;
+      items: ScenarioType[];
+    };
     /** Msg */
     msg?: string;
     /** Success */
@@ -468,6 +517,46 @@ declare namespace API {
     parameters?: Parameter[];
     /** Servers server ip, ex:[ '1.1.1.1','2.2.2.2'] */
     servers: string[];
+    /** Admin password */
+    admin_passwd: string;
+  };
+
+  type OcpServer = {
+    component: string;
+    version: string;
+    release: string;
+    package_hash: string;
+    servers: string[];
+    admin_password: string;
+    home_path: string;
+    log_dir: string;
+    soft_dir: string;
+    ocp_site_url?: string | string[];
+    port: number;
+    manage_info: {
+      machine: number;
+    };
+    memory_size: number;
+    meta_tenant: {
+      name: {
+        tenant_name: string;
+      };
+      password: string;
+      resource: {
+        cpu: number;
+        memory: number;
+      };
+    };
+    monitor_tenant: {
+      name: {
+        tenant_name: string;
+      };
+      password: string;
+      resource: {
+        cpu: number;
+        memory: number;
+      };
+    };
   };
 
   type Parameter = {

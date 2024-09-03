@@ -35,7 +35,7 @@ def get_memory_limit(cursor, client):
     try:
         memory_limit = cursor.fetchone('show parameters where name = \'memory_limit\'')
         if memory_limit and 'value' in memory_limit and memory_limit['value']:
-            return Capacity(memory_limit['value']).btyes
+            return Capacity(memory_limit['value']).bytes
         ret = client.execute_command('free -b')
         if ret:
             ret = client.execute_command("cat /proc/meminfo | grep 'MemTotal:' | awk -F' ' '{print $2}'")
@@ -117,7 +117,7 @@ def init(plugin_context, env, *args, **kwargs):
         exec_init_user_for_oracle = 'init_user_oracle.sql|SYS@oracle|SYS'
         client = plugin_context.clients[server]
         memory_limit = get_memory_limit(cursor, client)
-        is_mini = memory_limit and Capacity(memory_limit).btyes < (16<<30)
+        is_mini = memory_limit and Capacity(memory_limit).bytes < (16<<30)
         if env['is_business']:
             init_sql = [exec_mini_init if is_mini else exec_init, exec_init_user_for_oracle, exec_init_user]
         else:

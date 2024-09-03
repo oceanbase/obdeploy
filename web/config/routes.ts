@@ -23,26 +23,31 @@ export default [
         path: 'update',
         component: 'OcpInstaller/Update',
         name: 'ocp升级',
-        spmb:'b71440'
+        spmb: 'b71440',
       },
       {
         path: 'ocpInstaller/install',
         component: 'OcpInstaller/Install',
         name: '安装无MetaDB',
-        spmb:'b71462',
+        spmb: 'b71462',
         exact: true,
       },
       {
         path: 'ocpInstaller/configuration',
         component: 'OcpInstaller/Configuration',
         name: '安装有MetaDB',
-        spmb:'b71463',
+        spmb: 'b71463',
         exact: true,
       },
       {
-        path: 'ocpInstaller',
-        component: 'OcpInstaller/Index/index',
-        name: 'oceanbase云平台安装',
+        path: 'componentDeploy',
+        component: 'ComponentDeploy/index',
+        name: '安装组件',
+      },
+      {
+        path: 'componentUninstall',
+        component: 'ComponentUninstall/index',
+        name: '卸载组件',
       },
       {
         path: 'quit',
@@ -53,7 +58,7 @@ export default [
       {
         path: '/guide',
         component: 'Guide',
-        spmb:'b57206',
+        spmb: 'b57206',
         name: '部署向导',
       },
     ],

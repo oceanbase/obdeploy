@@ -1,6 +1,7 @@
-import moment from 'moment';
 import { MICROSECOND } from '@/constant/must-ignore';
+import { SPECIAL_SYMBOLS_OCP } from '@/utils/helper';
 import { intl } from '@/utils/intl';
+import moment from 'moment';
 
 export const ALL = '__OCP_ALL_CONSTANT_VALUE__';
 
@@ -9,7 +10,6 @@ export const WILDCARD = '*';
 
 // OB 官网链接
 export const OB_SITE_LINK = 'https://www.oceanbase.com';
-
 
 export const SMLL_FORM_ITEM_LAYOUT = {
   labelCol: {
@@ -307,3 +307,51 @@ export const OCP_UPGRADE_STATUS_LIST = [
     badgeStatus: 'ignored',
   },
 ];
+
+export const DEL_STATUS_MAP = {
+  RUNNING: { status: 'processing', text: '卸载中' },
+  FAILED: { status: 'error', text: '卸载失败' },
+  SUCCESSFUL: { status: 'success', text: '卸载成功' },
+  PENDING: { status: 'warning', text: '待卸载' },
+};
+
+export const NO_CONNECT_COMP_STATUS = {
+  ERROR: { status: 'error', text: '不可卸载' },
+  PENDING: { status: 'error', text: '不可卸载' },
+  DELETING: { status: 'processing', text: '移除中' },
+  SUCCESSFUL: { status: 'success', text: '移除成功' },
+};
+export const PASSWORD_SUPPORT_CHARACTERS = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789${SPECIAL_SYMBOLS_OCP}`;
+
+export const PORT_MIN = 1025;
+export const PORT_MAX = 65535;
+
+export const DEFAULT_PROXY_PWD = {
+  key: 'obproxy_sys_password',
+  description: 'password pf obproxy sys user',
+  value:'',
+  adaptive: false,
+  auto: true,
+  require: false,
+  type: 'String',
+  is_essential: true,
+  name: 'obproxy_sys_password',
+  default: '',
+  min_value: '',
+  max_value: '',
+  need_redeploy: false,
+  modify_limit: '_none_limit',
+  need_reload: false,
+  need_restart: false,
+  section: '',
+  isChanged: true,
+  parameterValue: {
+    value: '',
+    defaultValue: '',
+    adaptive: true,
+    auto: true,
+    require: false,
+    isChanged: false,
+    type: 'String',
+  },
+};

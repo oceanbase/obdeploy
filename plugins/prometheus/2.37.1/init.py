@@ -22,7 +22,8 @@ from __future__ import absolute_import, division, print_function
 
 import os.path
 
-from _errno import EC_FAIL_TO_INIT_PATH, EC_CLEAN_PATH_FAILED, InitDirFailedErrorMessage, EC_CONFIG_CONFLICT_DIR
+from _errno import EC_FAIL_TO_INIT_PATH, EC_CLEAN_PATH_FAILED, InitDirFailedErrorMessage, EC_CONFIG_CONFLICT_DIR, \
+    EC_COMPONENT_DIR_NOT_EMPTY
 
 
 def _clean(server, client, path, stdio=None):
@@ -39,7 +40,7 @@ def init(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-
+    deploy_name = plugin_context.deploy_name
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
     clean = getattr(plugin_context.options, 'clean', False)
@@ -100,6 +101,7 @@ def init(plugin_context, *args, **kwargs):
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path',
                                                         msg=InitDirFailedErrorMessage.NOT_EMPTY.format(
                                                             path=home_path)))
+                stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 continue
         else:
             global_ret = False
@@ -115,6 +117,7 @@ def init(plugin_context, *args, **kwargs):
                     stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='data_dir',
                                                             msg=InitDirFailedErrorMessage.NOT_EMPTY.format(
                                                                 path=data_dir)))
+                    stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 global_ret = False
@@ -134,6 +137,7 @@ def init(plugin_context, *args, **kwargs):
                     stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='data_dir',
                                                             msg=InitDirFailedErrorMessage.NOT_EMPTY.format(
                                                                 path=data_dir)))
+                    stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 global_ret = False

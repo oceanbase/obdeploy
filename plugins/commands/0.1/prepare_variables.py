@@ -54,6 +54,7 @@ def prepare_variables(plugin_context, name, context, component, server, *args, *
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     clients = plugin_context.clients
+    cluster_servers = cluster_config.servers
 
     components = get_value_from_context("components", [])
     servers = get_value_from_context("servers", [])
@@ -61,7 +62,9 @@ def prepare_variables(plugin_context, name, context, component, server, *args, *
     loading_env = {}
 
     if server is None:
-        server = cluster_config.servers[0]
+        server = cluster_servers[0]
+    if server not in cluster_servers and getattr(server, 'ip', server) in [s.ip for s in cluster_servers]:
+        server = [s for s in cluster_servers if s.ip == getattr(server, 'ip', server)][0]
     # find command template
     command_template = None
     interactive = None
@@ -94,7 +97,7 @@ def prepare_variables(plugin_context, name, context, component, server, *args, *
         return
     cmd_input = None
 
-    if server not in cluster_config.servers:
+    if server not in cluster_servers:
         if interactive:
             stdio.error("{} is not a server in {}".format(server, component))
             return plugin_context.return_false()

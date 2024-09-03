@@ -164,6 +164,8 @@ class ObVersionGraph(object):
 
 
 def format_route(routes, repository):
+    if not routes:
+        return routes
     route_res = []
     from_version = repository.version
     from_release = repository.release

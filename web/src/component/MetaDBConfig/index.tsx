@@ -288,7 +288,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
       initialValues={initialValues}
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <ProCard>
+        <ProCard bodyStyle={{ paddingBottom: 24 }}>
           <UserConfig form={form} />
           <NodeConfig form={form} />
           <DataBaseNodeConfig

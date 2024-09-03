@@ -20,11 +20,13 @@
 
 from __future__ import absolute_import, division, print_function
 
-
+import os
 import time
 
+import const
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 from _types import Capacity
+from tool import Exector
 
 tenant_cursor = None
 
@@ -53,7 +55,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args,
     def get_parsed_option(key, default=''):
         value = get_option(key=key, default=default)
         try:
-            parsed_value = Capacity(value).btyes
+            parsed_value = Capacity(value).bytes
         except:
             stdio.exception("")
             raise Exception("Invalid option {}: {}".format(key, value))
@@ -180,11 +182,11 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args,
             MIN_IOPS = 128
             MIN_SESSION_NUM = 64
             if cpu_total < MIN_CPU:
-                return error('%s: resource not enough: cpu count less than %s' % (zone_list, MIN_CPU))
+                return error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_total, need=MIN_CPU))
             if mem_total < MIN_MEMORY:
-                return error('%s: resource not enough: memory less than %s' % (zone_list, Capacity(MIN_MEMORY)))
+                return error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_total), need=Capacity(MIN_MEMORY)))
             if disk_total < MIN_DISK_SIZE:
-                return error('%s: resource not enough: disk space less than %s' % (zone_list, Capacity(MIN_DISK_SIZE)))
+                return error('{zone} not enough disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(disk_total), need=Capacity(MIN_DISK_SIZE)))
 
             try:
                 max_memory = get_parsed_option('max_memory', mem_total)
@@ -290,14 +292,36 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None,  *args,
         db_username = get_option('db_username')
         db_password = get_option('db_password', '')
         if db_username:
+            create_sql, grant_sql = "", ""
             if mode == "mysql":
-                sql = """create user if not exists '{username}' IDENTIFIED BY %s;
-            grant all on *.* to '{username}' WITH GRANT OPTION;""".format(
-                    username=db_username)
+                create_sql = "create user if not exists '{username}' IDENTIFIED BY %s;".format(username=db_username)
+                grant_sql = "grant all on *.* to '{username}' WITH GRANT OPTION;".format(username=db_username)
             else:
                 error("Create user in oracle tenant is not supported")
-            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[db_password], stdio=stdio):
+            if not exec_sql_in_tenant(sql=create_sql, cursor=cursor, tenant=name, mode=mode, args=[db_password], stdio=stdio):
                 stdio.error('failed to create user {}'.format(db_username))
                 return
+            if not exec_sql_in_tenant(sql=grant_sql, cursor=cursor, tenant=name, mode=mode, stdio=stdio):
+                stdio.error('Failed to grant privileges to user {}'.format(db_username))
+                return
 
+        clients = plugin_context.clients
+        repositories = plugin_context.repositories
+        client = clients[plugin_context.cluster_config.servers[0]]
+        cluster_config = plugin_context.cluster_config
+        global_config = cluster_config.get_global_conf()
+
+        time_zone = get_option('time_zone', client.execute_command('date +%:z').stdout.strip())
+        exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, args=[db_password], stdio=stdio)
+
+        exector_path = get_option('exector_path', '/usr/obd/lib/executer')
+        exector = Exector(tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user, tenant_cursor.password, exector_path, stdio)
+        for repository in repositories:
+            if repository.name in const.COMPS_OB:
+                time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
+                if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
+                    stdio.warn('execute import_time_zone_info.py failed')
+                break
+        cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+        stdio.print(cmd)
     return plugin_context.return_true()

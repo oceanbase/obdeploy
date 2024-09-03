@@ -102,11 +102,14 @@ def check_opt(plugin_context, name, context, *args, **kwargs):
         servers = list(clients.keys())
     else:
         server_names = servers.split(',')
-        servers = []
+        servers = set()
         for server in clients:
+            if server.ip in server_names:
+                server_names.remove(server.ip)
+                servers.add(server)
             if server.name in server_names:
                 server_names.remove(server.name)
-                servers.append(server)
+                servers.add(server)
         if server_names:
             stdio.error("Server {} not found in current deployment".format(','.join(server_names)))
             return
@@ -118,5 +121,5 @@ def check_opt(plugin_context, name, context, *args, **kwargs):
     if failed_components:
         stdio.error('{} not support. {} is allowed'.format(','.join(failed_components), deployed_components))
         return plugin_context.return_false()
-    context.update(components=components, servers=servers, command_config=command_config)
+    context.update(components=components, servers=list(servers), command_config=command_config)
     return plugin_context.return_true(context=context)

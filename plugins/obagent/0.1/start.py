@@ -190,6 +190,17 @@ def start(plugin_context, *args, **kwargs):
                     if key and isinstance(key, dict):
                         key = list(key.keys())[0]
                         need_encrypted.append(key)
+
+    for comp in ["oceanbase", "oceanbase-ce"]:
+        if cluster_config.get_depend_config(comp) and plugin_context.get_return('start', comp).get_return('need_bootstrap'):
+            error_servers_list = []
+            for server in cluster_config.servers:
+                if not cluster_config.get_depend_config(comp, server):
+                    error_servers_list.append(server)
+            if error_servers_list:
+                error_servers_msg = ', '.join(map(lambda x: str(x), error_servers_list))
+                stdio.warn(WC_OBAGENT_SERVER_NAME_ERROR.format(servers=error_servers_msg))
+
     targets = []
     for server in cluster_config.servers:
         client = clients[server]

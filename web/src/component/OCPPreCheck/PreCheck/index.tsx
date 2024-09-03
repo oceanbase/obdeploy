@@ -218,7 +218,7 @@ export default function PreCheck({
     window.scrollTo(0, 0);
   };
 
-  const { run: installOcp, loading: precheckLoading } = useRequest(
+  const { run: installOcp, loading: installLoading } = useRequest(
     OCP.installOcp,
     {
       manual: true,
@@ -284,6 +284,7 @@ export default function PreCheck({
       handleRetryCheck={handleRetryCheck}
       prevStep={prevStep}
       handleInstall={handleInstall}
+      installLoading={installLoading}
       setOnlyManual={setOnlyManual}
     />
   );

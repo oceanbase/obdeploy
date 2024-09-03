@@ -25,6 +25,7 @@ import re
 
 from ssh import LocalClient
 from tool import DirectoryUtil
+from const import TOOL_TPCC, TOOL_TPCC_BENCHMARKSQL, COMP_OBCLIENT
 
 PROPS4OB_TEMPLATE = """
 db=oceanbase
@@ -49,7 +50,18 @@ resultDirectory=my_result_%tY-%tm-%td_%tH%tM%tS
 osCollectorScript=./misc/os_collector_linux.py
 osCollectorInterval=1
 """
-    
+
+def file_path_check(bin_path, tool_name, tool_path, cmd, stdio):
+    result = None
+    tool_path = os.path.join(os.getenv('HOME'), tool_name, tool_path)
+    for path in [bin_path, tool_path]:
+        result = LocalClient.execute_command(cmd % path, stdio=stdio)
+        if not result:
+            continue
+        break
+    else:
+        return None, result
+    return path, None
 
 def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     def get_option(key, default=''):
@@ -89,6 +101,16 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
         stdio.error('Create tmp dir failed')
         return
 
+    bmsql_jar_paths = [bmsql_jar, os.path.join(os.getenv('HOME'), TOOL_TPCC, "tpcc/%s" % TOOL_TPCC_BENCHMARKSQL)]
+    for jar_path in bmsql_jar_paths:
+        if os.path.exists(jar_path):
+            bmsql_jar = jar_path
+            setattr(options, 'bmsql_dir', bmsql_jar)
+            break
+    else:
+        stdio.error('BenchmarkSQL jar file not found at %s. Please use `--bmsql-jar` to set BenchmarkSQL jar file' % bmsql_jar)
+        return
+
     if not os.path.exists(bmsql_jar):
         stdio.error(
             'BenchmarkSQL jar file not found at %s. Please use `--bmsql-jar` to set BenchmarkSQL jar file' % bmsql_jar)
@@ -105,20 +127,27 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     bmsql_classpath = ':'.join(jars)
 
     obclient_bin = get_option('obclient_bin', 'obclient')
-    ret = LocalClient.execute_command('%s --help' % obclient_bin, stdio=stdio)
-    if not ret:
+    cmd = '%s --help'
+    path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd, stdio)
+    if result:
         stdio.error(
-            '%s\n%s is not an executable file. please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
-            ret.stderr, obclient_bin))
+            '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
+                result.stderr, obclient_bin))
         return
+    obclient_bin = path
+    setattr(options, 'obclient_bin', obclient_bin)
 
     java_bin = get_option('java_bin', 'java')
-    ret = local_execute_command('{java_bin} -version'.format(java_bin=java_bin))
-    if not ret:
+    cmd = '%s -version'
+    path, result = file_path_check(java_bin, TOOL_TPCC, 'lib/bin/java', cmd, stdio)
+    if result:
         stdio.error(
             '%s\n%s is not an executable file. please use `--java-bin` to set.\nYou may not have java installed' % (
-                ret.stderr, java_bin))
+                result.stderr, java_bin))
         return
+    java_bin = path
+    setattr(options, 'java_bin', java_bin)
+
     exec_classes = ['jTPCC', 'LoadData', 'ExecJDBC']
     passed = True
     for exec_class in exec_classes:

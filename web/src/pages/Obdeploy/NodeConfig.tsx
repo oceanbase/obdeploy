@@ -238,7 +238,7 @@ export default function NodeConfig() {
     const componentTextMap = {
       obproxy: 'OBProxy',
       ocpexpress: 'OCP Express',
-      obconfigserver: 'OBConfigServer',
+      obconfigserver: 'obconfigserver',
     };
     const customComponentServers = compoentServers?.filter(
       (item: string) =>
@@ -841,7 +841,7 @@ export default function NodeConfig() {
                     },
                     {
                       validator: (_: any, value: string[]) =>
-                        serversValidator(_, value, 'OBConfigServer'),
+                        serversValidator(_, value, 'obconfigserver'),
                     },
                   ]}
                   options={formatOptions(allOBServer)}

@@ -83,6 +83,7 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
     max_cpu = kwargs.get('max_cpu', 2)
     tenant_id = kwargs.get('tenant_id')
     unit_count = kwargs.get('unit_count', 0)
+    parallel_num = get_option('parallel', int(max_cpu * unit_count))
 
     if not_test_only:
         sql_cmd_prefix = '%s -h%s -P%s -u%s@%s %s -A' % (obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
@@ -122,8 +123,6 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
                 if not path.startswith(ret):
                     stdio.error('Access denied. Please set `secure_file_priv` to "".')
                     return
-
-        parallel_num = int(max_cpu * unit_count)
         
         if not_test_only:
             # 替换并发数

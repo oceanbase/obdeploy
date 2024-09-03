@@ -1,3 +1,4 @@
+import { PORT_MAX, PORT_MIN } from '@/constant';
 import { commonStyle } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { ProFormDigit } from '@ant-design/pro-components';
@@ -12,7 +13,7 @@ interface InputPortProps {
 }
 
 /**
- * default port range 1024~65535
+ * default port range 1025~65535
  */
 export default function InputPort({
   name,
@@ -35,11 +36,11 @@ export default function InputPort({
   if (limit) {
     rules.push(() => ({
       validator(_: any, value: number) {
-        if (value < 1024 || value > 65535) {
+        if (value < PORT_MIN || value > PORT_MAX) {
           return Promise.reject(
             intl.formatMessage({
               id: 'OBD.component.InputPort.ThePortNumberCanOnly',
-              defaultMessage: '端口号只支持 1024~65535 范围',
+              defaultMessage: '端口号只支持 1025~65535 范围',
             }),
           );
         }

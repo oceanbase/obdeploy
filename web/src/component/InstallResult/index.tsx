@@ -46,7 +46,7 @@ export interface InsstallResultProps extends ResultProps {
 }
 
 const InstallResult: React.FC<InsstallResultProps> = ({
-  ocpInfo,
+  ocpInfo = {},
   upgradeOcpInfo,
   installStatus,
   installResult,
@@ -57,7 +57,10 @@ const InstallResult: React.FC<InsstallResultProps> = ({
 }) => {
   let isHaveMetadb = 'install';
   const isUpdate = getTailPath() === 'update';
-  const { RELEASE_RECORD, OCP_DOCS } = useModel('global');
+  const { RELEASE_RECORD, OCP_DOCS, ocpConfigData } = useModel('global');
+  const ocpAdminPwd = ocpConfigData?.components?.ocpserver?.admin_password;
+
+  if (ocpAdminPwd) ocpInfo.password = ocpAdminPwd;
   // 获取 升级主机列表
   const { data: upgraadeAgentHosts, run: getOcpNotUpgradingHost } = useRequest(
     OCP.getOcpNotUpgradingHost,
@@ -465,7 +468,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems:'center',
+                        alignItems: 'center',
                         padding: '0 4px',
                         lineHeight: '32px',
                       }}
@@ -476,10 +479,7 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                           defaultMessage:
                             '请妥善保存以下访问地址及账密信息，及时更新 OCP\n                        初始密码，如需了解更多，请访问',
                         })}{' '}
-                        <a
-                          target="_blank"
-                          href={OCP_DOCS}
-                        >
+                        <a target="_blank" href={OCP_DOCS}>
                           {intl.formatMessage({
                             id: 'OBD.component.InstallResult.OceanbaseDocumentCenter',
                             defaultMessage: 'OceanBase 文档中心',
@@ -489,7 +489,9 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       <Button
                         type="primary"
                         onClick={() => {
-                          handleCopy(ocpInfo ? JSON.stringify(ocpInfo, null, 4) : '');
+                          handleCopy(
+                            ocpInfo ? JSON.stringify(ocpInfo, null, 4) : '',
+                          );
                         }}
                       >
                         {intl.formatMessage({
@@ -657,7 +659,9 @@ const InstallResult: React.FC<InsstallResultProps> = ({
                       <CopyOutlined
                         onClick={() =>
                           handleCopy(
-                            ocpInfo?.password ? JSON.stringify(ocpInfo, null, 4) : '',
+                            ocpInfo?.password
+                              ? JSON.stringify(ocpInfo, null, 4)
+                              : '',
                           )
                         }
                       />

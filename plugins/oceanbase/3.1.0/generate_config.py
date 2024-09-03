@@ -46,7 +46,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
         if not only_generate_password:
             generate_keys += [
                 'memory_limit', 'datafile_size', 'clog_disk_utilization_threshold', 'clog_disk_usage_limit_percentage',
-                'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id',
+                'syslog_level', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id',
                 'devname', 'system_memory', 'cpu_count'
             ]
         if generate_password:
@@ -59,7 +59,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
         cluster_config.update_global_conf('appname', plugin_context.deploy_name)
     if original_global_conf.get('cluster_id') is None:
         cluster_config.update_global_conf('cluster_id', round(time.time()) % 4294901759, False)
-    if generate_password:
+    if generate_password or only_generate_password:
         generate_random_password(cluster_config)
     if only_generate_password:
         return plugin_context.return_true()
@@ -101,8 +101,6 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
     max_syslog_file_count_default = 4
     if global_config.get('syslog_level') is None:
         update_global_conf('syslog_level', 'INFO')
-    if global_config.get('enable_syslog_recycle') is None:
-        update_global_conf('enable_syslog_recycle', True)
     if global_config.get('enable_syslog_wf') is None:
         update_global_conf('enable_syslog_wf', False)
     if global_config.get('max_syslog_file_count') is None:
@@ -153,7 +151,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                 total_memory = 0
                 for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                     if k == 'MemTotal':
-                        total_memory = Capacity(str(v)).btyes
+                        total_memory = Capacity(str(v)).bytes
             memory_limit = int(total_memory * user_server_config.get('memory_limit_percentage') / 100)
         else:
             if not server_config.get('memory_limit'):
@@ -172,7 +170,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                     for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                         if k in memory_key_map:
                             key = memory_key_map[k]
-                            server_memory_stats[key] = Capacity(str(v)).btyes
+                            server_memory_stats[key] = Capacity(str(v)).bytes
 
                     if generate_check:
                         if server_memory_stats['available'] < START_NEED_MEMORY:
@@ -194,7 +192,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                     success = False
                     continue
             else:
-                memory_limit = Capacity(server_config.get('memory_limit')).btyes
+                memory_limit = Capacity(server_config.get('memory_limit')).bytes
 
         auto_set_system_memory = False
         if not user_server_config.get('system_memory'):
@@ -258,10 +256,10 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                 disk_free = data_dir_disk['avail']
                 real_disk_total = data_dir_disk['total']
                 if mounts[dirs['home_path']] == data_dir_mount:
-                    if user_server_config.get('enable_syslog_recycle') is False:
-                        log_size = real_disk_total * 0.1
-                    else:
+                    if int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) != 0:
                         log_size = (256 << 20) * int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) * 4
+                    else:
+                        log_size = real_disk_total * 0.1
                 else:
                     log_size = 0
                 clog_padding_size = int(real_disk_total * (1 - clog_disk_utilization_threshold_max / 100.0 * 0.8))
@@ -280,13 +278,13 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                         if auto_set_system_memory:
                             min_size = MIN_MEMORY * 7
                         else:
-                            min_size = max(MIN_MEMORY, Capacity(user_server_config.get('system_memory')).btyes * 2) * 7
+                            min_size = max(MIN_MEMORY, Capacity(user_server_config.get('system_memory')).bytes * 2) * 7
                         min_need = padding_size + min_size
                         if min_need <= disk_free:
                             memory_limit = (disk_free - padding_size) / 7
                             server_config['memory_limit'] = str(Capacity(memory_limit, 0))
                             update_server_conf(server, 'memory_limit', server_config['memory_limit'])
-                            memory_limit = Capacity(server_config['memory_limit']).btyes
+                            memory_limit = Capacity(server_config['memory_limit']).bytes
                             clog_disk_size = memory_limit * 4
                             clog_size = int(round(clog_disk_size * 0.64))
                             if auto_set_system_memory:
@@ -301,7 +299,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                     continue
 
                 datafile_size_format = str(Capacity(disk_total - clog_disk_size - disk_used, 0))
-                datafile_size = Capacity(datafile_size_format).btyes
+                datafile_size = Capacity(datafile_size_format).bytes
                 clog_disk_utilization_threshold = max(80, int(100.0 * (disk_used + datafile_size + padding_size + clog_disk_size * 0.8) / real_disk_total))
                 clog_disk_utilization_threshold = min(clog_disk_utilization_threshold, clog_disk_utilization_threshold_max)
                 clog_disk_usage_limit_percentage = min(int(clog_disk_utilization_threshold / 80.0 * 95), clog_disk_usage_limit_percentage_max)
@@ -330,7 +328,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                 if key in generate_configs.get(server, {}):
                     value = generate_configs[server][key]
                     servers.append(server)
-                    values.append(Capacity(value).btyes if is_capacity_key else value)
+                    values.append(Capacity(value).bytes if is_capacity_key else value)
             if values:
                 if len(values) != server_num and key in generate_global_config:
                     continue

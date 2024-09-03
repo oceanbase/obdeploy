@@ -796,15 +796,14 @@
   description_local: 本地存储配置文件的多个目录，为了冗余存储多份配置文件
 - name: enable_syslog_recycle
   require: false
-  essential: true
   type: BOOL
   default: false
   min_value: NULL
   max_value: NULL
   section: OBSERVER
   need_restart: false
-  description_en: specifies whether log file recycling is turned on
-  description_local: 是否自动回收系统日志
+  description_en: specifies whether to include the log files before restarting into the recycling space
+  description_local: 是否将重启前的日志文件纳入回收空间
 - name: max_syslog_file_count
   require: false
   essential: true

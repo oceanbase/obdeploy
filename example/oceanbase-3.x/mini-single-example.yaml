@@ -40,6 +40,5 @@ oceanbase-ce:
     datafile_disk_percentage: 20 # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.
     syslog_level: INFO # System log level. The default value is INFO.
     enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
-    enable_syslog_recycle: true # Enable auto system log recycling or not. The default value is false.
     max_syslog_file_count: 4 # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
     # root_password: # root user password, can be empty

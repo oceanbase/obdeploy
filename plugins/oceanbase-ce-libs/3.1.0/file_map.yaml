@@ -8,3 +8,6 @@
   target_path: libmariadb.so
 - src_path: ./home/admin/oceanbase/lib/libmariadb.so.3
   target_path: libmariadb.so.3
+- src_path: ./home/admin/oceanbase/lib
+  target_path: ''
+  type: dir

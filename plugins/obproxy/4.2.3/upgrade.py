@@ -75,8 +75,8 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
 
     apply_param_plugin(dest_repository)
     if not start_plugin(namespace, namespaces, deploy_name,deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, need_bootstrap=True, *args, **kwargs):
-        return 
-    
+        return
+
     ret = connect_plugin(namespace, namespaces, deploy_name,deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)
     if ret:
         if bootstrap_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, ret.get_return('cursor'), *args, **kwargs) and display_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, ret.get_return('cursor'), *args, **kwargs):

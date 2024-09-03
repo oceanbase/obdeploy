@@ -25,9 +25,21 @@ import subprocess
 
 from ssh import LocalClient
 from _types import Capacity
+from const import TOOL_SYSBENCH, COMP_OBCLIENT
 
 stdio = None
 
+def file_path_check(bin_path, tool_name, tool_path, cmd):
+    result = None
+    tool_path = os.path.join(os.getenv('HOME'), tool_name, tool_path)
+    for path in [bin_path, tool_path]:
+        result = LocalClient.execute_command(cmd % path, stdio=stdio)
+        if not result:
+            continue
+        break
+    else:
+        return None, result
+    return path, None
 
 def pre_test(plugin_context, cursor, *args, **kwargs):
     def get_option(key, default=''):
@@ -57,26 +69,42 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
         stdio.error('DO NOT use sys tenant for testing.')
         return
 
-    ret = LocalClient.execute_command('%s --help' % obclient_bin, stdio=stdio)
-    if not ret:
+    cmd = '%s --help'
+    path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd)
+    if result:
         stdio.error(
             '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
-            ret.stderr, obclient_bin))
+                result.stderr, obclient_bin))
         return
-    ret = LocalClient.execute_command('%s --help' % sysbench_bin, stdio=stdio)
-    if not ret:
+    obclient_bin = path
+    setattr(options, 'obclient_bin', obclient_bin)
+
+    path, result = file_path_check(sysbench_bin, TOOL_SYSBENCH, 'sysbench/bin/sysbench', cmd)
+    if result:
         stdio.error(
             '%s\n%s is not an executable file. Please use `--sysbench-bin` to set.\nYou may not have ob-sysbench installed' % (
-            ret.stderr, sysbench_bin))
+                result.stderr, sysbench_bin))
         return
+    setattr(options, 'sysbench_bin', path)
 
-    if not script_name.endswith('.lua'):
-        script_name += '.lua'
-    script_path = os.path.join(sysbench_script_dir, script_name)
-    if not os.path.exists(script_path):
-        stdio.error(
-            'No such file %s. Please use `--sysbench-script-dir` to set sysbench scrpit dir.\nYou may not have ob-sysbench installed' % script_path)
-        return
+    if not os.path.exists(sysbench_script_dir):
+        sysbench_script_dir = os.path.join(os.getenv('HOME'), TOOL_SYSBENCH, 'sysbench/share/sysbench')
+        setattr(options, 'sysbench_script_dir', sysbench_script_dir)
+
+    scripts = script_name.split(',')
+    for script in scripts:
+        if not script.endswith('.lua'):
+            script += '.lua'
+        script_path = os.path.join(sysbench_script_dir, script)
+        if not os.path.exists(script_path):
+            stdio.error(
+                'No such file %s. Please use `--sysbench-script-dir` to set sysbench scrpit dir.\nYou may not have ob-sysbench installed' % script_path)
+            return
+
+    for thread in threads.split(","):
+        if not thread.isdecimal():
+            stdio.error("Illegal characters in threads: %s" % thread)
+            return
 
     sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
     max_cpu = 2

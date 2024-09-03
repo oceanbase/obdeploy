@@ -5,6 +5,7 @@ import type { FormInstance } from 'antd/lib/form';
 import RandExp from 'randexp';
 import { getLocale, history } from 'umi';
 import { SPECIAL_SYMBOLS_OCP } from './helper';
+import { PASSWORD_SUPPORT_CHARACTERS } from '@/constant';
 
 export const handleResponseError = (desc: any, msg?: string | undefined) => {
   notification.error({
@@ -68,10 +69,11 @@ export const handleQuit = (
   handleQuitProgress: () => void,
   setCurrentStep: (step: number) => void,
   isFinshed?: boolean,
+  finalStep?: number
 ) => {
   const quitRequest = async () => {
     await handleQuitProgress();
-    setCurrentStep(7);
+    setCurrentStep(finalStep ? finalStep : 7);
   };
   if (isFinshed) {
     quitRequest();
@@ -113,7 +115,20 @@ export const checkLowVersion = (version: string) => {
   return Number(version.split('')[0]) < 4;
 };
 
-export const getErrorInfo = ({ response, data, type }: any) => {
+export const getErrorInfo = ({ response, data, type, errorPipeline }: any) => {
+  if (errorPipeline?.length >= 5) {
+    return {
+      title: intl.formatMessage({
+        id: 'OBD.src.utils.BackendProcessesMayExit',
+        defaultMessage: '后端进程可能退出',
+      }),
+      desc: intl.formatMessage({
+        id: 'OBD.src.utils.AfterExitingTheDeploymentWill',
+        defaultMessage: '退出后，部署工作将被终止，请谨慎操作。',
+      }),
+      showModal: true,
+    };
+  }
   if (type === 'Timeout') {
     return {
       title: intl.formatMessage({
@@ -125,7 +140,8 @@ export const getErrorInfo = ({ response, data, type }: any) => {
         defaultMessage: '您的网络发生异常，无法连接服务器',
       }),
     };
-  } else if (!response) {
+  }
+  if (!response) {
     return {
       title: intl.formatMessage({
         id: 'OBD.src.utils.NetworkException',
@@ -197,7 +213,7 @@ export const errorHandler = ({ response, data }) => {
 
 //ip格式
 export const serverReg =
-  /^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.){3}(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])?$/;
+  /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 // 数据库名仅支持英文、数字，长度不超过20个字符
 // export const dbReg = /^[a-zA-Z0-9]{1,20}$/;
 // 网站的地址：要求以http/https开始，包含VIP地址/域名/端口的网址，且结尾不含斜杠 /
@@ -269,12 +285,12 @@ export const serversValidator = (_: any, value: string[], type: string) => {
         }),
       ),
     );
-  } else if (type === 'OBConfigServer') {
+  } else if (type === 'obconfigserver') {
     return Promise.reject(
       new Error(
         intl.formatMessage({
           id: 'OBD.src.utils.SelectTheCorrectObconfigserverNode',
-          defaultMessage: '请选择正确的 OBConfigServer 节点',
+          defaultMessage: '请选择正确的 obconfigserver 节点',
         }),
       ),
     );
@@ -302,8 +318,8 @@ export function generateRandomPassword() {
 
   // 生成随机密码
   for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    const randomChar = characters[randomIndex];
+    const randomIndex = Math.floor(Math.random() * PASSWORD_SUPPORT_CHARACTERS.length);
+    const randomChar = PASSWORD_SUPPORT_CHARACTERS[randomIndex];
     password += randomChar;
 
     // 判断字符类型并增加相应计数器

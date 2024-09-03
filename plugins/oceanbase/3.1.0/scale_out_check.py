@@ -42,6 +42,8 @@ def scale_out_check(plugin_context, *args, **kwargs):
         add_plugin('connect', plugins)
         add_plugin('bootstrap', plugins)
         add_plugin('create_tenant', plugins)
+    if 'ob-configserver' in added_components:
+        cluster_config.add_depend_component('ob-configserver')
         
     plugin_context.stdio.verbose('scale_out_check plugins: %s' % plugins)
     plugin_context.stdio.verbose('added_components: %s' % added_components)

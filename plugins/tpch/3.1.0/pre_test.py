@@ -31,7 +31,19 @@ except:
 from ssh import LocalClient
 from tool import DirectoryUtil
 from _types import Capacity
+from const import TOOL_TPCH, COMP_OBCLIENT
 
+def file_path_check(bin_path, tool_name, tool_path, cmd, stdio):
+    result = None
+    tool_path = os.path.join(os.getenv('HOME'), tool_name, tool_path)
+    for path in [bin_path, tool_path]:
+        result = LocalClient.execute_command(cmd % path, stdio=stdio)
+        if result.code > 1:
+            continue
+        break
+    else:
+        return None, result
+    return path, None
 
 def pre_test(plugin_context, cursor, *args, **kwargs):
     def get_option(key, default=''):
@@ -88,10 +100,15 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     setattr(options, 'sql_path', sql_path)
     obclient_bin = get_option('obclient_bin', 'obclient')
 
-    ret = local_execute_command('%s --help' % obclient_bin)
-    if not ret:
-        stdio.error('%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (ret.stderr, obclient_bin))
+    cmd = '%s --help'
+    path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd, stdio)
+    if result:
+        stdio.error(
+            '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
+                result.stderr, obclient_bin))
         return
+    obclient_bin = path
+    setattr(options, 'obclient_bin', obclient_bin)
 
     if not DirectoryUtil.mkdir(tmp_dir, stdio=stdio):
         return
@@ -139,10 +156,17 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
             return
     else:
         if not tbl_path:
-            ret = local_execute_command('%s -h' % dbgen_bin)
-            if ret.code > 1:
-                stdio.error('%s\n%s is not an executable file. Please use `--dbgen-bin` to set.\nYou may not have obtpch installed' % (ret.stderr, dbgen_bin))
+            cmd = '%s -h'
+            path, result = file_path_check(dbgen_bin, TOOL_TPCH, 'tpch/bin/dbgen', cmd, stdio)
+            if result:
+                stdio.error('%s\n%s is not an executable file. Please use `--dbgen-bin` to set.\nYou may not have obtpch installed' % (result.stderr, dbgen_bin))
                 return
+            dbgen_bin = path
+            setattr(options, 'dbgen_bin', dbgen_bin)
+
+            if not os.path.exists(dss_config):
+                dss_config = os.path.join(os.getenv('HOME'), TOOL_TPCH, 'tpch')
+                setattr(options, 'dss_config', dss_config)
             
             dss_path = os.path.join(dss_config, 'dists.dss')
             if not os.path.exists(dss_path):

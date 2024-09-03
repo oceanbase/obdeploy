@@ -27,7 +27,7 @@ from tool import Cursor, NetUtil
 from ssh import LocalClient, SshConfig, SshClient
 from service.handler.base_handler import BaseHandler
 from service.common import log, const
-from service.model.service_info import ServiceInfo, DeployName
+from service.model.service_info import ServiceInfo, DeployNames
 from service.model.server import OcpServerInfo, InstallerMode, ComponentInfo, MsgInfo
 from service.model.metadb import DatabaseConnection
 from service.model.ocp import OcpDeploymentConfig
@@ -36,6 +36,7 @@ from service.model.parameter import Parameter
 from service.model.ssh import SshAuth
 from service.model.tenant import TenantConfig, TenantUser, TenantResource
 from service.handler.ocp_handler import OcpHandler
+from service.handler.rsa_handler import RSAHandler
 
 
 @singleton
@@ -222,7 +223,7 @@ class ServiceInfoHandler(BaseHandler):
     def get_deployments_name(self):
         deploys = self.obd.deploy_manager.get_deploy_configs()
         log.get_logger().info('deploys: %s' % deploys)
-        ret = DeployName()
+        ret = DeployNames()
         for _ in deploys:
             if _.deploy_info.status == DeployStatus.STATUS_RUNNING and \
                     (const.OCP_SERVER in _.deploy_config.components or const.OCP_SERVER_CE in _.deploy_config.components):
@@ -298,7 +299,8 @@ class ServiceInfoHandler(BaseHandler):
             user = ''
             self.context["connection_info"][metadb.cluster_name] = metadb
             self.context['meta_database'] = metadb.database
-            self.context['metadb_cursor'] = Cursor(ip=metadb.host, port=metadb.port, user=metadb.user, password=metadb.password,
+            meta_password = RSAHandler().decrypt_private_key(metadb.password) if metadb.password else metadb.password
+            self.context['metadb_cursor'] = Cursor(ip=metadb.host, port=metadb.port, user=metadb.user, password=meta_password,
                                                    stdio=self.obd.stdio)
             log.get_logger().info('cursor: %s' % self.context['metadb_cursor'])
             monitor_tenant_sql = "select `value` from %s.config_properties where `key` = 'ocp.monitordb.username'" % metadb.database

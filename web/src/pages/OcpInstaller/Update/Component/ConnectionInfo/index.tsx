@@ -1,7 +1,9 @@
 import InputPort from '@/component/InputPort';
 import { FORM_ITEM_SMALL_LAYOUT } from '@/constant';
 import type { ConnectInfoType } from '@/models/ocpInstallData';
+import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import * as Metadb from '@/services/ocp_installer_backend/Metadb';
+import { encrypt } from '@/utils/encrypt';
 import { intl } from '@/utils/intl';
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import { ProCard, ProForm } from '@ant-design/pro-components';
@@ -100,9 +102,10 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
   const handleCheckSystemUser = () => {
     systemUserForm.validateFields().then(async (values: any) => {
       const { user, password, systemPort: port } = values;
+      const { data: publicKey } = await getPublicKey();
       const res = await checkOperatingUser({
         user,
-        password,
+        password: encrypt(password, publicKey) || password,
         port,
         servers:
           updateInfo?.component.find(
@@ -266,7 +269,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
           </ProForm.Item>
           <ProForm.Item noStyle dependencies={['accessUser']}>
             {({ getFieldValue, getFieldError }) => {
-              const accessUser = getFieldValue('accessUser')
+              const accessUser = getFieldValue('accessUser');
               if (
                 (/^root@/.test(accessUser) || accessUser === 'root') &&
                 getFieldError('accessCode').length
@@ -282,7 +285,8 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                   })}
                   rules={[
                     {
-                      required: !/^root@/.test(accessUser) && accessUser !== 'root',
+                      required:
+                        !/^root@/.test(accessUser) && accessUser !== 'root',
                       message: intl.formatMessage({
                         id: 'OBD.Component.ConnectionInfo.EnterAnAccessPassword',
                         defaultMessage: '请输入访问密码',

@@ -1,35 +1,35 @@
+import { commonInputStyle, commonPortStyle } from '@/pages/constants';
 import { intl } from '@/utils/intl';
-import { ProForm, ProFormDigit } from '@ant-design/pro-components';
-import { Input, Checkbox, Tooltip } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
+import { ProForm, ProFormDigit } from '@ant-design/pro-components';
+import { Checkbox, Input, Tooltip } from 'antd';
+import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import type { FormInstance } from 'antd/lib/form';
 import { useModel } from 'umi';
-import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 
-import { commonStyle } from '@/pages/constants';
 import { nameReg } from '@/utils';
 import styles from './index.less';
 
 export default function UserConfig({ form }: { form: FormInstance<any> }) {
-  const { useRunningUser, setUseRunningUser,setDeployUser } =
+  const { useRunningUser, setUseRunningUser, setDeployUser } =
     useModel('ocpInstallData');
-  const { DOCS_USER } = useModel('global')
+  const { DOCS_USER } = useModel('global');
   const onChange = (e: CheckboxChangeEvent) => {
-    let {checked} = e.target
+    let { checked } = e.target;
     setUseRunningUser(checked);
-    if(checked){
-      let launch_user = form.getFieldValue('launch_user')
-      launch_user && setDeployUser(launch_user)
-    }else{
-      let user = form.getFieldValue(['auth', 'user'])
-      user && setDeployUser(user)
+    if (checked) {
+      let launch_user = form.getFieldValue('launch_user');
+      launch_user && setDeployUser(launch_user);
+    } else {
+      let user = form.getFieldValue(['auth', 'user']);
+      user && setDeployUser(user);
     }
   };
 
-  const userChange = (e:React.ChangeEvent<HTMLInputElement>)=>{
-    const {value} = e.target
-    setDeployUser(value)
-  }
+  const userChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setDeployUser(value);
+  };
 
   return (
     <div className={styles.userConfigContainer}>
@@ -41,10 +41,15 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
       </p>
       <ProForm.Item
         name={['auth', 'user']}
-        label={intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.UserConfig.Username',
-          defaultMessage: '用户名',
-        })}
+        label={
+          <span className={styles.labelText}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.UserConfig.Username',
+              defaultMessage: '用户名',
+            })}
+          </span>
+        }
+        style={commonInputStyle}
         rules={
           !useRunningUser
             ? [
@@ -59,11 +64,7 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
             : []
         }
       >
-        <Input
-          style={commonStyle}
-          disabled={useRunningUser}
-          onChange={userChange}
-        />
+        <Input disabled={useRunningUser} onChange={userChange} />
       </ProForm.Item>
       <p className={styles.descText}>
         {intl.formatMessage({
@@ -71,7 +72,7 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
           defaultMessage: '请提供主机用户名用以自动化配置平台专用操作系统用户',
         })}
 
-        <a href={DOCS_USER} target="_blank" style={{ marginLeft: '8px' }}>
+        <a href={DOCS_USER} target="_blank" style={{ marginLeft: '4px' }}>
           {intl.formatMessage({
             id: 'OBD.component.MetaDBConfig.UserConfig.ViewHelpDocuments',
             defaultMessage: '查看帮助文档',
@@ -80,13 +81,18 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
       </p>
       <ProForm.Item
         name={['auth', 'password']}
-        label={intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.UserConfig.PasswordOptional',
-          defaultMessage: '密码（可选）',
-        })}
+        style={commonInputStyle}
+        label={
+          <span className={styles.labelText}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.UserConfig.PasswordOptional',
+              defaultMessage: '密码（可选）',
+            })}
+          </span>
+        }
       >
         <Input.Password
-          style={{ width: 328, marginBottom: 21 }}
+          style={{ marginBottom: 21 }}
           autoComplete="new-password"
           disabled={useRunningUser}
           placeholder={intl.formatMessage({
@@ -98,11 +104,15 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
       <ProFormDigit
         style={{ padding: 0 }}
         name={['auth', 'port']}
-        label={intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.UserConfig.SshPort',
-          defaultMessage: 'SSH端口',
-        })}
-        fieldProps={{ style: { width: 216 } }}
+        label={
+          <span className={styles.labelText}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.UserConfig.SshPort',
+              defaultMessage: 'SSH端口',
+            })}
+          </span>
+        }
+        fieldProps={{ style: commonPortStyle }}
         placeholder={intl.formatMessage({
           id: 'OBD.component.MetaDBConfig.UserConfig.PleaseEnter',
           defaultMessage: '请输入',
@@ -119,7 +129,7 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
       />
 
       <Checkbox
-        style={{ margin: '16px 0 16px 4px' }}
+        style={{ margin: '24px 0 24px 4px' }}
         checked={useRunningUser}
         onChange={onChange}
       >
@@ -131,8 +141,9 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
       {useRunningUser && (
         <ProForm.Item
           name="launch_user"
+          style={commonInputStyle}
           label={
-            <>
+            <span className={styles.labelText}>
               {intl.formatMessage({
                 id: 'OBD.component.MetaDBConfig.UserConfig.RunningUsername',
                 defaultMessage: '运行用户名',
@@ -145,7 +156,7 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
               >
                 <QuestionCircleOutlined className="ml-10" />
               </Tooltip>
-            </>
+            </span>
           }
           rules={
             useRunningUser
@@ -171,7 +182,7 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
         >
           <Input
             onChange={userChange}
-            style={{ width: 216 }}
+            style={{ marginBottom: 24 }}
             placeholder={intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.UserConfig.PleaseEnter',
               defaultMessage: '请输入',

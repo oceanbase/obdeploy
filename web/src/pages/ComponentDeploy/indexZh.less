@@ -1,0 +1,147 @@
+@greyTextColor: #8592ad;
+@cardBackgroundColor: #f8fafe;
+@smallSpace: 8px;
+@subTitleColor: #5c6b8a;
+
+.spaceWidth {
+  width: 100%;
+  :global {
+    .ant-space-item {
+      width: 100%;
+    }
+  }
+}
+
+.pageCard {
+  box-shadow: 0 2px 4px 0 rgba(19, 32, 57, 0.02),
+    0 1px 6px -1px rgba(19, 32, 57, 0.02), 0 1px 2px 0 rgba(19, 32, 57, 0.03);
+  :global {
+    .ant-space-item {
+      .ant-col {
+        padding-right: 0 !important;
+        padding-left: 0 !important;
+      }
+    }
+  }
+}
+
+.titleExtra {
+  margin-left: 12px;
+  color: @greyTextColor;
+  font-weight: 400 !important;
+  font-size: 14px !important;
+}
+
+.componentCard {
+  margin-bottom: 16px !important;
+  background-color: @cardBackgroundColor !important;
+  :global {
+    .ant-pro-card-body {
+      padding: 0 !important;
+    }
+  }
+  &.disabledCard {
+    opacity: 0.4;
+  }
+  &:last-child {
+    margin-bottom: 0 !important;
+  }
+}
+
+.descContent {
+  display: flex;
+  justify-content: space-between;
+  .learnMore {
+    margin-right: 16px;
+    color: #006aff !important;
+  }
+}
+
+.componentTable,
+.nodeEditabletable {
+  :global {
+    .ant-table,
+    .ant-table-wrapper .ant-table-thead > tr > th,
+    .ant-table-thead > tr > th {
+      background-color: rgba(0, 0, 0, 0) !important;
+    }
+    .ant-table {
+      color: #132039 !important;
+    }
+    .ant-table-thead > tr > th {
+      color: @subTitleColor !important;
+      font-weight: normal !important;
+    }
+  }
+}
+
+.componentTable {
+  :global {
+    .ant-table
+      .ant-table-tbody
+      tr:nth-child(2n + 1):not(.ant-table-placeholder)
+      td {
+      background-color: rgba(0, 0, 0, 0) !important ;
+    }
+  }
+}
+
+.componentTable,
+.nodeEditabletable,
+.connectTable {
+  :global {
+    .ant-table-cell::before {
+      width: 0 !important;
+    }
+    .ant-table-cell {
+      padding-top: 16px !important;
+      padding-bottom: 16px !important;
+    }
+    .ant-table-thead > tr > th {
+      padding-bottom: 0 !important;
+      border-bottom: none !important;
+      padding-top: 16px !important;
+    }
+    .ant-table-tbody > tr > td {
+      vertical-align: top !important;
+    }
+  }
+}
+
+.emptyContent {
+  background-color: #f8fafe;
+  border-radius: 8px;
+  color: #8592ad;
+  height: 164px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.checkInfoSpace {
+  :global {
+    .ant-col {
+      padding-right: 0 !important;
+      padding-left: 0 !important;
+    }
+    .ant-col.ant-col-12:nth-child(2n + 1) {
+      padding-right: @smallSpace !important;
+    }
+    .ant-col.ant-col-12:nth-child(2n) {
+      padding-left: @smallSpace !important;
+    }
+  }
+}
+
+.firstCell,
+.thirdCell,
+.secondCell {
+  padding-left: 0px !important;
+  padding-right: 0px !important;
+}
+
+.alertContent svg {
+  width: 20px;
+  height: 20px;
+}

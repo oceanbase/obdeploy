@@ -210,7 +210,7 @@ def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwar
     for server in dict_servers:
         config = dict_servers[server]
         if 'memory_limit' in config:
-            dict_servers[server]['production_mode'] = CapacityMB(config['memory_limit']).btyes >= PRO_MEMORY_MIN
+            dict_servers[server]['production_mode'] = CapacityMB(config['memory_limit']).bytes >= PRO_MEMORY_MIN
         if 'cluster' in config:
             config['appname'] = config['cluster']
             del config['cluster']

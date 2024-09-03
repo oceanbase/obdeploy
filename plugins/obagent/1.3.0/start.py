@@ -32,6 +32,7 @@ from copy import deepcopy
 from Crypto import Random
 from Crypto.Cipher import AES
 
+from _errno import WC_OBAGENT_SERVER_NAME_ERROR
 from ssh import SshClient, SshConfig
 from tool import YamlLoader, FileUtil
 
@@ -186,7 +187,7 @@ def prepare_parameters(cluster_config):
     return env
 
 
-def start(plugin_context, *args, **kwargs):
+def start(plugin_context, is_reinstall=False, *args, **kwargs):
     global stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -209,6 +210,16 @@ def start(plugin_context, *args, **kwargs):
         config_mapper = yaml.load(f).get('config_mapper', {})
     stdio.start_loading('Start obagent')
 
+    for comp in ["oceanbase", "oceanbase-ce"]:
+        if cluster_config.get_depend_config(comp) and plugin_context.get_return('start', comp).get_return('need_bootstrap'):
+            error_servers_list = []
+            for server in cluster_config.servers:
+                if not cluster_config.get_depend_config(comp, server):
+                    error_servers_list.append(server)
+            if error_servers_list:
+                error_servers_msg = ', '.join(map(lambda x: str(x), error_servers_list))
+                stdio.warn(WC_OBAGENT_SERVER_NAME_ERROR.format(servers=error_servers_msg))
+
     targets = []
     for server in cluster_config.servers:
         client = clients[server]
@@ -226,6 +237,9 @@ def start(plugin_context, *args, **kwargs):
         config_flag = os.path.join(home_path, '.configured')
         if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % config_flag):
             use_parameter = False
+
+        if is_reinstall:
+            use_parameter = True
 
         if use_parameter:
             # todo: set agent secret key

@@ -49,6 +49,8 @@ no_generate_comps = ['ob-configserver']
 DESTROY_PLUGIN = "destroy"
 INIT_PLUGINS = ("init",)
 START_PLUGINS = ("start_check", "start", "connect", "bootstrap", "display")
+DEL_COMPONENT_PLUGINS = ("stop", "destroy")
+CHANGED_COMPONENTS = ('obproxy-ce', 'obagent', 'ocp-express', 'ob-configserver', 'prometheus', 'grafana')
 UPGRADE_PLUGINS = ("upgrade")
 # filter component of oceanbase and obproxy version above 4.0
 VERSION_FILTER = {

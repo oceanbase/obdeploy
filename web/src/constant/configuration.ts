@@ -75,8 +75,40 @@ export const METADB_OCP_INSTALL = [
   },
 ];
 
+export const COMPONENT_INSTALL = [
+  {
+    title: '部署配置',
+    key: 1,
+  },
+  {
+    title: '组件配置',
+    key: 2,
+  },
+  {
+    title: '预检查',
+    key: 3,
+  },
+  {
+    title: '部署',
+    key: 4,
+  },
+];
+
+export const COMPONENT_UNINSTALL = [
+  {
+    title: '卸载配置',
+    key: 1,
+  },
+  {
+    title: '卸载',
+    key: 2,
+  },
+];
+
 export const STEPS_KEYS_INSTALL = [1, 2, 3, 4, 5];
 export const STEPS_KEYS_UPDATE = [1, 2, 3, 4];
+export const STEPS_KEYS_COMP_INSTALL = [1, 2, 3, 4];
+export const STEPS_KEYS_COMP_UNINSTALL = [1, 2];
 export const METADB_OCP_UPDATE = [
   {
     title: intl.formatMessage({
@@ -120,7 +152,7 @@ export const selectOcpexpressConfig = [
   'ocp_meta_tenant_max_cpu',
   'ocp_meta_tenant_memory_size',
   'ocp_meta_tenant_log_disk_size',
-]
+];
 
 export const showConfigKeys = {
   oceanbase: [
@@ -131,9 +163,15 @@ export const showConfigKeys = {
     'redo_dir',
     'mysql_port',
     'rpc_port',
+    'scenario',
   ],
 
-  obproxy: ['home_path', 'listen_port', 'prometheus_listen_port'],
+  obproxy: [
+    'home_path',
+    'listen_port',
+    'prometheus_listen_port',
+    'rpc_listen_port',
+  ],
   obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
   ocpexpress: ['home_path', 'port'],
   obconfigserver: [
@@ -150,14 +188,14 @@ export const obproxyAddonAfter = '/obproxy';
 export const oceanbaseAddonAfter = '/oceanbase';
 
 export const OBD_COMMAND = 'obd web';
-export const OBD_COMMAND_UPGRADE = 'obd web upgrade'
+export const OBD_COMMAND_UPGRADE = 'obd web upgrade';
 
 // 参数类型
 export const PARAMETER_TYPE = {
-  number:'Integer',
-  numberLogogram:'int',
-  string:'String',
-  capacity:'Capacity',
-  capacityMB:'CapacityMB',
-  boolean:'Boolean'
-}
+  number: 'Integer',
+  numberLogogram: 'int',
+  string: 'String',
+  capacity: 'Capacity',
+  capacityMB: 'CapacityMB',
+  boolean: 'Boolean',
+};

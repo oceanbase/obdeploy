@@ -67,3 +67,15 @@ PKG_RPM_FILE = 'rpm'
 PKG_REPO_FILE = 'repository'
 
 RSA_KEY_SIZE = 512
+
+
+# test tool
+TOOL_TPCH = 'obtpch'
+TOOL_TPCC = 'obtpcc'
+TOOL_SYSBENCH = 'ob-sysbench'
+TEST_TOOLS = {
+    TOOL_TPCH: 'tpch',
+    TOOL_TPCC: 'tpcc',
+    TOOL_SYSBENCH: 'sysbench',
+}
+TOOL_TPCC_BENCHMARKSQL = 'OB-BenchmarkSQL-5.0.jar'

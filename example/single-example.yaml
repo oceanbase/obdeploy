@@ -28,10 +28,9 @@ oceanbase-ce:
     # if current hardware's memory capacity is smaller than 50G, please use the setting of "mini-single-example.yaml" and do a small adjustment.
     memory_limit: 64G # The maximum running memory for an observer
     # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
-    system_memory: 30G
+    system_memory: 10G
     datafile_size: 192G # Size of the data file. 
     log_disk_size: 192G # The size of disk space used by the clog files.
     enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
-    enable_syslog_recycle: true # Enable auto system log recycling or not. The default value is false.
     max_syslog_file_count: 4 # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
     # root_password: # root user password, can be empty

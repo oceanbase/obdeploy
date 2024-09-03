@@ -41,7 +41,7 @@ def display(plugin_context, *args, **kwargs):
                 'url':  'obclient -h%s -P%s' % (server.ip, server_config['service_port']),
                 'status': 'active'
             })
-    stdio.print_list(results, ['ip', 'port', 'status'], lambda x: [x['ip'], x['port'], x['status']], title='oblogproxy')
+    stdio.print_list(results, ['ip', 'port', 'status'], lambda x: [x['ip'], x['port'], x['status']], title=cluster_config.name)
     stdio.print(results[0]['url'] if results else '')
     stdio.print('')
     return plugin_context.return_true()

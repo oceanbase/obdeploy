@@ -20,10 +20,13 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 import time
 from collections import defaultdict
 from copy import deepcopy
 
+import const
+from tool import Exector
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 from _types import Capacity
 
@@ -32,6 +35,7 @@ tenant_cursor_cache = defaultdict(dict)
 
 
 def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
+    global tenant_cursor
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     # find tenant ip, port
@@ -114,7 +118,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
         if value is None:
             return value
         try:
-            parsed_value = Capacity(value).btyes
+            parsed_value = Capacity(value).bytes
         except:
             stdio.exception("")
             raise Exception("Invalid option {}: {}".format(key, value))
@@ -246,11 +250,11 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
             STANDBY_MIN_LOG_DISK_SIZE = 1073741824 * 4
 
             if cpu_available < MIN_CPU:
-                return error('%s: resource not enough: cpu count less than %s' % (zone_list, MIN_CPU))
+                return error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_available, need=MIN_CPU))
             if mem_available < MIN_MEMORY:
-                return error('%s: resource not enough: memory less than %s' % (zone_list, Capacity(MIN_MEMORY)))
+                return error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(MIN_MEMORY)))
             if log_disk_available < MIN_LOG_DISK_SIZE:
-                return error('%s: resource not enough: log disk size less than %s' % (zone_list, Capacity(MIN_MEMORY)))
+                return error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(log_disk_available), need=Capacity(MIN_LOG_DISK_SIZE)))
 
             if primary_tenant_info:
                 recreate_cmd = ''
@@ -271,7 +275,7 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
             max_cpu = get_option('max_cpu', cpu_available)
             min_cpu = get_option('min_cpu', max_cpu)
             if cpu_available < max_cpu:
-                return error('Resource not enough: cpu (Avail: %s, Need: %s)' % (cpu_available, max_cpu))
+                return error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_available, need=max_cpu))
             if max_cpu < min_cpu:
                 return error('min_cpu must less then max_cpu')
             if min_cpu < MIN_CPU:
@@ -287,20 +291,20 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
                     log_disk_size = log_disk_available
 
             if mem_available < memory_size:
-                return error('resource not enough: memory (Avail: %s, Need: %s)' % (Capacity(mem_available), Capacity(memory_size)))
+                return error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(memory_size)))
             if memory_size < MIN_MEMORY:
                 return error('memory must greater then %s' % Capacity(MIN_MEMORY))
 
             # log disk size options
             if log_disk_size is not None and log_disk_available < log_disk_size:
-                return error('resource not enough: log disk space (Avail: %s, Need: %s)' % (Capacity(disk_available), Capacity(log_disk_size)))
+                return error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(log_disk_available), need=Capacity(log_disk_size)))
 
             if primary_tenant_info:
-                if Capacity(primary_memory_size).btyes < STANDBY_MIN_MEMORY:
+                if Capacity(primary_memory_size).bytes < STANDBY_MIN_MEMORY:
                     return error('Primary tenant memory_size:{}B is less than {}B, creating a standby tenant is not supported.'.format(primary_memory_size, STANDBY_MIN_MEMORY))
-                if Capacity(primary_memory_size).btyes < STANDBY_WARN_MEMORY:
+                if Capacity(primary_memory_size).bytes < STANDBY_WARN_MEMORY:
                     stdio.warn('Primary tenant memory_size: {}B , suggestion: {}B'.format(primary_memory_size, STANDBY_WARN_MEMORY))
-                if Capacity(primary_log_disk_size).btyes < STANDBY_MIN_LOG_DISK_SIZE:
+                if Capacity(primary_log_disk_size).bytes < STANDBY_MIN_LOG_DISK_SIZE:
                     return error('Primary tenant log_disk_size:{}B is less than {}B, creating a standby tenant is not supported.'.format(primary_log_disk_size, STANDBY_MIN_LOG_DISK_SIZE))
 
             # iops options
@@ -401,15 +405,41 @@ def create_tenant(plugin_context, cursor = None, create_tenant_options=[], relat
                 db_username = get_option('db_username')
                 db_password = get_option('db_password', '')
                 if db_username:
+                    create_sql, grant_sql = "", ""
                     if mode == "mysql":
-                        sql = """create user if not exists '{username}' IDENTIFIED BY %s;
-                grant all on *.* to '{username}' WITH GRANT OPTION;""".format(
-                            username=db_username)
+                        create_sql = "create user if not exists '{username}' IDENTIFIED BY %s;".format(username=db_username)
+                        grant_sql = "grant all on *.* to '{username}' WITH GRANT OPTION;".format(username=db_username)
                     else:
                         error("Create user in oracle tenant is not supported")
-                    if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[db_password]):
+                    if not exec_sql_in_tenant(sql=create_sql, cursor=cursor, tenant=name, mode=mode, args=[db_password], stdio=stdio):
                         stdio.error('failed to create user {}'.format(db_username))
                         return
+                    if not exec_sql_in_tenant(sql=grant_sql, cursor=cursor, tenant=name, mode=mode, stdio=stdio):
+                        stdio.error('Failed to grant privileges to user {}'.format(db_username))
+                        return
+
+                clients = plugin_context.clients
+                client = clients[plugin_context.cluster_config.servers[0]]
+                repositories = plugin_context.repositories
+                cluster_config = plugin_context.cluster_config
+                global_config = cluster_config.get_global_conf()
+
+                time_zone = get_option('time_zone', client.execute_command('date +%:z').stdout.strip())
+                exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
+
+                exector_path = get_option('exector_path', '/usr/obd/lib/executer')
+                exector = Exector(tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user, tenant_cursor.password, exector_path, stdio)
+                for repository in repositories:
+                    if repository.name in const.COMPS_OB:
+                        time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
+                        srs_data_param = os.path.join(repository.repository_dir, 'etc', 'default_srs_data_mysql.sql')
+                        if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
+                            stdio.warn('execute import_time_zone_info.py failed')
+                        if not exector.exec_script('import_srs_data.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), srs_data_param)):
+                            stdio.warn('execute import_srs_data.py failed')
+                            break
+                cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+                stdio.print(cmd)
             else:
                 # create standby tenant
                 # query ip_list

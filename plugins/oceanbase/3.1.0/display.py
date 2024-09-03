@@ -63,7 +63,7 @@ def display(plugin_context, cursor, *args, **kwargs):
                 servers = cursor.fetchall('select * from oceanbase.__all_server', raise_exception=True, exc_level='verbose')
                 if servers:
                     stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'],
-                        lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title='observer')
+                        lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title=cluster_config.name)
                     user = 'root'
                     password = cluster_config.get_global_conf().get('root_password', '')
                     cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A' % (servers[0]['svr_ip'], servers[0]['inner_port'], user, '-p%s ' % passwd_format(password) if password else '')

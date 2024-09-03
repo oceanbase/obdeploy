@@ -62,6 +62,8 @@ def generate_config(plugin_context, auto_depend=False, return_generate_keys=Fals
                     break
             else:
                 cluster_config.update_server_conf(server, 'ob_monitor_status', 'inactive', False)
+                if generate_configs.get(server) is None:
+                    generate_configs[server] = {}
                 generate_configs[server]['ob_monitor_status'] = 'inactive'
     else:
         cluster_config.update_global_conf('ob_monitor_status', 'inactive', False)

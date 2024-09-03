@@ -641,15 +641,14 @@
   description_local: 本地存储配置文件的多个目录，为了冗余存储多份配置文件
 - name: enable_syslog_recycle
   require: false
-  essential: true
   type: BOOL
   default: false
   min_value: NULL
   max_value: NULL
   section: OBSERVER
   need_restart: false
-  description_en: specifies whether log file recycling is turned on
-  description_local: 是否自动回收系统日志
+  description_en: specifies whether to include the log files before restarting into the recycling space
+  description_local: 是否将重启前的日志文件纳入回收空间
 - name: max_syslog_file_count
   require: false
   essential: true
@@ -1871,6 +1870,13 @@
   need_redeploy: true
   description_en: The password for obagent monitor user
   description_local: obagent 监控用户的密码
+- name: ocp_agent_monitor_username
+  require: false
+  type: STRING
+  default: ocp_monitor
+  need_redeploy: true
+  description_en: The user name for ocp meta db
+  description_local: obagent 监控用户名
 - name: ocp_monitor_tenant
   require: false
   type: DICT
@@ -1883,7 +1889,6 @@
   description_local: ocp 的监控数据库使用的租户定义
 - name: ocp_monitor_tenant_max_cpu
   name_local: OCP 监控数据库租户的CPU数
-  essential: true
   require: false
   type: INT
   default: 1
@@ -1892,7 +1897,6 @@
   description_local: ocp 监控数据库使用的CPU数量
 - name: ocp_monitor_tenant_memory_size
   name_local: OCP 监控数据库租户内存
-  essential: true
   require: false
   type: CAPACITY_MB
   default: 2G
@@ -1901,7 +1905,6 @@
   description_local: ocp 监控数据库使用的租户内存大小
 - name: ocp_monitor_tenant_log_disk_size
   name_local: OCP 监控数据库租户日志磁盘大小
-  essential: true
   require: false
   type: CAPACITY_MB
   default: 6656M

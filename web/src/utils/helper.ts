@@ -1,4 +1,5 @@
 import {
+  PARAMETER_TYPE,
   selectOcpexpressConfig,
   showConfigKeys,
 } from '@/constant/configuration';
@@ -9,8 +10,8 @@ import {
 } from '@/pages/constants';
 import { intl } from '@/utils/intl'; //与UI无关的函数
 import { message } from 'antd';
-import { clone } from 'lodash';
 import copy from 'copy-to-clipboard';
+import { clone } from 'lodash';
 import { generateRandomPassword as oldGenerateRandomPassword } from '.';
 // 不用navigator.clipboard.writeText的原因：该接口需要在HTTPS环境下才能使用
 export function copyText(text: string) {
@@ -44,7 +45,7 @@ export const formatMoreConfig = (
       ? componentVersionTypeToComponent[item.component]
       : item.component;
     const componentConfig = componentsConfig[component];
-    
+
     let configParameter = item?.config_parameters.filter((parameter) => {
       let configKeys = { ...showConfigKeys };
       if (!isSelectOcpexpress) {
@@ -57,7 +58,7 @@ export const formatMoreConfig = (
         parameter.name,
       );
     });
-    
+
     const newConfigParameter: API.NewConfigParameter[] = configParameter.map(
       (parameterItem) => {
         let parameterValue: any;
@@ -69,7 +70,7 @@ export const formatMoreConfig = (
           auto: parameterItem.auto,
           require: parameterItem.require,
           isChanged: parameterItem.is_changed,
-          unitDisable: parameterItem.unitDisable
+          unitDisable: parameterItem.unitDisable,
         };
         if (
           parameterItem.type === 'CapacityMB' ||
@@ -406,4 +407,148 @@ export const formatConfigData = (configData: any) => {
     });
   });
   return _config;
+};
+
+export const getInitialParameters = (
+  currentComponent: string,
+  dataSource: API.MoreParameter[],
+  data: API.NewParameterMeta[],
+) => {
+  const currentComponentNameConfig = data?.filter(
+    (item) => item.component === currentComponent,
+  )?.[0];
+  if (currentComponentNameConfig) {
+    const parameters: any = {};
+    currentComponentNameConfig.configParameter.forEach((item) => {
+      let parameter = {
+        ...item,
+        key: item.name,
+        params: {
+          value: item.default,
+          adaptive: item.auto,
+          auto: item.auto,
+          require: item.require,
+          type: item.type,
+          isChanged: item.is_changed,
+          unitDisable: item?.unitDisable,
+        },
+      };
+      dataSource?.some((dataItem) => {
+        if (item.name === dataItem.key) {
+          parameter = {
+            key: dataItem.key,
+            description: parameter.description,
+            params: {
+              ...parameter.params,
+              ...dataItem,
+            },
+          };
+          return true;
+        }
+        return false;
+      });
+      if (
+        (parameter.params.type === PARAMETER_TYPE.capacity ||
+          parameter.params.type === PARAMETER_TYPE.capacityMB) &&
+        parameter.params.value == '0'
+      ) {
+        parameter.params.value += 'GB';
+      }
+      parameters[item.name] = parameter;
+    });
+    return parameters;
+  } else {
+    return undefined;
+  }
+};
+
+export const getQueryFromComps = (comps: string[]) => {
+  return comps
+    .reduce((pre, cur) => pre + `components=${cur}&`, '')
+    .slice(0, -1);
+};
+/**
+ * abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+ * 从这些字符里面随机取10个
+ */
+export const generatePwd = () => {
+  const allLetters =
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let pwd = '';
+  for (let i = 0; i < 10; i++) {
+    const randomIdx = Math.floor(Math.random() * (allLetters.length - 1));
+    pwd += allLetters[randomIdx];
+  }
+  return pwd;
+};
+
+export const generateComplexPwd = (
+  lowercaseLength = 2,
+  uppercaseLength = 2,
+  digitsLength = 2,
+  punctuationLength = 2,
+  punctuationChars = '(._+@#%)',
+) => {
+  let pwd = '';
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const digits = '0123456789';
+  const punctuation = punctuationChars;
+
+  for (let i = 0; i < lowercaseLength; i++) {
+    pwd += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+  }
+  for (let i = 0; i < uppercaseLength; i++) {
+    pwd += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+  }
+  for (let i = 0; i < digitsLength; i++) {
+    pwd += digits.charAt(Math.floor(Math.random() * digits.length));
+  }
+  for (let i = 0; i < punctuationLength; i++) {
+    pwd += punctuation.charAt(Math.floor(Math.random() * punctuation.length));
+  }
+
+  let pwdArray = pwd.split('');
+  for (let i = pwdArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pwdArray[i], pwdArray[j]] = [pwdArray[j], pwdArray[i]];
+  }
+
+  return pwdArray.join('');
+};
+
+const insertPwd = (url: string, pwd: string) => {
+  const urlArr = url.split(' ');
+  for (let i = 0; i < urlArr.length; i++) {
+    if (urlArr[i].includes('-u')) {
+      urlArr.splice(i + 1, 0, `-p'${pwd}'`);
+      break;
+    }
+  }
+  return urlArr.reduce((pre, cur) => pre + ' ' + cur);
+};
+export const connectInfoForPwd = (
+  connectInfo: API.ConnectionInfo[],
+  components: any = {},
+) => {
+  connectInfo?.forEach((item) => {
+    if (item.component === 'oceanbase-ce' && components.oceanbase) {
+      item.password = components.oceanbase?.root_password;
+      item.connect_url = insertPwd(item.connect_url, item.password);
+    }
+    if (item.component === 'obproxy-ce') {
+      if (components.obproxy.obproxy_sys_password) {
+        item.password = components.obproxy.obproxy_sys_password;
+      } else {
+        item.password = components.obproxy?.parameters?.find(
+          (item) => item.key === 'obproxy_sys_password',
+        )?.value;
+      }
+      item.connect_url = insertPwd(item.connect_url, item.password);
+    }
+    if (item.component === 'ocp-express' && components.ocpexpress) {
+      item.password = components.ocpexpress?.admin_passwd;
+    }
+  });
+  return connectInfo;
 };

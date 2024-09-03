@@ -25,82 +25,20 @@ import time
 import tool
 import datetime
 from ssh import LocalClient
+from tool import Exector as BaseExector
 
 
-class Exector(object):
+class Exector(BaseExector):
 
     def __init__(self, tmp_prefix, host, port, user, pwd, exector_path, stdio):
+        super(Exector, self).__init__(host, port, user, pwd, exector_path, stdio)
         self.tmp_prefix = tmp_prefix
-        self._host = host
-        self._port = port
-        self._user = user
-        self._pwd = pwd
-        self._cmd = None
-        self.stdio = stdio
-        self._exector = os.path.join(exector_path, 'executer27/bin/executer')
-
-    @property
-    def host(self):
-        return self._host
-
-    @property
-    def port(self):
-        return self._port
-
-    @property
-    def user(self):
-        return self._user
-
-    @property
-    def pwd(self):
-        return self._pwd
-
-    @property
-    def exector(self):
-        return self._exector
 
     @property
     def cmd(self):
         if self._cmd is None:
             self._cmd = '%s %%s -h %s -P %s -u %s %s' % (self._exector, self.host, self.port, self.user, '-p %s' % tool.ConfigUtil.passwd_format(self.pwd) if self.pwd else '')
         return self._cmd
-
-    @host.setter
-    def host(self, value):
-        self._host = value
-        self._cmd = None
-
-    @port.setter
-    def port(self, value):
-        self._port = value
-        self._cmd = None
-
-    @user.setter
-    def user(self, value):
-        self._user = value
-        self._cmd = None
-
-    @pwd.setter
-    def pwd(self, value):
-        self._pwd = value
-        self._cmd = None
-
-    @pwd.setter
-    def exector(self, exector_path):
-        self._exector = os.path.join(exector_path, 'bin/executer27')
-        self._cmd = None
-
-    def create_temp(self, repository, direct_upgrade=False):
-        tmp_path = os.path.join('/tmp', self.tmp_prefix, repository.md5)
-        if not os.path.exists(tmp_path):
-            relative_dir = 'etc/direct_upgrade' if direct_upgrade else 'etc'
-            script_dir = os.path.join(repository.repository_dir, relative_dir)
-            LocalClient.put_dir(script_dir, tmp_path)
-        return tmp_path
-            
-    def clear_temp(self):
-        tmp_path = os.path.join('/tmp', self.tmp_prefix)
-        tool.DirectoryUtil.rm(tmp_path)
 
     def exec_script(self, name, repository, direct_upgrade=False, can_skip=False):
         script_dir = self.create_temp(repository, direct_upgrade)
@@ -214,6 +152,7 @@ class Upgrader(object):
         total = len(self.route)
         self.apply_param_plugin(self.repositories[self.route_index - 1])
         while self.route_index < total:
+            setattr(self.plugin_context.options, 'without_parameter', True)
             self.call_plugin(self.start_plugin, local_home_path=None, repository_dir=None)
             self.close()
             if not self.connect():
@@ -222,14 +161,14 @@ class Upgrader(object):
             while self.process_index < self.process_total:
                 try:
                     if not self.process[self.process_index]():
-                        self._dump()
                         return False
                     self.process_index += 1
                     self.process_route_index = self.route_index
                 except Exception as e:
-                    self._dump()
                     self.stdio.exception(str(e))
                     return False
+                finally:
+                    self._dump()
             self.process_index = 0
             self.route_index = self.next_stage + 1
             self.exector.clear_temp()
@@ -251,8 +190,8 @@ class Upgrader(object):
             self.db = None
             self.exector = None
 
-    def connect(self):
-        if self.cursor is None or self.execute_sql('select version()', error=False) is False:
+    def connect(self, cache=True):
+        if self.cursor is None or not cache or self.execute_sql('select version()', error=False) is False:
             ret = self.call_plugin(self.connect_plugin)
             if not ret:
                 return False
@@ -349,6 +288,7 @@ class Upgrader(object):
             if ret is None:
                 break
             time.sleep(sleep_time)
+            self.connect(cache=False)
 
     def wait(self):
         if not self.connect():

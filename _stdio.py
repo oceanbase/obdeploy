@@ -21,6 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import re
 import signal
 import sys
 import fcntl
@@ -89,6 +90,13 @@ class BufferIO(object):
     def flush(self):
         self.auto_clear and self.clear()
         return True
+    
+
+class SetBufferIO(BufferIO):
+
+    def write(self, s):
+        if s not in self._buffer:
+            return super(SetBufferIO, self).write(s)
 
 
 class SysStdin(object):
@@ -178,7 +186,7 @@ class SysStdin(object):
             return sys.stdin.readlines()
 
 
-class FormtatText(object):
+class FormatText(object):
 
     def __init__(self, text, color):
         self.text = text
@@ -192,27 +200,27 @@ class FormtatText(object):
 
     @staticmethod
     def info(text):
-        return FormtatText(text, Fore.BLUE)
+        return FormatText(text, Fore.BLUE)
 
     @staticmethod
     def success(text):
-        return FormtatText(text, Fore.GREEN)
+        return FormatText(text, Fore.GREEN)
 
     @staticmethod
     def warning(text):
-        return FormtatText(text, Fore.YELLOW)
+        return FormatText(text, Fore.YELLOW)
 
     @staticmethod
     def error(text):
-        return FormtatText(text, Fore.RED)
+        return FormatText(text, Fore.RED)
 
 
 class LogSymbols(Enum):
 
-    INFO = FormtatText.info('!')
-    SUCCESS = FormtatText.success('ok')
-    WARNING = FormtatText.warning('!!')
-    ERROR = FormtatText.error('x')
+    INFO = FormatText.info('!')
+    SUCCESS = FormatText.success('ok')
+    WARNING = FormatText.warning('!!')
+    ERROR = FormatText.error('x')
 
 
 class IOTable(PrettyTable):
@@ -366,8 +374,8 @@ class IO(object):
 
     WIDTH = 64
     VERBOSE_LEVEL = 0
-    WARNING_PREV = FormtatText.warning('[WARN]')
-    ERROR_PREV = FormtatText.error('[ERROR]')
+    WARNING_PREV = FormatText.warning('[WARN]')
+    ERROR_PREV = FormatText.error('[ERROR]')
 
     def __init__(self,
         level,
@@ -394,8 +402,10 @@ class IO(object):
         self._out_obj = None
         self._cur_out_obj = None
         self._before_critical = None
+        self._exit_msg = ""
         self._output_is_tty = False
         self._input_is_tty = False
+        self._exit_buffer = SetBufferIO()
         self.set_input_stream(input_stream)
         self.set_output_stream(output_stream)
 
@@ -485,8 +495,20 @@ class IO(object):
             except:
                 pass
 
+    @property
+    def exit_msg(self):
+        return self._exit_msg
+
+    @exit_msg.setter
+    def exit_msg(self, msg):
+        self._exit_msg = msg
+
     def _close(self):
         self.before_close()
+        self._flush_cache()
+        if self.exit_msg:
+            self.print(self.exit_msg)
+            self.exit_msg = ""
         self._flush_log()
 
     def __del__(self):
@@ -524,6 +546,11 @@ class IO(object):
         if self._root_io:
             return self._root_io.get_cur_out_obj()
         return self._cur_out_obj
+    
+    def get_exit_buffer(self):
+        if self._root_io:
+            return self._root_io.get_exit_buffer()
+        return self._exit_buffer
 
     def _start_buffer_io(self):
         if self._root_io:
@@ -708,12 +735,25 @@ class IO(object):
             del kwargs['prev_msg']
         else:
             print_msg = msg
-        kwargs['file'] = self.get_cur_out_obj()
+
+        if kwargs.get('_on_exit'):
+            kwargs['file'] = self.get_exit_buffer()
+            del kwargs['_on_exit']
+        else:
+            kwargs['file'] = self.get_cur_out_obj()
+
+        if '_disable_log' in kwargs:
+            enaable_log = not kwargs['_disable_log']
+            del kwargs['_disable_log']
+        else:
+            enaable_log = True
+        
         kwargs['file'] and print(self._format(print_msg, *args), **kwargs)
         del kwargs['file']
-        self.log(msg_lv, msg, *args, **kwargs)
+        enaable_log and self.log(msg_lv, msg, *args, **kwargs)
 
     def log(self, levelno, msg, *args, **kwargs):
+        msg = self.log_masking(msg)
         self._cache_log(levelno, msg, *args, **kwargs)
 
     def _cache_log(self, levelno, msg, *args, **kwargs):
@@ -735,6 +775,12 @@ class IO(object):
     def _log(self, levelno, msg, *args, **kwargs):
         if self.trace_logger:
             self.trace_logger.log(levelno, msg, *args, **kwargs)
+    
+    def _flush_cache(self):
+        if not self._root_io:
+            text = self._exit_buffer.read()
+            if text:
+                self.print(text, _disable_log=True)
 
     def print(self, msg, *args, **kwargs):
         self._print(MsgLevel.INFO, msg, *args, **kwargs)
@@ -754,6 +800,17 @@ class IO(object):
         self._print(MsgLevel.CRITICAL, '%s %s' % (self.ERROR_PREV, msg), *args, **kwargs)
         if not self._root_io:
             self.exit(code)
+
+    def contains_keys(self, msg):
+        keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT"]
+        return any(keyword in msg.upper() for keyword in keywords)
+
+    def log_masking(self, msg):
+        regex = r"(-P\s*\S+\s+.*?-p\s*['\"]?|_PASSWORD\s*(=|to)\s*['\"]*|IDENTIFIED BY \S+.*args:\s*\[['\"]?|_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
+        pattern = re.compile(regex)
+        if isinstance(msg, str) and self.contains_keys(msg):
+            msg = pattern.sub(r"\1******\4", msg)
+        return msg
 
     def verbose(self, msg, *args, **kwargs):
         if self.level > self.VERBOSE_LEVEL:
@@ -853,7 +910,7 @@ class StdIO(object):
                 self._attrs[item] = attr
             else:
                 is_tty = getattr(self._stream, 'isatty', lambda : False)()
-                self._warn_func(FormtatText.warning("WARNING: {} has no attribute '{}'".format(self.io, item)).format(is_tty))
+                self._warn_func(FormatText.warning("WARNING: {} has no attribute '{}'".format(self.io, item)).format(is_tty))
                 self._attrs[item] = FAKE_RETURN
         return self._attrs[item]
 

@@ -1,24 +1,39 @@
-import { ConfigProvider, Space, Dropdown } from 'antd';
-import { useState } from 'react';
+import { localeList, localeText } from '@/constants';
+import { intl } from '@/utils/intl';
+import { requestPipeline } from '@/utils/useRequest';
+import {
+  GlobalOutlined,
+  HomeOutlined,
+  ProfileOutlined,
+  ReadOutlined,
+} from '@ant-design/icons';
+import { ConfigProvider, Dropdown, Modal, notification, Space } from 'antd';
 import type { Locale } from 'antd/es/locale-provider';
 import enUS from 'antd/es/locale/en_US';
 import zhCN from 'antd/es/locale/zh_CN';
-import { getLocale, setLocale, Outlet, useModel } from 'umi';
-import {
-  HomeOutlined,
-  ReadOutlined,
-  ProfileOutlined,
-  GlobalOutlined,
-} from '@ant-design/icons';
-import { intl } from '@/utils/intl';
-import { localeList, localeText } from '@/constants';
-import theme from '../theme';
+import { useEffect, useState } from 'react';
+import { getLocale, history, Outlet, setLocale, useModel } from 'umi';
 import styles from '../Obdeploy/index.less';
+import theme from '../theme';
 
+let requestHandler;
+export { requestHandler };
 export default function Layout() {
   const locale = getLocale();
-  const { OFFICAIL_WEBSITE, FORUMS_VISITED, HELP_CENTER } = useModel('global')
+  const {
+    OFFICAIL_WEBSITE,
+    FORUMS_VISITED,
+    HELP_CENTER,
+    setCurrentStep,
+    errorVisible,
+    errorsList,
+    setErrorVisible,
+    setErrorsList,
+  } = useModel('global');
+  const [modalVisible, setModalVisible] = useState(false);
   const [token, setToken] = useState('');
+  const [lastError, setLastError] = useState<API.ErrorInfo>({});
+  const [modal, contextHolder] = Modal.useModal();
   const [localeConfig, setLocalConfig] = useState<Locale>(
     locale === 'zh-CN' ? zhCN : enUS,
   );
@@ -37,6 +52,51 @@ export default function Layout() {
       label: <a onClick={() => setCurrentLocale(item.key)}>{item.label}</a>,
     }));
   };
+  useEffect(() => {
+    const newLastError = errorsList?.[errorsList?.length - 1] || null;
+    if (errorVisible) {
+      if (newLastError?.desc !== lastError?.desc) {
+        if (newLastError?.showModal && !modalVisible) {
+          setModalVisible(true);
+          modal.confirm({
+            title: newLastError?.title,
+            content: newLastError?.desc,
+            okText: intl.formatMessage({
+              id: 'OBD.pages.Layout.Exit',
+              defaultMessage: '退出',
+            }),
+            cancelText: intl.formatMessage({
+              id: 'OBD.pages.Layout.ContinueToWait',
+              defaultMessage: '继续等待',
+            }),
+            afterClose: () => {
+              setModalVisible(false);
+            },
+            onOk: () => {
+              requestPipeline.processExit = true;
+              let path = history.location.pathname.split('/')[1];
+              if (path === 'ocpInstaller' || path === 'update') {
+                history.push(`/quit?path=${path}`);
+              }
+              if (path === 'obdeploy') {
+                setCurrentStep(7);
+              }
+            },
+          });
+        } else {
+          notification.error({
+            description: newLastError?.desc,
+            message: newLastError?.title,
+            duration: null,
+          });
+        }
+      }
+    } else {
+      notification.destroy();
+    }
+    setLastError(newLastError);
+  }, [errorVisible, errorsList, lastError]);
+
   return (
     <ConfigProvider theme={theme} locale={localeConfig}>
       <div
@@ -127,6 +187,7 @@ export default function Layout() {
         </header>
         <Outlet />
       </div>
+      {contextHolder}
     </ConfigProvider>
   );
 }

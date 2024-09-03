@@ -32,6 +32,8 @@ import decimal
 import ConfigParser
 import socket
 import platform
+import ctypes
+import mmap
 
 if __name__ == '__main__':
     defaultencoding = 'utf-8'

@@ -266,7 +266,7 @@
   description_local: 是否禁用 debug 接口的basic auth 认证，true 表示禁用，false 表示不禁用
 - name: target_sync_configs
   require: false
-  type: PARAM_LIST
+  type: LIST
   need_restart: true
   description_en:
   description_local: '''将地址同步至指定远端目录

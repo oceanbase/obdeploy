@@ -1,0 +1,54 @@
+@cardBackgroundColor: #f8fafe;
+@subTitleColor: #5c6b8a;
+
+.infoSubCard {
+  overflow: hidden;
+  border-radius: 8px;
+  .pwdIcon {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    color: #8592ad;
+    font-size: 17px;
+  }
+  :global {
+    .ant-pro-card .ant-pro-card-body {
+      padding-top: 4px !important;
+    }
+
+    .ant-pro-card-body,
+    .ant-pro-card-header {
+      background-color: @cardBackgroundColor !important;
+    }
+    .ant-pro-card-title {
+      color: @subTitleColor !important ;
+      font-weight: normal !important;
+      font-size: 14px !important;
+    }
+    .ant-pro-card-body {
+      color: #132039 !important;
+    }
+    .ant-pro-card-col.ant-pro-card-split-vertical {
+      border-inline-end: none !important;
+      .ant-pro-card::before {
+        position: absolute;
+        top: 50%;
+        width: 1px;
+        height: 48px;
+        background-color: #e8eaf3;
+        transform: translateY(-50%);
+        transition: #e8eaf3 0.3s;
+        content: '';
+        inset-inline-end: 0;
+      }
+    }
+  }
+}
+
+.clusterConfigCard {
+  :global {
+    .ant-pro-card-col {
+      flex-basis: 25%;
+    }
+  }
+}

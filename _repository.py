@@ -354,6 +354,21 @@ class Repository(PackageInfo):
     def need_load(self, pkg, plugin):
         return self.hash != pkg.md5 or not self.install_time > plugin.check_value or not self.file_check(plugin)
 
+    def rpm_headers_list(self, rpm_headers):
+        def ensure_list(param):
+            if isinstance(param, (list, tuple)):
+                return param
+            return [param] if param is not None else []
+
+        dirnames = ensure_list(rpm_headers.get("dirnames"))
+        basenames = ensure_list(rpm_headers.get("basenames"))
+        dirindexes = ensure_list(rpm_headers.get("dirindexes"))
+        filelinktos = ensure_list(rpm_headers.get("filelinktos"))
+        filemd5s = ensure_list(rpm_headers.get("filemd5s"))
+        filemodes = ensure_list(rpm_headers.get("filemodes"))
+
+        return dirnames, basenames, dirindexes, filelinktos, filemd5s, filemodes
+
     def load_pkg(self, pkg, plugin):
         if self.is_shadow_repository():
             self.stdio and getattr(self.stdio, 'print', '%s is a shadow repository' % self)
@@ -374,12 +389,7 @@ class Repository(PackageInfo):
                         need_files[src_path] = file_item.target_path
                 files = {}
                 links = {}
-                dirnames = rpm.headers.get("dirnames")
-                basenames = rpm.headers.get("basenames")
-                dirindexes = rpm.headers.get("dirindexes")
-                filelinktos = rpm.headers.get("filelinktos")
-                filemd5s = rpm.headers.get("filemd5s")
-                filemodes = rpm.headers.get("filemodes")
+                dirnames, basenames, dirindexes, filelinktos, filemd5s, filemodes = self.rpm_headers_list(rpm.headers)
                 dirs = sorted(need_dirs.keys(), reverse=True)
                 format_str = lambda s: s.decode(errors='replace') if isinstance(s, bytes) else s
                 for i in range(len(basenames)):
@@ -684,6 +694,8 @@ class RepositoryManager(Manager):
         for repository in repositories:
             if not repository.path.startswith(self.path):
                 self.stdio.error("The path of the %s file does not start with %s." % (repository.path, self.path))
+                return False
+            if os.path.basename(repository.path) == repository.name and not DirectoryUtil.rm(os.path.join(os.path.dirname(repository.path), repository.md5), self.stdio):
                 return False
             if not DirectoryUtil.rm(repository.path, self.stdio):
                 return False

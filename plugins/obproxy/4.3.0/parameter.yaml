@@ -1,0 +1,483 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: PATH
+  need_redeploy: true
+  description_en: the directory for the work data file
+  description_local: ObProxy工作目录
+- name: listen_port
+  name_local: 服务端口
+  require: true
+  essential: true
+  type: INT
+  default: 2883
+  min_value: 1025
+  max_value: 65535
+  need_restart: true
+  description_en: port number for mysql connection
+  description_local: SQL服务协议端口号
+- name: prometheus_listen_port
+  name_local: Exporter 端口
+  require: true
+  essential: true
+  type: INT
+  default: 2884
+  min_value: 1025
+  max_value: 65535
+  need_restart: true
+  description_en: obproxy prometheus listen port
+  description_local: 提供prometheus服务端口号
+- name: rpc_listen_port
+  name_local: RPC 端口
+  require: true
+  essential: true
+  type: INT
+  default: 2885
+  min_value: 1025
+  max_value: 65535
+  need_restart: true
+  description_en: obproxy customize the rpc service port
+  description_local: RPC 服务端口
+- name: enable_obproxy_rpc_service
+  require: true
+  type: BOOL
+  default: true
+  min_value: false
+  max_value: true
+  need_restart: true
+  description_en: enable obproxy rpc service
+  description_local: 启用 obproxy rpc 服务
+- name: appname
+  require: false
+  type: SAFE_STRING
+  need_restart: true
+  description_en: application name
+  description_local: 应用名
+- name: cluster_name
+  require: false
+  type: SAFE_STRING
+  need_restart: true
+  description_en: observer cluster name
+  description_local: 代理的observer集群名
+- name: rs_list
+  type: ARRAY
+  need_restart: true
+  description_en: root server list(format ip:sql_port)
+  description_local: observer列表（格式 ip:sql_port)
+- name: proxy_mem_limited
+  name_local: 最大运行内存
+  essential: true
+  type: CAPACITY
+  default: 2G
+  min_value: 100MB
+  max_value: 100GB
+  description_en: The upper limit of ODP runtime memory. If the ODP exceeds the upper limit, it will exit automatically. Please enter an capacity, such as 2G
+  description_local: ODP 运行时内存上限。超过上限 ODP 即自动退出。请输入带容量带单位的整数，如2G
+- name: refresh_json_config
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: force update json info if refresh_json_config is true
+- name: refresh_rslist
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: when refresh config server, update all rslist if refresh_rslist is true
+- name: refresh_idc_list
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: when refresh config server, update all idc list if refresh_idc_list is true
+- name: refresh_config
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: when table processor do check work, update all proxy config if refresh_config is true
+- name: proxy_info_check_interval
+  type: TIME
+  default: 60s
+  min_value: 1s
+  max_value: 1h
+  need_restart: false
+  description_en: proxy info check task interval, [1s, 1h]
+- name: cache_cleaner_clean_interval
+  type: TIME
+  default: 20s
+  min_value: 1s
+  max_value: 1d
+  need_restart: false
+  description_en: the interval for cache cleaner to clean cache, [1s, 1d]
+- name: server_state_refresh_interval
+  type: TIME
+  default: 20s
+  min_value: 10ms
+  max_value: 1h
+  need_restart: false
+  description_en: the interval to refresh server state for getting zone or server newest state, [10ms, 1h]
+- name: metadb_server_state_refresh_interval
+  type: TIME
+  default: 60s
+  min_value: 10ms
+  max_value: 1h
+  need_restart: false
+  description_en: the interval to refresh metadb server state for getting zone or server newest state, [10ms, 1h]
+- name: config_server_refresh_interval
+  type: TIME
+  default: 60s
+  min_value: 10s
+  max_value: 1d
+  need_restart: false
+  description_en: config server info refresh task interval, [10s, 1d]
+- name: idc_list_refresh_interval
+  type: TIME
+  default: 2h
+  min_value: 10s
+  max_value: 1d
+  need_restart: false
+  description_en: the interval to refresh idc list for getting newest region-idc, [10s, 1d]
+- name: stat_table_sync_interval
+  type: TIME
+  default: 60s
+  min_value: 0s
+  max_value: 1d
+  need_restart: false
+  description_en: update sync statistic to ob_all_proxy_stat table interval, [0s, 1d], 0 means disable, if set a negative value, proxy treat it as 0
+- name: stat_dump_interval
+  type: TIME
+  default: 6000s
+  min_value: 0s
+  max_value: 1d
+  need_restart: false
+  description_en: dump statistic in log interval, [0s, 1d], 0 means disable, if set a negative value, proxy treat it as 0
+- name: partition_location_expire_relative_time
+  type: INT
+  default: 0
+  min_value: -36000000
+  max_value: 36000000
+  need_restart: false
+  description_en: the unit is ms, 0 means do not expire, others will expire partition location base on relative time
+- name: cluster_count_high_water_mark
+  type: INT
+  default: 256
+  min_value: 2
+  max_value: 102400
+  need_restart: false
+  description_en: if cluster count is greater than this water mark, cluser will be kicked out by LRU
+- name: cluster_expire_time
+  type: TIME
+  default: 1d
+  min_value: 0
+  max_value: 
+  need_restart: false
+  description_en: cluster resource expire time, 0 means never expire,cluster will be deleted if it has not been accessed for more than the time,[0, ]
+- name: fetch_proxy_bin_random_time
+  type: TIME
+  default: 300s
+  min_value: 1s
+  max_value: 1h
+  need_restart: false
+  description_en: max random waiting time of fetching proxy bin in hot upgrade, [1s, 1h]
+- name: fetch_proxy_bin_timeout
+  type: TIME
+  default: 120s
+  min_value: 1s
+  max_value: 1200s
+  need_restart: false
+  description_en: default hot upgrade fetch binary timeout, proxy will stop fetching after such long time, [1s, 1200s]
+- name: hot_upgrade_failure_retries
+  type: INT
+  default: 5
+  min_value: 1
+  max_value: 20
+  need_restart: false
+  description_en: default hot upgrade failure retries, proxy will stop handle hot_upgrade command after such retries, [1, 20]
+- name: hot_upgrade_rollback_timeout
+  type: TIME
+  default: 24h
+  min_value: 1s
+  max_value: 30d
+  need_restart: false
+  description_en: default hot upgrade rollback timeout, proxy will do rollback if receive no rollback command in such long time, [1s, 30d]
+- name: hot_upgrade_graceful_exit_timeout
+  type: TIME
+  default: 120s
+  min_value: 0s
+  max_value: 30d
+  need_restart: false
+  description_en: graceful exit timeout, [0s, 30d], if set a value <= 0, proxy treat it as 0
+- name: delay_exit_time
+  type: TIME
+  default: 100ms
+  min_value: 100ms
+  max_value: 500ms
+  need_restart: false
+  description_en: delay exit time, [100ms,500ms]
+- name: log_file_percentage
+  type: INT
+  default: 80
+  min_value: 0
+  max_value: 100
+  need_restart: false
+  description_en: max percentage of avail size occupied by proxy log file, [0, 90], 0 means ignore such limit
+- name: log_cleanup_interval
+  type: TIME
+  default: 10m
+  min_value: 5s
+  max_value: 30d
+  need_restart: false
+  description_en: log file clean up task schedule interval, set 1 day or longer, [5s, 30d]
+- name: log_dir_size_threshold
+  type: CAPACITY
+  default: 64GB
+  min_value: 256M
+  max_value: 1T
+  need_restart: false
+  description_en: max usable space size of log dir, used to decide whether should clean up log file, [256MB, 1T]
+- name: need_convert_vip_to_tname
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: convert vip to tenant name, which is useful in cloud
+- name: long_async_task_timeout
+  type: TIME
+  default: 60s
+  min_value: 1s
+  max_value: 1h
+  need_restart: false
+  description_en: long async task timeout, [1s, 1h]
+- name: short_async_task_timeout
+  type: TIME
+  default: 5s
+  min_value: 1s
+  max_value: 1h
+  need_restart: false
+  description_en: short async task timeout, [1s, 1h]
+- name: username_separator
+  type: SAFE_STRING_LIST
+  default: :;-;.
+  min_value: 
+  max_value: 
+  need_restart: false
+  description_en: username separator
+- name: enable_client_connection_lru_disconnect
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: if client connections reach throttle, true is that new connection will be accepted, and eliminate lru client connection, false is that new connection will disconnect, and err packet will be returned
+- name: max_connections
+  type: INT
+  default: 60000
+  min_value: 0
+  max_value: 65535
+  need_restart: false
+  description_en: max fd proxy could use
+- name: client_max_connections
+  type: INT
+  default: 8192
+  min_value: 0
+  max_value: 65535
+  need_restart: false
+  description_en: client max connections for one obproxy, [0, 65535]
+- name: observer_query_timeout_delta
+  type: TIME
+  default: 20s
+  min_value: 1s
+  max_value: 30s
+  need_restart: false
+  description_en: the delta value for @@ob_query_timeout, to cover net round trip time(proxy<->server) and task schedule time(server), [1s, 30s]
+- name: enable_cluster_checkout
+  type: BOOL
+  default: true
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: if enable cluster checkout, proxy will send cluster name when login and server will check it
+- name: enable_proxy_scramble
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: if enable proxy scramble, proxy will send client its variable scramble num, not support old observer
+- name: enable_client_ip_checkout
+  type: BOOL
+  default: true
+  min_value: false
+  max_value: true
+  need_restart: false
+  description_en: if enabled, proxy send client ip when login
+- name: connect_observer_max_retries
+  type: INT
+  default: 3
+  min_value: 2
+  max_value: 5
+  need_restart: false
+  description_en: max retries to do connect
+- name: frequent_accept
+  type: BOOL
+  default: true
+  min_value: false
+  max_value: true
+  need_restart: true
+  description_en: frequent accept
+- name: net_accept_threads
+  type: INT
+  default: 2
+  min_value: 0
+  max_value: 8
+  need_restart: true
+  description_en: net accept threads num, [0, 8]
+- name: stack_size
+  type: CAPACITY
+  default: 1MB
+  min_value: 1MB
+  max_value: 10MB
+  need_restart: true
+  description_en: stack size of one thread, [1MB, 10MB]
+- name: work_thread_num
+  type: INT
+  default: 128
+  min_value: 1
+  max_value: 128
+  need_restart: true
+  description_en: proxy work thread num or max work thread num when automatic match, [1, 128]
+- name: task_thread_num
+  type: INT
+  default: 2
+  min_value: 1
+  max_value: 4
+  need_restart: true
+  description_en: proxy task thread num, [1, 4]
+- name: block_thread_num
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: 4
+  need_restart: true
+  description_en: proxy block thread num, [1, 4]
+- name: grpc_thread_num
+  type: INT
+  default: 8
+  min_value: 8
+  max_value: 16
+  need_restart: true
+  description_en: proxy grpc thread num, [8, 16]
+- name: grpc_client_num
+  type: INT
+  default: 9
+  min_value: 9
+  max_value: 16
+  need_restart: true
+  description_en: proxy grpc client num, [9, 16]
+- name: automatic_match_work_thread
+  type: BOOL
+  default: true
+  min_value: false
+  max_value: true
+  need_restart: true
+  description_en: ignore work_thread_num configuration item, use the count of cpu for current proxy work thread num
+- name: enable_strict_kernel_release
+  require: true
+  type: BOOL
+  default: false
+  min_value: false
+  max_value: true
+  need_restart: true
+  description_en: If is true, proxy only support 5u/6u/7u redhat. Otherwise no care kernel release, and proxy maybe unstable
+- name: enable_cpu_topology
+  type: BOOL
+  default: true
+  min_value: false
+  max_value: true
+  need_restart: true
+  description_en: enable cpu topology, work threads bind to cpu
+- name: local_bound_ip
+  type: SAFE_STRING
+  default: 0.0.0.0
+  need_restart: true
+  description_en: local bound ip(any)
+- name: obproxy_config_server_url
+  type: WEB_URL
+  default: ''
+  need_restart: true
+  description_en: url of config info(rs list and so on)
+- name: proxy_service_mode
+  type: SAFE_STRING
+  default: ''
+  need_restart: true
+  description_en: "proxy deploy and service mode: 1.client(default); 2.server"
+- name: client_session_id_version
+  type: INT
+  default: 2
+  max_value: 2
+  min_value: 1
+  need_reload: true
+  description_en: This parameter is used to specify whether to use the new logic to generate the client session ID. The parameter type is integer. The value range is [1, 2] and the default value is 2 (use the new logic).
+- name: proxy_id
+  type: INT
+  default: 0
+  max_value: 8191
+  min_value: 0
+  need_reload: true
+  description_en: This parameter is used to set the ID for an ODP. The parameter type is integer. The default value is 0 and the value range is [0, 8191].
+- name: app_name
+  type: SAFE_STRING
+  default: undefined
+  need_restart: true
+  description_en: current application name which proxy works for, need defined, only modified when restart
+- name: enable_metadb_used
+  type: BOOL
+  default: true
+  max_value: true
+  min_value: false
+  need_restart: true
+  description_en: use MetaDataBase when proxy run
+- name: rootservice_cluster_name
+  type: SAFE_STRING
+  default: undefined
+  need_restart: true
+  description_en: default cluster name for rootservice_list
+- name: prometheus_cost_ms_unit
+  type: BOOL
+  default: true
+  max_value: true
+  min_value: false
+  need_restart: true
+  description_en: update sync metrics to prometheus exposer interval, [1s, 1h], 0 means disable, if set a negative value, proxy treat it as 0
+- name: bt_retry_times
+  type: INT
+  default: 3
+  min_value: 0
+  max_value: 100
+  need_restart: true
+  description_en: beyond trust sdk retry times
+- name: obproxy_sys_password
+  name_local: 密码
+  essential: true
+  type: STRING
+  default: ''
+  need_restart: false
+  description_en: password pf obproxy sys user
+- name: observer_sys_password
+  type: STRING
+  default: ''
+  need_restart: false
+  description_en: password of observer proxyro user
+- name: observer_root_password
+  type: STRING
+  default: ''
+  need_restart: false
+  description_en: password of observer root user

@@ -48,7 +48,7 @@ def time_delta(client):
     time_ed = time.time() * 1000
 
     time_it = time_ed - time_st
-    time_srv -= time_it
+    time_srv -= time_it/2
     return time_srv - time_st
 
 
@@ -148,7 +148,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 factor = 0.7
                 suggest = err.SUG_OBSERVER_SYS_MEM_TOO_LARGE.format(factor=factor)
                 suggest.auto_fix = 'system_memory' not in global_generate_config and 'system_memory' not in generate_configs.get(server, {})
-                if memory_limit < server_memory_config[server]['system_memory']:
+                if memory_limit <= server_memory_config[server]['system_memory']:
                     critical('mem', err.EC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server), [suggest])
                 elif memory_limit * factor < server_memory_config[server]['system_memory']:
                     alert('mem', err.WC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server, factor=factor), [suggest])
@@ -327,7 +327,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory_limit = 0
             percentage = 0
             if server_config.get('memory_limit'):
-                memory_limit = Capacity(server_config['memory_limit']).btyes
+                memory_limit = Capacity(server_config['memory_limit']).bytes
                 memory['num'] += memory_limit
             elif 'memory_limit_percentage' in server_config:
                 percentage = server_config['memory_limit_percentage']
@@ -338,7 +338,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory['servers'][server] = {
                 'num': memory_limit,
                 'percentage': percentage,
-                'system_memory': Capacity(server_config.get('system_memory', 0)).btyes
+                'system_memory': Capacity(server_config.get('system_memory', 0)).bytes
             }
 
             data_path = server_config['data_dir'] if server_config.get('data_dir') else  os.path.join(server_config['home_path'], 'store')
@@ -509,7 +509,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                 if k in memory_key_map:
                     key = memory_key_map[k]
-                    server_memory_stats[key] = Capacity(str(v)).btyes
+                    server_memory_stats[key] = Capacity(str(v)).bytes
 
             server_memory_stat = servers_memory[ip]
             min_start_need = server_num * START_NEED_MEMORY
@@ -548,7 +548,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             if isinstance(need, int):
                 disk[kp]['need'] += disk[kp]['total'] * need / 100
             else:
-                disk[kp]['need'] += Capacity(need).btyes
+                disk[kp]['need'] += Capacity(need).bytes
         
         for path in servers_clog_mount[ip]:
             kp = '/'
@@ -613,7 +613,17 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
     if success:
         for ip in servers_net_interface:
             client = servers_clients[ip]
+            is_check_ping_permission = False
             for devname in servers_net_interface[ip]:
+                if not is_check_ping_permission:
+                    ret = client.execute_command('ping -W 1 -c 1 127.0.0.1')
+                    if ret.code == 127:
+                        critical('net', err.EC_OBSERVER_PING_NOT_FOUND.format())
+                        break
+                    if not ret:
+                        critical('net', err.EC_OBSERVER_PING_FAILED_SUID.format())
+                        break
+                    is_check_ping_permission = True
                 if client.is_localhost() and devname != 'lo' or (not client.is_localhost() and devname == 'lo'):
                     suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                     suggest.auto_fix = client.is_localhost() and 'devname' not in global_generate_config and 'devname' not in server_generate_config

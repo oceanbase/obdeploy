@@ -20,6 +20,7 @@ import {
   SELECT_TOKEN_SPEARATORS,
 } from '@/constant';
 import { validatePassword } from '@/utils';
+import { PORT_MAX,PORT_MIN } from '@/constant';
 // import tracert from '@/util/tracert';
 import validator from 'validator';
 
@@ -485,8 +486,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({
                   }}
                 >
                   <InputNumber
-                    min={1024}
-                    max={65535}
+                    min={PORT_MIN}
+                    max={PORT_MAX}
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
@@ -536,8 +537,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({
                   }}
                 >
                   <InputNumber
-                    min={1024}
-                    max={65535}
+                    min={PORT_MIN}
+                    max={PORT_MAX}
                     style={{ width: '100%' }}
                   />
                 </Form.Item>

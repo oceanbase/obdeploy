@@ -1,28 +1,36 @@
 import { changeParameterUnit } from '@/component/OCPPreCheck/helper';
-import PasswordCard from '@/component/PasswordCard';
+import {
+  CompDetailCheckInfo,
+  CompNodeCheckInfo,
+  DeployedCompCheckInfo,
+  PathCheckInfo,
+  UserCheckInfo,
+} from '@/component/PreCheckComps';
+import { DEFAULT_PROXY_PWD } from '@/constant';
+import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import { createDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
 import { getErrorInfo, handleQuit } from '@/utils';
+import { encryptPwdForConfig } from '@/utils/encrypt';
+import { generateRandomPassword, isExist } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
 import { ProCard } from '@ant-design/pro-components';
 import { Alert, Button, Col, Row, Space, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import _ from 'lodash';
-import { useState } from 'react';
-import { isExist } from '@/utils/helper';
+import { useEffect } from 'react';
 import { getLocale, useModel } from 'umi';
 import {
   allComponentsKeys,
   componentsConfig,
-  oceanbaseComponent,
-  obagentComponent,
+  componentVersionTypeToComponent,
   configServerComponent,
-  ocpexpressComponentKey,
   configServerComponentKey,
   modeConfig,
+  obagentComponent,
   obproxyComponent,
+  oceanbaseComponent,
+  ocpexpressComponentKey,
   onlyComponentsKeys,
-  componentVersionTypeToComponent,
 } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
@@ -36,63 +44,53 @@ interface ComponentsNodeConfig {
   isTooltip: boolean;
 }
 
-const obVersionCheck = (version: string) => {
-  const versionArr = version.split('.');
-  if (
-    (Number(versionArr[0]) === 4 && Number(versionArr[1]) >= 3) ||
-    Number(versionArr[0]) > 4
-  ) {
-    return true;
-  }
-  return false;
-};
-
-export const formatConfigData = (configData: API.DeploymentConfig) => {
-  const _configData = _.cloneDeep(configData);
-  Object.keys(_configData.components).forEach((key) => {
-    for (let i = 0; i < _configData.components[key].parameters.length; i++) {
-      const parameter = _configData.components[key].parameters[i];
-      // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
-      if (
-        (!parameter.adaptive && !isExist(parameter.value)) ||
-        parameter.adaptive ||
-        !parameter.isChanged
-      ) {
-        _configData.components[key].parameters?.splice(i--, 1);
-      }
-      if (parameter.key === 'ocp_meta_tenant_memory_size') {
-        parameter.value = changeParameterUnit(parameter).value;
-      }
-      delete parameter.isChanged;
-    }
-    if (key === configServerComponentKey) {
-      _configData.components[key]?.parameters?.forEach((parameter) => {
-        if (parameter.key === 'log_maxsize') {
-          parameter.type = 'Integer';
-          parameter.value = Number(parameter.value.split('MB')[0]);
+export const formatConfigData = (
+  configData: API.DeploymentConfig,
+  scenarioParam: any,
+  publicKey: string,
+) => {
+  const formatedConfigData = encryptPwdForConfig(configData, publicKey);
+  let isOBConfig = false;
+  const _configData = formatedConfigData.components || formatedConfigData;
+  if (formatedConfigData.components) isOBConfig = true;
+  Object.keys(_configData).forEach((key) => {
+    if (typeof _configData[key] === 'object') {
+      for (let i = 0; i < _configData[key].parameters.length; i++) {
+        const parameter = _configData[key].parameters[i];
+        // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
+        if (
+          (!parameter.adaptive && !isExist(parameter.value)) ||
+          parameter.adaptive ||
+          !parameter.isChanged
+        ) {
+          _configData[key].parameters?.splice(i--, 1);
         }
-      });
+        if (parameter.key === 'ocp_meta_tenant_memory_size') {
+          parameter.value = changeParameterUnit(parameter).value;
+        }
+        delete parameter.isChanged;
+      }
+      if (key === configServerComponentKey) {
+        _configData[key]?.parameters?.forEach((parameter) => {
+          if (parameter.key === 'log_maxsize') {
+            parameter.type = 'Integer';
+            parameter.value = Number(parameter.value.split('MB')[0]);
+          }
+        });
+      }
     }
   });
-
-  // 前端硬编码 添加scenario参数
-  const scenario = {
-    adaptive: false,
-    auto: false,
-    description: '业务场景：如 htap, express_oltp, complex_oltp, olap, kv.',
-    key: 'scenario',
-    require: true,
-    type: 'String',
-    unitDisable: undefined,
-    value: 'htap',
-  };
-  const { parameters = [], version } = _configData.components.oceanbase;
-  if (
-    obVersionCheck(version) &&
-    (!parameters.length ||
-      !parameters.some((parameter) => parameter.key === 'scenario'))
-  ) {
-    _configData.components.oceanbase.parameters = [scenario, ...parameters];
+  if (scenarioParam) {
+    _configData.oceanbase.parameters = [
+      scenarioParam,
+      ...(_configData.oceanbase.parameters || []),
+    ];
+  }
+  if (isOBConfig) {
+    return {
+      ...formatedConfigData,
+      components: _configData,
+    };
   }
   return _configData;
 };
@@ -100,6 +98,7 @@ export const formatConfigData = (configData: API.DeploymentConfig) => {
 export default function CheckInfo() {
   const {
     configData,
+    setConfigData,
     setCheckOK,
     lowVersion,
     setCurrentStep,
@@ -108,6 +107,8 @@ export default function CheckInfo() {
     setErrorsList,
     selectedConfig,
     errorsList,
+    scenarioParam,
+    loadTypeVisible,
   } = useModel('global');
   const { components = {}, auth, home_path } = configData || {};
   const {
@@ -138,10 +139,11 @@ export default function CheckInfo() {
     window.scrollTo(0, 0);
   };
 
-  const handlePreCheck = () => {
+  const handlePreCheck = async () => {
+    const { data: publicKey } = await getPublicKey();
     handleCreateConfig(
       { name: oceanbase?.appname },
-      formatConfigData(configData),
+      formatConfigData(configData, scenarioParam, publicKey),
     );
   };
 
@@ -225,44 +227,6 @@ export default function CheckInfo() {
       render: (text) => text || '-',
     },
   ];
-
-  const getMoreColumns = (label: string) => {
-    const columns: ColumnsType<API.MoreParameter> = [
-      {
-        title: label,
-        dataIndex: 'key',
-        render: (text) => text,
-      },
-      {
-        title: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.ParameterValue',
-          defaultMessage: '参数值',
-        }),
-        dataIndex: 'value',
-        render: (text, record) =>
-          record.adaptive
-            ? intl.formatMessage({
-                id: 'OBD.pages.components.CheckInfo.Adaptive',
-                defaultMessage: '自动分配',
-              })
-            : text || '-',
-      },
-      {
-        title: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.Introduction',
-          defaultMessage: '介绍',
-        }),
-        dataIndex: 'description',
-        render: (text) => (
-          <Tooltip title={text} placement="topLeft">
-            <div className="ellipsis">{text}</div>
-          </Tooltip>
-        ),
-      },
-    ];
-
-    return columns;
-  };
 
   const componentsList = getComponentsList();
   const componentsNodeConfigList = getComponentsNodeConfigList();
@@ -353,8 +317,8 @@ export default function CheckInfo() {
       content = content.concat(
         {
           label: intl.formatMessage({
-            id: 'OBD.pages.components.CheckInfo.ObproxyServicePort',
-            defaultMessage: 'OBProxy 服务端口',
+            id: 'OBD.pages.Obdeploy.CheckInfo.PortObproxySql',
+            defaultMessage: 'OBProxy SQL端口',
           }),
           value: obproxy?.listen_port,
         },
@@ -364,6 +328,13 @@ export default function CheckInfo() {
             defaultMessage: 'OBProxy Exporter 端口',
           }),
           value: obproxy?.prometheus_listen_port,
+        },
+        {
+          label: intl.formatMessage({
+            id: 'OBD.pages.Obdeploy.CheckInfo.PortObproxyRpc',
+            defaultMessage: 'OBProxy RPC 端口',
+          }),
+          value: obproxy?.rpc_listen_port,
         },
       );
       obproxy?.parameters?.length &&
@@ -405,6 +376,17 @@ export default function CheckInfo() {
         }),
         value: ocpexpress?.port,
       });
+      content.push({
+        label: intl.formatMessage({
+          id: 'OBD.pages.Obdeploy.CheckInfo.OcpExpressAdministratorPassword',
+          defaultMessage: 'OCP Express 管理员密码',
+        }),
+        value: (
+          <Tooltip title={ocpexpress?.admin_passwd} placement="topLeft">
+            <div className="ellipsis">{ocpexpress?.admin_passwd}</div>
+          </Tooltip>
+        ),
+      });
       ocpexpress?.parameters?.length &&
         more.push({
           label: componentsConfig[ocpexpressComponentKey].labelName,
@@ -416,7 +398,7 @@ export default function CheckInfo() {
       content = content.concat({
         label: intl.formatMessage({
           id: 'OBD.pages.Obdeploy.CheckInfo.ObconfigserverServicePort',
-          defaultMessage: 'OBConfigServer 服务端口',
+          defaultMessage: 'obconfigserver 服务端口',
         }),
         value: obconfigserver?.listen_port,
       });
@@ -436,6 +418,38 @@ export default function CheckInfo() {
       more,
     });
   }
+
+  useEffect(() => {
+    const { obproxy = {} } = configData.components;
+    if (obproxy?.parameters) {
+      // 如果没有密码，前端来随机生成一个
+      const targetParam = obproxy?.parameters.find(
+        (item) => item.key === 'obproxy_sys_password',
+      );
+      if (!targetParam || !targetParam.value) {
+        if (!targetParam) {
+          const temp = { ...DEFAULT_PROXY_PWD };
+          temp.value = generateRandomPassword('ob');
+          obproxy?.parameters.push(temp);
+        } else {
+          obproxy?.parameters?.forEach((item) => {
+            if (item.key === 'obproxy_sys_password') {
+              item.value = generateRandomPassword('ob');
+              item.adaptive = false;
+              item.isChanged = true;
+            }
+          });
+        }
+        setConfigData({
+          ...configData,
+          components: {
+            ...configData.components,
+            obproxy,
+          },
+        });
+      }
+    }
+  }, []);
 
   return (
     <Space
@@ -473,62 +487,25 @@ export default function CheckInfo() {
                 >
                   {oceanbase?.appname}
                 </ProCard>
+                {loadTypeVisible ? (
+                  <ProCard
+                    colSpan={10}
+                    title={intl.formatMessage({
+                      id: 'OBD.pages.Obdeploy.CheckInfo.LoadType',
+                      defaultMessage: '负载类型',
+                    })}
+                  >
+                    {scenarioParam?.value}
+                  </ProCard>
+                ) : null}
               </ProCard>
             </Col>
           </ProCard>
-          <ProCard
-            title={intl.formatMessage({
-              id: 'OBD.pages.components.CheckInfo.DeployComponents',
-              defaultMessage: '部署组件',
-            })}
-            className="card-header-padding-top-0 card-padding-bottom-24 "
-          >
-            <Row gutter={16}>
-              {componentsList.map(
-                (item: API.TableComponentInfo, index: number) => (
-                  <Col
-                    span={12}
-                    style={index > 1 ? { marginTop: 16 } : {}}
-                    key={item.key}
-                  >
-                    <ProCard
-                      className={styles.infoSubCard}
-                      split="vertical"
-                      key={item.key}
-                    >
-                      <ProCard
-                        colSpan={10}
-                        title={intl.formatMessage({
-                          id: 'OBD.pages.components.CheckInfo.Component',
-                          defaultMessage: '组件',
-                        })}
-                      >
-                        {item?.showComponentName}
-                      </ProCard>
-                      <ProCard
-                        colSpan={7}
-                        title={intl.formatMessage({
-                          id: 'OBD.pages.components.CheckInfo.Type',
-                          defaultMessage: '类型',
-                        })}
-                      >
-                        {componentsConfig[item.key]?.type}
-                      </ProCard>
-                      <ProCard
-                        colSpan={7}
-                        title={intl.formatMessage({
-                          id: 'OBD.pages.components.CheckInfo.Version',
-                          defaultMessage: '版本',
-                        })}
-                      >
-                        {item?.version}
-                      </ProCard>
-                    </ProCard>
-                  </Col>
-                ),
-              )}
-            </Row>
-          </ProCard>
+          {/* 部署组件配置 */}
+          <DeployedCompCheckInfo
+            className="card-header-padding-top-0"
+            componentsList={componentsList}
+          />
         </Row>
       </ProCard>
       <ProCard className={styles.pageCard} split="horizontal">
@@ -555,132 +532,34 @@ export default function CheckInfo() {
               />
             </ProCard>
           </ProCard>
+          {/* 组件节点配置 */}
           {selectedConfig.length ? (
-            <ProCard
-              title={intl.formatMessage({
-                id: 'OBD.pages.components.CheckInfo.ComponentNodeConfiguration',
-                defaultMessage: '组件节点配置',
-              })}
-              className="card-header-padding-top-0 card-padding-bottom-24"
-            >
-              <Col span={componentsNodeConfigList?.length === 1 ? 12 : 24}>
-                <ProCard className={styles.infoSubCard} split="vertical">
-                  {componentsNodeConfigList.map(
-                    (item: ComponentsNodeConfig) => (
-                      <ProCard title={item.name} key={item.key}>
-                        {item.isTooltip ? (
-                          <Tooltip title={item?.servers} placement="topLeft">
-                            <div className="ellipsis">{item?.servers}</div>
-                          </Tooltip>
-                        ) : (
-                          item?.servers
-                        )}
-                      </ProCard>
-                    ),
-                  )}
-                </ProCard>
-              </Col>
-            </ProCard>
+            <CompNodeCheckInfo
+              className="card-header-padding-top-0"
+              componentsNodeConfigList={componentsNodeConfigList}
+            />
           ) : null}
-          <ProCard
+          {/* 部署用户配置 */}
+          <UserCheckInfo
             title={intl.formatMessage({
               id: 'OBD.pages.components.CheckInfo.DeployUserConfiguration',
               defaultMessage: '部署用户配置',
             })}
-            className="card-header-padding-top-0 card-padding-bottom-24"
-          >
-            <Col span={12}>
-              <ProCard className={styles.infoSubCard} split="vertical">
-                <ProCard
-                  title={intl.formatMessage({
-                    id: 'OBD.pages.components.CheckInfo.Username',
-                    defaultMessage: '用户名',
-                  })}
-                >
-                  {auth?.user}
-                </ProCard>
-                <PasswordCard password={auth?.password} />
-              </ProCard>
-            </Col>
-          </ProCard>
-          <ProCard
-            title={intl.formatMessage({
-              id: 'OBD.pages.components.CheckInfo.SoftwarePathConfiguration',
-              defaultMessage: '软件路径配置',
-            })}
-            className="card-header-padding-top-0 card-padding-bottom-24"
-          >
-            <Col span={12}>
-              <ProCard className={styles.infoSubCard} split="vertical">
-                <ProCard
-                  title={intl.formatMessage({
-                    id: 'OBD.pages.components.CheckInfo.SoftwarePath',
-                    defaultMessage: '软件路径',
-                  })}
-                >
-                  <Tooltip title={home_path} placement="topLeft">
-                    {home_path}
-                  </Tooltip>
-                </ProCard>
-              </ProCard>
-            </Col>
-          </ProCard>
+            className="card-header-padding-top-0"
+            user={auth?.user}
+            password={auth?.password}
+          />
+          {/* 软件路径配置 */}
+          <PathCheckInfo
+            className="card-header-padding-top-0"
+            home_path={home_path}
+          />
         </Row>
       </ProCard>
-      <ProCard split="horizontal">
-        <Row gutter={16}>
-          {clusterConfigInfo?.map((item, index) => (
-            <ProCard
-              title={item.group}
-              key={item.key}
-              className={`${
-                index === clusterConfigInfo?.length - 1
-                  ? 'card-header-padding-top-0 card-padding-bottom-24'
-                  : 'card-padding-bottom-24'
-              }`}
-            >
-              <Col span={24}>
-                <ProCard className={styles.infoSubCard} split="vertical">
-                  {item.content.map((subItem) => (
-                    <ProCard
-                      title={subItem.label}
-                      key={subItem.label}
-                      colSpan={subItem.colSpan}
-                    >
-                      {subItem.value}
-                    </ProCard>
-                  ))}
-                </ProCard>
-              </Col>
-              {item?.more?.length ? (
-                <Space
-                  direction="vertical"
-                  size="middle"
-                  style={{ marginTop: 16 }}
-                >
-                  {item?.more.map((moreItem) => (
-                    <ProCard
-                      className={styles.infoSubCard}
-                      style={{ border: '1px solid #e2e8f3' }}
-                      split="vertical"
-                      key={moreItem.label}
-                    >
-                      <Table
-                        className={`${styles.infoCheckTable}  ob-table`}
-                        columns={getMoreColumns(moreItem.label)}
-                        dataSource={moreItem?.parameters}
-                        pagination={false}
-                        scroll={{ y: 300 }}
-                        rowKey="key"
-                      />
-                    </ProCard>
-                  ))}
-                </Space>
-              ) : null}
-            </ProCard>
-          ))}
-        </Row>
-      </ProCard>
+      <CompDetailCheckInfo
+        className="card-header-padding-top-0"
+        clusterConfigInfo={clusterConfigInfo}
+      />
       <footer className={styles.pageFooterContainer}>
         <div className={styles.pageFooter}>
           <Space className={styles.foolterAction}>

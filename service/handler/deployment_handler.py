@@ -19,6 +19,7 @@
 
 import json
 import tempfile
+import re
 from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid1 as uuid
@@ -28,13 +29,15 @@ import yaml
 from _deploy import DeployStatus, DeployConfigStatus
 from _errno import CheckStatus, FixEval
 from _plugin import PluginType
+from _rpm import Version
 from const import COMP_JRE, COMP_OCP_EXPRESS
 from service.api.v1.deployments import DeploymentInfo
 from service.handler.base_handler import BaseHandler
+from service.handler.rsa_handler import RSAHandler
 from service.model.deployments import DeploymentConfig, PreCheckResult, RecoverChangeParameter, TaskInfo, \
     ComponentInfo, PrecheckTaskResult, \
     DeployMode, ConnectionInfo, PreCheckInfo, RecoverAdvisement, DeploymentReport, Deployment, Auth, DeployConfig, \
-    DeploymentStatus, Parameter
+    DeploymentStatus, Parameter, ScenarioType
 
 from service.common import log, task, util, const
 from service.common.task import TaskStatus, TaskResult
@@ -73,11 +76,12 @@ class DeploymentHandler(BaseHandler):
         if config.components.oceanbase is not None:
             self.generate_oceanbase_config(cluster_config, config, name, config.components.oceanbase)
         if config.components.obproxy is not None:
-            cluster_config[config.components.obproxy.component] = self.generate_component_config(config, const.OBPROXY, ['cluster_name', 'prometheus_listen_port', 'listen_port'])
+            cluster_config[config.components.obproxy.component] = self.generate_component_config(config, const.OBPROXY, ['cluster_name', 'prometheus_listen_port', 'listen_port', 'rpc_listen_port'])
         if config.components.obagent is not None:
             cluster_config[config.components.obagent.component] = self.generate_component_config(config, const.OBAGENT, ['monagent_http_port', 'mgragent_http_port'])
         if config.components.ocpexpress is not None:
-            cluster_config[config.components.ocpexpress.component] = self.generate_component_config(config, const.OCP_EXPRESS, ['port'])
+            ocp_pwd = self.generate_component_config(config, const.OCP_EXPRESS, ['port', 'admin_passwd'])
+            cluster_config[config.components.ocpexpress.component] = ocp_pwd
         if config.components.obconfigserver is not None:
             cluster_config[config.components.obconfigserver.component] = self.generate_component_config(config, const.OB_CONFIGSERVER, ['listen_port'])
         cluster_config_yaml_path = ''
@@ -102,6 +106,10 @@ class DeploymentHandler(BaseHandler):
         ext_keys.insert(0, 'home_path')
         for key in ext_keys:
             if config_dict[key]:
+                if key == 'admin_passwd':
+                    passwd = RSAHandler().decrypt_private_key(config_dict[key])
+                    comp_config['global'][key] = passwd
+                    continue
                 comp_config['global'][key] = config_dict[key]
 
         if input_comp_config.home_path == '':
@@ -109,6 +117,10 @@ class DeploymentHandler(BaseHandler):
 
         for parameter in input_comp_config.parameters:
             if not parameter.adaptive:
+                if parameter.key.endswith('_password'):
+                    passwd = RSAHandler().decrypt_private_key(parameter.value)
+                    comp_config['global'][parameter.key] = passwd
+                    continue
                 comp_config['global'][parameter.key] = parameter.value
         return comp_config
 
@@ -146,6 +158,10 @@ class DeploymentHandler(BaseHandler):
         for key in config_dict:
             if config_dict[key] and key in {'mysql_port', 'rpc_port', 'home_path', 'data_dir', 'redo_dir', 'appname',
                                             'root_password'}:
+                if key == 'root_password':
+                    passwd = RSAHandler().decrypt_private_key(config_dict[key])
+                    oceanbase_config['global'][key] = passwd
+                    continue
                 oceanbase_config['global'][key] = config_dict[key]
 
         if oceanbase.home_path == '':
@@ -168,7 +184,8 @@ class DeploymentHandler(BaseHandler):
             cluster_config['user'] = {}
         cluster_config['user']['username'] = auth.user
         if auth.password:
-            cluster_config['user']['password'] = auth.password
+            passwd = RSAHandler().decrypt_private_key(auth.password)
+            cluster_config['user']['password'] = passwd
         cluster_config['user']['port'] = auth.port
 
     def create_deployment(self, name: str, config_path: str):
@@ -414,8 +431,12 @@ class DeploymentHandler(BaseHandler):
                               connect_url=info['cmd'] if info['type'] == 'db' else info['url'])
 
     def list_connection_info(self, name):
+        pwd_rege = r"-p'[^']*'\s*"
         if self.context["connection_info"][name] is not None:
             log.get_logger().info("get deployment {0} connection info from context".format(name))
+            for item in self.context["connection_info"][name]:
+                item.password = ''
+                item.connect_url = re.sub(pwd_rege, '', item.connect_url)
             return self.context["connection_info"][name]
         deploy = self.get_deploy(name)
         connection_info_list = list()
@@ -435,6 +456,7 @@ class DeploymentHandler(BaseHandler):
             if connection_info is not None:
                 connection_info_copy = deepcopy(connection_info)
                 connection_info_copy.password = ''
+                connection_info_copy.connect_url = re.sub(pwd_rege, '', connection_info_copy.connect_url)
                 connection_info_list.append(connection_info_copy)
             else:
                 log.get_logger().warn("can not get connection info for component: {0}".format(component))
@@ -765,3 +787,67 @@ class DeploymentHandler(BaseHandler):
             cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, self.obd.stdio.log_path, trace_id)
             stdout = LocalClient.execute_command(cmd).stdout
         return stdout
+
+    def get_scenario_by_version(self, version, language='zh-CN'):
+        version = version.split('-')[0]
+        if language == 'zh-CN':
+            scenario_4_3_0_0 = [
+                {
+                    'type': 'Express OLTP',
+                    'desc': '适用于贸易、支付核心系统、互联网高吞吐量应用程序等工作负载。没有外键等限制、没有存储过程、没有长交易、没有大交易、没有复杂的连接、没有复杂的子查询。',
+                    'value': 'express_oltp'
+                },
+                {
+                    'type': 'Complex OLTP',
+                    'desc': '适用于银行、保险系统等工作负载。他们通常具有复杂的联接、复杂的相关子查询、用 PL 编写的批处理作业，以及长事务和大事务。有时对短时间运行的查询使用并行执行',
+                    'value': 'complex_oltp'
+                },
+                {
+                    'type': 'HTAP',
+                    'desc': '适用于混合 OLAP 和 OLTP 工作负载。通常用于从活动运营数据、欺诈检测和个性化建议中获取即时见解',
+                    'value': 'htap'
+                },
+                {
+                    'type': 'OLAP',
+                    'desc': '用于实时数据仓库分析场景',
+                    'value': 'olap'
+                },
+                {
+                    'type': 'OBKV',
+                    'desc': '用于键值工作负载和类似 Hbase 的宽列工作负载，这些工作负载通常具有非常高的吞吐量并且对延迟敏感',
+                    'value': 'kv'
+                },
+            ]
+        else:
+            scenario_4_3_0_0 = [
+                {
+                    'type': 'Express OLTP',
+                    'desc': 'This is suitable for trading, core payment systems, high-throughput Internet applications, and other workloads. There are no limitations such as foreign keys, stored procedures, long transactions, large transactions, complex joins, or complex subqueries.',
+                    'value': 'express_oltp'
+                },
+                {
+                    'type': 'Complex OLTP',
+                    'desc': 'This is suitable for workloads in industries like banking and insurance. They often have complex joins, complex correlated subqueries, batch jobs written in PL, and long, large transactions. Sometimes parallel execution is used for queries that run for a short time.',
+                    'value': 'complex_oltp'
+                },
+                {
+                    'type': 'HTAP',
+                    'desc': 'This is suitable for mixed OLAP and OLTP workloads, typically used to obtain real-time insights from activity operational data, fraud detection, and personalized recommendations.',
+                    'value': 'htap'
+                },
+                {
+                    'type': 'OLAP',
+                    'desc': 'This is suitable for real-time data warehouse analysis scenarios.',
+                    'value': 'olap'
+                },
+                {
+                    'type': 'OBKV',
+                    'desc': 'This is suitable for key-value workloads and wide-column workloads similar to HBase, which often have very high throughput and are sensitive to latency.',
+                    'value': 'kv'
+                },
+            ]
+        data = []
+        if Version(version) >= Version('4.3.0.0'):
+            for scenario in scenario_4_3_0_0:
+                data.append(ScenarioType(type=scenario['type'], desc=scenario['desc'], value=scenario['value']))
+        return data

@@ -6,7 +6,7 @@
     width: 100vw;
     height: calc(100% - 171px);
     min-height: 628px;
-    padding: 24px calc(120 / 1280 * 100%);
+    padding: 24px calc((100% - 1040px)/2);
     padding-bottom: 92px;
     background-color: rgba(245, 248, 254, 1);
     box-sizing: border-box;
@@ -18,28 +18,30 @@
   .disableCustomCardContainer,
   .customCardContainer {
     box-sizing: border-box;
-    min-width: 484px;
-    height: 100%;
-    min-height: 200px;
+    width: 484px;
+    height: 222px;
     display: flex;
+    background-color: #f8fafe;
+    border: none;
     align-items: center;
-    // width: 40%;
-    // height: 40%;
-    padding: 35px 18px;
+    padding: 35px 0 18px 0;
     .cardHeader {
       display: flex;
       justify-content: center;
-      height: 60px;
-      margin-bottom: 16px;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-direction: column;
       .cardImg {
-        margin-right: 8px;
+        height: 60px;
+        width: 60px;
+        margin-bottom: 8px;
       }
       .cardTitle,
       .disableCardTitle {
         margin-left: 8px;
         font-weight: 500;
         font-size: 18px;
-        line-height: 60px;
+        line-height: 18px;
       }
       .disableCardTitle {
         color: #cdd5e4;
@@ -51,6 +53,7 @@
       font-size: 16px;
       line-height: 22px;
       text-align: center;
+      color: #8592ad;
     }
     .disableCardDetail {
       color: #cdd5e4;
@@ -65,10 +68,6 @@
           color: #006aff !important;
         }
       }
-    }
-
-    &.customCardContainer:hover {
-      cursor: pointer;
     }
   }
   .pageFooterContainer {
@@ -89,4 +88,24 @@
       }
     }
   }
+  .guideBtn {
+    display: block;
+    margin: auto;
+    position: absolute;
+    bottom: 24px;
+    left: 0;
+    right: 0;
+  }
+  :global {
+    .ant-dropdown-menu {
+      width: 189px !important;
+    }
+  }
+}
+.cardDetailText {
+  color: #8592ad;
+  margin-bottom: 0px;
+}
+.cardDetailTitle {
+  margin-bottom: 0px;
 }

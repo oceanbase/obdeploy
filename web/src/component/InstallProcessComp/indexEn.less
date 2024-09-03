@@ -1,0 +1,103 @@
+@cardBackgroundColor: #f8fafe;
+@greyTextColor: #8592ad;
+
+.progressEffectContainer {
+  position: relative;
+  height: 150px;
+  .deployTitle {
+    position: absolute;
+    left: calc(50% - 70px);
+    font-weight: 500;
+    font-size: 16px;
+  }
+  .computer {
+    position: absolute;
+    top: 20px;
+    left: 195px;
+    .computerAnimate {
+      width: 150px;
+    }
+  }
+  .progress {
+    position: absolute;
+    top: 65px;
+    left: 327px;
+    .progressVedio {
+      width: 285px;
+      height: 11px;
+      background-color: #fff;
+      :global {
+        .vjs-text-track-display {
+          background-color: #fff !important;
+        }
+        .vjs-poster {
+          top: 1px !important;
+          left: 1px !important;
+          background-position: 0 0 !important;
+          background-size: 100% !important;
+        }
+        .vjs-modal-dialog {
+          background: #fff !important;
+        }
+        .vjs-error-display:before {
+          content: '' !important;
+        }
+      }
+    }
+    .progressCover {
+      position: absolute;
+      top: 2.5px;
+      right: 2px;
+      height: 5.5px;
+      background: #fff;
+      border-radius: 0 5px 5px 0;
+    }
+  }
+
+  .spaceman {
+    position: absolute;
+    top: 25px;
+    left: 310px;
+    .spacemanAnimate {
+      width: 320px;
+    }
+  }
+  .database {
+    position: absolute;
+    top: 20px;
+    right: 190px;
+    .sqlAnimate {
+      width: 150px;
+    }
+  }
+}
+
+.deploymentName {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  color: @greyTextColor;
+  font-size: 12px;
+  transform: translateX(-50%);
+}
+
+.installSubCard,
+.reportLog {
+  background-color: @cardBackgroundColor;
+}
+.installLog,
+.reportLog {
+  margin: 0 !important;
+  overflow: auto;
+  color: #8592ad;
+}
+.installLog {
+  height: 360px;
+}
+.reportLog {
+  max-width: 1008px;
+  min-height: 100px;
+  max-height: 360px;
+  padding: 16px;
+  border-radius: 8px;
+}

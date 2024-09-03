@@ -80,6 +80,6 @@ def generate_random_password(cluster_config):
     global_config = cluster_config.get_original_global_conf()
     if cluster_config.name in add_components and 'admin_passwd' not in global_config:
         cluster_config.update_global_conf('admin_passwd', ConfigUtil.get_random_pwd_by_rule(), False)
-    if cluster_config.name in add_components and 'ocp_root_password' not in global_config:
+    if cluster_config.name in add_components and 'oceanbase-ce' not in add_components and 'oceanbase' not in add_components and 'ocp_root_password' not in global_config:
         cluster_config.update_global_conf('ocp_root_password', ConfigUtil.get_random_pwd_by_rule(), False)
 

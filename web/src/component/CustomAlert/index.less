@@ -1,0 +1,36 @@
+.alertContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 13px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  :global {
+    .ant-alert-icon {
+      font-size: 14px !important;
+    }
+  }
+}
+.alertContainer::before {
+  content: '';
+  width: 8px;
+  transform: rotateY(60deg);
+  position: absolute;
+  height: calc(100% - 1px);
+  left: -3px;
+  top: 0.5px;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.alert-warning::before {
+  background-color: #ffa21a;
+}
+.alert-success::before {
+  background-color: #0ac185;
+}
+.alert-info::before {
+  background-color: #006aff;
+}
+.alert-info::error {
+  background-color: #f93939;
+}

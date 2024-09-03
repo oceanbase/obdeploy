@@ -5,4 +5,5 @@ export type PathType =
   | 'guide'
   | 'install'
   | 'obdeploy'
+  | 'componentDeploy'
   | 'update';

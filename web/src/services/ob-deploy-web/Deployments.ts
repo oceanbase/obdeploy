@@ -223,3 +223,13 @@ export async function queryDeploymentReport(
     },
   );
 }
+
+export async function getScenarioType(version: string) {
+  return request<API.OBResponseDataListScenarioType>(
+    '/api/v1/deployments/scenario/type',
+    {
+      method: 'GET',
+      params: { version },
+    },
+  );
+}

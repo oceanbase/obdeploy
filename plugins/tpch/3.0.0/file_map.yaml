@@ -1,0 +1,3 @@
+- src_path: './usr/tpc-h-tools/tpc-h-tools'
+  target_path: 'tpch'
+  type: dir

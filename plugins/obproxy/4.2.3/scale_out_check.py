@@ -21,6 +21,11 @@
 from __future__ import absolute_import, division, print_function
 
 
+def add_plugin(component_name, plugins):
+    if component_name not in plugins:
+        plugins.append(component_name)
+
+
 def scale_out_check(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     added_components = cluster_config.get_deploy_added_components()
@@ -29,8 +34,14 @@ def scale_out_check(plugin_context, *args, **kwargs):
     need_restart = False
     if 'ob-configserver' in added_components:
         cluster_config.add_depend_component('ob-configserver')
+
+    if 'obproxy-ce' in added_components or 'obproxy' in added_components:
+        plugin_context.set_variable('auto_depend', True)
+        add_plugin('generate_config', plugins)
+
+    if 'ob-configserver' in added_components and 'obproxy-ce' not in added_components and 'obproxy' not in added_components:
         need_restart = True
-        
+
     plugin_context.stdio.verbose('scale_out_check plugins: %s' % plugins)
     plugin_context.stdio.verbose('added_components: %s' % added_components)
     return plugin_context.return_true(plugins=plugins, need_restart=need_restart)

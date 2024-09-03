@@ -21,6 +21,7 @@
 def scenario_check(plugin_context, scenario='', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
+
     scenarios = ['express_oltp', 'complex_oltp', 'olap', 'htap', 'kv']
     scenario_check = lambda scenario: scenario in scenarios
     scenario = getattr(plugin_context.options, 'optimize', scenario)

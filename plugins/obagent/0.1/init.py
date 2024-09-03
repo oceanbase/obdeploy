@@ -20,13 +20,14 @@
 
 from __future__ import absolute_import, division, print_function
 
-from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage
+from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
 
 
 def init(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    deploy_name = plugin_context.deploy_name
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
     clean = getattr(plugin_context.options, 'clean', False)
@@ -69,6 +70,7 @@ def init(plugin_context, *args, **kwargs):
                 if not ret or ret.stdout.strip():
                     global_ret = False
                     stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
+                    stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 global_ret = False

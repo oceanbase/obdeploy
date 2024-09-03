@@ -537,6 +537,8 @@ class RemoteMirrorRepository(MirrorRepository):
         self.stdio and getattr(self.stdio, 'verbose', print)('min_version is %s' % min_version)
         max_version = ConfigUtil.get_value_from_dict(pattern, 'max_version', transform_func=Version)
         self.stdio and getattr(self.stdio, 'verbose', print)('max_version is %s' % max_version)
+        only_download = pattern['only_download'] if 'only_download' in pattern else False
+        self.stdio and getattr(self.stdio, 'verbose', print)('only_download is %s' % only_download)
         pkgs = []
         for key in self.db:
             info = self.db[key]
@@ -551,6 +553,8 @@ class RemoteMirrorRepository(MirrorRepository):
             if min_version and min_version > info.version:
                 continue
             if max_version and max_version <= info.version:
+                continue
+            if only_download and not self.is_download(info):
                 continue
             pkgs.append(info)
         if pkgs:
@@ -618,6 +622,11 @@ class RemoteMirrorRepository(MirrorRepository):
 
         c = [len(name) / len(info.name), lse_score, info]
         return c
+
+    def is_download(self, pkg_info):
+        file_name = pkg_info.location[1]
+        file_path = os.path.join(self.mirror_path, file_name)
+        return os.path.exists(file_path)
 
 
     @staticmethod
@@ -755,7 +764,7 @@ class LocalMirrorRepository(MirrorRepository):
                 self.stdio and getattr(self.stdio, 'print', print)('add %s to local mirror', src_path)
                 return pkg
         except IOError:
-            self.self.stdio and getattr(self.self.stdio, 'exception', print)('')
+            self.stdio and getattr(self.stdio, 'exception', print)('')
             self.stdio and getattr(self.stdio, 'error', print)('Set local mirror failed. %s IO Error' % pkg.file_name)
         except:
             self.stdio and getattr(self.stdio, 'exception', print)('')
@@ -1021,6 +1030,7 @@ class MirrorRepositoryManager(Manager):
         if not repo_conf:
             return None
         return repo_conf.sections.get(section_name)
+
 
     def get_remote_mirrors(self, is_enabled=True):
         self._lock()

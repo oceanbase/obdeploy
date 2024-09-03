@@ -24,7 +24,7 @@ import os
 from tool import TimeUtils
 import _errno as err
 from datetime import datetime
-from _stdio import FormtatText
+from _stdio import FormatText
 
 
 def gather_scene_run(plugin_context, *args, **kwargs):
@@ -56,7 +56,7 @@ def gather_scene_run(plugin_context, *args, **kwargs):
         obdiag_cmd = get_obdiag_cmd()
         stdio.verbose('execute cmd: {}'.format(obdiag_cmd))
         run_result = LocalClient.run_command(obdiag_cmd, env=None, stdio=stdio)
-        stdio.warn(FormtatText.warning("\nGather all result stored in this directory: {0}\n".format(store_dir_option)))
+        stdio.warn(FormatText.warning("\nGather all result stored in this directory: {0}\n".format(store_dir_option)))
         return run_result
 
     options = plugin_context.options

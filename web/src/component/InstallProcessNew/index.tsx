@@ -1,24 +1,22 @@
-import { intl } from '@/utils/intl';
-import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
-import { ProCard } from '@ant-design/pro-components';
-import useCustomRequest from '@/utils/useRequest';
-import { useRequest } from 'ahooks';
-import {
-  queryInstallStatus,
-  queryInstallLog,
-} from '@/services/ob-deploy-web/Deployments';
-import { getErrorInfo } from '@/utils';
-import * as OCP from '@/services/ocp_installer_backend/OCP';
-import lottie from 'lottie-web';
-import NP from 'number-precision';
-import videojs from 'video.js';
-import 'video.js/dist/video-js.css';
-import { getLocale } from 'umi';
-import CustomFooter from '../CustomFooter';
-import ExitBtn from '../ExitBtn';
 import EnStyles from '@/pages/Obdeploy/indexEn.less';
 import ZhStyles from '@/pages/Obdeploy/indexZh.less';
+import {
+  queryInstallLog,
+  queryInstallStatus,
+} from '@/services/ob-deploy-web/Deployments';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
+import { getErrorInfo } from '@/utils';
+import { intl } from '@/utils/intl';
+import useCustomRequest, { requestPipeline } from '@/utils/useRequest';
+import { ProCard } from '@ant-design/pro-components';
+import lottie from 'lottie-web';
+import NP from 'number-precision';
+import { useEffect, useState } from 'react';
+import { getLocale, useModel } from 'umi';
+import videojs from 'video.js';
+import 'video.js/dist/video-js.css';
+import CustomFooter from '../CustomFooter';
+import ExitBtn from '../ExitBtn';
 
 interface InstallProcessNewProps {
   current: number;
@@ -115,7 +113,7 @@ export default function InstallProcessNew({
       }
     },
     onError: (e: any) => {
-      if (currentPage) {
+      if (currentPage && !requestPipeline.processExit) {
         setTimeout(() => {
           fetchInstallStatus({ name });
         }, 2000);
@@ -136,7 +134,11 @@ export default function InstallProcessNew({
       }
     },
     onError: (e: any) => {
-      if (installStatus === 'RUNNING' && currentPage) {
+      if (
+        installStatus === 'RUNNING' &&
+        currentPage &&
+        !requestPipeline.processExit
+      ) {
         setTimeout(() => {
           handleInstallLog({ name });
         }, 2000);
@@ -147,7 +149,7 @@ export default function InstallProcessNew({
     },
   });
   // ocp
-  const { run: getInstallTask } = useRequest(getTaskFn, {
+  const { run: getInstallTask } = useCustomRequest(getTaskFn, {
     manual: true,
     onSuccess: ({ success, data }) => {
       if (success) {
@@ -192,7 +194,7 @@ export default function InstallProcessNew({
       }
     },
     onError: (e: any) => {
-      if (currentPage) {
+      if (currentPage && !requestPipeline.processExit) {
         setTimeout(() => {
           getInstallTask({ id, task_id });
         }, 2000);
@@ -203,7 +205,7 @@ export default function InstallProcessNew({
       setErrorsList([...errorsList, errorInfo]);
     },
   });
-  const { run: getInstallTaskLog } = useRequest(getTaskLogFn, {
+  const { run: getInstallTaskLog } = useCustomRequest(getTaskLogFn, {
     manual: true,
     onSuccess: ({ success, data }: API.OBResponseInstallLog_) => {
       if (success) setLogData(data || {});
@@ -218,7 +220,11 @@ export default function InstallProcessNew({
       }
     },
     onError: (e: any) => {
-      if (installStatus === 'RUNNING' && currentPage) {
+      if (
+        installStatus === 'RUNNING' &&
+        currentPage &&
+        !requestPipeline.processExit
+      ) {
         setTimeout(() => {
           if (type === 'update') {
             getInstallTaskLog({ cluster_name, task_id });
