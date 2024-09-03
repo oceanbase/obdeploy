@@ -24,6 +24,7 @@ from optparse import Values
 from singleton_decorator import singleton
 
 from service.handler.base_handler import BaseHandler
+from service.handler.rsa_handler import RSAHandler
 from service.common import log, task, util, const
 from service.common.task import Serial as serial
 from service.common.task import AutoRegister as auto_register
@@ -886,6 +887,8 @@ class MetadbHandler(BaseHandler):
 
     def create_connection_info(self, info, sys=False):
         self.context["connection_info"][info.cluster_name] = info
+        passwd = RSAHandler().decrypt_private_key(info.password)
+        info.password = passwd
         log.get_logger().info(
             f'connection host: {info.host}, port: {info.port}, user: {info.user}, password: {info.password}'
         )

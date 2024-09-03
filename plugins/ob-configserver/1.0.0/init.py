@@ -21,7 +21,7 @@ from __future__ import absolute_import, division, print_function
 
 import os.path
 
-from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage
+from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
 
 
 def check_home_path(home_path, client):
@@ -49,6 +49,7 @@ def init(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    deploy_name = plugin_context.deploy_name
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
     stdio.start_loading('Initializes ob-configserver work home')
@@ -71,8 +72,8 @@ def init(plugin_context, *args, **kwargs):
                     stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))
             else:
                 global_ret = False
-                err_msg = ' {} is not empty'.format(home_path)
-                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err_msg))
+                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
+                stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
 
         if global_ret and not client.execute_command(f"""bash -c 'mkdir -p {os.path.join(home_path, '{run,bin,conf,log}')}'"""):
             stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path',msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=home_path)))

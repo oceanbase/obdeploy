@@ -40,9 +40,9 @@ export function getDocs(getLocale) {
 
   //OCP Express
   const OCP_EXPRESS_CN =
-    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000508228';
+    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000001050397';
   const OCP_EXPRESS_EN =
-    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000001166743';
+    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000001375615';
   const OCP_EXPRESS = getLocale() === 'zh-CN' ? OCP_EXPRESS_CN : OCP_EXPRESS_EN;
 
   //OCP
@@ -51,12 +51,7 @@ export function getDocs(getLocale) {
   const OCP_DOCS = getLocale() === 'zh-CN' ? OCP_DOCS_CN : OCP_DOCS_EN;
 
   //OBAgent
-  const OBAGENT_DOCS_CN =
-    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000509852';
-  const OBAGENT_DOCS_EN =
-    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000001168964';
-  const OBAGENT_DOCS =
-    getLocale() === 'zh-CN' ? OBAGENT_DOCS_CN : OBAGENT_DOCS_EN;
+  const OBAGENT_DOCS = 'https://github.com/oceanbase/obagent';
 
   //OBProxy
   const OBPROXY_DOCS_CN = 'https://www.oceanbase.com/docs/odp-doc-cn';
@@ -69,7 +64,7 @@ export function getDocs(getLocale) {
 
   //模式配置规则
   const MODE_CONFIG_RULE_CN =
-    'https://www.oceanbase.com/docs/community-obd-cn-1000000000634883';
+    'https://www.oceanbase.com/docs/community-obd-cn-1000000001188758';
   const MODE_CONFIG_RULE_EN =
     'https://en.oceanbase.com/docs/community-obd-en-10000000001181555';
   const MODE_CONFIG_RULE =
@@ -85,7 +80,7 @@ export function getDocs(getLocale) {
 
   // 部署向导帮助文档
   const DOCS_PRODUCTION_CN =
-    'https://www.oceanbase.com/docs/community-obd-cn-1000000000634915';
+    'https://www.oceanbase.com/docs/community-obd-cn-1000000001188793';
   const DOCS_PRODUCTION_EN =
     'https://en.oceanbase.com/docs/community-obd-en-10000000001181618';
   const DOCS_PRODUCTION =
@@ -99,6 +94,12 @@ export function getDocs(getLocale) {
   const RELEASE_RECORD_EN = 'https://en.oceanbase.com/softwarecenter';
   const RELEASE_RECORD =
     getLocale() === 'zh-CN' ? RELEASE_RECORD_CN : RELEASE_RECORD_EN;
+
+  // Grafana官网
+  const DOCS_GRAFANA = 'https://grafana.com/';
+
+  // Prometheus
+  const DOCS_PROMETHEUS = 'https://prometheus.io/';
 
   return {
     DOCS_LINK,
@@ -117,5 +118,7 @@ export function getDocs(getLocale) {
     DOCS_SOP,
     RELEASE_RECORD,
     OBCONFIGSERVER_DOCS,
+    DOCS_GRAFANA,
+    DOCS_PROMETHEUS,
   };
 }

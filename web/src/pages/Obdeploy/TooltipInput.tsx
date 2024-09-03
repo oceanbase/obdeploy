@@ -6,8 +6,8 @@ interface Props {
   onChange?: (value?: string) => void;
   placeholder: string;
   name: string;
-  isPassword: boolean;
-  fieldProps: any;
+  isPassword?: boolean;
+  fieldProps?: any;
 }
 
 export default ({

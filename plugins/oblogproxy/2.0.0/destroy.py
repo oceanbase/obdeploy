@@ -23,11 +23,25 @@ from __future__ import absolute_import, division, print_function
 from _errno import EC_CLEAN_PATH_FAILED
 
 
+def check_mount_path(client, path, stdio):
+    stdio and getattr(stdio, 'verbose', print)('check mount: %s' % path)
+    try:
+        if client.execute_command("grep '\\s%s\\s' /proc/mounts" % path):
+            return True
+        return False
+    except Exception as e:
+        stdio and getattr(stdio, 'exception', print)('')
+        stdio and getattr(stdio, 'error', print)('failed to check mount: %s' % path)
+
+
 def destroy(plugin_context, *args, **kwargs):
     global_ret = True
     def clean(server, path):
         client = clients[server]
-        ret = client.execute_command('rm -fr %s/' % (path), timeout=-1)
+        if check_mount_path(client, path, stdio):
+            ret = client.execute_command('rm -fr %s/*' % path, timeout=-1)
+        else:
+            ret = client.execute_command('rm -fr %s' % path, timeout=-1)
         if not ret:
             global global_ret
             global_ret = False

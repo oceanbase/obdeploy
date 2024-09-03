@@ -53,7 +53,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })
 
-    stdio.print_list(results, [ 'url', 'user', 'password', 'status'], lambda x: [x['url'], x['user'], x['password'], x['status']], title='grafana')
+    stdio.print_list(results, [ 'url', 'user', 'password', 'status'], lambda x: [x['url'], x['user'], x['password'], x['status']], title=cluster_config.name)
     active_result = [r for r in results if r['status'] == 'active']
     info_dict = active_result[0] if len(active_result) > 0 else None
     if info_dict is not None:

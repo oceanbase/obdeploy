@@ -48,3 +48,16 @@ async def keep_alive(token: str = Query(None, description='token'),
                      is_clear: bool = Query(False, description='is need clear token')):
     handler = handler_utils.new_common_handler()
     return response_utils.new_ok_response(handler.keep_alive(token, overwrite, is_clear))
+
+
+@router.get("/keys/rsa/public",
+            response_model=OBResponse,
+            description='rsa public key',
+            operation_id='rsaPublicKey',
+            tags=['Common'])
+async def public_key():
+    handler = handler_utils.new_rsa_handler()
+    key, err = handler.public_key_to_bytes()
+    if err:
+        return response_utils.new_internal_server_error_exception(Exception('get rea public key is failed'))
+    return response_utils.new_ok_response(key)

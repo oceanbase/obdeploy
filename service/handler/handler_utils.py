@@ -24,6 +24,8 @@ from service.handler.comment_handler import CommonHandler
 from service.handler.mirror_handler import MirrorHandler
 from service.handler.ocp_handler import OcpHandler
 from service.handler.metadb_handler import MetadbHandler
+from service.handler.component_change_handler import ComponentChangeHandler
+from service.handler.rsa_handler import RSAHandler
 
 
 def new_component_handler():
@@ -56,3 +58,9 @@ def new_metadb_handler():
 
 def new_server_info_handler():
     return ServiceInfoHandler()
+
+
+def new_component_change_handler():
+    return ComponentChangeHandler()
+def new_rsa_handler():
+    return RSAHandler()

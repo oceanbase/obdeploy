@@ -1,31 +1,31 @@
+import ExitBtn from '@/component/ExitBtn';
+import EnStyles from '@/pages/Obdeploy/indexEn.less';
+import ZhStyles from '@/pages/Obdeploy/indexZh.less';
 import { intl } from '@/utils/intl';
-import { useEffect } from 'react';
 import {
-  Space,
-  Button,
-  Progress,
-  Timeline,
-  Checkbox,
-  Typography,
-  Tooltip,
-  Tag,
-  Spin,
-  Empty,
-} from 'antd';
-import { ProCard } from '@ant-design/pro-components';
-import {
+  CheckCircleFilled,
+  CloseCircleFilled,
   CloseOutlined,
   QuestionCircleFilled,
   ReadFilled,
-  CheckCircleFilled,
-  CloseCircleFilled,
 } from '@ant-design/icons';
-import CustomFooter from '../CustomFooter';
-import ExitBtn from '@/component/ExitBtn';
+import { ProCard } from '@ant-design/pro-components';
+import {
+  Button,
+  Checkbox,
+  Empty,
+  Progress,
+  Space,
+  Spin,
+  Tag,
+  Timeline,
+  Tooltip,
+  Typography,
+} from 'antd';
 import NP from 'number-precision';
+import { useEffect } from 'react';
 import { getLocale } from 'umi';
-import ZhStyles from '@/pages/Obdeploy/indexZh.less';
-import EnStyles from '@/pages/Obdeploy/indexEn.less';
+import CustomFooter from '../CustomFooter';
 
 interface PreCehckComponentProps {
   checkFinished: boolean;
@@ -37,7 +37,8 @@ interface PreCehckComponentProps {
   hasAuto: boolean;
   recoverLoading: boolean;
   precheckLoading?: boolean;
-  errCodeLink:string;
+  errCodeLink: string;
+  installLoading?: boolean;
   failedList: API.PreCheckInfo[];
   statusData: API.PreCheckResult;
   showFailedList: API.PreCheckInfo[];
@@ -60,7 +61,7 @@ const statusColorConfig = {
   PASSED: 'green',
   PENDING: 'gray',
   FAILED: 'red',
-  SUCCESSFUL: 'green'
+  SUCCESSFUL: 'green',
 };
 
 let timerScroll: NodeJS.Timer;
@@ -85,7 +86,7 @@ export default function PreCehckComponent({
   recoverLoading,
   showFailedList,
   prevStep,
-  precheckLoading,
+  installLoading,
   handleInstall,
   setIsScroll,
   setIsScrollFailed,
@@ -194,12 +195,18 @@ export default function PreCehckComponent({
     </div>
   );
 
-  const checkItemLength = `${statusData?.finished || 0}/${
-    statusData?.total || 0
-  }`;
+  const checkItemLength =
+    !statusData?.finished && !statusData?.total
+      ? null
+      : `${statusData?.finished || 0}/${statusData?.total || 0}`;
   const failedItemLength = failedList?.length;
   return (
-    <Space className={styles.spaceWidth} direction="vertical" size="middle">
+    <Space
+      className={styles.spaceWidth}
+      style={{ overflowX: 'hidden' }}
+      direction="vertical"
+      size="middle"
+    >
       <ProCard
         title={
           checkStatus
@@ -230,6 +237,7 @@ export default function PreCehckComponent({
           )}
           colSpan={12}
           className={`${styles.preCheckSubCard} card-padding-bottom-24 `}
+          bodyStyle={{ overflowY: 'hidden' }}
           extra={
             <Button
               className={styles.preCheckBtn}
@@ -336,7 +344,11 @@ export default function PreCehckComponent({
                 </Checkbox>
               ) : null}
               <Button
-                className={styles.preCheckBtn}
+                className={
+                  !checkFinished || !hasAuto
+                    ? styles.disabledPreCheckBtn
+                    : styles.preCheckBtn
+                }
                 type="primary"
                 disabled={!checkFinished || !hasAuto}
                 onClick={handleAutoRepair}
@@ -360,7 +372,10 @@ export default function PreCehckComponent({
           {showFailedList?.length ? (
             <div className={styles.failedContainer} id="failed-container">
               {showFailedList?.map((item, index) => {
-                let reason = '',responseReason = item?.description || handleAdvisement(item?.advisement) as string
+                let reason = '',
+                  responseReason =
+                    item?.description ||
+                    (handleAdvisement(item?.advisement) as string);
                 if (responseReason) {
                   const index = responseReason.indexOf(':');
                   reason = responseReason.substring(
@@ -384,7 +399,9 @@ export default function PreCehckComponent({
                       {item.name}
                     </Text>
                     <Tooltip
-                      title={item.description || handleAdvisement(item?.advisement)}
+                      title={
+                        item.description || handleAdvisement(item?.advisement)
+                      }
                       overlayClassName="list-tooltip"
                     >
                       <Text ellipsis>
@@ -403,7 +420,10 @@ export default function PreCehckComponent({
                       </Text>
                     </Tooltip>
                     <Tooltip
-                      title={item.advisement?.description || handleAdvisement(item?.advisement)}
+                      title={
+                        item.advisement?.description ||
+                        handleAdvisement(item?.advisement)
+                      }
                       overlayClassName="list-tooltip"
                     >
                       <Text ellipsis>
@@ -430,7 +450,8 @@ export default function PreCehckComponent({
                             })}
                           </Tag>
                         )}{' '}
-                        {item.advisement?.description || handleAdvisement(item?.advisement)}
+                        {item.advisement?.description ||
+                          handleAdvisement(item?.advisement)}
                       </Text>
                       <br />
                       <a
@@ -458,8 +479,8 @@ export default function PreCehckComponent({
               description={
                 <span style={{ color: '#8592ad' }}>
                   {intl.formatMessage({
-                    id: 'OBD.component.PreCheck.preCheck.GreatNoFailedItems',
-                    defaultMessage: '太棒了！无失败项',
+                    id: 'OBD.component.EnvPreCheck.CheckFailuredItem.GreatCheckAllSuccessful',
+                    defaultMessage: '太棒了！检查全部成功！',
                   })}
                 </span>
               }
@@ -503,12 +524,12 @@ export default function PreCehckComponent({
         ) : (
           <Button
             type="primary"
-            loading={precheckLoading}
+            loading={installLoading}
             onClick={handleInstall}
           >
             {intl.formatMessage({
-              id: 'OBD.component.PreCheck.preCheck.NextStep',
-              defaultMessage: '下一步',
+              id: 'OBD.component.PreCheck.preCheck.Deployment',
+              defaultMessage: '部署',
             })}
           </Button>
         )}

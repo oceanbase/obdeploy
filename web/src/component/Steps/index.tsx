@@ -1,13 +1,12 @@
-import { intl } from '@/utils/intl';
+import { CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { Space } from 'antd';
-import { ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 import { getLocale } from 'umi';
 import EnStyles from '../../pages/Obdeploy/indexEn.less';
 import ZhStyles from '../../pages/Obdeploy/indexZh.less';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
-import { useEffect, useState } from 'react';
 
 interface StepsProps {
   stepsItems: {
@@ -24,6 +23,8 @@ export default function Steps({
   stepsItems,
 }: StepsProps) {
   const [showBorder, setShowBorder] = useState(false);
+  const backgroundGap = locale === 'zh-CN' ? 158.75 : 181.25;
+  const contentGap = locale === 'zh-CN' ? 140 : 180;
   const getIcon = (key: number) => {
     return currentStep > key ? (
       <CheckCircleOutlined className={styles.stepIcon} />
@@ -45,15 +46,9 @@ export default function Steps({
   };
 
   const getZhGap = () => {
-    if (showStepsKeys.length === 4) {
-      return 150;
-    }
     return 100;
   };
   const getEnGap = () => {
-    if (showStepsKeys.length === 4) {
-      return 60;
-    }
     return 0;
   };
 
@@ -68,8 +63,14 @@ export default function Steps({
     >
       {showStepsKeys.includes(currentStep) ? (
         <div style={{ height: 120 }}>
-          <div className={styles.stepsContent}>
-            <div className={styles.stepsBackground}>
+          <div
+            className={styles.stepsContent}
+            style={{ width: `${showStepsKeys.length * contentGap}px` }}
+          >
+            <div
+              className={styles.stepsBackground}
+              style={{ width: `${(showStepsKeys.length - 1) * backgroundGap}px` }}
+            >
               <div
                 className={styles.stepsBackgroundProgress}
                 style={{

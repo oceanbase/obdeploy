@@ -1,8 +1,8 @@
+import { commonInputStyle, commonPortStyle } from '@/pages/constants';
 import { intl } from '@/utils/intl';
-import { DownOutlined, RightOutlined } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormSelect } from '@ant-design/pro-components';
 import { useUpdateEffect } from 'ahooks';
-import { Input, Row, Space } from 'antd';
+import { Input, Row, Space, Switch } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useState } from 'react';
 import { useModel } from 'umi';
@@ -145,11 +145,13 @@ export default function OBProxyConfig({
         id: 'OBD.component.MetaDBConfig.OBProxyConfig.ObproxyConfiguration',
         defaultMessage: 'OBProxy 配置',
       })}
+      bodyStyle={{ paddingBottom: 24 }}
+      className={styles.proxyContainer}
     >
       <ProFormSelect
-        style={{ width: 201 }}
         mode="tags"
         name={['obproxy', 'servers']}
+        fieldProps={{ style: commonInputStyle }}
         rules={[
           {
             required: true,
@@ -170,8 +172,9 @@ export default function OBProxyConfig({
       />
 
       <Row>
-        <Space size="middle">
+        <Space size="large">
           <InputPort
+            fieldProps={{ style: commonPortStyle }}
             name={['obproxy', 'listen_port']}
             label={intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.OBProxyConfig.SqlPort',
@@ -179,21 +182,18 @@ export default function OBProxyConfig({
             })}
           />
           <InputPort
+            fieldProps={{ style: commonPortStyle }}
             name={['obproxy', 'prometheus_listen_port']}
             label={intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.OBProxyConfig.PortExporter',
               defaultMessage: 'Exporter 端口',
             })}
           />
-
-          {/* <Tooltip title="OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。">
-                  <QuestionCircleOutlined className="ml-10" />
-                 </Tooltip> */}
         </Space>
       </Row>
       <ProForm.Item
         name={['obproxy', 'home_path']}
-        style={{ width: '552px' }}
+        style={commonInputStyle}
         rules={[
           {
             required: true,
@@ -210,19 +210,17 @@ export default function OBProxyConfig({
       >
         <Input addonAfter={<span>{obproxyAddonAfter}</span>} />
       </ProForm.Item>
-      <div>
-        <span
-          onClick={() => handleCluserMoreChange()}
-          className={styles.moreConfigText}
-        >
-          <span>
-            {intl.formatMessage({
-              id: 'OBD.component.MetaDBConfig.OBProxyConfig.MoreConfigurations',
-              defaultMessage: '更多配置',
-            })}
-          </span>
-          {!isShowMoreConfig ? <RightOutlined /> : <DownOutlined />}
-        </span>
+      <div className={styles.moreSwitch}>
+        {intl.formatMessage({
+          id: 'OBD.component.MetaDBConfig.OBProxyConfig.MoreConfigurations',
+          defaultMessage: '更多配置',
+        })}
+
+        <Switch
+          className="ml-20"
+          checked={isShowMoreConfig}
+          onChange={handleCluserMoreChange}
+        />
       </div>
       <ConfigTable
         parameterRules={parameterRules}

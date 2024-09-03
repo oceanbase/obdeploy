@@ -19,6 +19,7 @@
 
 from fastapi import Body
 from pydantic import BaseModel
+from typing import Union
 
 
 class Mirror(BaseModel):
@@ -29,7 +30,7 @@ class Mirror(BaseModel):
     repomd_age: int = Body(None, description='repomd age')
     repo_age: int = Body(None, description='repo age')
     priority: int = Body(None, description='priority')
-    gpgcheck: str = Body('', description='gpgcheck')
+    gpgcheck: Union[str, int] = Body('', description='gpgcheck')
     enabled: bool = Body('', description='remote mirror is enabled')
     available: bool = Body('', description='remote mirror is enabled')
 

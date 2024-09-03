@@ -30,7 +30,7 @@ from uuid import uuid1 as uuid, UUID
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
 from core import ObdHome
-from _stdio import IO, FormtatText
+from _stdio import IO, FormatText
 from _lock import LockMode
 from _types import Capacity
 from tool import DirectoryUtil, FileUtil, NetUtil, COMMAND_ENV
@@ -226,17 +226,22 @@ class ObdCommand(BaseCommand):
             self.parser.allow_undefine = self.dev_mode
         return super(ObdCommand, self).parse_command()
 
+    def _init_log(self):
+        trace_id = uuid()
+        log_dir = os.path.join(self.OBD_PATH, 'log')
+        DirectoryUtil.mkdir(log_dir)
+        log_path = os.path.join(log_dir, 'obd')
+        ROOT_IO.init_trace_logger(log_path, 'obd', trace_id)
+        ROOT_IO.exit_msg = '''Trace ID: {trace_id}
+If you want to view detailed obd logs, please run: obd display-trace {trace_id}'''.format(trace_id=trace_id)
+
     def do_command(self):
         self.parse_command()
         self.init_home()
-        trace_id = uuid()
         ret = False
         try:
-            log_dir = os.path.join(self.OBD_PATH, 'log')
-            DirectoryUtil.mkdir(log_dir)
-            log_path = os.path.join(log_dir, 'obd')
-            if self.enable_log:
-                ROOT_IO.init_trace_logger(log_path, 'obd', trace_id)
+            if self.has_trace and self.enable_log:
+                self._init_log()
             ROOT_IO.track_limit += 1
             ROOT_IO.verbose('cmd: %s' % self.cmds)
             ROOT_IO.verbose('opts: %s' % self.opts)
@@ -245,7 +250,7 @@ class ObdCommand(BaseCommand):
             obd.set_cmds(self.cmds)
             ret = self._do_command(obd)
             if not ret:
-                ROOT_IO.print(DOC_LINK_MSG)
+                ROOT_IO.exit_msg = DOC_LINK_MSG + "\n" + ROOT_IO.exit_msg
         except NotImplementedError:
             ROOT_IO.exception('command \'%s\' is not implemented' % self.prev_cmd)
         except LockError:
@@ -257,9 +262,6 @@ class ObdCommand(BaseCommand):
         except:
             e = sys.exc_info()[1]
             ROOT_IO.exception('Running Error: %s' % e)
-        if self.has_trace:
-            ROOT_IO.print('Trace ID: %s' % trace_id)
-            ROOT_IO.print('If you want to view detailed obd logs, please run: obd display-trace %s' % trace_id)
         return ret
 
     def _do_command(self, obd):
@@ -859,7 +861,7 @@ class ClusterDeployCommand(ClusterMirrorCommand):
             res = obd.deploy_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
             if res:
-                obd.stdio.print(FormtatText.success('Please execute ` obd cluster start %s ` to start' % self.cmds[0]))
+                obd.stdio.print(FormatText.success('Please execute ` obd cluster start %s ` to start' % self.cmds[0]))
             return res
         else:
             return self._show_help()
@@ -900,6 +902,7 @@ class ClusterComponentDeleteCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterComponentDeleteCommand, self).__init__('del', 'Add components for cluster')
+        self.parser.add_option('-f', '--force', action='store_true', help="Force delete components.", default=False)
         self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force kill the observer while standby tenant in others cluster exists.")
 
     def init(self, cmd, args):
@@ -1129,6 +1132,7 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
         self.parser.add_option('--tablegroup', type='string', help="Tenant tablegroup.")
         self.parser.add_option('--primary-zone', type='string', help="Tenant primary zone. [RANDOM].", default='RANDOM')
         self.parser.add_option('--locality', type='string', help="Tenant locality.")
+        self.parser.add_option('--time-zone', type='string', help="Tenant time zone. The default tenant time_zone is [+08:00].")
         self.parser.add_option('-s', '--variables', type='string', help="Set the variables for the system tenant. [ob_tcp_invited_nodes='%'].", default="ob_tcp_invited_nodes='%'")
         self.parser.add_option('-o', '--optimize', type='string', help="Specify scenario optimization when creating a tenant, the default is consistent with the cluster dimension.\n{express_oltp, complex_oltp, olap, htap, kv}\nSupported since version 4.3.")
 
@@ -1406,7 +1410,7 @@ class SysBenchCommand(TestMirrorCommand):
         self.parser.add_option('--sysbench-script-dir', type='string', help='The directory of the sysbench lua script file. [/usr/sysbench/share/sysbench]', default='/usr/sysbench/share/sysbench')
         self.parser.add_option('--table-size', type='int', help='Number of data initialized per table. [20000]', default=20000)
         self.parser.add_option('--tables', type='int', help='Number of initialization tables. [30]', default=30)
-        self.parser.add_option('--threads', type='int', help='Number of threads to use. [16]', default=16)
+        self.parser.add_option('--threads', type='string', help='Number of threads to use. [16]', default='16')
         self.parser.add_option('--time', type='int', help='Limit for total execution time in seconds. [60]', default=60)
         self.parser.add_option('--interval', type='int', help='Periodically report intermediate statistics with a specified time interval in seconds. 0 disables intermediate reports. [10]', default=10)
         self.parser.add_option('--events', type='int', help='Limit for total number of events.')
@@ -1447,6 +1451,8 @@ class TPCHCommand(TestMirrorCommand):
         self.parser.add_option('-O', '--optimization', type='int', help='Optimization level {0/1/2}. [1] 0 - No optimization. 1 - Optimize some of the parameters which do not need to restart servers. 2 - Optimize all the parameters and maybe RESTART SERVERS for better performance.', default=1)
         self.parser.add_option('--test-only', action='store_true', help='Only testing SQLs are executed. No initialization is executed.')
         self.parser.add_option('-S', '--skip-cluster-status-check', action='store_true', help='Skip cluster status check', default=False)
+        self.parser.add_option('--direct-load', action='store_true', help="Enable load data by direct feature.")
+        self.parser.add_option('--parallel', type='int', help='The degree of parallelism for loading data. [max_cpu * unit_count]')
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1605,9 +1611,10 @@ class CommandsCommand(ObdCommand):
         super(CommandsCommand, self).__init__('command', 'Common tool commands')
         self.parser.add_option('-c', '--components', type='string', help='The components used by the command. The first component in the configuration will be used by default in interactive commands, and all available components will be used by default in non-interactive commands.')
         self.parser.add_option('-s', '--servers', type='string', help='The servers used by the command. The first server in the configuration will be used by default in interactive commands, and all available servers will be used by default in non-interactive commands.')
+        self.parser.undefine_warn = False
 
     def _do_command(self, obd):
-        if len(self.cmds) == 2:
+        if len(self.cmds) in [2, 3]:
             return obd.commands(self.cmds[0], self.cmds[1], self.opts)
         else:
             return self._show_help()

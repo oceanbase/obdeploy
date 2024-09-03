@@ -42,7 +42,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             'url': url,
             'status': 'active' if api_cursor and api_cursor.status(stdio) else 'inactive'
         })
-    stdio.print_list(results, ['url', 'username', 'initial password', 'status'], lambda x: [x['url'], 'admin', x['password'], x['status']], title='ocp-express')
+    stdio.print_list(results, ['url', 'username', 'initial password', 'status'], lambda x: [x['url'], 'admin', x['password'], x['status']], title=cluster_config.name)
     active_result = [r for r in results if r['status'] == 'active']
     info_dict = active_result[0] if len(active_result) > 0 else None
     if info_dict is not None:

@@ -46,7 +46,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             continue
         result.append(data)
     stdio.print_list(result, ['ip', 'port', 'prometheus_port', 'status'],
-        lambda x: [x['ip'], x['listen_port'], x['prometheus_listen_port'], x['status']], title='obproxy')
+        lambda x: [x['ip'], x['listen_port'], x['prometheus_listen_port'], x['status']], title=cluster_config.name)
     server = servers[0]
     with_observer = False
     server_config = cluster_config.get_server_conf(server)

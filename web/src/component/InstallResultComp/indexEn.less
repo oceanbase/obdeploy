@@ -1,0 +1,41 @@
+@cardBackgroundColor: #f8fafe;
+
+.reportLog {
+  background-color: @cardBackgroundColor;
+  margin: 0 !important;
+  overflow: auto;
+  color: #8592ad;
+  max-width: 1008px;
+  min-height: 100px;
+  max-height: 360px;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.spaceWidth {
+  width: 100%;
+}
+.connectTable {
+  :global {
+    .ant-table-cell::before {
+      width: 0 !important;
+    }
+    .ant-table-thead > tr > th {
+      padding-bottom: 0 !important;
+      border-bottom: none !important;
+    }
+    .ant-table-thead > tr > th {
+      padding-left: 0 !important;
+    }
+  }
+}
+
+.collapsibleCard {
+  :global {
+    .ant-pro-card-title .anticon {
+      position: absolute;
+      top: 21px;
+      left: 180px;
+    }
+  }
+}

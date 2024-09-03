@@ -173,15 +173,7 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
 
     stdio.start_loading('Start obproxy')
 
-    for server in cluster_config.servers:
-        client = clients[server]
-        server_config = cluster_config.get_server_conf(server)
-        home_path = server_config['home_path']
-        if not client.execute_command('ls %s/etc/obproxy_config.bin' % home_path):
-            need_bootstrap = True
-            break
-
-    if getattr(options, 'without_parameter', False) and need_bootstrap is False:
+    if getattr(options, 'without_parameter', False):
         use_parameter = False
     else:
         # Bootstrap is required when starting with parameter, ensure the passwords are correct.
@@ -192,6 +184,10 @@ def start(plugin_context, need_bootstrap=False, *args, **kwargs):
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
+
+        if not client.execute_command('ls %s/etc/obproxy_config.bin' % home_path):
+            need_bootstrap = True
+
         if not server_config.get('obproxy_config_server_url') and obproxy_config_server_url:
             server_config['obproxy_config_server_url'] = obproxy_config_server_url
 

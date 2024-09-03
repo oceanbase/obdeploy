@@ -24,8 +24,11 @@ import os.path
 from glob import glob
 
 import _errno as err
+from _arch import getArchList
+from core import ObdHome
 from const import CONST_OBD_HOME
 from ssh import LocalClient
+from _mirror import MirrorRepositoryManager
 
 
 def _clean(server, client, path, stdio=None):
@@ -48,27 +51,28 @@ def _ocp_lib(client, home_path, soft_dir='', stdio=None):
     client.execute_command('mkdir -p -m 775  %s/logs/ocp/' % home_path, timeout=-1)
 
     OBD_HOME = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
-    for rpm in glob(os.path.join(OBD_HOME, 'mirror/local/*ocp-agent-*.rpm')):
-        name = os.path.basename(rpm)
-        client.put_file(rpm, os.path.join(home_path, 'ocp-server/lib/', name))
+    mirror_manager = MirrorRepositoryManager(OBD_HOME)
+    pkgs = []
+    for arch in ['x86_64', 'aarch64']:
+        pkg = mirror_manager.get_exact_pkg(name="ocp-agent-ce", arch=arch, only_download=True)
+        if pkg:
+            pkgs.append(pkg)
+    for comp in ['oceanbase-ce', 'oceanbase-ce-libs', 'oceanbase-ce-utils', 'obproxy-ce']:
+        pkg = mirror_manager.get_exact_pkg(name=comp, only_download=True)
+        if pkg:
+            pkgs.append(pkg)
+    for pkg in pkgs:
+        client.put_file(pkg.path, os.path.join(home_path, 'ocp-server/lib/', pkg.file_name))
         if soft_dir:
-            client.put_file(rpm, os.path.join(soft_dir, name))
-    max_ob_pkg = LocalClient.execute_command('find %s/mirror/ -type f -name "oceanbase-*.rpm" -exec readlink -f {} \; | grep -v "oceanbase.*libs" | grep -v "oceanbase.*utils" | sort -V | tail -n 1' % OBD_HOME, stdio=stdio).stdout.strip()
-    max_odp_pkg = LocalClient.execute_command('find %s/mirror/ -type f -name "obproxy-*.rpm" -exec readlink -f {} \; | sort -V | tail -n 1' % OBD_HOME, stdio=stdio).stdout.strip()
-    name = os.path.basename(max_ob_pkg)
-    client.put_file(max_ob_pkg, os.path.join(home_path, 'ocp-server/lib/', name))
-    if soft_dir:
-        client.put_file(max_ob_pkg, os.path.join(soft_dir, name))
-    name = os.path.basename(max_odp_pkg)
-    client.put_file(max_odp_pkg, os.path.join(home_path, 'ocp-server/lib/', name))
-    if soft_dir:
-        client.put_file(max_odp_pkg, os.path.join(soft_dir, name))
+            client.put_file(pkg.path, os.path.join(soft_dir, pkg.file_name))
+
 
 
 def init(plugin_context, upgrade=False, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    deploy_name = plugin_context.deploy_name
 
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
@@ -131,6 +135,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
             if not ret or ret.stdout.strip():
                 global_ret = False
                 stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err.InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
+                stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 continue
         else:
             global_ret = False
@@ -146,6 +151,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
                 if not ret or ret.stdout.strip():
                     global_ret = False
                     stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='log dir', msg=err.InitDirFailedErrorMessage.NOT_EMPTY.format(path=log_dir)))
+                    stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 global_ret = False
@@ -156,6 +162,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
             if not client.execute_command('mkdir -p -m 775  %s' % log_dir):
                 global_ret = False
                 stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='log dir', msg=err.InitDirFailedErrorMessage.NOT_EMPTY.format(path=log_dir)))
+                stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 continue
         link_path = os.path.join(home_path, 'log')
         client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))

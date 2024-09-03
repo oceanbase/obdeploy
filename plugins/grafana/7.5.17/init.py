@@ -20,7 +20,7 @@
 from __future__ import absolute_import, division, print_function
 import os
 from tool import OrderedDict
-from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage
+from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
 
 stdio = None
 force = False
@@ -37,6 +37,7 @@ def init(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    deploy_name = plugin_context.deploy_name
     servers_dirs = {}
     force = getattr(plugin_context.options, 'force', False)
     clean = getattr(plugin_context.options, 'clean', False)
@@ -107,6 +108,7 @@ def init(plugin_context, *args, **kwargs):
                     ret = client.execute_command('ls %s' % target_path)
                     if not ret or ret.stdout.strip():
                         critical(EC_FAIL_TO_INIT_PATH.format(server=server, key=k, msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=target_path)))
+                        critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                         mkdir_ret = False
                         continue
                     client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (target_path, link_path, target_path, link_path))

@@ -3,7 +3,7 @@ test:
   - name: proxy_mem_limited
     value: Capacity(min(max(threads * (8 << 10), 2 << 30), 4 << 30), 0)
     expression: true
-    condition: "lambda n, o: Capacity(n).btyes > Capacity(o).btyes"
+    condition: "lambda n, o: Capacity(n).bytes > Capacity(o).bytes"
   - name: enable_prometheus
     value: false
     value_type: BOOL

@@ -1,14 +1,16 @@
+import { commonInputStyle, commonPortStyle } from '@/pages/constants';
 import { intl } from '@/utils/intl';
-import { ProCard, ProFormText, ProFormDigit } from '@ant-design/pro-components';
+import { ProCard, ProFormDigit, ProFormText } from '@ant-design/pro-components';
+import { Row, Space } from 'antd';
 import { FormInstance } from 'antd/lib/form';
-import { Alert, Row, Col, message } from 'antd';
 import { useState } from 'react';
 import { useModel } from 'umi';
+import CustomAlert from '../CustomAlert';
 
-import CustomPasswordInput from '../CustomPasswordInput';
 import { resourceMap } from '@/pages/constants';
-import styles from './index.less';
+import CustomPasswordInput from '../CustomPasswordInput';
 import { MsgInfoType } from './index';
+import styles from './index.less';
 interface ResourcePlanProps {
   form: FormInstance<any>;
   metaMsgInfo: MsgInfoType;
@@ -25,6 +27,8 @@ type ResourceType = {
   cpu: number;
   memory: number;
 };
+
+const lableStyle = { color: '#132039' };
 
 export default function ResourcePlan({
   form,
@@ -107,34 +111,30 @@ export default function ResourcePlan({
         id: 'OBD.component.OCPConfigNew.ResourcePlan.ResourcePlanning',
         defaultMessage: '资源规划',
       })}
+      bodyStyle={{ paddingBottom: 0 }}
     >
-      <Alert
+      <CustomAlert
         type="info"
         showIcon={true}
-        description={intl.formatMessage({
+        message={intl.formatMessage({
           id: 'OBD.component.OCPConfigNew.ResourcePlan.TheOcpServiceRunsWith',
           defaultMessage:
             'OCP 服务在运行过程中会有计算和存储资源开销，您需要根据待管理的对象规模进行资源规划，包括 OCP 服务、MetaDB 和 MonitorDB。',
         })}
-        style={{
-          marginBottom: 24,
-          // height: 54
-        }}
+        style={{ height: 40 }}
       />
 
-      <p>
-        {intl.formatMessage({
-          id: 'OBD.component.OCPConfigNew.ResourcePlan.YouAreExpectedToNeed',
-          defaultMessage: '您预计需要管理：',
-        })}
-      </p>
-      <Row style={{ alignItems: 'center' }}>
+      <Row style={{ alignItems: 'center', marginTop: 16 }}>
         <ProFormDigit
           name={['ocpserver', 'manage_info', 'machine']}
-          label={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ResourcePlan.Host',
-            defaultMessage: '主机',
-          })}
+          label={
+            <span style={lableStyle}>
+              {intl.formatMessage({
+                id: 'OBD.component.OCPConfigNew.ResourcePlan.EstimatedNumberOfManagementHosts',
+                defaultMessage: '预计管理主机数量（台）',
+              })}
+            </span>
+          }
           rules={[
             {
               required: true,
@@ -149,17 +149,10 @@ export default function ResourcePlan({
               id: 'OBD.component.OCPConfigNew.ResourcePlan.Less',
               defaultMessage: '小于',
             }),
-            style: { width: 145, marginRight: 8 },
+            style: commonPortStyle,
             onChange: (inputHosts) => handleChangeHosts(inputHosts),
           }}
         />
-
-        <span style={{ lineHeight: '32px' }}>
-          {intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ResourcePlan.Table',
-            defaultMessage: '台',
-          })}
-        </span>
       </Row>
       <p className={styles.titleText}>
         {intl.formatMessage({
@@ -170,7 +163,7 @@ export default function ResourcePlan({
       <Row style={{ alignItems: 'center' }}>
         {' '}
         <ProFormDigit
-          fieldProps={{ style: { width: 127 } }}
+          fieldProps={{ style: commonPortStyle }}
           name={['ocpserver', 'memory_size']}
           rules={[
             {
@@ -181,61 +174,68 @@ export default function ResourcePlan({
               }),
             },
           ]}
-          label={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ResourcePlan.OcpApplicationMemory',
-            defaultMessage: 'OCP 应用内存',
-          })}
+          label={
+            <span style={lableStyle}>
+              {intl.formatMessage({
+                id: 'OBD.component.OCPConfigNew.ResourcePlan.OcpApplicationMemoryGib',
+                defaultMessage: 'OCP 应用内存（GiB）',
+              })}
+            </span>
+          }
         />
-        <span style={{ marginLeft: '12px' }}>GiB</span>
       </Row>
-      {/* <ProForm.Item name={['ocpserver', 'memory_size']} label="内存">
-          <InputNumber />
-          <span style={{ marginLeft: '12px' }}>GIB</span>
-         </ProForm.Item> */}
       <p className={styles.titleText}>
         {intl.formatMessage({
           id: 'OBD.component.OCPConfigNew.ResourcePlan.MetadataTenantConfiguration',
           defaultMessage: '元信息租户配置',
         })}
       </p>
-      <Row>
-        <Col style={{ marginRight: 12 }}>
-          <ProFormText
-            name={['ocpserver', 'meta_tenant', 'name', 'tenant_name']}
-            label={intl.formatMessage({
+      <ProFormText
+        name={['ocpserver', 'meta_tenant', 'name', 'tenant_name']}
+        label={
+          <span style={lableStyle}>
+            {intl.formatMessage({
               id: 'OBD.component.OCPConfigNew.ResourcePlan.TenantName',
               defaultMessage: '租户名称',
             })}
-            rules={[
-              {
-                required: true,
-                message: intl.formatMessage({
-                  id: 'OBD.component.OCPConfigNew.ResourcePlan.EnterATenantName',
-                  defaultMessage: '请输入租户名称',
-                }),
-              },
-            ]}
-          />
-        </Col>
-        <Col>
-          <CustomPasswordInput
-            msgInfo={metaMsgInfo}
-            setMsgInfo={setMetaMsgInfo}
-            form={form}
-            onChange={handleSetTenantPassword}
-            value={tenantPassword}
-            useFor='ob'
-            name={['ocpserver', 'meta_tenant', 'password']}
-            label={intl.formatMessage({
+          </span>
+        }
+        fieldProps={{ style: commonInputStyle }}
+        rules={[
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.component.OCPConfigNew.ResourcePlan.EnterATenantName',
+              defaultMessage: '请输入租户名称',
+            }),
+          },
+        ]}
+      />
+
+      <CustomPasswordInput
+        msgInfo={metaMsgInfo}
+        setMsgInfo={setMetaMsgInfo}
+        form={form}
+        onChange={handleSetTenantPassword}
+        value={tenantPassword}
+        useFor="ob"
+        name={['ocpserver', 'meta_tenant', 'password']}
+        style={commonInputStyle}
+        innerInputStyle={{ width: 388 }}
+        label={
+          <span style={lableStyle}>
+            {intl.formatMessage({
               id: 'OBD.component.OCPConfigNew.ResourcePlan.Password',
               defaultMessage: '密码',
             })}
-          />
-        </Col>
-      </Row>
-      <Row>
+          </span>
+        }
+      />
+
+      <Space size={'large'}>
         <ProFormDigit
           name={['ocpserver', 'meta_tenant', 'resource', 'cpu']}
+          fieldProps={{ style: commonPortStyle }}
           rules={[
             {
               required: true,
@@ -245,14 +245,12 @@ export default function ResourcePlan({
               }),
             },
           ]}
-          label="CPU"
+          label={<span style={lableStyle}>CPU（VCPUS）</span>}
         />
 
-        <span style={{ margin: '0 12px 0 14px', lineHeight: '86px' }}>
-          VCPUS
-        </span>
         <ProFormDigit
           name={['ocpserver', 'meta_tenant', 'resource', 'memory']}
+          fieldProps={{ style: commonPortStyle }}
           rules={[
             {
               required: true,
@@ -262,56 +260,65 @@ export default function ResourcePlan({
               }),
             },
           ]}
-          label={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ResourcePlan.Memory',
-            defaultMessage: '内存',
-          })}
+          label={
+            <span style={lableStyle}>
+              {intl.formatMessage({
+                id: 'OBD.component.OCPConfigNew.ResourcePlan.MemoryGib',
+                defaultMessage: '内存（GiB）',
+              })}
+            </span>
+          }
         />
-
-        <span style={{ lineHeight: '86px', marginLeft: '12px' }}>GiB</span>
-      </Row>
+      </Space>
       <p className={styles.titleText}>
         {intl.formatMessage({
           id: 'OBD.component.OCPConfigNew.ResourcePlan.MonitorDataTenantConfiguration',
           defaultMessage: '监控数据租户配置',
         })}
       </p>
-      <Row>
-        <Col style={{ marginRight: 12 }}>
-          <ProFormText
-            name={['ocpserver', 'monitor_tenant', 'name', 'tenant_name']}
-            rules={[
-              {
-                required: true,
-                message: intl.formatMessage({
-                  id: 'OBD.component.OCPConfigNew.ResourcePlan.PleaseEnter',
-                  defaultMessage: '请输入',
-                }),
-              },
-            ]}
-            label={intl.formatMessage({
+      <ProFormText
+        name={['ocpserver', 'monitor_tenant', 'name', 'tenant_name']}
+        rules={[
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.component.OCPConfigNew.ResourcePlan.PleaseEnter',
+              defaultMessage: '请输入',
+            }),
+          },
+        ]}
+        fieldProps={{ style: commonInputStyle }}
+        label={
+          <span style={lableStyle}>
+            {intl.formatMessage({
               id: 'OBD.component.OCPConfigNew.ResourcePlan.TenantName',
               defaultMessage: '租户名称',
             })}
-          />
-        </Col>
-        <Col>
-          <CustomPasswordInput
-            msgInfo={tenantMsgInfo}
-            setMsgInfo={setTenantMsgInfo}
-            form={form}
-            onChange={handleSetMonitorPassword}
-            value={monitorPassword}
-            useFor='ob'
-            name={['ocpserver', 'monitor_tenant', 'password']}
-            label={intl.formatMessage({
+          </span>
+        }
+      />
+
+      <CustomPasswordInput
+        msgInfo={tenantMsgInfo}
+        setMsgInfo={setTenantMsgInfo}
+        form={form}
+        onChange={handleSetMonitorPassword}
+        value={monitorPassword}
+        useFor="ob"
+        name={['ocpserver', 'monitor_tenant', 'password']}
+        style={commonInputStyle}
+        innerInputStyle={{ width: 388 }}
+        label={
+          <span style={lableStyle}>
+            {intl.formatMessage({
               id: 'OBD.component.OCPConfigNew.ResourcePlan.Password',
               defaultMessage: '密码',
             })}
-          />
-        </Col>
-      </Row>
-      <Row>
+          </span>
+        }
+      />
+
+      <Space size="large">
         <ProFormDigit
           name={['ocpserver', 'monitor_tenant', 'resource', 'cpu']}
           rules={[
@@ -323,12 +330,10 @@ export default function ResourcePlan({
               }),
             },
           ]}
-          label="CPU"
+          fieldProps={{ style: commonPortStyle }}
+          label={<span style={lableStyle}>CPU（VCPUS）</span>}
         />
 
-        <span style={{ margin: '0 12px 0 14px', lineHeight: '86px' }}>
-          VCPUS
-        </span>
         <ProFormDigit
           name={['ocpserver', 'monitor_tenant', 'resource', 'memory']}
           rules={[
@@ -340,14 +345,17 @@ export default function ResourcePlan({
               }),
             },
           ]}
-          label={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ResourcePlan.Memory',
-            defaultMessage: '内存',
-          })}
+          fieldProps={{ style: commonPortStyle }}
+          label={
+            <span style={lableStyle}>
+              {intl.formatMessage({
+                id: 'OBD.component.OCPConfigNew.ResourcePlan.MemoryGib',
+                defaultMessage: '内存（GiB）',
+              })}
+            </span>
+          }
         />
-
-        <span style={{ lineHeight: '86px', marginLeft: '12px' }}>GiB</span>
-      </Row>
+      </Space>
     </ProCard>
   );
 }

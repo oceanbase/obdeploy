@@ -7,7 +7,11 @@ export const obproxyComponent = 'obproxy';
 export const ocpexpressComponent = 'ocp-express';
 export const ocpComponent = 'ocpserver';
 export const obagentComponent = 'obagent';
+export const commonInputStyle = { width: 484 };
+export const commonPortStyle = { width: 230 };
 export const configServerComponent = 'ob-configserver';
+export const prometheusComponent = 'prometheus';
+export const graphnaComponent = 'grafana';
 
 export const ocpexpressComponentKey = 'ocpexpress';
 export const configServerComponentKey = 'obconfigserver';
@@ -125,8 +129,8 @@ export const componentsConfig = {
     }),
   },
   [configServerComponentKey]: {
-    name: 'OBConfigServer',
-    showComponentName: 'OBConfigServer',
+    name: 'obconfigserver',
+    showComponentName: 'obconfigserver',
     type: intl.formatMessage({
       id: 'OBD.pages.constants.Tools',
       defaultMessage: '工具',
@@ -137,6 +141,24 @@ export const componentsConfig = {
       defaultMessage: 'OB ConfigServer 参数名称',
     }),
   },
+  [prometheusComponent]:{
+    name:'Prometheus',
+    showComponentName:'Prometheus',
+    type: intl.formatMessage({
+      id: 'OBD.pages.constants.Tools',
+      defaultMessage: '工具',
+    }),
+    componentKey: prometheusComponent,
+  },
+  [graphnaComponent]:{
+    name:'Grafana',
+    showComponentName:'Grafana',
+    type: intl.formatMessage({
+      id: 'OBD.pages.constants.Tools',
+      defaultMessage: '工具',
+    }),
+    componentKey: graphnaComponent,
+  }
 };
 
 export const modeConfig = {
@@ -150,14 +172,14 @@ export const modeConfig = {
   }),
 };
 
-export const pathReg = /^\/[0-9a-zA-Z~@%^_+=(){}\[\]:,.?/\/]+$/;
+export const pathReg = /^\/[a-zA-Z0-9\-_:@\/.]*$/;
 
 export const pathRule = {
   pattern: pathReg,
   message: intl.formatMessage({
-    id: 'OBD.pages.constants.AnAbsolutePathThatStarts',
+    id: 'OBD.pages.constants.AnAbsolutePathThatStarts.1',
     defaultMessage:
-      '以 “/” 开头的绝对路径，只能包含字母、数字和特殊字符（~@%^_+=(){}[]:,./）',
+      '以 “/” 开头的绝对路径，只能包含字母、数字和特殊字符（-_:@/.）',
   }),
 };
 //https://www.oceanbase.com/docs/community-ocp-cn-1000000000261244
@@ -246,9 +268,4 @@ export const resourceMap = {
     },
   ],
 };
-export const CONFIGSERVER_LOG_LEVEL = [
-  'debug',
-  'info',
-  'warn',
-  'error',
-];
+export const CONFIGSERVER_LOG_LEVEL = ['debug', 'info', 'warn', 'error'];

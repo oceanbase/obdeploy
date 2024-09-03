@@ -13,7 +13,7 @@ test:
     value: 'false'
   variables:
   - name: ob_sql_work_area_percentage
-    value: 80
+    value: 30
   - name: ob_query_timeout
     value: 36000000000
   - name: ob_trx_timeout

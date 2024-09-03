@@ -1,44 +1,36 @@
 import { intl } from '@/utils/intl';
-import { history } from 'umi';
-import { useRef, useState } from 'react';
-import { Tooltip, Space, Row, Col, Card, Button, Modal } from 'antd';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
+import { DownOutlined } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
-import { useModel } from 'umi';
+import { Button, Card, Col, Dropdown, Row, Space, Tag, Tooltip } from 'antd';
+import { useRef } from 'react';
+import { history, useModel } from 'umi';
 
-import obSelectIcon from '../../../public/assets/welcome/ob-selected.png';
-import obUnselectIcon from '../../../public/assets/welcome/ob-unselected.png';
-import ocpSelectIcon from '../../../public/assets/welcome/ocp-selected.png';
-import ocpUnselectIcon from '../../../public/assets/welcome/ocp-unselected.png';
-import odcSelectIcon from '../../../public/assets/welcome/odc-selected.png';
-import odcUnselectIcon from '../../../public/assets/welcome/odc-unselected.png';
-import omsSelectIcon from '../../../public/assets/welcome/oms-selected.png';
-import omsUnselectIcon from '../../../public/assets/welcome/oms-unselected.png';
 import Banner from '@/component/Banner';
-import ExitBtn from '@/component/ExitBtn';
-import CustomFooter from '@/component/CustomFooter';
+import compManageGuideIcon from '../../../public/assets/welcome/component-manage.svg';
+import obGuideIcon from '../../../public/assets/welcome/ob-guide.png';
+import ocpGuideIcon from '../../../public/assets/welcome/ocp-guide.png';
+import omsGuideDisableIcon from '../../../public/assets/welcome/oms-guide-disable.png';
 
 import styles from './index.less';
 
-type ChooseResultType = 'obdeploy' | 'ocpInstaller';
 interface CustomCardProps {
   disable: boolean;
-  unselectIconPath: string;
-  selectIconPath: string;
+  icon: string;
   title: string;
   detail: string;
+  id: string;
   onClick?: (prop: string) => void;
   type?: string;
   tooltipText?: string;
-  select?: boolean;
+  action?: React.ReactNode;
 }
 
-const getGuideConfigList = (onClick: any) => {
-  const guideConfigList: CustomCardProps[] = [
+export default function Guide() {
+  const guideConfigListRef = useRef<CustomCardProps[]>([
     {
       disable: false,
-      unselectIconPath: obUnselectIcon,
-      selectIconPath: obSelectIcon,
+      id: 'ob',
+      icon: obGuideIcon,
       title: intl.formatMessage({
         id: 'OBD.pages.Guide.OceanbaseAndSupportingTools',
         defaultMessage: 'OceanBase 及配套工具',
@@ -47,63 +39,181 @@ const getGuideConfigList = (onClick: any) => {
         id: 'OBD.pages.Guide.DistributedDatabasesAndVariousTools',
         defaultMessage: '分布式数据库以及各类工具，方便客户管理、运维和使用',
       }),
-      onClick: () => onClick('obdeploy'),
-      type: 'obdeploy',
+      action: (
+        <Button
+          onClick={() => {
+            setOBCurrentStep(1);
+            history.push('/obdeploy');
+          }}
+          className={styles.guideBtn}
+          style={{ width: 63 }}
+        >
+          {intl.formatMessage({
+            id: 'OBD.pages.Guide.Installation',
+            defaultMessage: '安装',
+          })}
+        </Button>
+      ),
     },
     {
       disable: false,
-      unselectIconPath: ocpUnselectIcon,
-      selectIconPath: ocpSelectIcon,
-      title: 'OCP',
-      detail: intl.formatMessage({
-        id: 'OBD.pages.Guide.OceanbaseCloudPlatformFullLifecycle',
-        defaultMessage: 'OceanBase 云平台：对 OB 集群进行全生命周期管理',
+      icon: ocpGuideIcon,
+      title: intl.formatMessage({
+        id: 'OBD.pages.Guide.OceanbaseCloudPlatform',
+        defaultMessage: 'OceanBase 云平台',
       }),
-      onClick: () => onClick('ocpInstaller'),
-      type: 'ocpInstaller',
+      id: 'ocp-guide',
+      detail: intl.formatMessage({
+        id: 'OBD.pages.Guide.FullLifecycleManagementForOb',
+        defaultMessage: '可对 OB 集群进行全生命周期管理',
+      }),
+      action: (
+        <Dropdown
+          menu={{
+            items: [
+              {
+                label: (
+                  <div>
+                    <p className={styles.cardDetailTitle}>
+                      {intl.formatMessage({
+                        id: 'OBD.pages.Guide.UseTheNewOceanbaseDatabase',
+                        defaultMessage: '使用全新 OceanBase 数据库',
+                      })}{' '}
+                      <Tag className={`green-tag`}>
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.DeployType.Recommended',
+                          defaultMessage: '推荐',
+                        })}
+                      </Tag>
+                    </p>
+                    <p className={styles.cardDetailText}>
+                      {intl.formatMessage({
+                        id: 'OBD.pages.Guide.ANewOceanbaseDatabaseWill',
+                        defaultMessage:
+                          '将建立全新 OceanBase 数据库来部署 MetaDB 继而安装 OCP',
+                      })}
+                    </p>
+                  </div>
+                ),
+
+                key: '/ocpInstaller/install',
+              },
+              {
+                label: (
+                  <div>
+                    <p className={styles.cardDetailTitle}>
+                      {intl.formatMessage({
+                        id: 'OBD.pages.Guide.UseAnExistingOceanbaseDatabase',
+                        defaultMessage: '使用已有 OceanBase 数据库',
+                      })}
+                    </p>
+                    <p className={styles.cardDetailText}>
+                      {intl.formatMessage({
+                        id: 'OBD.pages.Guide.MetadbWillBeDeployedThrough',
+                        defaultMessage:
+                          '将通过已有 OceanBase 数据库来部署 MetaDB 继而安装 OCP',
+                      })}{' '}
+                    </p>
+                  </div>
+                ),
+
+                key: '/ocpInstaller/configuration',
+              },
+            ],
+
+            onClick: (val) => {
+              history.push(val.key);
+            },
+          }}
+        >
+          <Button className={styles.guideBtn} style={{ width: 84 }}>
+            <Space>
+              {intl.formatMessage({
+                id: 'OBD.pages.Guide.Installation',
+                defaultMessage: '安装',
+              })}
+
+              <DownOutlined style={{ color: '#5C6B8A' }} />
+            </Space>
+          </Button>
+        </Dropdown>
+      ),
+    },
+    {
+      disable: false,
+      id: 'component-manage',
+      icon: compManageGuideIcon,
+      title: intl.formatMessage({
+        id: 'OBD.pages.Guide.ComponentManagement',
+        defaultMessage: '组件管理',
+      }),
+      detail: intl.formatMessage({
+        id: 'OBD.pages.Guide.YouCanInstallAndUninstall.1',
+        defaultMessage: '可对集群进行 OCP Express、OBAgent 等组件安装、卸载',
+      }),
+      action: (
+        <Dropdown
+          getPopupContainer={() => document.getElementById('component-manage')}
+          menu={{
+            items: [
+              {
+                label: intl.formatMessage({
+                  id: 'OBD.pages.Guide.ComponentInstallation',
+                  defaultMessage: '组件安装',
+                }),
+                key: '/componentDeploy',
+              },
+              {
+                label: intl.formatMessage({
+                  id: 'OBD.pages.Guide.ComponentUninstallation',
+                  defaultMessage: '组件卸载',
+                }),
+                key: '/componentUninstall',
+              },
+            ],
+
+            onClick: (val) => {
+              history.push(val.key);
+            },
+          }}
+        >
+          <Button className={styles.guideBtn} style={{ width: 84 }}>
+            <Space>
+              {intl.formatMessage({
+                id: 'OBD.pages.Guide.Management',
+                defaultMessage: '管理',
+              })}
+
+              <DownOutlined style={{ color: '#5C6B8A' }} />
+            </Space>
+          </Button>
+        </Dropdown>
+      ),
     },
     {
       disable: true,
-      unselectIconPath: odcUnselectIcon,
-      selectIconPath: odcSelectIcon,
-      title: 'ODC',
+      id: 'oms',
+      icon: omsGuideDisableIcon,
+      title: intl.formatMessage({
+        id: 'OBD.pages.Guide.OceanbaseDataMigration',
+        defaultMessage: 'OceanBase 数据迁移',
+      }),
       detail: intl.formatMessage({
-        id: 'OBD.pages.Guide.OceanbaseDeveloperCenterManageDatabases',
-        defaultMessage: 'OceanBase 开发者中心：对数据库&表进行管理',
+        id: 'OBD.pages.Guide.ItIsAOneStop',
+        defaultMessage: '是数据库一站式数据传输和同步产品',
       }),
     },
-    {
-      disable: true,
-      unselectIconPath: omsUnselectIcon,
-      selectIconPath: omsSelectIcon,
-      title: 'OMS',
-      detail: intl.formatMessage({
-        id: 'OBD.pages.Guide.OceanbaseDataMigrationFastData',
-        defaultMessage: 'OceanBase 数据迁移：对数据进行快速迁移',
-      }),
-    },
-  ];
-
-  return guideConfigList;
-};
-
-export default function Guide() {
-  const [chooseResult, setChooseResult] =
-    useState<ChooseResultType>('obdeploy');
-  const guideConfigListRef = useRef<CustomCardProps[]>(
-    getGuideConfigList(setChooseResult),
-  );
-  const { setCurrentStep: setOBCurrentStep, DOCS_PRODUCTION } = useModel('global');
+  ]);
+  const { setCurrentStep: setOBCurrentStep, DOCS_PRODUCTION } =
+    useModel('global');
   const CustomCard = ({
     disable = false,
-    unselectIconPath,
-    selectIconPath,
+    icon,
     title,
     detail,
-    onClick,
-    type,
     tooltipText,
-    select,
+    action,
+    id,
   }: CustomCardProps) => {
     const CardWrap = (prop: React.PropsWithChildren<any>) => {
       if (disable) {
@@ -125,26 +235,24 @@ export default function Guide() {
         return prop.children;
       }
     };
-
     return (
       <CardWrap>
         <Card
-          bodyStyle={{ width: '100%' }}
-          className={[
+          bodyStyle={{
+            width: '100%',
+            paddingTop: 0,
+            paddingBottom: 0,
+            height: '100%',
+          }}
+          className={
             disable
               ? styles.disableCustomCardContainer
-              : styles.customCardContainer,
-            select ? styles.customCardSelect : '',
-          ].join(' ')}
-          onClick={onClick && type ? () => onClick(type) : () => {}}
+              : styles.customCardContainer
+          }
+          id={id}
         >
           <div className={styles.cardHeader}>
-            <img
-              className={styles.cardImg}
-              src={select ? selectIconPath : unselectIconPath}
-              alt=""
-            />
-
+            <img className={styles.cardImg} src={icon} alt="" />
             <span
               className={disable ? styles.disableCardTitle : styles.cardTitle}
             >
@@ -154,6 +262,7 @@ export default function Guide() {
           <p className={disable ? styles.disableCardDetail : styles.cardDetail}>
             {detail}
           </p>
+          {action}
         </Card>
       </CardWrap>
     );
@@ -167,10 +276,10 @@ export default function Guide() {
     };
     return (
       <div style={{ height: '32px' }}>
-        <span>
+        <span style={{ color: '#132039' }}>
           {intl.formatMessage({
-            id: 'OBD.pages.Guide.SelectAnInstallationProduct',
-            defaultMessage: '请选择安装产品',
+            id: 'OBD.pages.Guide.SelectInstallProductOrComponent',
+            defaultMessage: '请选择安装产品或组件管理',
           })}
         </span>{' '}
         <span style={{ ...textStyle, color: '#E2E8F3' }}>|</span>{' '}
@@ -188,13 +297,6 @@ export default function Guide() {
     );
   };
 
-  const nextStep = (path: ChooseResultType) => {
-    if (path === 'obdeploy') {
-      setOBCurrentStep(1);
-    }
-    history.push(`/${path}`);
-  };
-
   return (
     <div className={styles.guideContainer}>
       <Banner
@@ -203,17 +305,17 @@ export default function Guide() {
           defaultMessage: '欢迎使用 OceanBase 部署向导',
         })}
       />
+
       <div className={styles.content} style={{ display: 'block' }}>
         <ProCard
           title={<Title />}
           style={{
-            minWidth: '1040px',
-            height: '100%',
+            width: 1040,
+            height: 576,
             boxShadow:
               '0 2px 4px 0 rgba(19,32,57,0.02), 0 1px 6px -1px rgba(19,32,57,0.02), 0 1px 2px 0 rgba(19,32,57,0.03)',
           }}
           bodyStyle={{ height: 'calc(100% - 64px)' }}
-          // divided={false}
         >
           <Row
             gutter={[24, 24]}
@@ -222,48 +324,23 @@ export default function Guide() {
             align="middle"
           >
             {guideConfigListRef.current.map((guideConfig, idx) => {
-              let select = Boolean(
-                guideConfig.type && chooseResult === guideConfig.type,
-              );
               return (
-                <Col key={idx} span={12} style={{ height: 'calc(50% - 12px)' }}>
-                  <CustomCard
-                    title={guideConfig.title}
-                    detail={guideConfig.detail}
-                    disable={guideConfig.disable}
-                    unselectIconPath={guideConfig.unselectIconPath}
-                    selectIconPath={guideConfig.selectIconPath}
-                    onClick={guideConfig.onClick}
-                    type={guideConfig.type}
-                    tooltipText={guideConfig.tooltipText}
-                    select={select}
-                  />
+                <Col
+                  key={idx}
+                  span={12}
+                  style={
+                    idx % 2 === 0
+                      ? { height: 'calc(50% - 12px)', paddingLeft: 0 }
+                      : { height: 'calc(50% - 12px)', paddingRight: 0 }
+                  }
+                >
+                  <CustomCard {...guideConfig} />
                 </Col>
               );
             })}
           </Row>
         </ProCard>
       </div>
-      <CustomFooter>
-        <ExitBtn />
-        <Button
-          type="primary"
-          disabled={!chooseResult}
-          data-aspm-click="c337188.d384331"
-          data-aspm-desc={intl.formatMessage({
-            id: 'OBD.pages.Guide.WizardSelectDeploymentTool',
-            defaultMessage: '向导-选择部署工具',
-          })}
-          data-aspm-param={``}
-          data-aspm-expo
-          onClick={() => nextStep(chooseResult!)}
-        >
-          {intl.formatMessage({
-            id: 'OBD.pages.Guide.Ok',
-            defaultMessage: '确定',
-          })}
-        </Button>
-      </CustomFooter>
     </div>
   );
 }

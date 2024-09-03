@@ -102,6 +102,7 @@ class ObProxy(BaseModel):
     cluster_name: str = Body(None, description='obproxy name')
     home_path: str = Body('', description='install obproxy home path')
     prometheus_listen_port: int = Body(..., description='prometheus port')
+    rpc_listen_port: int = Body(None, description='rpc service port')
     listen_port: int = Body(..., description='sql port')
     parameters: List[Parameter] = Body(None, description='config parameter')
     servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
@@ -116,6 +117,7 @@ class OcpExpress(BaseModel):
     port: int = Body(..., description='server port')
     parameters: List[Parameter] = Body(None, description='config parameter')
     servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
+    admin_passwd: str = Body(..., description="ocp-express admin password")
 
 
 class ObAgent(BaseModel):
@@ -292,5 +294,8 @@ class OCPDeploymnetConfig(BaseModel):
     launch_user: Optional[str] = Body(None, description='process user')
 
 
-
+class ScenarioType(BaseModel):
+    type: str = Body(..., description='scenario name')
+    desc: str = Body(..., description='scenario description')
+    value: str = Body(..., description='scenario value')
 

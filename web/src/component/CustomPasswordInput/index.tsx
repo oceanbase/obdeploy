@@ -5,7 +5,7 @@ import {
   OCP_PASSWORD_ERROR_REASON,
   OCP_PASSWORD_ERROR_REASON_OLD,
   passwordCheck,
-  passwordCheckLowVersion
+  passwordCheckLowVersion,
 } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import { ProForm } from '@ant-design/pro-components';
@@ -23,6 +23,8 @@ interface CustomPasswordInputProps {
   msgInfo: MsgInfoType;
   useOldRuler?: boolean;
   useFor: 'ob' | 'ocp';
+  style?: React.CSSProperties;
+  innerInputStyle?: React.CSSProperties;
   setMsgInfo: React.Dispatch<React.SetStateAction<MsgInfoType | undefined>>;
 }
 
@@ -46,9 +48,10 @@ export default function CustomPasswordInput({
   setMsgInfo,
   useOldRuler = false,
   useFor,
+  innerInputStyle = { width: 328 },
   ...props
 }: CustomPasswordInputProps) {
-  const textStyle = { marginTop: '8px' };
+  const textStyle = { marginTop: '8px', marginBottom: '24px' };
   const oldValidateInput = (value: string): MsgInfoType => {
     if (!passwordCheckLowVersion(value)) {
       return {
@@ -121,14 +124,13 @@ export default function CustomPasswordInput({
         {intl.formatMessage({
           id: 'OBD.component.CustomPasswordInput.PleaseRememberThePasswordOr',
           defaultMessage: '请牢记密码，也可',
-        })}
-
+        })}{' '}
         <a onClick={() => passwordCopy()}>
           {intl.formatMessage({
             id: 'OBD.component.CustomPasswordInput.CopyPassword',
             defaultMessage: '复制密码',
           })}
-        </a>
+        </a>{' '}
         {intl.formatMessage({
           id: 'OBD.component.CustomPasswordInput.AndKeepItProperly',
           defaultMessage: '并妥善保存',
@@ -156,15 +158,15 @@ export default function CustomPasswordInput({
           }),
         },
         {
-          validator:(_,value)=>{
-            let validateRes =  validateInput(value)
-            if( validateRes.validateStatus === 'success'){
-              return Promise.resolve()
-            }else{
-              return Promise.reject(new Error(validateRes.errorMsg!))
+          validator: (_, value) => {
+            let validateRes = validateInput(value);
+            if (validateRes.validateStatus === 'success') {
+              return Promise.resolve();
+            } else {
+              return Promise.reject(new Error(validateRes.errorMsg!));
             }
-          }
-        }
+          },
+        },
       ]}
       name={name}
       {...props}
@@ -173,17 +175,17 @@ export default function CustomPasswordInput({
         <Input.Password
           onChange={(e) => handleChange(e.target.value)}
           value={value}
-          style={{ width: 328 }}
+          style={innerInputStyle}
         />
 
-        <Button onClick={handleRandomGenerate} style={{ margin: '0 12px' }}>
+        <Button onClick={handleRandomGenerate} style={{ marginLeft: 12 }}>
           {intl.formatMessage({
             id: 'OBD.component.CustomPasswordInput.RandomlyGenerated',
             defaultMessage: '随机生成',
           })}
         </Button>
         {showCopyBtn && (
-          <Button onClick={passwordCopy}>
+          <Button style={{ marginLeft: 12 }} onClick={passwordCopy}>
             {intl.formatMessage({
               id: 'OBD.component.CustomPasswordInput.CopyPassword',
               defaultMessage: '复制密码',

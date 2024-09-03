@@ -1,16 +1,67 @@
-import { intl } from '@/utils/intl';
-import { Button,Modal } from 'antd';
-import { useRequest, history } from 'umi';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { errorHandler } from '@/utils';
-import { useModel } from 'umi';
-import * as Process from '@/services/ocp_installer_backend/Process';
 import { PathType } from '@/pages/type';
+import * as Process from '@/services/ocp_installer_backend/Process';
+import { errorHandler } from '@/utils';
 import { getTailPath } from '@/utils/helper';
+import { intl } from '@/utils/intl';
+import { ExclamationCircleOutlined } from '@ant-design/icons';
+import { Button, Modal } from 'antd';
+import { history, useModel, useRequest } from 'umi';
+
+const defaultContentText = intl.formatMessage({
+  id: 'OBD.src.component.ExitBtn.AfterExitingTheDeploymentAnd',
+  defaultMessage: '退出后，部署安装工作将被终止，请谨慎操作。',
+});
 
 export default function ExitBtn() {
   const { setInstallStatus, setInstallResult } = useModel('ocpInstallData');
   const path: PathType = getTailPath() as PathType;
+  const ocpTextMap = {
+    title: intl.formatMessage({
+      id: 'OBD.src.component.ExitBtn.ExitTheOcpDeploymentInstaller',
+      defaultMessage: '退出 OCP 部署安装程序',
+    }),
+    content: defaultContentText,
+  };
+  const pathTextMap = {
+    componentDeploy: {
+      title: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.ExitTheComponentDeploymentProgram',
+        defaultMessage: '退出组件部署程序',
+      }),
+      content: defaultContentText,
+    },
+    update: {
+      title: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.ExitTheOcpUpgradeProgram',
+        defaultMessage: '退出 OCP 升级程序',
+      }),
+      content: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.AfterExitingTheUpgradeWill',
+        defaultMessage: '退出后，升级工作将被终止，请谨慎操作',
+      }),
+    },
+    guide: {
+      title: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.ExitTheOceanbaseDeploymentWizard',
+        defaultMessage: '退出 OceanBase 部署向导',
+      }),
+      content: defaultContentText,
+    },
+    obdeploy: {
+      title: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.ExitTheDeploymentProgram',
+        defaultMessage: '退出部署程序',
+      }),
+      content: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.AfterExitingTheDeploymentWill',
+        defaultMessage: '退出后，部署工作将被终止，请谨慎操作。',
+      }),
+    },
+    install: ocpTextMap,
+    configuration: ocpTextMap,
+    ocpInstaller: ocpTextMap,
+    default: ocpTextMap,
+  };
   // 退出
   const { run: suicide, loading: suicideLoading } = useRequest(
     Process.suicide,
@@ -38,33 +89,9 @@ export default function ExitBtn() {
       })}
       onClick={() => {
         Modal.confirm({
-          title:
-            path === 'update'
-              ? intl.formatMessage({
-                  id: 'OBD.src.component.ExitBtn.ExitTheOcpUpgradeProgram',
-                  defaultMessage: '退出 OCP 升级程序',
-                })
-              : path === 'guide'
-              ? intl.formatMessage({
-                  id: 'OBD.src.component.ExitBtn.ExitTheOceanbaseDeploymentWizard',
-                  defaultMessage: '退出 OceanBase 部署向导',
-                })
-              : intl.formatMessage({
-                  id: 'OBD.src.component.ExitBtn.ExitTheOcpDeploymentInstaller',
-                  defaultMessage: '退出 OCP 部署安装程序',
-                }),
+          title: pathTextMap[path]?.title ?? pathTextMap.default.title,
           icon: <ExclamationCircleOutlined style={{ color: '#FF4B4B' }} />,
-          content:
-            path === 'update'
-              ? intl.formatMessage({
-                  id: 'OBD.src.component.ExitBtn.AfterExitingTheUpgradeWill',
-                  defaultMessage: '退出后，升级工作将被终止，请谨慎操作',
-                })
-              : intl.formatMessage({
-                  id: 'OBD.src.component.ExitBtn.AfterExitingTheDeploymentAnd',
-                  defaultMessage: '退出后，部署安装工作将被终止，请谨慎操作。',
-                }),
-
+          content: pathTextMap[path]?.content ?? pathTextMap.default.content,
           okText: intl.formatMessage({
             id: 'OBD.src.component.ExitBtn.Exit',
             defaultMessage: '退出',

@@ -311,11 +311,10 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                     continue
 
         if not cluster_config.depends:
+            curosr = None
             # check meta db connect before start
             jdbc_url = server_config['jdbc_url']
             matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
-            cursor = getattr(options, 'metadb_cursor', '')
-            cursor = kwargs.get('metadb_cursor', '') if cursor == '' else cursor
             stdio.verbose('metadb connect check')
             if matched:
                 jdbc_host = matched.group(1)
@@ -343,9 +342,10 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                     error('metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR])
             else:
                 critical('metadb connect', err.EC_OCP_SERVER_ERROR_JDBC_URL, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR])
-            client = clients[server]
+
             # time check
             stdio.verbose('time check ')
+            client = clients[server]
             now = client.execute_command('date +"%Y-%m-%d %H:%M:%S"').stdout.strip()
             now = datetime.datetime.strptime(now, '%Y-%m-%d %H:%M:%S')
             stdio.verbose('now: %s' % now)
@@ -353,10 +353,9 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             if cursor:
                 ob_time = cursor.fetchone("SELECT NOW() now")['now']
                 stdio.verbose('ob_time: %s' % ob_time)
-                if not abs((now - ob_time).total_seconds()) < 180:
-                    critical('time check', err.EC_OCP_SERVER_TIME_SHIFT.format(server=server))
-
-            if cursor and cursor.user == 'root@sys':
+                if not abs((now - ob_time).total_seconds()) < 60:
+                    critical('time check', err.EC_OCP_SERVER_TIME_SHIFT.format(server=server), suggests=[err.SUG_OCP_SERVER_MACHINE_TIME])
+            if cursor and cursor.user == 'root@sys' and source_option == 'start_check':
                 stdio.verbose('tenant check ')
                 zone_obs_num = {}
                 sql = "select zone, count(*) num from oceanbase.DBA_OB_SERVERS where status = 'active' group by zone"
@@ -405,20 +404,20 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                     log_disk_available = min(servers_stat['LOG_DISK_CAPACITY'] - servers_stat['LOG_DISK_ASSIGNED'], log_disk_available)
 
                 global_conf_with_default = copy.deepcopy(cluster_config.get_global_conf_with_default())
-                meta_db_memory_size = Capacity(global_conf_with_default['ocp_meta_tenant'].get('memory_size')).btyes
-                monitor_db_memory_size = Capacity(global_conf_with_default['ocp_monitor_tenant'].get('memory_size', 0)).btyes
+                meta_db_memory_size = Capacity(global_conf_with_default['ocp_meta_tenant'].get('memory_size')).bytes
+                monitor_db_memory_size = Capacity(global_conf_with_default['ocp_monitor_tenant'].get('memory_size', 0)).bytes
                 meta_db_max_cpu = global_conf_with_default['ocp_meta_tenant'].get('max_cpu')
                 monitor_db_max_cpu = global_conf_with_default['ocp_monitor_tenant'].get('max_cpu', 0)
                 meta_db_log_disk_size = global_conf_with_default['ocp_meta_tenant'].get('log_disk_size', 0)
-                meta_db_log_disk_size = Capacity(meta_db_log_disk_size).btyes
+                meta_db_log_disk_size = Capacity(meta_db_log_disk_size).bytes
                 monitor_db_log_disk_size = global_conf_with_default['ocp_monitor_tenant'].get('log_disk_size', 0)
-                monitor_db_log_disk_size = Capacity(monitor_db_log_disk_size).btyes
+                monitor_db_log_disk_size = Capacity(monitor_db_log_disk_size).bytes
                 if meta_db_max_cpu and monitor_db_max_cpu:
                     if int(meta_db_max_cpu) + int(monitor_db_max_cpu) > cpu_available:
                         critical('tenant cpu', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='cpu', avail=cpu_available, need=int(meta_db_max_cpu) + int(monitor_db_max_cpu)))
                 if meta_db_memory_size and monitor_db_memory_size:
                     if meta_db_memory_size + monitor_db_memory_size > mem_available:
-                        critical('tenant mem', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='memory', avail=Capacity(mem_available), need=Capacity(meta_db_memory_size + monitor_db_memory_size)))
+                        critical('tenant mem', err.EC_OCP_SERVER_EXIST_METADB_TENANT_MEMORY_NOT_ENOUGH.format(avail=Capacity(mem_available), need=Capacity(meta_db_memory_size + monitor_db_memory_size)), suggests=[err.SUG_OCP_SERVER_EXIST_METADB_TENANT_NOT_ENOUGH.format()])
                 if meta_db_log_disk_size and monitor_db_log_disk_size:
                     if meta_db_log_disk_size + monitor_db_log_disk_size > log_disk_available:
                         critical('tenant log disk', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='log_disk_size', avail=Capacity(log_disk_available), need=Capacity(meta_db_log_disk_size + monitor_db_log_disk_size)))
@@ -543,8 +542,6 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
             if client.execute_command(clockdiff_cmd):
                 check_pass('clockdiff')
             else:
-                if not client.execute_command('sudo -n true'):
-                    critical('clockdiff', err.EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS.format(server=server))
                 ret = client.execute_command('sudo ' + clockdiff_cmd)
                 if not ret:
                     critical('clockdiff', err.EC_OCP_SERVER_CLOCKDIFF_NOT_EXISTS.format(server=server))
@@ -563,12 +560,12 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
         ip_servers = {}
         MIN_MEMORY_VALUE = 1073741824
 
-        memory_size = Capacity(server_config.get('memory_size', '1G')).btyes
+        memory_size = Capacity(server_config.get('memory_size', '1G')).bytes
         if server_config.get('log_dir'):
             log_dir = server_config['log_dir']
         else:
             log_dir = os.path.join(server_config['home_path'], 'log')
-        need_size = Capacity(server_config.get('logging_file_total_size_cap', '1G')).btyes
+        need_size = Capacity(server_config.get('logging_file_total_size_cap', '1G')).bytes
         ip = server.ip
         if ip not in servers_client:
             servers_client[ip] = client
@@ -611,7 +608,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
                 for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                     if k in memory_key_map:
                         key = memory_key_map[k]
-                        server_memory_stats[key] = Capacity(str(v)).btyes
+                        server_memory_stats[key] = Capacity(str(v)).bytes
                 mem_suggests = [err.SUG_OCP_SERVER_REDUCE_MEM.format()]
                 if memory_needed > server_memory_stats['available']:
                     for server in ip_servers[ip]:

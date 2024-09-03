@@ -531,7 +531,7 @@ def start_check(plugin_context, init_check_status=False, work_dir_check=False, w
         server_config = env[server]
         admin_passwd = server_config.get('admin_passwd')
         if not admin_passwd or not password_check(admin_passwd):
-            error('admin_passwd', err.EC_COMPONENT_PASSWD_ERROR.format(ip=server.ip, component='ocp-express', key='admin_passwd', rule='Must be 8 to 32 characters in length, containing at least 3 types from digits, lowercase letters, uppercase letters and the following special characters: ~!@#%^&*_-+=|(){{}}[]:;,.?/'), suggests=[err.SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD.format()])
+            error('admin_passwd', err.EC_COMPONENT_PASSWD_ERROR.format(ip=server.ip, component='ocp-express', key='admin_passwd', rule='The password must be 8 to 32 characters in length, containing at least 2 uppercase letters, 2 lowercase letters, 2 numbers, and 2 of the following special characters: ~!@#%^&*_-+=|(){{}}[]:;,.?/'), suggests=[err.SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD.format()])
 
     plugin_context.set_variable('start_env', env)
 

@@ -1,3 +1,4 @@
+import { pathReg } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { ProCard } from '@ant-design/pro-components';
 import { Form, Space, Spin, Table, Tooltip } from 'antd';
@@ -11,7 +12,12 @@ const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 export type RulesDetail = {
-  targetTable?: 'oceanbase-ce' | 'obproxy-ce' | 'ocp-express' | 'obagent' | 'ob-configserver';
+  targetTable?:
+    | 'oceanbase-ce'
+    | 'obproxy-ce'
+    | 'ocp-express'
+    | 'obagent'
+    | 'ob-configserver';
   rules: any;
   targetColumn?: string;
 };
@@ -71,6 +77,22 @@ const getMoreColumns = (
           );
           if (targetRuleDetail) rules = targetRuleDetail.rules;
         }
+        if (record.name === 'log_dir') {
+          rules.push(() => ({
+            validator: (_, value) => {
+              if (pathReg.test(value?.value || '') || value?.adaptive) {
+                return Promise.resolve();
+              }
+              return Promise.reject(
+                intl.formatMessage({
+                  id: 'OBD.pages.constants.AnAbsolutePathThatStarts.1',
+                  defaultMessage:
+                    '以 “/” 开头的绝对路径，只能包含字母、数字和特殊字符（-_:@/.）',
+                }),
+              );
+            },
+          }));
+        }
         return (
           <Form.Item
             validateFirst={true}
@@ -114,8 +136,8 @@ const getMoreColumns = (
 };
 /**
  *
- * @param parameterRules 
- * 用于动态自定义某些字段的校验规则 RulesDetail | RulesDetail[] 
+ * @param parameterRules
+ * 用于动态自定义某些字段的校验规则 RulesDetail | RulesDetail[]
  * 涉及到多个table需要传数组，rule需要通过targetTable字段映射到对应的table
  */
 export default function ConfigTable({
@@ -137,10 +159,12 @@ export default function ConfigTable({
             {/* moreItem表示某一个组件,如 obproxy、ocp-express */}
             {dataSource.map((moreItem) => {
               // 每一项表示组件中的某一个参数的rules
-              let rulesList:RulesDetail[] = [];
+              let rulesList: RulesDetail[] = [];
               if (parameterRules) {
                 if (Array.isArray(parameterRules)) {
-                  rulesList = parameterRules.filter((item)=>item.targetTable === moreItem.component)
+                  rulesList = parameterRules.filter(
+                    (item) => item.targetTable === moreItem.component,
+                  );
                 } else {
                   rulesList.push(parameterRules);
                 }

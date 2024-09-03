@@ -91,7 +91,7 @@ class PluginContextNamespace:
         ret = self._return.get(plugin_name)
         if isinstance(ret, PluginReturn):
             return ret
-        return None
+        return PluginReturn()
 
     def set_return(self, plugin_name, plugin_return):
         self._return[plugin_name] = plugin_return
@@ -99,7 +99,7 @@ class PluginContextNamespace:
 
 class PluginReturn(object):
 
-    def __init__(self, value=False, *arg, **kwargs):
+    def __init__(self, value=None, *arg, **kwargs):
         self._return_value = value
         self._return_args = arg
         self._return_kwargs = kwargs

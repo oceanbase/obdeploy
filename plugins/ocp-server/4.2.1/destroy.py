@@ -29,6 +29,17 @@ from tool import Cursor
 global_ret = True
 
 
+def check_mount_path(client, path, stdio):
+    stdio and getattr(stdio, 'verbose', print)('check mount: %s' % path)
+    try:
+        if client.execute_command("grep '\\s%s\\s' /proc/mounts" % path):
+            return True
+        return False
+    except Exception as e:
+        stdio and getattr(stdio, 'exception', print)('')
+        stdio and getattr(stdio, 'error', print)('failed to check mount: %s' % path)
+
+
 def get_missing_required_parameters(parameters):
     results = []
     for key in ["jdbc_url"]:
@@ -105,7 +116,12 @@ def destroy(plugin_context, *args, **kwargs):
 
     def clean(path):
         client = clients[server]
-        ret = client.execute_command('sudo rm -fr %s/*' % path, timeout=-1)
+        cmd = 'rm -fr %s/' % path
+        if check_mount_path(client, path, stdio):
+            cmd = 'rm -fr %s/*' % path
+        if not client.execute_command('[ `id -u` == "0" ]') and server_config.get('launch_user', '') and client.execute_command('sudo -n true'):
+            cmd = 'sudo' + cmd
+        ret = client.execute_command(cmd, timeout=-1)
         if not ret:
             global global_ret
             global_ret = False

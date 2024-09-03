@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 
 class DatabaseConnection(BaseModel):
-    cluster_name = Body('', description="cluster name of the connection in installer")
+    cluster_name: str = Body('', description="cluster name of the connection in installer")
     host: str = Body('', description="host")
     port: int = Body(2881, description="port")
     user: str = Body('meta_user@ocp_meta', description="user")

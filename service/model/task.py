@@ -63,6 +63,7 @@ class PreCheckResult(BaseModel):
     result: PrecheckEventResult = Body('', description="precheck event result")
     recoverable: bool = Body(False, description="precheck event recoverable")
     code: str = Body('', description="error code")
+    description: str = Body('', description='error description')
     advisement: str = Body("", description="advisement of precheck event failure")
 
 

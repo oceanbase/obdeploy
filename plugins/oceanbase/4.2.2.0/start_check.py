@@ -52,7 +52,7 @@ def time_delta(client):
     time_ed = time.time() * 1000
 
     time_it = time_ed - time_st
-    time_srv -= time_it
+    time_srv -= time_it/2
     return time_srv - time_st
 
 
@@ -65,21 +65,24 @@ def get_mount_path(disk, _path):
     return _mount_path
 
 
-def get_system_memory(memory_limit, min_pool_memory):
-    if memory_limit <= 8 << 30:
-        system_memory = 2 << 30
-    elif memory_limit <= 16 << 30:
-        system_memory = 3 << 30
-    elif memory_limit <= 32 << 30:
+def get_system_memory(memory_limit):
+    if memory_limit < 12 << 30:
+        system_memory = 1 << 30
+    elif memory_limit < 20 << 30:
         system_memory = 5 << 30
-    elif memory_limit <= 48 << 30:
+    elif memory_limit < 40 << 30:
+        system_memory = 6 << 30
+    elif memory_limit < 60 << 30:
         system_memory = 7 << 30
-    elif memory_limit <= 64 << 30:
+    elif memory_limit < 80 << 30:
+        system_memory = 8 << 30
+    elif memory_limit < 100 << 30:
+        system_memory = 9 << 30
+    elif memory_limit < 130 << 30:
         system_memory = 10 << 30
     else:
-        memory_limit_gb = memory_limit >> 30
-        system_memory = int(3 * (sqrt(memory_limit_gb) - 3)) << 30
-    return max(system_memory, min_pool_memory)
+        system_memory = int(memory_limit * 0.08)
+    return system_memory
 
 
 def get_disk_info_by_path(path, client, stdio):
@@ -181,7 +184,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 factor = 0.75
                 suggest = err.SUG_OBSERVER_SYS_MEM_TOO_LARGE.format(factor=factor)
                 suggest.auto_fix = 'system_memory' not in global_generate_config and 'system_memory' not in generate_configs.get(server, {})
-                if memory_limit < server_memory_config[server]['system_memory']:
+                if memory_limit <= server_memory_config[server]['system_memory']:
                     critical('mem', err.EC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server), [suggest])
                 elif memory_limit * factor < server_memory_config[server]['system_memory']:
                     alert('mem', err.WC_OBSERVER_SYS_MEM_TOO_LARGE.format(server=server, factor=factor), [suggest])
@@ -380,7 +383,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory_limit = 0
             percentage = 0
             if server_config.get('memory_limit'):
-                memory_limit = Capacity(server_config['memory_limit']).btyes
+                memory_limit = Capacity(server_config['memory_limit']).bytes
                 if production_mode and memory_limit < PRO_MEMORY_MIN:
                     error('mem', err.EC_OBSERVER_PRODUCTION_MODE_LIMIT.format(server=server, key='memory_limit', limit=Capacity(PRO_MEMORY_MIN)), [err.SUB_SET_NO_PRODUCTION_MODE.format()])
                 memory['num'] += memory_limit
@@ -393,7 +396,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             memory['servers'][server] = {
                 'num': memory_limit,
                 'percentage': percentage,
-                'system_memory': Capacity(server_config.get('system_memory', 0)).btyes
+                'system_memory': Capacity(server_config.get('system_memory', 0)).bytes
             }
 
             data_path = server_config['data_dir'] if server_config.get('data_dir') else  os.path.join(server_config['home_path'], 'store')
@@ -567,7 +570,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
             for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                 if k in memory_key_map:
                     key = memory_key_map[k]
-                    server_memory_stats[key] = Capacity(str(v)).btyes
+                    server_memory_stats[key] = Capacity(str(v)).bytes
 
             ip_server_memory_info[ip] = server_memory_stats
             server_memory_stat = servers_memory[ip]
@@ -615,7 +618,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 # slog need 4G
                 disk[mount_path]['need'] += max(disk[mount_path]['total'] - slog_size, 0) * need / 100
             else:
-                disk[mount_path]['need'] += Capacity(need).btyes
+                disk[mount_path]['need'] += Capacity(need).bytes
 
             disk[mount_path]['need'] += slog_size
             disk[mount_path]['is_data_disk'] = True
@@ -635,7 +638,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 log_disk_size = disk[mount_path]['total'] * need / 100
             else:
                 # log_disk_size
-                log_disk_size = Capacity(need).btyes
+                log_disk_size = Capacity(need).bytes
             servers_log_disk_size[servers_clog_mount[ip][path]['server']] = log_disk_size
             disk[mount_path]['need'] += log_disk_size
             disk[mount_path]['is_clog_disk'] = True
@@ -698,9 +701,9 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                     global_conf_with_default['ocp_%s_tenant' % tenant][key.replace(prefix, '', 1)] = global_conf_with_default[key]
             if set(list(plugin_context.components)) & set(component_list):
                 tenant_memory_default = global_conf_with_default[tenant_key].get('memory_size', '0')
-                tenant_memory += Capacity(original_global_conf.get(tenant_key, {}).get('memory_size', tenant_memory_default)).btyes
+                tenant_memory += Capacity(original_global_conf.get(tenant_key, {}).get('memory_size', tenant_memory_default)).bytes
                 tenant_log_disk_default = global_conf_with_default[tenant_key].get('log_disk_size', '0')
-                tenant_log_disk += Capacity(original_global_conf.get(tenant_key, {}).get('log_disk_size', tenant_log_disk_default)).btyes
+                tenant_log_disk += Capacity(original_global_conf.get(tenant_key, {}).get('log_disk_size', tenant_log_disk_default)).bytes
 
         servers_sys_memory = {}
         if tenant_memory:
@@ -715,14 +718,15 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 system_memory = servers_memory[server.ip]['servers'][server]['system_memory']
                 min_pool_memory = servers_min_pool_memory[server]
                 if system_memory == 0:
-                    system_memory = get_system_memory(memory_limit, min_pool_memory)
+                    system_memory = get_system_memory(memory_limit)
                 if not sys_memory_size:
-                    sys_memory_size = servers_sys_memory[server] = max(min_pool_memory, min((memory_limit - system_memory) * 0.25, Capacity('16G').btyes))
+                    sys_memory_size = servers_sys_memory[server] = max(min_pool_memory, min((memory_limit - system_memory) * 0.25, Capacity('16G').bytes))
                 if tenant_memory + system_memory + sys_memory_size <= memory_limit:
                     break
             else:
-                critical('ocp tenant memory', err.EC_OCP_SERVER_RESOURCE_NOT_ENOUGH.format(resource='memory', avail=Capacity(memory_limit - system_memory - sys_memory_size), need=Capacity(tenant_memory)))
-
+                ocp_meta_tenant_mem = original_global_conf.get('ocp_meta_tenant', {}).get('memory_size', global_conf_with_default['ocp_meta_tenant'].get('memory_size', '0'))
+                ocp_monitor_tenant_mem = original_global_conf.get('ocp_monitor_tenant', {}).get('memory_size', global_conf_with_default['ocp_monitor_tenant'].get('memory_size', '0'))
+                critical('ocp tenant memory', err.EC_OCP_SERVER_NOT_EXIST_METADB_TENANT_MEMORY_NOT_ENOUGH.format(avail=Capacity(memory_limit - system_memory - sys_memory_size), need=Capacity(tenant_memory), memory_limit=Capacity(memory_limit), system_memory=Capacity(system_memory), sys_tenant_memory=Capacity(sys_memory_size), ocp_meta_tenant_memory=Capacity(ocp_meta_tenant_mem), ocp_monitor_tenant_memory=Capacity(ocp_monitor_tenant_mem)), [err.SUG_OCP_SERVER_NOT_EXIST_METADB_TENANT_NOT_ENOUGH.format()])
         if tenant_log_disk:
             for server in cluster_config.servers:
                 log_disk_size = servers_log_disk_size[server]
@@ -735,7 +739,17 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
     if success:
         for ip in servers_net_interface:
             client = servers_clients[ip]
+            is_check_ping_permission = False
             for devname in servers_net_interface[ip]:
+                if not is_check_ping_permission:
+                    ret = client.execute_command('ping -W 1 -c 1 127.0.0.1')
+                    if ret.code == 127:
+                        critical('net', err.EC_OBSERVER_PING_NOT_FOUND.format())
+                        break
+                    if not ret:
+                        critical('net', err.EC_OBSERVER_PING_FAILED_SUID.format())
+                        break
+                    is_check_ping_permission = True
                 if client.is_localhost() and (devname != 'lo' and devname is not None) or (not client.is_localhost() and devname == 'lo'):
                     suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                     suggest.auto_fix = client.is_localhost() and 'devname' not in global_generate_config and 'devname' not in server_generate_config

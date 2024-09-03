@@ -22,7 +22,7 @@ from fastapi import APIRouter, Query, Body
 from service.api import response_utils
 from service.api.response import OBResponse
 from service.handler import handler_utils
-from service.model.service_info import ServiceInfo, DeployName
+from service.model.service_info import ServiceInfo, DeployNames
 from service.model.database import DatabaseConnection
 from service.model.server import OcpServerInfo
 
@@ -41,7 +41,7 @@ async def get_info():
 
 
 @router.get("/deployment/names",
-            response_model=OBResponse[DeployName],
+            response_model=OBResponse[DeployNames],
             description='get deployment names',
             operation_id='getDeploymentNames',
             tags=['Info'])

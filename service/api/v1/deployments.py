@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU General Public License
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 
-from fastapi import APIRouter, Path, Query, BackgroundTasks
+from fastapi import APIRouter, Path, Query, BackgroundTasks, Request
 
 from service.api import response_utils
 from service.api.response import OBResponse, DataList
 from service.handler import handler_utils
 from service.model.deployments import DeploymentConfig, PreCheckResult, RecoverChangeParameter, TaskInfo, \
-    ConnectionInfo, InstallLog, Deployment, DeploymentInfo, DeploymentReport, DeploymentStatus
+    ConnectionInfo, InstallLog, Deployment, DeploymentInfo, DeploymentReport, DeploymentStatus, ScenarioType
 
 router = APIRouter()
 
@@ -203,6 +203,24 @@ async def get_destroy_task_info(name: str):
     handler = handler_utils.new_deployment_handler()
     info = handler.get_destroy_task_info(name)
     return response_utils.new_ok_response(info)
+
+
+@router.get("/deployments/scenario/type",
+            response_model=OBResponse[DataList[ScenarioType]],
+            description='get scenario',
+            operation_id='getScenario',
+            tags=['Deployments'])
+async def get_destroy_task_info(
+        request: Request,
+        version: str = Query(None, description='ob version')
+):
+    headers = request.headers
+    language = headers.get('accept-language')
+    handler = handler_utils.new_deployment_handler()
+    info = handler.get_scenario_by_version(version, language)
+    return response_utils.new_ok_response(info)
+
+
 @router.get("/deployments_test",
             response_model=OBResponse,
             description='get destroy task info',

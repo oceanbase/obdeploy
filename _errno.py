@@ -139,6 +139,8 @@ EC_COMPONENT_REMOVE_DEPENDS = OBDErrorCodeTemplate(1022, 'Component {component1}
 EC_COMPONENT_FAILED_TO_MERGE_CONFIG = OBDErrorCodeTemplate(1023, 'Failed to merge config: {message}')
 EC_COMPONENT_NO_REMAINING_COMPS = OBDErrorCodeTemplate(1024, 'The cluster will have no remaining components. If you are absolutely sure about DELETING ALL COMPONENTS, please use "obd cluster destroy <deploy>" command to completely destroy the cluster')
 EC_COMPONENT_PASSWD_ERROR = OBDErrorCodeTemplate(1025, '({ip}) {component} {key} invalid. (Rule: {rule})')
+EC_RUNNING_CLUSTER_NO_REDEPLOYED = OBDErrorCodeTemplate(1026, 'Could not modify {key} when the cluster is in the working status(`production_mode` is True, not support this operation).')
+EC_COMPONENT_DIR_NOT_EMPTY = OBDErrorCodeTemplate(1027, 'If you are sure the directory can be emptied, run `obd cluster deploy -f {deploy_name}` to perform forced deployment.')
 
 WC_ULIMIT_CHECK = OBDErrorCodeTemplate(1007, '({server}) The recommended number of {key} is {need} (Current value: {now})')
 WC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) The recommended value of fs.aio-max-nr is 1048576 (Current value: {current})')
@@ -160,6 +162,8 @@ EC_OBSERVER_FAILED_TO_REGISTER = OBDErrorCodeTemplate(2005, 'Failed to register 
 EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS = OBDErrorCodeTemplate(2005, 'Failed to register cluster. {appname} may have been registered in {obconfig_url}.')
 EC_OBSERVER_MULTI_NET_DEVICE = OBDErrorCodeTemplate(2006, '{ip} has more than one network interface. Please set `devname` for ({server})')
 EC_OBSERVER_PING_FAILED = OBDErrorCodeTemplate(2007, '{ip1} {devname} fail to ping {ip2}. Please check configuration `devname`')
+EC_OBSERVER_PING_NOT_FOUND = OBDErrorCodeTemplate(2007, '/usr/bin/ping: No such file or directory. You can run `sudo yum install iputils` or `sudo apt-get install iputils-ping`.')
+EC_OBSERVER_PING_FAILED_SUID = OBDErrorCodeTemplate(2007, 'If the error message `operation not permitted` appears, please check the ping file permissions. You can try running `sudo chmod u+s /usr/bin/ping`')
 EC_OBSERVER_PING_FAILED_WITH_NO_DEVNAME = OBDErrorCodeTemplate(2007, '{ip1} fail to ping {ip2}. Please check your network')
 EC_OBSERVER_TIME_OUT_OF_SYNC = OBDErrorCodeTemplate(2008, 'Cluster clocks are out of sync')
 EC_OBSERVER_PRODUCTION_MODE_LIMIT = OBDErrorCodeTemplate(2009, '({server}): when production_mode is True, {key} can not be less then {limit}')
@@ -180,6 +184,7 @@ EC_TPCC_RUN_TEST_FAILED = OBDErrorCodeTemplate(3003, 'Failed to run TPC-C benchm
 # obagent
 EC_OBAGENT_RELOAD_FAILED = OBDErrorCodeTemplate(4000, 'Fail to reload {server}')
 EC_OBAGENT_SEND_CONFIG_FAILED = OBDErrorCodeTemplate(4001, 'Fail to send config file to {server}')
+WC_OBAGENT_SERVER_NAME_ERROR = OBDErrorCodeTemplate(4002, '{servers}: Failed to obtain the configuration of the OceanBase database component. \nPlease ensure that the server configurations are consistent between the OBAgent and OceanBase database components.')
 
 # obproxy
 EC_OBPROXY_NEED_CONFIG = OBDErrorCodeTemplate(4100, '{server} need config "rs_list" or "obproxy_config_server_url"')
@@ -220,8 +225,9 @@ EC_OCP_SERVER_NOT_ENOUGH_MEMORY_AVAILABLE = OBDErrorCodeTemplate(4364, '({ip}) n
 EC_OCP_SERVER_NOT_ENOUGH_MEMORY_CACHED = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Buff/Cache: {cached}, Need: {need})')
 EC_OCP_SERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(4364, '({ip}) not enough memory. (Free: {free}, Need: {need})')
 EC_OCP_SERVER_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4365, '({ip}) {disk} not enough disk space. (Avail: {avail}, Need: {need})')
-EC_OCP_SERVER_RESOURCE_NOT_ENOUGH = OBDErrorCodeTemplate(4366, 'There is not enough {resource}. (Avail: {avail}, need: {need})')
-
+EC_OCP_SERVER_RESOURCE_NOT_ENOUGH = OBDErrorCodeTemplate(4366, 'There is not enough {resource}. (Avail: {avail}, Need: {need})')
+EC_OCP_SERVER_EXIST_METADB_TENANT_MEMORY_NOT_ENOUGH = OBDErrorCodeTemplate(4367, 'The allocated memory for the provided meta database is currently insufficient for creating a tenant. Available: {avail}, Need: {need}.')
+EC_OCP_SERVER_NOT_EXIST_METADB_TENANT_MEMORY_NOT_ENOUGH = OBDErrorCodeTemplate(4368, 'The allocated memory for the provided meta database is currently insufficient for creating a tenant. Available: {avail}, Need: {need}(Available = memory_limit [{memory_limit}] - system_memory [{system_memory}] - sys tenant memory [{sys_tenant_memory}]. Need = ocp meta tenant memory [{ocp_meta_tenant_memory}] + ocp_monitor_tenant_memory [{ocp_monitor_tenant_memory}]).')
 
 
 WC_OCP_EXPRESS_FAILED_TO_GET_DISK_INFO = OBDErrorCodeTemplate(4303, '({ip}) failed to get disk information, skip disk space check')
@@ -300,7 +306,10 @@ SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION = OBDErrorSuggestionTemplate('Please in
 SUG_OCP_SERVER_REDUCE_MEM = OBDErrorSuggestionTemplate('Please reduce the `memory_size`', fix_eval=[FixEval(FixEval.DEL, 'memory_size')])
 SUG_OCP_SERVER_REDUCE_DISK = OBDErrorSuggestionTemplate('Please reduce the `logging_file_total_size_cap`', fix_eval=[FixEval(FixEval.DEL, 'logging_file_total_size_cap')])
 SUG_OCP_SERVER_EDIT_ADMIN_PASSWD_ERROR = OBDErrorSuggestionTemplate('Please edit the `admin_password`, must be 8 to 32 characters in length, containing at least 3 types from digits, lowercase letters, uppercase letters and the following special characters: ~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_password')], auto_fix=True)
+SUG_OCP_SERVER_MACHINE_TIME = OBDErrorSuggestionTemplate('Please ensure that the machine time is synchronized with the ob time')
 SUG_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.')
+SUG_OCP_SERVER_EXIST_METADB_TENANT_NOT_ENOUGH = OBDErrorSuggestionTemplate('Please reduce the ocp meta tenant memory or ocp monitor tenant memory')
+SUG_OCP_SERVER_NOT_EXIST_METADB_TENANT_NOT_ENOUGH = OBDErrorSuggestionTemplate('Please increase the meta db memory_limit and reduce the ocp meta tenant memory or ocp monitor tenant memory')
 SUG_OB_SYS_USERNAME = OBDErrorSuggestionTemplate('Please delete the "ob_sys_username" parameter.')
 SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" component.''')
 SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)

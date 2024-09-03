@@ -27,4 +27,12 @@ class ServiceInfo(BaseModel):
 
 
 class DeployName(BaseModel):
+    name: str = Body('', description="deploy name list")
+    deploy_user: str = Body('', description="deploy user")
+    ob_servers: List[str] = Body([], description="ob servers")
+    ob_version: str = Body('', description="ob version")
+    create_date: str = Body(None, description="ob create date")
+
+
+class DeployNames(BaseModel):
     name: List[str] = Body([], description="deploy name list")

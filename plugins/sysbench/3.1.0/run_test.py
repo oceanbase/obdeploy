@@ -79,17 +79,13 @@ def run_test(plugin_context, *args, **kwargs):
     sysbench_bin = get_option('sysbench_bin', 'sysbench')
     sysbench_script_dir = get_option('sysbench_script_dir', '/usr/sysbench/share/sysbench')
 
-    try:
-        sysbench_cmd = "cd %s; %s %s --mysql-host=%s --mysql-port=%s --mysql-user=%s@%s --mysql-db=%s" % (sysbench_script_dir, sysbench_bin, script_name, host, port, user, tenant_name, mysql_db)
-
+    def generate_sysbench_cmd(sysbench_cmd):
         if password:
             sysbench_cmd += ' --mysql-password=%s' % password
         if table_size:
             sysbench_cmd += ' --table_size=%s' % table_size
         if tables:
             sysbench_cmd += ' --tables=%s' % tables
-        if threads:
-            sysbench_cmd += ' --threads=%s' % threads
         if time:
             sysbench_cmd += ' --time=%s' % time
         if interval:
@@ -104,8 +100,24 @@ def run_test(plugin_context, *args, **kwargs):
             sysbench_cmd += ' --percentile=%s' % percentile
         for opt_key in opt_keys:
             sysbench_cmd += ' --%s=%s' % (opt_key.replace('_', '-'), getattr(options, opt_key))
-        if exec_cmd('%s cleanup' % sysbench_cmd) and exec_cmd('%s prepare' % sysbench_cmd) and exec_cmd('%s --db-ps-mode=disable run' % sysbench_cmd):
-            return plugin_context.return_true()
+        return sysbench_cmd
+
+    try:
+        scripts = script_name.split(',')
+        user_threads = threads.split(',')
+        max_thread = max(user_threads)
+        for script in scripts:
+            stdio.print("\nStart executing %s" % (script if script.endswith('.lua') else script + '.lua'))
+            sysbench_cmd = "cd %s; %s %s --mysql-host=%s --mysql-port=%s --mysql-user=%s@%s --mysql-db=%s" % (sysbench_script_dir, sysbench_bin, script, host, port, user, tenant_name, mysql_db)
+            sysbench_cmd = generate_sysbench_cmd(sysbench_cmd)
+            base_cmd = f"{sysbench_cmd} --threads={max_thread}"
+            if not (exec_cmd('%s cleanup' % base_cmd) and exec_cmd('%s prepare' % base_cmd)):
+                return plugin_context.return_false()
+            for thread in user_threads:
+                sysbench_run_cmd = f"{sysbench_cmd} --threads={thread}"
+                if not exec_cmd('%s --db-ps-mode=disable run' % sysbench_run_cmd):
+                    return plugin_context.return_false()
+        return plugin_context.return_true()
     except KeyboardInterrupt:
         pass
     except:

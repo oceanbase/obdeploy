@@ -1,0 +1,3 @@
+- src_path: './usr/sysbench'
+  target_path: 'sysbench'
+  type: dir

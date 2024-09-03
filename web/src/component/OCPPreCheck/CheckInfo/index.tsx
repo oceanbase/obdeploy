@@ -12,6 +12,9 @@ import ConnectInfo from './ConnectInfo';
 import ResourceInfo from './ResourceInfo';
 import ExitBtn from '@/component/ExitBtn';
 import { formatPreCheckData } from '../helper';
+import { encryptPwdForConfig } from '@/utils/encrypt';
+import { getPublicKey } from '@/services/ob-deploy-web/Common';
+import CustomAlert from '@/component/CustomAlert';
 import styles from '../index.less';
 import type {
   BasicInfoProp,
@@ -174,10 +177,11 @@ export default function CheckInfo({
     },
   );
 
-  const nextStep = () => {
+  const nextStep = async() => {
+    const { data: publicKey } = await getPublicKey();
     handleCreateConfig(
       { name: oceanbase?.appname },
-      formatPreCheckData(ocpConfigData),
+      formatPreCheckData(encryptPwdForConfig(ocpConfigData, publicKey)),
     );
   };
   const prevStep = () => {
@@ -185,7 +189,7 @@ export default function CheckInfo({
   };
   return (
     <Space className={styles.checkInfoSpace} direction="vertical" size="middle">
-      <Alert
+      <CustomAlert
         message={intl.formatMessage({
           id: 'OBD.OCPPreCheck.CheckInfo.TheOcpInstallationInformationConfiguration',
           defaultMessage:
@@ -193,7 +197,7 @@ export default function CheckInfo({
         })}
         type="info"
         showIcon
-        style={{ margin: '16px 0', height: '54px' }}
+        style={{ margin: '16px 0', height: '40px' }}
       />
 
       <ProCard className={styles.pageCard} split="horizontal">

@@ -1,4 +1,5 @@
 import { oceanbaseAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
+import { commonInputStyle, commonPortStyle } from '@/pages/constants';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import { getErrorInfo } from '@/utils';
@@ -9,16 +10,14 @@ import {
 } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
-import { DownOutlined, RightOutlined } from '@ant-design/icons';
 import { ProFormText } from '@ant-design/pro-components';
-import { Button, Row, Space } from 'antd';
 import { useUpdateEffect } from 'ahooks';
+import { Button, Row, Space, Switch } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useState } from 'react';
 import { useModel } from 'umi';
 import InputPort from '../InputPort';
 import styles from './index.less';
-
 
 export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
@@ -165,13 +164,17 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
       <div className={styles.passwordInput}>
         <ProFormText.Password
           name={['oceanbase', 'root_password']}
-          label={intl.formatMessage({
-            id: 'OBD.component.MetaDBConfig.ClusterConfig.RootSysPassword',
-            defaultMessage: 'root@sys 密码',
-          })}
+          label={
+            <span className={styles.labelText}>
+              {intl.formatMessage({
+                id: 'OBD.component.MetaDBConfig.ClusterConfig.RootSysPassword',
+                defaultMessage: 'root@sys 密码',
+              })}
+            </span>
+          }
           rules={getPasswordRules('ob')}
           fieldProps={{
-            style: { width: 328 },
+            style: { width: 388 },
             autoComplete: 'new-password',
             value: rootPassword,
             onChange: (e) => {
@@ -187,7 +190,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
 
         <Button
           onClick={generateRandomPassword}
-          style={{ borderRadius: '6px', margin: '22px 0 0 8px' }}
+          style={{ borderRadius: '6px', margin: '30px 0 0 8px' }}
         >
           {intl.formatMessage({
             id: 'OBD.component.MetaDBConfig.ClusterConfig.RandomlyGenerated',
@@ -198,10 +201,14 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
 
       <ProFormText
         name={['oceanbase', 'home_path']}
-        label={intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.ClusterConfig.SoftwareInstallationPath',
-          defaultMessage: '软件安装路径',
-        })}
+        label={
+          <span className={styles.labelText}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.ClusterConfig.SoftwareInstallationPath',
+              defaultMessage: '软件安装路径',
+            })}
+          </span>
+        }
         rules={[
           {
             required: true,
@@ -213,16 +220,20 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
         ]}
         fieldProps={{
           addonAfter: <span>{oceanbaseAddonAfter}</span>,
-          style: { width: 552 },
+          style: commonInputStyle,
         }}
       />
 
       <ProFormText
         name={['oceanbase', 'data_dir']}
-        label={intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.ClusterConfig.DataPath',
-          defaultMessage: '数据路径',
-        })}
+        label={
+          <span className={styles.labelText}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.ClusterConfig.DataPath',
+              defaultMessage: '数据路径',
+            })}
+          </span>
+        }
         rules={[
           {
             required: true,
@@ -232,15 +243,19 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
             }),
           },
         ]}
-        fieldProps={{ style: { width: 552 } }}
+        fieldProps={{ style: commonInputStyle }}
       />
 
       <ProFormText
         name={['oceanbase', 'redo_dir']}
-        label={intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.ClusterConfig.LogPath',
-          defaultMessage: '日志路径',
-        })}
+        label={
+          <span className={styles.labelText}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.ClusterConfig.LogPath',
+              defaultMessage: '日志路径',
+            })}
+          </span>
+        }
         rules={[
           {
             required: true,
@@ -250,40 +265,48 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
             }),
           },
         ]}
-        fieldProps={{ style: { width: 552 } }}
+        fieldProps={{ style: commonInputStyle }}
       />
 
       <Row className={styles.portContainer}>
-        <Space size="middle">
+        <Space size="large">
           <InputPort
+            fieldProps={{ style: commonPortStyle }}
             name={['oceanbase', 'mysql_port']}
-            label={intl.formatMessage({
-              id: 'OBD.component.MetaDBConfig.ClusterConfig.SqlPort.1',
-              defaultMessage: 'SQL 端口',
-            })}
+            label={
+              <span className={styles.labelText}>
+                {intl.formatMessage({
+                  id: 'OBD.component.MetaDBConfig.ClusterConfig.SqlPort.1',
+                  defaultMessage: 'SQL 端口',
+                })}
+              </span>
+            }
           />
           <InputPort
+            fieldProps={{ style: commonPortStyle }}
             name={['oceanbase', 'rpc_port']}
-            label={intl.formatMessage({
-              id: 'OBD.component.MetaDBConfig.ClusterConfig.RpcPort.1',
-              defaultMessage: 'RPC 端口',
-            })}
+            label={
+              <span className={styles.labelText}>
+                {intl.formatMessage({
+                  id: 'OBD.component.MetaDBConfig.ClusterConfig.RpcPort.1',
+                  defaultMessage: 'RPC 端口',
+                })}
+              </span>
+            }
           />
         </Space>
       </Row>
-      <div>
-        <span
-          onClick={() => handleCluserMoreChange()}
-          className={styles.moreConfigText}
-        >
-          <span>
-            {intl.formatMessage({
-              id: 'OBD.component.MetaDBConfig.ClusterConfig.MoreConfigurations',
-              defaultMessage: '更多配置',
-            })}
-          </span>
-          {!ocpClusterMore ? <RightOutlined /> : <DownOutlined />}
-        </span>
+      <div className={styles.moreSwitch}>
+        {intl.formatMessage({
+          id: 'OBD.component.MetaDBConfig.ClusterConfig.MoreConfigurations',
+          defaultMessage: '更多配置',
+        })}
+
+        <Switch
+          className="ml-20"
+          checked={ocpClusterMore}
+          onChange={handleCluserMoreChange}
+        />
       </div>
       <ConfigTable
         showVisible={ocpClusterMore}

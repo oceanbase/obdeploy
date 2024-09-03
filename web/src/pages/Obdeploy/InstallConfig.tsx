@@ -1,5 +1,7 @@
+import CustomAlert from '@/component/CustomAlert';
 import ErrorCompToolTip from '@/component/ErrorCompToolTip';
 import { selectOcpexpressConfig } from '@/constant/configuration';
+import { useComponents } from '@/hooks/useComponents';
 import {
   queryAllComponentVersions,
   queryComponentParameters,
@@ -7,6 +9,7 @@ import {
 import {
   destroyDeployment,
   getDeployment,
+  getScenarioType,
 } from '@/services/ob-deploy-web/Deployments';
 import { listRemoteMirrors } from '@/services/ob-deploy-web/Mirror';
 import {
@@ -24,6 +27,7 @@ import {
   SafetyCertificateFilled,
 } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormText } from '@ant-design/pro-components';
+import { useUpdateEffect } from 'ahooks';
 import {
   Alert,
   Button,
@@ -44,11 +48,11 @@ import { getLocale, history, useModel } from 'umi';
 import {
   allComponentsName,
   commonStyle,
+  configServerComponent,
   obagentComponent,
   obproxyComponent,
   oceanbaseComponent,
   ocpexpressComponent,
-  configServerComponent,
 } from '../constants';
 import { getParamstersHandler } from './ClusterConfig/helper';
 import DeleteDeployModal from './DeleteDeployModal';
@@ -75,6 +79,7 @@ export default function InstallConfig() {
     configData,
     setConfigData,
     lowVersion,
+    setLowVersion,
     isFirstTime,
     setIsFirstTime,
     isDraft,
@@ -83,7 +88,6 @@ export default function InstallConfig() {
     setComponentsVersionInfo,
     handleQuitProgress,
     getInfoByName,
-    setLowVersion,
     setErrorVisible,
     errorsList,
     setErrorsList,
@@ -97,15 +101,21 @@ export default function InstallConfig() {
     OBAGENT_DOCS,
     OBPROXY_DOCS,
     OBCONFIGSERVER_DOCS,
+    setScenarioParam,
+    loadTypeVisible,
+    setLoadTypeVisible,
+    selectedLoadType,
+    setSelectedLoadType,
   } = useModel('global');
-
+  const componentsGroupInfo = useComponents();
   const { components, home_path } = configData || {};
   const { oceanbase } = components || {};
   const [existNoVersion, setExistNoVersion] = useState(false);
   const [obVersionValue, setOBVersionValue] = useState<string | undefined>(
     undefined,
   );
-
+  const [scenarioTypeList, setScenarioTypeList] =
+    useState<API.ScenarioType[]>();
   const [hasDraft, setHasDraft] = useState(false);
   const [deleteLoadingVisible, setDeleteLoadingVisible] = useState(false);
   const [deleteName, setDeleteName] = useState('');
@@ -136,92 +146,6 @@ export default function InstallConfig() {
       },
     ],
   };
-  const componentsGroupInfo = [
-    {
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.Proxy',
-        defaultMessage: '代理',
-      }),
-      key: 'agency',
-      onlyAll: true,
-      content: [
-        {
-          key: obproxyComponent,
-          name: 'OBProxy',
-          onlyAll: true,
-          desc: intl.formatMessage({
-            id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
-            defaultMessage:
-              '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
-          }),
-          doc: OBPROXY_DOCS,
-        },
-      ],
-    },
-    {
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.Tools',
-        defaultMessage: '工具',
-      }),
-      key: 'ocpexpressTool',
-      onlyAll: true,
-      content: [
-        {
-          key: ocpexpressComponent,
-          name: 'OCP Express',
-          onlyAll: true,
-          desc: intl.formatMessage({
-            id: 'OBD.pages.components.InstallConfig.ItIsAManagementAnd',
-            defaultMessage:
-              '是专为 OceanBase 设计的管控平台，可实现对集群、租户的监控管理、诊断等核心能力。',
-          }),
-          doc: OCP_EXPRESS,
-        },
-      ],
-    },
-    {
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.Tools',
-        defaultMessage: '工具',
-      }),
-      key: 'obagentTool',
-      onlyAll: true,
-      content: [
-        {
-          key: obagentComponent,
-          name: 'OBAgent',
-          onlyAll: true,
-          desc: intl.formatMessage({
-            id: 'OBD.pages.components.InstallConfig.IsAMonitoringAndCollection',
-            defaultMessage:
-              '是一个监控采集框架。OBAgent 支持推、拉两种数据采集模式，可以满足不同的应用场景。',
-          }),
-          doc: OBAGENT_DOCS,
-        },
-      ],
-    },
-    {
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.Tools',
-        defaultMessage: '工具',
-      }),
-      key: 'configServerTool',
-      onlyAll: true,
-      content: [
-        {
-          key: configServerComponent,
-          name: 'OBConfigServer',
-          onlyAll: true,
-          desc: intl.formatMessage({
-            id: 'OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration',
-            defaultMessage:
-              '是一个可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。',
-          }),
-          doc: OBCONFIGSERVER_DOCS,
-        },
-      ],
-    },
-  ];
 
   const errorCommonHandle = (e: any) => {
     const errorInfo = getErrorInfo(e);
@@ -279,7 +203,6 @@ export default function InstallConfig() {
 
           const currentOceanbaseVersionInfo =
             newSelectedOceanbaseVersionInfo || initOceanbaseVersionInfo;
-
           data?.items?.forEach((item) => {
             if (allComponentsName.includes(item.name)) {
               if (item?.info?.length) {
@@ -317,7 +240,7 @@ export default function InstallConfig() {
               }
             }
           });
-
+          
           const noVersion =
             Object.keys(newComponentsVersionInfo).length !==
             allComponentsName.length;
@@ -435,6 +358,15 @@ export default function InstallConfig() {
         const firstHalfHomePath = home_path.split(`/${lastAppName}`)[0];
         newHomePath = `${firstHalfHomePath}/${values?.appname}`;
       }
+      if (scenarioTypeList?.length) {
+        setScenarioParam({
+          key: 'scenario',
+          value: selectedLoadType,
+          adaptive: false,
+        });
+      } else {
+        setScenarioParam(null);
+      }
       let newComponents: API.Components = {
         oceanbase: {
           ...(components?.oceanbase || {}),
@@ -487,7 +419,6 @@ export default function InstallConfig() {
           package_hash: componentsVersionInfo?.[configServerComponent]?.md5,
         };
       }
-
       setConfigData({
         ...configData,
         components: newComponents,
@@ -554,7 +485,8 @@ export default function InstallConfig() {
       {
         title: group,
         dataIndex: 'name',
-        width: supportCheckbox ? 147 : 195,
+        width: supportCheckbox ? 147 : 175,
+        className: supportCheckbox ? styles.firstCell : '',
         render: (text, record) => {
           return (
             <>
@@ -587,7 +519,8 @@ export default function InstallConfig() {
           defaultMessage: '版本',
         }),
         dataIndex: 'version',
-        width: locale === 'zh-CN' ? 130 : 154,
+        width: locale === 'zh-CN' ? 130 : 144,
+        className: styles.secondCell,
         render: (_, record) => {
           const versionInfo = componentsVersionInfo[record.key] || {};
           if (record?.key === oceanbaseComponent) {
@@ -665,14 +598,17 @@ export default function InstallConfig() {
           defaultMessage: '描述',
         }),
         dataIndex: 'desc',
+        className: styles.thirdCell,
         render: (text, record) => {
           let disabled = false;
           if (record.key === ocpexpressComponent && lowVersion) {
             disabled = true;
           }
           return (
-            <>
-              {text || '-'}
+            <div className={styles.descContent}>
+              <p style={{ marginRight: 24, maxWidth: 556, marginTop: 0 }}>
+                {text || '-'}
+              </p>
               <a
                 className={styles.learnMore}
                 onClick={() => {
@@ -685,7 +621,7 @@ export default function InstallConfig() {
                   defaultMessage: '了解更多',
                 })}
               </a>
-            </>
+            </div>
           );
         },
       },
@@ -881,6 +817,25 @@ export default function InstallConfig() {
     }
   }, [selectedConfig]);
 
+  useEffect(() => {
+    if (obVersionValue) {
+      getScenarioType(obVersionValue).then((res) => {
+        if (res.success) {
+          setScenarioTypeList(res.data?.items);
+        }
+      });
+    }
+  }, [obVersionValue]);
+
+  useEffect(() => {
+    if (!scenarioTypeList?.length && loadTypeVisible) {
+      setLoadTypeVisible(false);
+    }
+    if (scenarioTypeList?.length && !loadTypeVisible) {
+      setLoadTypeVisible(true);
+    }
+  }, [scenarioTypeList]);
+
   return (
     <Spin spinning={loading || componentLoading}>
       <Space className={styles.spaceWidth} direction="vertical" size="middle">
@@ -891,6 +846,7 @@ export default function InstallConfig() {
               defaultMessage: '部署配置',
             })}
             className="card-padding-bottom-24"
+            bodyStyle={{ paddingBottom: 0 }}
           >
             <ProForm
               form={form}
@@ -940,12 +896,12 @@ export default function InstallConfig() {
             title={
               <>
                 {intl.formatMessage({
-                  id: 'OBD.pages.components.InstallConfig.DeployComponents',
-                  defaultMessage: '部署组件',
+                  id: 'OBD.pages.Obdeploy.InstallConfig.DeployADatabase',
+                  defaultMessage: '部署数据库',
                 })}
 
                 <span className={styles.titleExtra}>
-                  <InfoCircleOutlined />{' '}
+                  <InfoCircleOutlined style={{ marginRight: 4 }} />{' '}
                   {intl.formatMessage(
                     {
                       id: 'OBD.pages.components.InstallConfig.EstimatedInstallationRequiresSizeMb',
@@ -1056,6 +1012,79 @@ export default function InstallConfig() {
               </ProCard>
             </Space>
           </ProCard>
+          {loadTypeVisible && (
+            <ProCard
+              title={intl.formatMessage({
+                id: 'OBD.pages.Obdeploy.InstallConfig.LoadType',
+                defaultMessage: '负载类型',
+              })}
+              headStyle={{ paddingTop: 0 }}
+              bodyStyle={{ paddingBottom: 24, paddingTop: 8 }}
+            >
+              <Space
+                className={styles.spaceWidth}
+                direction="vertical"
+                size="small"
+              >
+                <CustomAlert
+                  type="info"
+                  style={{ height: 40 }}
+                  description={intl.formatMessage({
+                    id: 'OBD.pages.Obdeploy.InstallConfig.TheLoadTypeMainlyAffects',
+                    defaultMessage:
+                      '负载类型主要影响 SQL 类大查询判断时间（参数：large_query_threshold），对 OLTP 类型业务的 RT 可能存在较大影响，请谨慎选择。',
+                  })}
+                />
+
+                <ProCard type="inner" className={`${styles.componentCard}`}>
+                  <Table
+                    className={styles.componentTable}
+                    pagination={false}
+                    columns={[
+                      {
+                        title: intl.formatMessage({
+                          id: 'OBD.pages.Obdeploy.InstallConfig.Type',
+                          defaultMessage: '类型',
+                        }),
+                        dataIndex: 'type',
+                        width: 340,
+                        render: (_) => {
+                          return (
+                            <Select
+                              value={selectedLoadType}
+                              style={{ width: 292 }}
+                              onChange={(value) => setSelectedLoadType(value)}
+                              options={scenarioTypeList?.map((item) => ({
+                                label: item.type,
+                                value: item.value,
+                              }))}
+                            />
+                          );
+                        },
+                      },
+                      {
+                        title: intl.formatMessage({
+                          id: 'OBD.pages.Obdeploy.InstallConfig.Description',
+                          defaultMessage: '描述',
+                        }),
+                        dataIndex: 'desc',
+                      },
+                    ]}
+                    dataSource={[
+                      {
+                        type: selectedLoadType,
+                        desc: scenarioTypeList?.find(
+                          (item) => item.value === selectedLoadType,
+                        )?.desc,
+                      },
+                    ]}
+                    rowKey="key"
+                  />
+                </ProCard>
+              </Space>
+            </ProCard>
+          )}
+
           <ProCard
             title={
               <>
@@ -1065,7 +1094,7 @@ export default function InstallConfig() {
                 })}
 
                 <span className={styles.titleExtra}>
-                  <InfoCircleOutlined />{' '}
+                  <InfoCircleOutlined style={{ marginRight: 4 }} />{' '}
                   {intl.formatMessage(
                     {
                       id: 'OBD.pages.components.InstallConfig.EstimatedInstallationRequiresSizeMb',

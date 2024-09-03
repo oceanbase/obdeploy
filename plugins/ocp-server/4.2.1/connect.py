@@ -39,7 +39,7 @@ class OcpServerCursor(object):
         def __bool__(self):
             return self.code == 200
 
-    def __init__(self, ip, port, username=None, password=None, component_name=None, base_url=None):
+    def __init__(self, ip, port, username=None, password=None, component_name=None, base_url=None, stdio=None):
         self.auth = None
         self.ip = ip
         self.port = port
@@ -49,6 +49,8 @@ class OcpServerCursor(object):
         self.component_name = component_name
         if self.username:
             self.auth = HTTPBasicAuth(username=username, password=password)
+        self.stdio = stdio
+        self.stdio.verbose('connect {} ({}:{} by user {})'.format(component_name, ip, port, username))
 
 
     def status(self, stdio=None):
@@ -181,8 +183,7 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         config = cluster_config.get_server_conf(server)
         username = 'admin' if not address else user
         password = config['admin_password'] if not address else password
-        stdio.verbose('connect {} ({}:{} by user {})'.format(cluster_config.name, server.ip, config['port'], username))
-        cursor = OcpServerCursor(ip=server.ip, port=config['port'], username=username, password=password, component_name=cluster_config.name, base_url=address)
+        cursor = OcpServerCursor(ip=server.ip, port=config['port'] if not address else '', username=username, password=password, component_name=cluster_config.name, base_url=address, stdio=stdio)
         if cursor.status(stdio=stdio):
             cursors[server] = cursor
     if not cursors:

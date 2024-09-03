@@ -52,7 +52,7 @@ def display(plugin_context, cursor, *args, **kwargs):
 
     stdio.print_list(result, ['server', 'port', 'vip_address', 'vip_port', 'status', 'pid'],
                  lambda x: [x['server'], x['port'], x['vip_address'], x['vip_port'], x['status'], x['pid']],
-                 title='ob-configserver')
+                 title=cluster_config.name)
     if result:
         cmd = "curl -s 'http://{0}:{1}/services?Action=GetObProxyConfig'".format(result[0]['server'], result[0]['port'])
         stdio.print(cmd)

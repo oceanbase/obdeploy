@@ -42,8 +42,6 @@ oceanbase-ce:
     # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true. The default value for autodeploy mode is false.
     # enable_syslog_wf: false
     # Enable auto system log recycling or not. The default value is false. The default value for autodeploy mode is on.
-    # enable_syslog_recycle: true
-    # The maximum number of reserved log files before enabling auto recycling. When set to 0, no logs are deleted. The default value for autodeploy mode is 4.
     # max_syslog_file_count: 4
     # Cluster name for OceanBase Database. The default value is obcluster. When you deploy OceanBase Database and obproxy, this value must be the same as the cluster_name for obproxy.
     # appname: obcluster

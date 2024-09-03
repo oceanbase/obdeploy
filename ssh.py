@@ -26,6 +26,7 @@ import os
 import tempfile
 import warnings
 from glob import glob
+from pathlib import Path
 
 from subprocess32 import Popen, PIPE
 
@@ -352,7 +353,7 @@ class SshClient(SafeStdio):
 
     def add_env(self, key, value, rewrite=False, stdio=None):
         if key not in self.env or not self.env[key] or rewrite:
-            stdio.verbose('%s@%s set env %s to \'%s\'' % (self.config.username, self.config.host, key, value))
+            stdio.verbose('%s@%s export %s=\'%s\'' % (self.config.username, self.config.host, key, value))
             if self._is_local:
                 self._add_env_for_local(key, value, rewrite)
             else:
@@ -476,7 +477,7 @@ class SshClient(SafeStdio):
         except SSHException as e:
             if retry:
                 self.close()
-                return self._execute_command(command, retry-1, stdio)
+                return self._execute_command(command, retry=retry - 1, stdio=stdio)
             else:
                 stdio.exception('')
                 stdio.critical('%s@%s connect failed: %s' % (self.config.username, self.config.host, e))
@@ -556,7 +557,7 @@ class SshClient(SafeStdio):
     def _client_put_file(self, local_path, remote_path, stdio=None):
         if self.execute_command('mkdir -p %s && rm -fr %s' % (os.path.dirname(remote_path), remote_path), stdio=stdio):
             stdio.verbose('send %s to %s' % (local_path, remote_path))
-            if self.sftp.put(local_path.replace('~', os.getenv('HOME')), remote_path.replace('~', os.getenv('HOME'))):
+            if self.sftp.put(str(Path(local_path).expanduser()), str(Path(remote_path).expanduser())):
                 return self.execute_command('chmod %s %s' % (oct(os.stat(local_path).st_mode)[-3:], remote_path))
         return False
 

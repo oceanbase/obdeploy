@@ -28,7 +28,8 @@ import base64
 import sys
 from copy import deepcopy
 
-from tool import FileUtil, YamlLoader, ConfigUtil
+from tool import FileUtil, YamlLoader, ConfigUtil, Cursor
+from _errno import EC_SQL_EXECUTE_FAILED
 
 from Crypto import Random
 from Crypto.Hash import SHA
@@ -39,47 +40,6 @@ from _types import Capacity, CapacityWithB
 
 PRI_KEY_FILE = '.ocp-express'
 PUB_KEY_FILE = '.ocp-express.pub'
-
-
-if sys.version_info.major == 2:
-    import MySQLdb as mysql
-else:
-    import pymysql as mysql
-from _stdio import SafeStdio
-
-
-class Cursor(SafeStdio):
-
-    def __init__(self, ip, port, user='root', tenant='sys', password='', database=None, stdio=None):
-        self.stdio = stdio
-        self.ip = ip
-        self.port = port
-        self._user = user
-        self.tenant = tenant
-        self.password = password
-        self.database = database
-        self.cursor = None
-        self.db = None
-        self._connect()
-
-    @property
-    def user(self):
-        if "@" in self._user:
-            return self._user
-        if self.tenant:
-            return "{}@{}".format(self._user, self.tenant)
-        else:
-            return self._user
-
-    def _connect(self):
-        self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
-        if sys.version_info.major == 2:
-            self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), passwd=str(self.password), database=self.database)
-            self.cursor = self.db.cursor(cursorclass=mysql.cursors.DictCursor)
-        else:
-            self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password), database=self.database,
-                               cursorclass=mysql.cursors.DictCursor)
-            self.cursor = self.db.cursor()
 
 
 def generate_key(client, key_dir, stdio):
@@ -272,6 +232,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    added_components = cluster_config.get_deploy_added_components()
 
     if not start_env:
         start_env = prepare_parameters(cluster_config, stdio)
@@ -327,17 +288,28 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             database = server_config.get('ocp_meta_db', '')
         connected = False
         retries = 300
+        tenant_map = {'meta@ocp_meta': {'user': 'meta@ocp', 'database': 'ocp_express'}, 'meta@ocp': {'user': 'meta@ocp_meta', 'database': 'ocp_meta'}}
         while not connected and retries:
             for connect_info in connect_infos:
                 retries -= 1
                 server_ip = connect_info[0]
                 server_port = connect_info[-1]
                 try:
-                    Cursor(ip=server_ip, port=server_port, user=jdbc_username, password=jdbc_password, database=database, stdio=stdio)
+                    ob_cursor = Cursor(ip=server_ip, port=server_port, user=jdbc_username, password=jdbc_password, stdio=stdio)
                     jdbc_url = 'jdbc:oceanbase://{}:{}/{}'.format(server_ip, server_port, database)
                     connected = True
+                    if 'ocp-express' in added_components:
+                        if ob_cursor.execute("select * from %s.config_properties limit 1" % database, exc_level='verbose'):
+                            if not ob_cursor.execute("update %s.config_properties set `value`=NULL, default_value=NULL where `key`='ocp.version' or `key`='ocp.version.full'" % database, exc_level='verbose'):
+                                stdio.verbose("failed to update 'ocp.version' and 'ocp.version.full' to NULL in config_properties table")
+                        if ob_cursor.execute("select * from %s.user limit 1" % database, exc_level='verbose'):
+                            if not ob_cursor.execute("update %s.user set need_change_password=true where id='100'" % database, exc_level='verbose'):
+                                stdio.verbose("failed to update 'need_change_password' to true in user table")
                     break
                 except:
+                    if tenant_map.get(jdbc_username, {}):
+                        database = tenant_map.get(jdbc_username, {}).get('database')
+                        jdbc_username = tenant_map.get(jdbc_username, {}).get('user')
                     time.sleep(1)
         if not connected:
             success = False
@@ -351,7 +323,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         else:
             public_key_str = ""
         memory_size = server_config['memory_size']
-        jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(Capacity(memory_size).btyes * 0.5, 0)).lower())
+        jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(Capacity(memory_size).bytes * 0.5, 0)).lower())
         java_bin = server_config['java_bin']
         client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
         cmd = '{java_bin} -jar {jvm_memory_option} -DJDBC_URL={jdbc_url} -DJDBC_USERNAME={jdbc_username}' \

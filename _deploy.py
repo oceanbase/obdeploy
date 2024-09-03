@@ -28,6 +28,7 @@ import getpass
 import hashlib
 from copy import deepcopy
 from enum import Enum
+from datetime import datetime
 
 from ruamel.yaml.comments import CommentedMap
 
@@ -628,8 +629,14 @@ class ClusterConfig(object):
 
     def get_depend_servers(self, name):
         if name not in self._depends:
-            return None
+            return []
         cluster_config = self._depends[name]
+        return deepcopy(cluster_config.original_servers)
+    
+    def get_be_depend_servers(self, name):
+        if name not in self._be_depends:
+            return []
+        cluster_config = self._be_depends[name]
         return deepcopy(cluster_config.original_servers)
         
     def get_depend_added_servers(self, name):
@@ -1033,11 +1040,12 @@ class  DeployInstallMode(object):
 
 class DeployInfo(object):
 
-    def __init__(self, name, status, components=None, config_status=DeployConfigStatus.UNCHNAGE):
+    def __init__(self, name, status, components=None, config_status=DeployConfigStatus.UNCHNAGE, create_date=None):
         self.status = status
         self.name = name
         self.components = components if components else {}
         self.config_status = config_status
+        self.create_date = create_date
 
     def __str__(self):
         info = ['%s (%s)' % (self.name, self.status.value)]
@@ -1218,19 +1226,23 @@ class DeployConfig(SafeStdio):
                 source_data = self.yaml_loader.load(f)
                 for key in source_data:
                     if key in ['user', 'unuse_lib_repository', 'auto_create_tenant']:
-                        self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(key))
+                        self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(message=key))
                         ret = False
                     elif issubclass(type(source_data[key]), dict):
                         new_depends = source_data[key].get('depends', [])
+                        if key not in self.components:
+                            self.stdio.error(err.EC_COMPONENT_NOT_EXISTS.format(component=key))
+                            ret = False
+                            break
                         if new_depends and new_depends != self.components[key].depends:
                             self.stdio.error(err.EC_COMPONENT_CHANGE_CONFIG.format(message='depends:{}'.format(key)))
                             ret = False
                         # temp _depends
                         depends[key] = self.components[key].depends
-                    
+
                     if not self._merge_component(key, source_data[key]):
                         ret = False
-                    
+
                 for comp in depends:
                     conf = self.components[comp]
                     for name in depends[comp]:
@@ -1243,7 +1255,7 @@ class DeployConfig(SafeStdio):
             ret = False
         return ret
 
-    def add_components(self, config_path):
+    def add_components(self, config_path, ignore_exist=False):
         ret = True
         depends = {}
         try:
@@ -1255,6 +1267,8 @@ class DeployConfig(SafeStdio):
                         ret = False
                     elif issubclass(type(source_data[key]), dict):
                         if key in self.components:
+                            if ignore_exist:
+                                continue
                             self.stdio.error(err.EC_COMPONENT_EXISTS.format(component=key))
                             ret = False
                             continue
@@ -1578,6 +1592,7 @@ class Deploy(object):
                         getattr(DeployStatus, data['status'], DeployStatus.STATUS_CONFIGURED),
                         ConfigUtil.get_value_from_dict(data, 'components', OrderedDict()),
                         getattr(DeployConfigStatus, ConfigUtil.get_value_from_dict(data, 'config_status', '_'), DeployConfigStatus.UNCHNAGE),
+                        ConfigUtil.get_value_from_dict(data, 'create_date', None),
                     )
             except:
                 self._info = DeployInfo(self.name, DeployStatus.STATUS_CONFIGURED)
@@ -1654,6 +1669,7 @@ class Deploy(object):
                     'components': self.deploy_info.components,
                     'status': self.deploy_info.status.name,
                     'config_status': self.deploy_info.config_status.name,
+                    'create_date': self.deploy_info.create_date,
                 }
                 yaml.dump(data, f)
             return True
@@ -1664,6 +1680,8 @@ class Deploy(object):
     def _update_deploy_status(self, status):
         old = self.deploy_info.status
         self.deploy_info.status = status
+        if old == DeployStatus.STATUS_DEPLOYED and status == DeployStatus.STATUS_RUNNING:
+            self.deploy_info.create_date = datetime.now().strftime('%Y-%m-%d')
         if self.dump_deploy_info():
             return True
         self.deploy_info.status = old

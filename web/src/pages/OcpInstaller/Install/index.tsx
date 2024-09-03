@@ -1,21 +1,24 @@
 import { intl } from '@/utils/intl';
-import { useModel } from 'umi';
-import React, { useState, useEffect } from 'react';
-import { Alert } from 'antd';
 import { PageContainer } from '@oceanbase/ui';
+import React, { useEffect, useState } from 'react';
+import { useModel } from 'umi';
 
-import { useRequest } from 'ahooks';
-import { errorHandler } from '@/utils';
-import * as OCP from '@/services/ocp_installer_backend/OCP';
-import { NEW_METADB_OCP_INSTALL } from '@/constant/configuration';
+import CustomAlert from '@/component/CustomAlert';
+import AlertMetadb from '@/component/CustomAlert/AlertMetadb';
 import DeployConfig from '@/component/DeployConfig';
-import OCPPreCheck from '@/component/OCPPreCheck';
 import InstallProcessNew from '@/component/InstallProcessNew';
 import InstallResult from '@/component/InstallResult';
-import Steps from '@/component/Steps';
-import { STEPS_KEYS_INSTALL } from '@/constant/configuration';
 import MetaDBConfig from '@/component/MetaDBConfig';
 import OCPConfigNew from '@/component/OCPConfigNew';
+import OCPPreCheck from '@/component/OCPPreCheck';
+import Steps from '@/component/Steps';
+import {
+  NEW_METADB_OCP_INSTALL,
+  STEPS_KEYS_INSTALL,
+} from '@/constant/configuration';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
+import { errorHandler } from '@/utils';
+import { useRequest } from 'ahooks';
 
 const Install: React.FC = () => {
   const [current, setCurrent] = useState(1);
@@ -52,8 +55,10 @@ const Install: React.FC = () => {
       });
     }
   }, [current, installStatus, installResult]);
+
+  const paddingTop = current === 2 ? 132 : current !== 6 ? 150 : 0;
   return (
-    <PageContainer style={{ paddingBottom: 90,backgroundColor:'#f5f8ff' }}>
+    <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
       <Steps
         currentStep={current}
         stepsItems={NEW_METADB_OCP_INSTALL}
@@ -62,28 +67,34 @@ const Install: React.FC = () => {
 
       <div
         style={{
-          paddingTop: `${current !== 6 ? 150 : 0}px`,
+          paddingTop: paddingTop,
           width: '1040px',
           margin: '0 auto',
           overflow: 'auto',
         }}
       >
-        {current === 1 ||
-          (current === 2 && (
-            <Alert
+        {current === 2 && (
+          <>
+            <CustomAlert
               type="info"
               showIcon={true}
-              message={intl.formatMessage({
-                id: 'OBD.OcpInstaller.Install.CreateANewMetadbMetadb',
-                defaultMessage:
-                  '创建全新的 MetaDB，MetaDB 与 OCP-Server 将使用相同的主机部署服务。OCP-Server 将访问本地 MetaDB 以获得更好的服务可靠性。',
-              })}
+              message={
+                <p style={{ lineHeight: '22px', margin: 0 }}>
+                  {intl.formatMessage({
+                    id: 'OBD.OcpInstaller.Install.CreateANewMetadbMetadb',
+                    defaultMessage:
+                      '创建全新的 MetaDB，MetaDB 与 OCP-Server 将使用相同的主机部署服务。OCP-Server 将访问本地 MetaDB 以获得更好的服务可靠性。',
+                  })}
+                </p>
+              }
               style={{
                 margin: '16px 0',
-                height: 54,
+                height: 40,
               }}
             />
-          ))}
+            <AlertMetadb />
+          </>
+        )}
 
         {current === 1 && (
           <DeployConfig current={current} setCurrent={setCurrent} />

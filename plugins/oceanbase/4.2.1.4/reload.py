@@ -20,8 +20,35 @@
 
 from __future__ import absolute_import, division, print_function
 
+from urllib.parse import urlparse
+
+import requests
+
 from _deploy import InnerConfigItem
 from _errno import EC_OBSERVER_INVALID_MODFILY_GLOBAL_KEY
+
+def get_ob_configserver_cfg_url(obconfig_url, appname, stdio):
+    parsed_url = urlparse(obconfig_url)
+    host = parsed_url.netloc
+    stdio.verbose('obconfig_url host: %s' % host)
+    url = '%s://%s/debug/pprof/cmdline' % (parsed_url.scheme, host)
+    try:
+        response = requests.get(url, allow_redirects=False)
+        if response.status_code != 200:
+            stdio.verbose('request %s status_code: %s' % (url, str(response.status_code)))
+            return None
+    except Exception:
+        stdio.verbose('Configserver url check failed: request %s failed' % url)
+        return None
+
+    if obconfig_url[-1] == '?':
+        link_char = ''
+    elif obconfig_url.find('?') == -1:
+        link_char = '?'
+    else:
+        link_char = '&'
+    cfg_url = '%s%sAction=ObRootServiceInfo&ObCluster=%s' % (obconfig_url, link_char, appname)
+    return cfg_url
 
 
 def reload(plugin_context, new_cluster_config, *args, **kwargs):
@@ -55,6 +82,10 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
                 stdio.verbose('%s is not a oceanbase parameter. skip' % key)
                 continue
             n_value = new_config[key]
+            if key == 'obconfig_url':
+                cfg_url = get_ob_configserver_cfg_url(n_value, cluster_config.name, stdio)
+                if cfg_url:
+                    n_value = cfg_url
             if key not in config or config[key] != n_value:
                 if isinstance(key, InnerConfigItem) and key in inner_keys:
                     zone = config['zone']

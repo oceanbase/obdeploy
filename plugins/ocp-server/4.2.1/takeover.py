@@ -98,7 +98,7 @@ def takeover(plugin_context, cursors=None, *args, **kwargs):
         root_password = cluster_config.get_global_conf().get("root_password")
         takeover_data = {"switchConfigUrl": True, "connectionMode": "direct", "rootSysPassword": root_password,
                          "address": server.ip, "port": mysql_port,
-                         "hostInfo": {"kind": "DEDICATED_PHYSICAL_MACHINE", "hostTypeId": host_type_id, "sshPort": 22,
+                         "hostInfo": {"kind": "DEDICATED_PHYSICAL_MACHINE", "hostTypeId": host_type_id, "sshPort": ssh_config.port,
                                       "credentialId": credential_id}}
         proxyro_password = cluster_config.get_global_conf().get("proxyro_password")
         if proxyro_password is not None and proxyro_password != "":

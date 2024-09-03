@@ -1,6 +1,7 @@
 import { intl } from '@/utils/intl';
-import { ProForm, ProFormDigit } from '@ant-design/pro-components';
+import { ProForm } from '@ant-design/pro-components';
 import styles from './index.less';
+import { commonInputStyle } from '@/pages/constants';
 import { Select, Row } from 'antd';
 import { ocpServersValidator } from '@/utils';
 import { useModel } from 'umi';
@@ -20,7 +21,7 @@ export default function NodeConfig({ form }: { form: FormInstance<any> }) {
   };
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div>
       <p className={styles.titleText}>
         {intl.formatMessage({
           id: 'OBD.component.MetaDBConfig.NodeConfig.OcpNodeConfiguration',
@@ -46,7 +47,7 @@ export default function NodeConfig({ form }: { form: FormInstance<any> }) {
             id: 'OBD.component.MetaDBConfig.NodeConfig.SelectHost',
             defaultMessage: '选择主机',
           })}
-          style={{ width: 448, marginRight: 12 }}
+          style={{ ...commonInputStyle, marginRight: 12 }}
           name={['ocpserver', 'servers']}
         >
           <Select

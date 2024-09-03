@@ -47,7 +47,7 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
         if is_admin and client.config.username != 'admin' and ocp_version < ocp_version_420:
             is_admin = False
             stdio.error('The current user must be the admin user. Run the edit-config command to modify the user.username field')
-        if can_sudo and not client.execute_command('sudo whoami'):
+        if can_sudo and not (client.execute_command('[ `id -u` == "0" ]') or client.execute_command('sudo whoami')):
             can_sudo = False
             stdio.error('The user must have the privilege to run sudo commands without a password.')
         if not client.execute_command('bash -c "if [ `pgrep observer | wc -l` -gt 1 ]; then exit 1; else exit 0;fi;"'):

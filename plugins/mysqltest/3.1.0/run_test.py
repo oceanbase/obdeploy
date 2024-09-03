@@ -30,7 +30,7 @@ from subprocess import Popen, PIPE
 from copy import deepcopy
 from ssh import LocalClient
 from tool import DirectoryUtil
-from _stdio import FormtatText
+from _stdio import FormatText
 
 inner_dir = os.path.split(__file__)[0]
 inner_test_dir = os.path.join(inner_dir, 't')
@@ -220,7 +220,7 @@ def run_test(plugin_context, env, *args, **kwargs):
             need_reboot = False
             return return_true(reboot=True)
         retry_msg = "in auto retry mode" if is_retry else ""
-        label = FormtatText.info("[ RUN      ]")
+        label = FormatText.info("[ RUN      ]")
         stdio.start_loading('%sRunning case: %s ( %s / %s ) %s' % (label, test, index+1, total_test_count, retry_msg))
         test_name = test
         opt = {}
@@ -428,9 +428,9 @@ def run_test(plugin_context, env, *args, **kwargs):
         if retcode:
             # verbose_msg += ', error output:\n%s' % errput
             stdio.print(errput)
-            case_status = FormtatText.error("[  FAILED  ]")
+            case_status = FormatText.error("[  FAILED  ]")
         else:
-            case_status = FormtatText.success('[       OK ]')
+            case_status = FormatText.success('[       OK ]')
         stdio.print("%s%s" % (case_status, case_info))
         if retcode == 0 and slb_host and exec_id:
             slb_request(test_name, exec_id=exec_id, slb_host=slb_host, op='success', stdio=stdio)

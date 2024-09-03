@@ -1,0 +1,4 @@
+- src_path: './usr/ob-benchmarksql'
+  target_path: 'tpcc'
+  type: dir
+  require: openjdk-jre

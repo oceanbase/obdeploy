@@ -1,0 +1,251 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: PATH
+  need_restart: true
+  need_redeploy: true
+  description_en: working directory for obagent
+  description_local: Obagent工作目录
+- name: log_path
+  require: true
+  type: PATH
+  default: log/monagent.log
+  need_restart: true
+  need_redeploy: true
+  description_en: log path
+  description_local: 日志路径
+- name: http_basic_auth_user
+  name_local: 用户名
+  require: true
+  essential: true
+  type: SAFE_STRING
+  default: admin
+  need_restart: true
+  description_en: username for HTTP authentication
+  description_local: HTTP 服务认证用户名
+- name: http_basic_auth_password
+  name_local: 密码
+  require: true
+  essential: true
+  type: STRING
+  default: root
+  need_restart: true
+  need_redeploy: false
+  description_en: password for HTTP authentication
+  description_local: HTTP 服务认证密码
+- name: mgragent_http_port
+  name_local: 管理服务端口
+  require: true
+  essential: true
+  type: INT
+  default: 8089
+  need_restart: true
+  need_redeploy: false
+  description_en: The port of manager agent
+  description_local: OBAgent 管理服务端口
+- name: mgragent_log_level
+  require: false
+  type: SAFE_STRING
+  need_restart: true
+  need_redeploy: false
+  description_en: The log level of manager agent.
+  description_local: ob_mgragent 日志级别
+- name: mgragent_log_max_size
+  require: false
+  type: INT
+  default: 30
+  need_restart: true
+  need_redeploy: false
+  description_en: The total size of manager agent.Log size is measured in Megabytes.
+  description_local: ob_mgragent 日志文件大小（单位：mb）
+- name: mgragent_log_max_days
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en: Expiration time for manager agent logs. The default value is 30 days.
+  description_local: ob_mgragent 日志文件最大保留天数
+- name: mgragent_log_max_backups
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en: The maximum number for manager agent log files.
+  description_local: ob_mgragent 日志文件最大备份数
+- name: mgragent_log_compress
+  require: false
+  type: BOOL
+  need_restart: true
+  need_redeploy: false
+  description_en: ob_mgragent log compression switch
+  description_local: ob_mgragent 日志压缩开关
+- name: monagent_http_port
+  name_local: 监控服务端口
+  require: true
+  essential: true
+  type: INT
+  default: 8088
+  need_restart: true
+  need_redeploy: false
+  description_en: The port of monitor agent.
+  description_local: OBAgent 监控服务端口
+- name: monagent_host_ip
+  require: false
+  type: SAFE_STRING
+  need_restart: true
+  need_redeploy: false
+  description_en: ob_monagent host ip
+  description_local: ob_monagent 主机 ip
+- name: monitor_password
+  require: false
+  type: STRING
+  need_restart: true
+  need_redeploy: false
+  description_en: monitor password for OceanBase Database
+  default: ''
+  description_local: OceanBase 数据库监控数据采集用户密码
+- name: monitor_user
+  require: false
+  type: STRING
+  default: ocp_monitor
+  need_restart: true
+  need_redeploy: false
+  description_en: The user name for ocp meta db
+  description_local: OceanBase 数据库监控数据采集用户名
+- name: sql_port
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en: SQL port for observer
+  default: 2881
+  min_value: 1025
+  max_value: 65535
+  description_local: observer的 SQL 端口
+- name: rpc_port
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en: the RPC port for observer
+  default: 2882
+  min_value: 1025
+  max_value: 65535
+  description_local: observer 的 RPC 端口
+- name: cluster_name
+  require: false
+  type: SAFE_STRING
+  need_restart: true
+  need_redeploy: false
+  description_en: cluster name for OceanBase Database
+  default: obcluster
+  description_local: OceanBase Database 集群名
+- name: cluster_id
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en: cluster ID for OceanBase Database
+  default: 1
+  min_value: 1
+  max_value: 4294901759
+  description_local: OceanBase 集群 ID
+- name: zone_name
+  require: false
+  type: SAFE_STRING
+  need_restart: true
+  need_redeploy: false
+  description_en: zone name for your observer
+  default: zone1
+  min_value:
+  max_value:
+  description_local: observer 所在的 zone 名字
+- name: ob_log_path
+  require: false
+  type: PATH
+  need_restart: true
+  need_redeploy: false
+  description_en: observer log path
+  description_local: observer 日志盘路径
+- name: ob_data_path
+  require: false
+  type: PATH
+  need_restart: true
+  need_redeploy: false
+  description_en: observer data path
+  description_local: observer 数据盘路径
+- name: ob_install_path
+  require: false
+  type: PATH
+  need_restart: true
+  need_redeploy: false
+  description_en: observer install path
+  description_local: observer 安装目录
+- name: observer_log_path
+  require: false
+  type: PATH
+  need_restart: true
+  need_redeploy: false
+  description_en: observer install path log
+  description_local: observer 安装目录下日志路径
+- name: monagent_log_level
+  require: false
+  type: SAFE_STRING
+  default: info
+  need_restart: true
+  need_redeploy: false
+  description_en: The log level of monitor agent.
+  description_local: ob_monagent 日志级别
+- name: monagent_log_max_size
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en: The total size of monitor agent.Log size is measured in Megabytes.
+  description_local: ob_monagent 日志文件大小（单位：mb）
+- name: monagent_log_max_days
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en: Expiration time for monitor agent logs.
+  description_local: ob_monagent 日志文件最大保留天数
+- name: monagent_log_max_backups
+  require: false
+  type: INT
+  need_restart: true
+  need_redeploy: false
+  description_en:  The maximum number for monitor agent log files.
+  description_local: ob_monagent 日志文件最大备份数
+- name: monagent_log_compress
+  require: false
+  type: BOOL
+  need_restart: true
+  need_redeploy: false
+  description_en: ob_monagent log compression switch
+  description_local: ob_monagent 日志压缩开关
+- name: ob_monitor_status
+  name_local: OceanBase 指标监控采集
+  require: true
+  essential: true
+  type: SAFE_STRING
+  default: active
+  need_restart: true
+  need_redeploy: false
+  description_en: monitor status for OceanBase Database. Active is to enable. Inactive is to disable.
+  description_local: OceanBase 监控指标采集状态，active 表示开启，inactive 表示关闭
+- name: target_sync_configs
+  require: false
+  type: LIST
+  need_restart: true
+  description_en:
+  description_local: '''将地址同步至指定远端目录
+  target_sync_configs:
+      - host: 192.168.1.1
+        target_dir: /data/prometheus/targets
+        user: user1
+        port: 22
+        # password: *****
+        key_file: xxxxx
+  '''

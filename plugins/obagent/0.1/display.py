@@ -47,5 +47,5 @@ def display(plugin_context, cursor, *args, **kwargs):
         })
         
     stdio.print_list(result, ['ip', 'server_port', 'pprof_port', 'status'], 
-        lambda x: [x['ip'], x['server_port'], x['pprof_port'], x['status']], title='obagent')
+        lambda x: [x['ip'], x['server_port'], x['pprof_port'], x['status']], title=cluster_config.name)
     plugin_context.return_true()

@@ -203,7 +203,7 @@ class Restart(object):
             clients = self.new_clients
 
         cluster_config = self.new_cluster_config if self.new_cluster_config else self.cluster_config
-        if not self.call_plugin(self.start_plugin, clients=clients, cluster_config=cluster_config, local_home_path=self.local_home_path, repository=self.repository):
+        if not self.call_plugin(self.start_plugin, clients=clients, cluster_config=self.cluster_config, new_cluster_config=self.new_cluster_config, local_home_path=self.local_home_path, repository=self.repository):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
         self.close()

@@ -40,6 +40,7 @@ from service.handler import handler_utils
 from service.api.v1 import ocp_deployments
 from service.api.v1 import metadb
 from service.api.v1 import installer
+from service.api.v1 import component_change
 from const import DISABLE_SWAGGER
 
 
@@ -64,7 +65,9 @@ class OBDWeb(object):
         self.app.include_router(ocp_deployments.router, prefix='/api/v1')
         self.app.include_router(metadb.router, prefix='/api/v1')
         self.app.include_router(installer.router, prefix='/api/v1')
+        self.app.include_router(component_change.router, prefix='/api/v1')
         self.app.add_middleware(IdleShutdownMiddleware, logger=log.get_logger(), idle_time_before_shutdown=IDLE_TIME_BEFORE_SHUTDOWN)
+        self.app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
         self.app.add_middleware(IPBlockMiddleware, ips=white_ip_list)
         self.app.add_middleware(ProcessTimeMiddleware)
         self.app.add_middleware(RequestResponseLogMiddleware, logger=log.get_logger())

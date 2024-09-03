@@ -1,23 +1,23 @@
-import { intl } from '@/utils/intl';
-import { ProCard, ProForm, ProFormDigit } from '@ant-design/pro-components';
-import { Input, Tooltip, Button, Row, message, Form } from 'antd';
-import { FormInstance } from 'antd/lib/form';
-import {
-  QuestionCircleOutlined,
-  CheckCircleFilled,
-  CloseCircleFilled,
-} from '@ant-design/icons';
-import { useEffect, useState } from 'react';
-import { useUpdateEffect } from 'ahooks';
-import { useModel, getLocale } from 'umi';
+import { ocpAddonAfter } from '@/constant/configuration';
+import { commonInputStyle, commonPortStyle } from '@/pages/constants';
 import { siteReg } from '@/utils';
-import styles from './index.less';
-import CustomPasswordInput from '../CustomPasswordInput';
 import {
   OCP_PASSWORD_ERROR_REASON,
   OCP_PASSWORD_ERROR_REASON_OLD,
 } from '@/utils/helper';
-import { ocpAddonAfter } from '@/constant/configuration';
+import { intl } from '@/utils/intl';
+import {
+  CheckCircleFilled,
+  CloseCircleFilled,
+  QuestionCircleOutlined,
+} from '@ant-design/icons';
+import { ProCard, ProForm, ProFormDigit } from '@ant-design/pro-components';
+import { getLocale, useModel } from '@umijs/max';
+import { useUpdateEffect } from 'ahooks';
+import { Button, Input, Tooltip } from 'antd';
+import { FormInstance } from 'antd/lib/form';
+import { useEffect, useState } from 'react';
+import CustomPasswordInput from '../CustomPasswordInput';
 import { MsgInfoType } from './index';
 
 interface ServiceConfigProps {
@@ -46,7 +46,7 @@ export default function ServiceConfig({
   const { ocpConfigData } = useModel('global');
   const { isSingleOcpNode, ocpVersionInfo, deployUser, useRunningUser } =
     useModel('ocpInstallData');
-  //ocp版本小于4.2.2密码使用旧规则，反之使用最新的密码规则
+  // ocp版本小于4.2.2密码使用旧规则，反之使用最新的密码规则
   const isLowVersion =
     Number(ocpVersionInfo?.version.split('.').reduce((pre, cur) => pre + cur)) <
     422;
@@ -119,6 +119,7 @@ export default function ServiceConfig({
         defaultMessage: '服务配置',
       })}
       style={{ width: '100%' }}
+      bodyStyle={{ paddingBottom: 0 }}
     >
       <CustomPasswordInput
         form={form}
@@ -129,7 +130,8 @@ export default function ServiceConfig({
         useFor="ocp"
         useOldRuler={isLowVersion}
         name={['ocpserver', 'admin_password']}
-        showCopyBtn
+        style={commonInputStyle}
+        innerInputStyle={{ width: 388 }}
         label={
           <>
             {intl.formatMessage({
@@ -164,7 +166,7 @@ export default function ServiceConfig({
 
       <ProForm.Item
         name={['ocpserver', 'home_path']}
-        style={{ width: 552 }}
+        style={commonInputStyle}
         label={intl.formatMessage({
           id: 'OBD.component.OCPConfigNew.ServiceConfig.SoftwarePath',
           defaultMessage: '软件路径',
@@ -181,150 +183,146 @@ export default function ServiceConfig({
       >
         <Input addonAfter={<span>{ocpAddonAfter}</span>} />
       </ProForm.Item>
-      <Row>
-        <ProForm.Item
-          name={['ocpserver', 'log_dir']}
-          style={{ width: 343, marginRight: 12 }}
-          label={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ServiceConfig.LogPath',
-            defaultMessage: '日志路径',
-          })}
-          rules={[
-            {
-              required: true,
-              message: intl.formatMessage({
-                id: 'OBD.component.OCPConfigNew.ServiceConfig.EnterALogPath',
-                defaultMessage: '请输入日志路径',
-              }),
-            },
-          ]}
-        >
-          <Input />
-        </ProForm.Item>
-        <ProForm.Item
-          name={['ocpserver', 'soft_dir']}
-          style={{ width: 343 }}
-          label={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ServiceConfig.PackagePath',
-            defaultMessage: '软件包路径',
-          })}
-          rules={[
-            {
-              required: true,
-              message: intl.formatMessage({
-                id: 'OBD.component.OCPConfigNew.ServiceConfig.EnterThePackagePath',
-                defaultMessage: '请输入软件包路径',
-              }),
-            },
-          ]}
-        >
-          <Input />
-        </ProForm.Item>
-      </Row>
-      <Row>
-        <ProForm.Item
-          style={{ width: 343, marginRight: '72px' }}
-          name={['ocpserver', 'ocp_site_url']}
-          label={
-            <>
-              ocp.site.url
-              <Tooltip
-                title={intl.formatMessage({
-                  id: 'OBD.component.OCPConfigNew.ServiceConfig.AddressForExternalAccessTo',
-                  defaultMessage:
-                    '外部访问OCP网站的地址：要求以http/https开始，包含VIP地址/域名/端口的网址，且结尾不含斜杠 /',
-                })}
-              >
-                <QuestionCircleOutlined className="ml-10" />
-              </Tooltip>
-            </>
-          }
-          rules={[
-            {
-              required: true,
-              message: intl.formatMessage({
-                id: 'OBD.component.OCPConfigNew.ServiceConfig.EnterOcpSiteUrl',
-                defaultMessage: '请输入ocp.site.url',
-              }),
-            },
-          ]}
-        >
-          <div>
-            <div style={{ display: 'flex' }}>
-              <div>
-                <Input
-                  value={siteUrl}
-                  onChange={siteUrlChange}
-                  onBlur={() => {
-                    form.validateFields([['ocpserver', 'ocp_site_url']]);
-                  }}
-                  // placeholder="例如：http://localhost:8080"
-                  style={{ width: 328 }}
-                />
+      <ProForm.Item
+        name={['ocpserver', 'log_dir']}
+        style={commonInputStyle}
+        label={intl.formatMessage({
+          id: 'OBD.component.OCPConfigNew.ServiceConfig.LogPath',
+          defaultMessage: '日志路径',
+        })}
+        rules={[
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.component.OCPConfigNew.ServiceConfig.EnterALogPath',
+              defaultMessage: '请输入日志路径',
+            }),
+          },
+        ]}
+      >
+        <Input />
+      </ProForm.Item>
+      <ProForm.Item
+        name={['ocpserver', 'soft_dir']}
+        style={commonInputStyle}
+        label={intl.formatMessage({
+          id: 'OBD.component.OCPConfigNew.ServiceConfig.PackagePath',
+          defaultMessage: '软件包路径',
+        })}
+        rules={[
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.component.OCPConfigNew.ServiceConfig.EnterThePackagePath',
+              defaultMessage: '请输入软件包路径',
+            }),
+          },
+        ]}
+      >
+        <Input />
+      </ProForm.Item>
+      <ProForm.Item
+        style={{ width: 343, marginRight: '72px' }}
+        name={['ocpserver', 'ocp_site_url']}
+        label={
+          <>
+            ocp.site.url
+            <Tooltip
+              title={intl.formatMessage({
+                id: 'OBD.component.OCPConfigNew.ServiceConfig.AddressForExternalAccessTo',
+                defaultMessage:
+                  '外部访问OCP网站的地址：要求以http/https开始，包含VIP地址/域名/端口的网址，且结尾不含斜杠 /',
+              })}
+            >
+              <QuestionCircleOutlined className="ml-10" />
+            </Tooltip>
+          </>
+        }
+        rules={[
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.component.OCPConfigNew.ServiceConfig.EnterOcpSiteUrl',
+              defaultMessage: '请输入ocp.site.url',
+            }),
+          },
+        ]}
+      >
+        <div>
+          <div style={{ display: 'flex' }}>
+            <div>
+              <Input
+                value={siteUrl}
+                onChange={siteUrlChange}
+                onBlur={() => {
+                  form.validateFields([['ocpserver', 'ocp_site_url']]);
+                }}
+                // placeholder="例如：http://localhost:8080"
+                style={{ width: 412 }}
+              />
 
-                {checkStatus === 'success' && (
-                  <div style={{ color: 'rgba(77,204,162,1)', marginTop: 4 }}>
-                    <CheckCircleFilled />
-                    <span style={{ marginLeft: 5 }}>
-                      {intl.formatMessage({
-                        id: 'OBD.component.OCPConfigNew.ServiceConfig.TheCurrentVerificationIsSuccessful',
-                        defaultMessage: '当前校验成功，请进行下一步',
-                      })}
-                    </span>
-                  </div>
-                )}
+              {checkStatus === 'success' && (
+                <div style={{ color: 'rgba(77,204,162,1)', marginTop: 4 }}>
+                  <CheckCircleFilled />
+                  <span style={{ marginLeft: 5 }}>
+                    {intl.formatMessage({
+                      id: 'OBD.component.OCPConfigNew.ServiceConfig.TheCurrentVerificationIsSuccessful',
+                      defaultMessage: '当前校验成功，请进行下一步',
+                    })}
+                  </span>
+                </div>
+              )}
 
-                {checkStatus === 'fail' && (
-                  <div style={{ color: 'rgba(255,75,75,1)', marginTop: 4 }}>
-                    <CloseCircleFilled />
-                    <span style={{ marginLeft: 5 }}>
-                      {intl.formatMessage({
-                        id: 'OBD.component.OCPConfigNew.ServiceConfig.TheCurrentVerificationFailedPlease',
-                        defaultMessage: '当前校验失败，请重新输入',
-                      })}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <Button
-                style={{ marginLeft: 12 }}
-                onClick={() => handleCheckSystemUser()}
-              >
-                {intl.formatMessage({
-                  id: 'OBD.component.OCPConfigNew.ServiceConfig.Verification',
-                  defaultMessage: '校 验',
-                })}
-              </Button>
+              {checkStatus === 'fail' && (
+                <div style={{ color: 'rgba(255,75,75,1)', marginTop: 4 }}>
+                  <CloseCircleFilled />
+                  <span style={{ marginLeft: 5 }}>
+                    {intl.formatMessage({
+                      id: 'OBD.component.OCPConfigNew.ServiceConfig.TheCurrentVerificationFailedPlease',
+                      defaultMessage: '当前校验失败，请重新输入',
+                    })}
+                  </span>
+                </div>
+              )}
             </div>
-            {isSingleOcpNode === false && (
-              <p style={{ marginTop: 8 }}>{multipleNodesDesc}</p>
-            )}
+            <Button
+              style={{ marginLeft: 12 }}
+              onClick={() => handleCheckSystemUser()}
+            >
+              {intl.formatMessage({
+                id: 'OBD.component.OCPConfigNew.ServiceConfig.Verification',
+                defaultMessage: '校 验',
+              })}
+            </Button>
           </div>
-        </ProForm.Item>
-        <div style={locale === 'zh-CN' ? {} : { marginLeft: 40 }}>
-          <ProFormDigit
-            name={['ocpserver', 'port']}
-            label={intl.formatMessage({
-              id: 'OBD.component.OCPConfigNew.ServiceConfig.ServicePort',
-              defaultMessage: '服务端口',
-            })}
-            // fieldProps={{ style: commonStyle }}
-            placeholder={intl.formatMessage({
-              id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
-              defaultMessage: '请输入',
-            })}
-            rules={[
-              {
-                required: true,
-                message: intl.formatMessage({
-                  id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
-                  defaultMessage: '请输入',
-                }),
-              },
-            ]}
-          />
+          {isSingleOcpNode === false && (
+            <p style={{ marginTop: 8 }}>{multipleNodesDesc}</p>
+          )}
         </div>
-      </Row>
+      </ProForm.Item>
+      <div style={locale === 'zh-CN' ? {} : { marginLeft: 40 }}>
+        <ProFormDigit
+          name={['ocpserver', 'port']}
+          label={intl.formatMessage({
+            id: 'OBD.component.OCPConfigNew.ServiceConfig.ServicePort',
+            defaultMessage: '服务端口',
+          })}
+          fieldProps={{ style: commonPortStyle }}
+          placeholder={intl.formatMessage({
+            id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
+            defaultMessage: '请输入',
+          })}
+          rules={[
+            {
+              required: true,
+              message: intl.formatMessage({
+                id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
+                defaultMessage: '请输入',
+              }),
+            },
+          ]}
+        />
+      </div>
     </ProCard>
   );
 }

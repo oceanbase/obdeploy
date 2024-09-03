@@ -5,16 +5,32 @@ import {
   preCheckStatus,
   recover,
 } from '@/services/ob-deploy-web/Deployments';
-import { getErrorInfo, handleQuit } from '@/utils';
+import { getErrorInfo } from '@/utils';
 import { intl } from '@/utils/intl';
+import { message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
-import { message } from 'antd';
 
-import useRequest from '@/utils/useRequest';
 import PreCehckComponent from '@/component/PreCheck/preCheck';
-import { formatConfigData } from './CheckInfo';
+import { getPublicKey } from '@/services/ob-deploy-web/Common';
+import useRequest from '@/utils/useRequest';
 import NP from 'number-precision';
+import { formatConfigData } from './CheckInfo';
+
+export const formatDataSource = (dataSource: API.PreCheckResult) => {
+  dataSource.timelineData = dataSource.info?.map(
+    (item: API.PreCheckInfo, index: number) => {
+      return {
+        isRunning:
+          (dataSource?.info[index - 1]?.status === 'FINISHED' &&
+            item.status === 'PENDING') ||
+          (dataSource?.all_passed && index === dataSource?.info.length - 1),
+        result: item.status === 'FINISHED' ? item.result : item.status,
+      };
+    },
+  );
+  return { ...dataSource };
+};
 
 export default function PreCheckStatus() {
   const {
@@ -25,6 +41,7 @@ export default function PreCheckStatus() {
     setConfigData,
     setErrorVisible,
     setErrorsList,
+    scenarioParam,
     errorsList,
     ERR_CODE,
   } = useModel('global');
@@ -44,20 +61,7 @@ export default function PreCheckStatus() {
   const [currentPage, setCurrentPage] = useState(true);
   const [firstErrorTimestamp, setFirstErrorTimestamp] = useState<number>();
 
-  const formatDataSource = (dataSource: API.PreCheckResult) => {
-    dataSource.timelineData = dataSource.info?.map(
-      (item: API.PreCheckInfo, index: number) => {
-        return {
-          isRunning:
-            (dataSource?.info[index - 1]?.status === 'FINISHED' &&
-              item.status === 'PENDING') ||
-            (dataSource?.all_passed && index === dataSource?.info.length - 1),
-          result: item.status === 'FINISHED' ? item.result : item.status,
-        };
-      },
-    );
-    return { ...dataSource };
-  };
+
 
   const { run: fetchPreCheckStatus } = useRequest(preCheckStatus, {
     onSuccess: ({ success, data }: API.OBResponsePreCheckResult_) => {
@@ -185,7 +189,7 @@ export default function PreCheckStatus() {
     },
   );
 
-  const { run: handleInstallConfirm } = useRequest(deployAndStartADeployment, {
+  const { run: handleInstallConfirm, loading:installLoading } = useRequest(deployAndStartADeployment, {
     onError: (e: any) => {
       const errorInfo = getErrorInfo(e);
       setErrorVisible(true);
@@ -223,7 +227,7 @@ export default function PreCheckStatus() {
     },
   );
 
-  const handleRetryCheck = (newConfigData?: any) => {
+  const handleRetryCheck = async(newConfigData?: any) => {
     setStatusData({});
     setFailedList([]);
     setShowFailedList([]);
@@ -233,7 +237,11 @@ export default function PreCheckStatus() {
       params = { ...newConfigData };
     }
     setLoading(true);
-    handleCreateConfig({ name: oceanbase?.appname }, formatConfigData(params));
+    const { data: publicKey } = await getPublicKey();
+    handleCreateConfig(
+      { name: oceanbase?.appname },
+      formatConfigData(params, scenarioParam, publicKey),
+    );
   };
 
   const { run: handleRecover, loading: recoverLoading } = useRequest(recover, {
@@ -349,6 +357,7 @@ export default function PreCheckStatus() {
       prevStep={prevStep}
       handleInstall={handleInstall}
       setOnlyManual={setOnlyManual}
+      installLoading={installLoading}
     />
   );
 }

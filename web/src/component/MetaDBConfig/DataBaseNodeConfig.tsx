@@ -1,17 +1,17 @@
 import { intl } from '@/utils/intl';
-import { EditableProTable, ProForm, ProCard } from '@ant-design/pro-components';
-import { useEffect, useRef, useState } from 'react';
+import { DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import type {
-  ProColumns,
   EditableFormInstance,
+  ProColumns,
 } from '@ant-design/pro-components';
+import { EditableProTable, ProForm } from '@ant-design/pro-components';
+import { Popconfirm, Select, Tooltip } from 'antd';
+import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
-import { Tooltip, Popconfirm, message, Select } from 'antd';
-import { QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 
-import { getAllServers } from '@/utils/helper';
-import { serversValidator } from '@/utils';
 import ServerTags from '@/pages/Obdeploy/ServerTags';
+import { serversValidator } from '@/utils';
+import { getAllServers } from '@/utils/helper';
 import styles from './index.less';
 
 interface DataBaseNodeConfigProps {
@@ -20,14 +20,14 @@ interface DataBaseNodeConfigProps {
   >;
   dbConfigData: API.DBConfig[];
   setDBConfigData: React.Dispatch<React.SetStateAction<API.DBConfig[]>>;
-  finalValidate:React.MutableRefObject<boolean>
+  finalValidate: React.MutableRefObject<boolean>;
 }
 
 export default function DataBaseNodeConfig({
   tableFormRef,
   dbConfigData,
   setDBConfigData,
-  finalValidate
+  finalValidate,
 }: DataBaseNodeConfigProps) {
   const { ocpConfigData, ocpNameIndex, setOcpNameIndex } = useModel('global');
   const { components = {} } = ocpConfigData || {};
@@ -150,9 +150,9 @@ export default function DataBaseNodeConfig({
             }),
           },
           {
-            validator: (_: any, value: string[]) =>{
-              return serversValidator(_, value, 'OBServer')
-            }
+            validator: (_: any, value: string[]) => {
+              return serversValidator(_, value, 'OBServer');
+            },
           },
         ],
       },
@@ -241,8 +241,8 @@ export default function DataBaseNodeConfig({
   }, [dbConfigData, lastDeleteServer]);
 
   return (
-    <div>
-      <p className={styles.titleText}>
+    <div className={styles.nodeConfigContainer}>
+      <p className={styles.titleText} style={{ marginBottom: 4 }}>
         {intl.formatMessage({
           id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.DatabaseNodeConfiguration',
           defaultMessage: '数据库节点配置',
@@ -267,6 +267,7 @@ export default function DataBaseNodeConfig({
             id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.AddZone',
             defaultMessage: '新增 Zone',
           }),
+          style: { margin: '0 0 10px 0' },
         }}
         editable={{
           type: 'multiple',

@@ -17,6 +17,8 @@ import { useRequest } from 'ahooks';
 import { find } from 'lodash';
 import React, { useEffect, useState } from 'react';
 import { history, useLocation, useModel } from 'umi';
+import { encrypt } from '@/utils/encrypt';
+import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import ConnectionInfo from './Component/ConnectionInfo';
 import UpdatePreCheck from './Component/UpdatePreCheck';
 
@@ -251,8 +253,9 @@ const Update: React.FC = () => {
   };
 
   const handleCheck = () => {
-    validateFields().then((values) => {
+    validateFields().then(async (values) => {
       const { host, port, database, accessUser, accessCode } = values;
+      const { data: publicKey } = await getPublicKey();
       setOcpConfigData({
         ...ocpConfigData,
         updateConnectInfo: {
@@ -265,7 +268,7 @@ const Update: React.FC = () => {
         port,
         database,
         user: accessUser,
-        password: accessCode,
+        password: encrypt(accessCode, publicKey) || accessCode,
         cluster_name,
       });
     });

@@ -60,7 +60,6 @@ def scale_out_check(plugin_context, *args, **kwargs):
         add_plugin('bootstrap', plugins)
     if 'ob-configserver' in added_components:
         cluster_config.add_depend_component('ob-configserver')
-        need_restart = True
     if cluster_config.added_servers:
         add_plugin('connect', plugins)
         add_plugin('bootstrap', plugins)

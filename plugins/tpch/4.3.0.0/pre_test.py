@@ -20,16 +20,28 @@
 
 from __future__ import absolute_import, division, print_function
 
-
 import re
 import os
 from glob import glob
+from const import TOOL_TPCH, COMP_OBCLIENT
 try:
     import subprocess32 as subprocess
 except:
     import subprocess
 from ssh import LocalClient
 from tool import DirectoryUtil
+
+def file_path_check(bin_path, tool_name, tool_path, cmd, stdio):
+    result = None
+    tool_path = os.path.join(os.getenv('HOME'), tool_name, tool_path)
+    for path in [bin_path, tool_path]:
+        result = LocalClient.execute_command(cmd % path, stdio=stdio)
+        if result.code > 1:
+            continue
+        break
+    else:
+        return None, result
+    return path, None
 
 
 def format_size(size, precision=1):
@@ -93,7 +105,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
 
     if tenant_name == 'sys':
         stdio.error('DO NOT use sys tenant for testing.')
-        return 
+        return
 
     test_server = get_option('test_server')
     tmp_dir = os.path.abspath(get_option('tmp_dir', './tmp'))
@@ -107,10 +119,15 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     setattr(options, 'sql_path', sql_path)
     obclient_bin = get_option('obclient_bin', 'obclient')
 
-    ret = local_execute_command('%s --help' % obclient_bin)
-    if not ret:
-        stdio.error('%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (ret.stderr, obclient_bin))
+    cmd = '%s --help'
+    path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd, stdio)
+    if result:
+        stdio.error(
+            '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
+                result.stderr, obclient_bin))
         return
+    obclient_bin = path
+    setattr(options, 'obclient_bin', obclient_bin)
 
     if not DirectoryUtil.mkdir(tmp_dir, stdio=stdio):
         return
@@ -133,6 +150,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     if tenant_unit is False:
         return
     max_cpu = tenant_unit['max_cpu']
+    memory_size = tenant_unit['memory_size']
     min_memory = MIN_MEMORY
     unit_count = pool['unit_count']
     server_num = len(cluster_config.servers)
@@ -151,7 +169,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     if not remote_tbl_dir:
         stdio.error('Please use --remote-tbl-dir to set a dir for remote tbl files')
         return
-    
+
     if disable_transfer:
         ret = clients[test_server].execute_command('ls %s' % (os.path.join(remote_tbl_dir, '*.tbl')))
         tbl_path = ret.stdout.strip().split('\n') if ret else []
@@ -160,11 +178,18 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
             return
     else:
         if not tbl_path:
-            ret = local_execute_command('%s -h' % dbgen_bin)
-            if ret.code > 1:
-                stdio.error('%s\n%s is not an executable file. Please use `--dbgen-bin` to set.\nYou may not have obtpch installed' % (ret.stderr, dbgen_bin))
+            cmd = '%s -h'
+            path, result = file_path_check(dbgen_bin, TOOL_TPCH, 'tpch/bin/dbgen', cmd, stdio)
+            if result:
+                stdio.error('%s\n%s is not an executable file. Please use `--dbgen-bin` to set.\nYou may not have obtpch installed' % (result.stderr, dbgen_bin))
                 return
-            
+            dbgen_bin = path
+            setattr(options, 'dbgen_bin', dbgen_bin)
+
+            if not os.path.exists(dss_config):
+                dss_config = os.path.join(os.getenv('HOME'), TOOL_TPCH, 'tpch')
+                setattr(options, 'dss_config', dss_config)
+
             dss_path = os.path.join(dss_config, 'dists.dss')
             if not os.path.exists(dss_path):
                 stdio.error('No such file: %s' % dss_path)
@@ -202,7 +227,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     return plugin_context.return_true(
         obclient_bin=obclient_bin, host=host, port=port, user=user, password=password, database=mysql_db,
         max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
-        tenant_id=tenant_meta['TENANT_ID'], format_size=format_size
+        tenant_id=tenant_meta['TENANT_ID'], format_size=format_size, memory_size=memory_size
     )
 
 

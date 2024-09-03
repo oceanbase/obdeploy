@@ -21,7 +21,7 @@ import time
 from collections import defaultdict
 
 from tool import ConfigUtil
-from _stdio import FormtatText
+from _stdio import FormatText
 
 tenant_cursor_cache = defaultdict(dict)
 
@@ -144,7 +144,7 @@ def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenan
     res = primary_cursor.fetchone(sql, (primary_tenant_info['tenant_id'], ))
     if not res or res['max_begin_lsn'] is None:
         error('Check primary tenant have full log failed.')
-        stdio.print(FormtatText.success('Please try again in a moment.'))
+        stdio.print(FormatText.success('Please try again in a moment.'))
         return
     if res['max_begin_lsn'] > 0:
         error('Primary cluster have not full log, not support create standby cluster.')

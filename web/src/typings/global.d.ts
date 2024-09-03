@@ -62,6 +62,7 @@ declare namespace API {
   interface ErrorInfo {
     title: string;
     desc?: string;
+    showModal?: boolean;
   }
 
   interface StepProp {

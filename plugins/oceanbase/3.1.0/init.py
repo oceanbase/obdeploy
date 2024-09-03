@@ -21,8 +21,7 @@
 from __future__ import absolute_import, division, print_function
 import os
 
-from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage
-
+from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
 
 stdio = None
 force = False
@@ -35,7 +34,7 @@ def critical(*arg, **kwargs):
     stdio.error(*arg, **kwargs)
 
 
-def init_dir(server, client, key, path, link_path=None):
+def init_dir(server, client, key, path, deploy_name, link_path=None):
     if force:
         ret = client.execute_command('rm -fr %s' % path, timeout=-1)
         if not ret:
@@ -46,6 +45,7 @@ def init_dir(server, client, key, path, link_path=None):
             ret = client.execute_command('ls %s' % (path))
             if not ret or ret.stdout.strip():
                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s path' % key, msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=path)))
+                critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 return False
         else:
             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s path' % key, msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=path)))
@@ -64,6 +64,7 @@ def init(plugin_context, *args, **kwargs):
     global stdio, force
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
+    deploy_name = plugin_context.deploy_name
     stdio = plugin_context.stdio
     servers_dirs = {}
     force = getattr(plugin_context.options, 'force', False)
@@ -135,6 +136,7 @@ def init(plugin_context, *args, **kwargs):
                 ret = client.execute_command('ls %s' % (home_path))
                 if not ret or ret.stdout.strip():
                     critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
+                    critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
@@ -151,6 +153,7 @@ def init(plugin_context, *args, **kwargs):
                     ret = client.execute_command('ls %s' % (data_path))
                     if not ret or ret.stdout.strip():
                         critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=data_path)))
+                        critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                         continue
                 else:
                     critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='data dir', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=data_path)))
@@ -159,7 +162,7 @@ def init(plugin_context, *args, **kwargs):
                 link_path = '%s/store' % home_path
                 client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (data_path, link_path, data_path, link_path))
                 for key in ['clog', 'ilog', 'slog']:
-                    # init_dir(server, client, key, server_config['%s_dir' % key], os.path.join(data_path, key))
+                    # init_dir(server, client, key, server_config['%s_dir' % key], deploy_name, os.path.join(data_path, key))
                     log_dir = server_config['%s_dir' % key]
                     if force:
                         ret = client.execute_command('rm -fr %s/*' % log_dir, timeout=-1)
@@ -171,6 +174,7 @@ def init(plugin_context, *args, **kwargs):
                             ret = client.execute_command('ls %s' % (log_dir))
                             if not ret or ret.stdout.strip():
                                 critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s dir' % key, msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=log_dir)))
+                                critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                                 continue
                         else:
                             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='%s dir' % key, msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=log_dir)))

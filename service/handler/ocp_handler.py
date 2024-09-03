@@ -27,6 +27,7 @@ from singleton_decorator import singleton
 from collections import defaultdict
 
 from service.handler.base_handler import BaseHandler
+from service.handler.rsa_handler import RSAHandler
 from service.common import log, task, util, const
 from service.common.task import Serial as serial
 from service.common.task import AutoRegister as auto_register
@@ -91,7 +92,8 @@ class OcpHandler(BaseHandler):
         if 'user' not in cluster_config.keys():
             cluster_config['user'] = {}
         cluster_config['user']['username'] = auth.user
-        cluster_config['user']['password'] = auth.password
+        passwd = RSAHandler().decrypt_private_key(auth.password) if auth.password is not None else auth.password
+        cluster_config['user']['password'] = passwd
         cluster_config['user']['port'] = auth.port
 
     def generate_metadb_config(self, cluster_config, oceanbase, home_path):
@@ -128,6 +130,10 @@ class OcpHandler(BaseHandler):
         for key in config_dict:
             if config_dict[key] and key in ['mysql_port', 'rpc_port', 'home_path', 'data_dir', 'redo_dir', 'appname',
                                             'root_password']:
+                if key == 'root_password':
+                    passwd = RSAHandler().decrypt_private_key(config_dict[key])
+                    oceanbase_config['global'][key] = passwd
+                    continue
                 oceanbase_config['global'][key] = config_dict[key]
 
         if oceanbase.home_path == '':
@@ -159,11 +165,17 @@ class OcpHandler(BaseHandler):
             if config_dict[key] and key in ('cluster_name', 'prometheus_listen_port', 'listen_port', 'home_path'):
                 comp_config['global'][key] = config_dict[key]
 
+        comp_config['global']['enable_obproxy_rpc_service'] = False
+
         if obproxy_config.home_path == '':
             comp_config['global']['home_path'] = home_path + '/obproxy'
 
         for parameter in obproxy_config.parameters:
             if not parameter.adaptive:
+                if parameter.key == 'obproxy_sys_password':
+                    passwd = RSAHandler().decrypt_private_key(parameter.value)
+                    comp_config['global'][parameter.key] = passwd
+                    continue
                 comp_config['global'][parameter.key] = parameter.value
         if 'depends' not in comp_config.keys():
             comp_config['depends'] = list()
@@ -189,6 +201,10 @@ class OcpHandler(BaseHandler):
 
         for key in config_dict:
             if config_dict[key] and key in ('port', 'admin_password', 'memory_size', 'manage_info', 'home_path', 'soft_dir', 'log_dir', 'ocp_site_url', 'launch_user'):
+                if key == 'admin_password':
+                    passwd = RSAHandler().decrypt_private_key(config_dict[key])
+                    ocp_config['global'][key] = passwd
+                    continue
                 ocp_config['global'][key] = config_dict[key]
 
         if launch_user:
@@ -197,7 +213,7 @@ class OcpHandler(BaseHandler):
         if config.metadb:
             ocp_config['global']['jdbc_url'] = 'jdbc:oceanbase://' + config_dict['metadb']['host'] + ':' + str(config_dict['metadb']['port']) + config_dict['metadb']['database']
             ocp_config['global']['jdbc_username'] = config_dict['metadb']['user']
-            ocp_config['global']['jdbc_password'] = config_dict['metadb']['password']
+            ocp_config['global']['jdbc_password'] = RSAHandler().decrypt_private_key(config_dict['metadb']['password'])
 
         if config.meta_tenant:
             tenant_config = cluster_config[ob_component] if ob_component is not None else ocp_config
@@ -206,7 +222,7 @@ class OcpHandler(BaseHandler):
             tenant_config['global']['ocp_meta_tenant']['max_cpu'] = config_dict['meta_tenant']['resource']['cpu']
             tenant_config['global']['ocp_meta_tenant']['memory_size'] = str(config_dict['meta_tenant']['resource']['memory']) + 'G'
             tenant_config['global']['ocp_meta_username'] = config_dict['meta_tenant']['name']['user_name']
-            tenant_config['global']['ocp_meta_password'] = config_dict['meta_tenant']['password']
+            tenant_config['global']['ocp_meta_password'] = RSAHandler().decrypt_private_key(config_dict['meta_tenant']['password'])
             tenant_config['global']['ocp_meta_db'] = config_dict['meta_tenant']['name']['user_database'] if config_dict['meta_tenant']['name']['user_database'] != '' else 'meta_database'
             self.context['meta_tenant'] = config_dict['meta_tenant']['name']['tenant_name']
 
@@ -217,7 +233,7 @@ class OcpHandler(BaseHandler):
             tenant_config['global']['ocp_monitor_tenant']['max_cpu'] = config_dict['monitor_tenant']['resource']['cpu']
             tenant_config['global']['ocp_monitor_tenant']['memory_size'] = str(config_dict['monitor_tenant']['resource']['memory']) + 'G'
             tenant_config['global']['ocp_monitor_username'] = config_dict['monitor_tenant']['name']['user_name']
-            tenant_config['global']['ocp_monitor_password'] = config_dict['monitor_tenant']['password']
+            tenant_config['global']['ocp_monitor_password'] = RSAHandler().decrypt_private_key(config_dict['monitor_tenant']['password'])
             tenant_config['global']['ocp_monitor_db'] = config_dict['monitor_tenant']['name']['user_database'] if config_dict['monitor_tenant']['name']['user_database'] != '' else 'monitor_database'
             self.context['monitor_tenant'] = config_dict['monitor_tenant']['name']['tenant_name']
 
@@ -289,6 +305,7 @@ class OcpHandler(BaseHandler):
 
     def check_user(self, user):
         self.context['upgrade_servers'] = user.servers
+        user.password = RSAHandler().decrypt_private_key(user.password) if user.password else user.password
         for ip in user.servers:
             log.get_logger().info('ip: %s, port: %s, user: %s, password: %s' % (ip, user.port, user.user, user.password))
             self.context['upgrade_user'] = user.user
@@ -296,11 +313,11 @@ class OcpHandler(BaseHandler):
             self.context['upgrade_ssh_port'] = user.port if user.port else 22
             config = SshConfig(host=ip, port=user.port, username=user.user, password=user.password)
             client = SshClient(config)
-            if not (client.execute_command('sudo -n true') or client.execute_command('[ `id -u` == "0" ]')):
-                raise Exception('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.'.format(user=user.user, ip=ip))
             res = client.connect(self.obd.stdio, exit=False)
             if res != True:
-                return False
+                raise Exception("{user}@{ip} connect failed: username or password error".format(user=user.user, ip=ip))
+            if not (client.execute_command('[ `id -u` == "0" ]') or client.execute_command('sudo -n true')):
+                raise Exception('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.'.format(user=user.user, ip=ip))
         return True
 
     def generate_secure_ocp_deployment(self, ocp_deployment):
@@ -500,7 +517,7 @@ class OcpHandler(BaseHandler):
                     if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
                         java_check = False
             res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False,
-                                       work_dir_check=True, precheck=True, java_check=java_check, clients=ssh_clients, 
+                                       work_dir_check=True, precheck=True, java_check=java_check, clients=ssh_clients, source_option = 'start_check',
                                        sys_cursor=self.context['metadb_cursor'], components=list(self.obd.deploy.deploy_config.components.keys()))
             if not res and res.get_return("exception"):
                 raise res.get_return("exception")
@@ -576,9 +593,9 @@ class OcpHandler(BaseHandler):
             elif v.status == v.FAIL:
                 check_info.result = PrecheckEventResult.FAILED
                 check_info.code = v.error.code
-                check_info.advisement = v.error.msg
-                print(k, vars(v))
+                check_info.description = v.error.msg
                 check_info.recoverable = len(v.suggests) > 0 and v.suggests[0].auto_fix
+                check_info.advisement = v.suggests[0].msg if len(v.suggests) > 0 and v.suggests[0].msg is not None else ''
                 all_passed = False
                 info.status = TaskStatus.FINISHED
                 info.result = TaskResult.FAILED
@@ -733,12 +750,12 @@ class OcpHandler(BaseHandler):
         deploy = self.obd.deploy
         self.obd.set_deploy(None)
         log.get_logger().info("start create meta tenant")
-        create_meta_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(meta_tenant_config)], clients = ssh_clients)
+        create_meta_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(meta_tenant_config)], clients=ssh_clients)
         if not create_meta_ret:
             self.obd.set_deploy(deploy)
             raise Exception("Create meta tenant failed")
         log.get_logger().info("start create monitor tenant")
-        create_monitor_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(monitor_tenant_config)], clients = ssh_clients)
+        create_monitor_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(monitor_tenant_config)], clients=ssh_clients)
         if not create_monitor_ret:
             self.obd.set_deploy(deploy)
             raise Exception("Create monitor tenant failed")
@@ -825,6 +842,7 @@ class OcpHandler(BaseHandler):
             servers = config.components.ocpserver.servers
             port = config.components.ocpserver.port
             password = config.components.ocpserver.admin_password
+            password = RSAHandler().decrypt_private_key(password)
             address = ['http://' + str(server) + ':' + str(port) for server in servers]
             self.obd.options._update_loose({"address": address[0], "user": 'admin', "password": password})
             self.obd.export_to_ocp(name)
@@ -858,7 +876,7 @@ class OcpHandler(BaseHandler):
                 for plugin in const.INIT_PLUGINS:
                     task_info.current = f'{component}-{plugin}'
                     step_info = TaskStepInfo(name=f'{component}-{plugin}', status=TaskStatus.RUNNING, result=TaskResult.RUNNING)
-                    if self.obd.namespaces[component].get_return(plugin) is not None:
+                    if self.obd.namespaces[component].get_return(plugin).value is not None:
                         if not self.obd.namespaces[component].get_return(plugin):
                             failed += 1
                             step_info.result = TaskResult.FAILED
@@ -874,7 +892,7 @@ class OcpHandler(BaseHandler):
                 task_info.current = f'{component}-{plugin}'
                 if component not in self.obd.namespaces:
                     break
-                if self.obd.namespaces[component].get_return(plugin) is not None:
+                if self.obd.namespaces[component].get_return(plugin).value is not None:
                     if not self.obd.namespaces[component].get_return(plugin):
                         step_info.result = TaskResult.FAILED
                         failed += 1
@@ -1017,7 +1035,7 @@ class OcpHandler(BaseHandler):
             step_info = TaskStepInfo(name=f'{c}-{const.DESTROY_PLUGIN}', status=TaskStatus.RUNNING,
                                      result=TaskResult.RUNNING)
             if c in self.obd.namespaces:
-                if self.obd.namespaces[c].get_return(const.DESTROY_PLUGIN) is not None:
+                if self.obd.namespaces[c].get_return(const.DESTROY_PLUGIN).value is not None:
                     task_info.status = TaskStatus.RUNNING
                     task_info.current = f'{c}-{const.DESTROY_PLUGIN}'
                     step_info.status = TaskStatus.FINISHED
@@ -1034,7 +1052,7 @@ class OcpHandler(BaseHandler):
                 for plugin in const.INIT_PLUGINS:
                     task_info.current = f'{component}-{plugin}'
                     step_info = TaskStepInfo(name=f'{component}-{plugin}', status=TaskStatus.RUNNING, result=TaskResult.RUNNING)
-                    if self.obd.namespaces[component].get_return(plugin) is not None:
+                    if self.obd.namespaces[component].get_return(plugin).value is not None:
                         if not self.obd.namespaces[component].get_return(plugin):
                             failed += 1
                             step_info.result = TaskResult.FAILED
@@ -1050,7 +1068,7 @@ class OcpHandler(BaseHandler):
                 task_info.current = f'{component}-{plugin}'
                 if component not in self.obd.namespaces:
                     break
-                if self.obd.namespaces[component].get_return(plugin) is not None:
+                if self.obd.namespaces[component].get_return(plugin).value is not None:
                     if not self.obd.namespaces[component].get_return(plugin):
                         step_info.result = TaskResult.FAILED
                         failed += 1
@@ -1127,7 +1145,7 @@ class OcpHandler(BaseHandler):
         for c in self.obd.deploy.deploy_config.components:
             step_info = TaskStepInfo(name=f'{c}-{const.DESTROY_PLUGIN}', status=TaskStatus.RUNNING, result=TaskResult.RUNNING)
             if c in self.obd.namespaces:
-                if self.obd.namespaces[c].get_return(const.DESTROY_PLUGIN) is not None:
+                if self.obd.namespaces[c].get_return(const.DESTROY_PLUGIN).value is not None:
                     task_info.status = TaskStatus.RUNNING
                     task_info.current = f'{c}-{const.DESTROY_PLUGIN}'
                     step_info.status = TaskStatus.FINISHED
@@ -1638,6 +1656,7 @@ class OcpHandler(BaseHandler):
                 opt = Values()
                 setattr(opt, "without_parameter", True)
                 setattr(opt, "skip_password_check", True)
+                setattr(opt, "source_option", 'upgrade')
                 self.obd.set_options(opt)
                 log.get_logger().info('begin start ocp')
                 ret = self.obd.start_cluster(name)
@@ -1667,21 +1686,21 @@ class OcpHandler(BaseHandler):
             task_info.current = f'{component}-{plugin}'
             if component not in self.obd.namespaces:
                 break
-            if self.obd.namespaces[component].get_return('stop') is not None:
+            if self.obd.namespaces[component].get_return('stop').value is not None:
                 if not self.obd.namespaces[component].get_return('stop'):
                     step_info.result = TaskResult.FAILED
                 else:
                     step_info.result = TaskResult.SUCCESSFUL
                 step_info.status = TaskStatus.FINISHED
 
-            if self.obd.namespaces[component].get_return('start') is not None:
+            if self.obd.namespaces[component].get_return('start').value is not None:
                 if not self.obd.namespaces[component].get_return('start'):
                     step_info.result = TaskResult.FAILED
                 else:
                     step_info.result = TaskResult.SUCCESSFUL
                 step_info.status = TaskStatus.FINISHED
 
-            if self.obd.namespaces[component].get_return('display') is not None:
+            if self.obd.namespaces[component].get_return('display').value is not None:
                 if not self.obd.namespaces[component].get_return('display'):
                     step_info.result = TaskResult.FAILED
                 else:
@@ -1707,7 +1726,7 @@ class OcpHandler(BaseHandler):
         config = self.context['ocp_deployment_info'][id]['config']
         servers = config.components.ocpserver.servers
         port = config.components.ocpserver.port
-        password = config.components.ocpserver.admin_password
+        password = ''
         address = ['http://' + str(server) + ':' + str(port) for server in servers]
         return OcpInstalledInfo(url=address, password=password)
 

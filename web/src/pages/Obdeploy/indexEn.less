@@ -8,7 +8,7 @@
 .videoContainer {
   position: relative;
   width: 100%;
-  height:100%;
+  height: 100%;
   padding-top: 50px;
   overflow: hidden;
   text-align: center;
@@ -295,7 +295,7 @@
 }
 
 .popupClassName {
-  width: 500px !important;
+  width: 530px !important;
   .localTag {
     float: right;
     color: #006aff;
@@ -403,6 +403,31 @@
         inset-inline-end: 0;
       }
     }
+    .ant-col {
+      border-inline-end: none !important;
+      .ant-pro-card::before {
+        position: absolute;
+        top: 50%;
+        width: 1px;
+        height: 48px;
+        background-color: #e8eaf3;
+        transform: translateY(-50%);
+        transition: #e8eaf3 0.3s;
+        content: '';
+        inset-inline-end: 0;
+      }
+    }
+  }
+  .targetCard::before {
+    display: none !important;
+  }
+}
+
+.clusterConfigCard {
+  :global {
+    .ant-pro-card-col {
+      flex-basis: 25%;
+    }
   }
 }
 
@@ -417,6 +442,7 @@
   :global {
     .ant-pro-card-body {
       padding-top: 0 !important;
+      padding-right: 0 !important;
       overflow: auto;
     }
     .ant-pro-card-header {
@@ -450,6 +476,16 @@
   .preCheckBtn {
     height: 28px !important;
     padding: 2px 8px !important;
+    border: none;
+  }
+
+  .disabledPreCheckBtn {
+    background-image: linear-gradient(111deg, #99d5ff 0%, #99b3ff 100%);
+    border-radius: 6px;
+    font-size: 14px;
+    color: #ffffff;
+    line-height: 22px;
+    border: none;
   }
 
   :global {
@@ -714,6 +750,9 @@
       padding-bottom: 0 !important;
       border-bottom: none !important;
     }
+    .ant-table-tbody > tr > td {
+      vertical-align: top;
+    }
   }
 }
 
@@ -882,7 +921,26 @@
   }
 }
 
-:global {
-  .english-container {
+.paramContent {
+  :global {
+    .ant-select-arrow {
+      color: #5c6b8a;
+    }
   }
+}
+
+.descContent {
+  display: flex;
+  justify-content: space-between;
+  .learnMore {
+    margin-right: 16px;
+    color: #006aff !important;
+  }
+}
+
+.firstCell,
+.thirdCell,
+.secondCell {
+  padding-left: 0px !important;
+  padding-right: 0px !important;
 }

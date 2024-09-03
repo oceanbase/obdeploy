@@ -1,35 +1,22 @@
-import { intl } from '@/utils/intl';
-import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
-import { Space, notification, ConfigProvider, Dropdown, Modal } from 'antd';
-import {
-  HomeOutlined,
-  ReadOutlined,
-  ProfileOutlined,
-  GlobalOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons';
-import useRequest from '@/utils/useRequest';
-import { getErrorInfo, getRandomPassword } from '@/utils';
-import { getDeployment } from '@/services/ob-deploy-web/Deployments';
 import { validateOrSetKeepAliveToken } from '@/services/ob-deploy-web/Common';
-import Welcome from './Welcome';
-import InstallConfig from './InstallConfig';
-import NodeConfig from './NodeConfig';
+import { getDeployment } from '@/services/ob-deploy-web/Deployments';
+import { getErrorInfo, getRandomPassword } from '@/utils';
+import { intl } from '@/utils/intl';
+import useRequest, { requestPipeline } from '@/utils/useRequest';
+import { InfoCircleOutlined } from '@ant-design/icons';
+import { Modal } from 'antd';
+import { useEffect, useState } from 'react';
+import { getLocale, useModel } from 'umi';
 import ClusterConfig from './ClusterConfig';
-import PreCheck from './PreCheck';
-import InstallProcess from './InstallProcess';
-import InstallFinished from './InstallFinished';
 import ExitPage from './ExitPage';
+import styles from './index.less';
+import InstallConfig from './InstallConfig';
+import InstallFinished from './InstallFinished';
+import InstallProcess from './InstallProcess';
+import NodeConfig from './NodeConfig';
+import PreCheck from './PreCheck';
 import ProgressQuit from './ProgressQuit';
 import Steps from './Steps';
-import { localeList, localeText } from '@/constants';
-import type { Locale } from 'antd/es/locale-provider';
-import { setLocale, getLocale } from 'umi';
-import enUS from 'antd/es/locale/en_US';
-import zhCN from 'antd/es/locale/zh_CN';
-import theme from '../theme';
-import styles from './index.less';
 
 export default function IndexPage() {
   const uuid = window.localStorage.getItem('uuid');
@@ -46,13 +33,9 @@ export default function IndexPage() {
     setFirst,
     token,
     setToken,
-    aliveTokenTimer
+    aliveTokenTimer,
   } = useModel('global');
-  const [lastError, setLastError] = useState<API.ErrorInfo>({});
   const [isInstall, setIsInstall] = useState(false);
-  const [localeConfig, setLocalConfig] = useState<Locale>(
-    locale === 'zh-CN' ? zhCN : enUS,
-  );
 
   const { run: fetchDeploymentInfo } = useRequest(getDeployment, {
     onError: (e: any) => {
@@ -97,7 +80,7 @@ export default function IndexPage() {
               setCurrentStep(8);
             }
           } else if (currentStep > 4) {
-            if (!isInstall) {
+            if (!isInstall && !requestPipeline.processExit) {
               handleValidateOrSetKeepAliveToken({
                 token: token,
                 is_clear: true,
@@ -105,17 +88,25 @@ export default function IndexPage() {
               setIsInstall(true);
             }
           } else {
-            aliveTokenTimer.current = setTimeout(() => {
-              handleValidateOrSetKeepAliveToken({ token });
-            }, 1000);
+            if (!requestPipeline.processExit)
+              aliveTokenTimer.current = setTimeout(() => {
+                handleValidateOrSetKeepAliveToken({ token });
+              }, 1000);
           }
           setFirst(false);
         }
       },
-      onError: () => {
-        if (currentStep > 4) {
+      onError: (err: any) => {
+        if (err?.errorPipeline.length >= 5) {
+          const errorInfo = getErrorInfo(err);
+          setErrorVisible(true);
+          setErrorsList([...errorsList, errorInfo]);
+        }
+        if (currentStep > 4 && !requestPipeline.processExit) {
           handleValidateOrSetKeepAliveToken({ token: token, is_clear: true });
         } else {
+          // 进程可能退出，停止轮询
+          if (requestPipeline.processExit) return;
           aliveTokenTimer.current = setTimeout(() => {
             handleValidateOrSetKeepAliveToken({ token });
           }, 1000);
@@ -123,21 +114,6 @@ export default function IndexPage() {
       },
     },
   );
-
-  const setCurrentLocale = (key: string) => {
-    if (key !== locale) {
-      setLocale(key);
-      window.localStorage.setItem('uuid', token);
-    }
-    setLocalConfig(key === 'zh-CN' ? zhCN : enUS);
-  };
-
-  const getLocaleItems = () => {
-    return localeList.map((item) => ({
-      ...item,
-      label: <a onClick={() => setCurrentLocale(item.key)}>{item.label}</a>,
-    }));
-  };
 
   const contentConfig = {
     1: <InstallConfig />,
@@ -152,7 +128,6 @@ export default function IndexPage() {
 
   useEffect(() => {
     let newToken = '';
-
     fetchDeploymentInfo({ task_status: 'INSTALLING' }).then(
       ({ success, data }: API.OBResponse) => {
         if (success && data?.items?.length) {
@@ -189,22 +164,6 @@ export default function IndexPage() {
     });
   }, []);
 
-  useEffect(() => {
-    const newLastError = errorsList?.[errorsList?.length - 1] || null;
-    if (errorVisible) {
-      if (newLastError?.desc !== lastError?.desc) {
-        notification.error({
-          description: newLastError?.desc,
-          message: newLastError?.title,
-          duration: null,
-        });
-      }
-    } else {
-      notification.destroy();
-    }
-    setLastError(newLastError);
-  }, [errorVisible, errorsList, lastError]);
-
   const containerStyle = {
     minHeight: `${
       currentStep < 6 ? 'calc(100% - 240px)' : 'calc(100% - 140px)'
@@ -218,87 +177,6 @@ export default function IndexPage() {
         locale !== 'zh-CN' ? styles.englishContainer : ''
       }`}
     >
-      <header className={styles.pageHeader}>
-        <img src="/assets/oceanbase.png" className={styles.logo} alt="logo" />
-        <span className={styles.logoText}>
-          {intl.formatMessage({
-            id: 'OBD.src.pages.DeploymentWizard',
-            defaultMessage: '部署向导',
-          })}
-        </span>
-        <Space className={styles.actionContent} size={25}>
-          <Dropdown menu={{ items: getLocaleItems() }}>
-            <a
-              className={styles.action}
-              onClick={(e) => e.preventDefault()}
-              data-aspm-click="c307509.d326700"
-              data-aspm-desc={intl.formatMessage({
-                id: 'OBD.src.pages.TopNavigationSwitchBetweenChinese',
-                defaultMessage: '顶部导航-中英文切换',
-              })}
-              data-aspm-param={``}
-              data-aspm-expo
-            >
-              <GlobalOutlined className={styles.actionIcon} />
-              {localeText[locale]}
-            </a>
-          </Dropdown>
-          <a
-            className={styles.action}
-            href="https://www.oceanbase.com/"
-            target="_blank"
-            data-aspm-click="c307509.d317285"
-            data-aspm-desc={intl.formatMessage({
-              id: 'OBD.src.pages.TopNavigationVisitTheOfficial',
-              defaultMessage: '顶部导航-访问官网',
-            })}
-            data-aspm-param={``}
-            data-aspm-expo
-          >
-            <HomeOutlined className={styles.actionIcon} />
-            {intl.formatMessage({
-              id: 'OBD.src.pages.VisitTheOfficialWebsite',
-              defaultMessage: '访问官网',
-            })}
-          </a>
-          <a
-            className={styles.action}
-            href="https://ask.oceanbase.com/"
-            target="_blank"
-            data-aspm-click="c307509.d317284"
-            data-aspm-desc={intl.formatMessage({
-              id: 'OBD.src.pages.TopNavigationAccessForum',
-              defaultMessage: '顶部导航-访问论坛',
-            })}
-            data-aspm-param={``}
-            data-aspm-expo
-          >
-            <ProfileOutlined className={styles.actionIcon} />
-            {intl.formatMessage({
-              id: 'OBD.src.pages.VisitTheForum',
-              defaultMessage: '访问论坛',
-            })}
-          </a>
-          <a
-            className={styles.action}
-            href="https://www.oceanbase.com/docs/obd-cn"
-            target="_blank"
-            data-aspm-click="c307509.d317286"
-            data-aspm-desc={intl.formatMessage({
-              id: 'OBD.src.pages.TopNavigationHelpCenter',
-              defaultMessage: '顶部导航-帮助中心',
-            })}
-            data-aspm-param={``}
-            data-aspm-expo
-          >
-            <ReadOutlined className={styles.actionIcon} />
-            {intl.formatMessage({
-              id: 'OBD.src.pages.HelpCenter',
-              defaultMessage: '帮助中心',
-            })}
-          </a>
-        </Space>
-      </header>
       <Steps />
       <div className={styles.pageContainer} style={containerStyle}>
         <main className={styles.pageMain}>

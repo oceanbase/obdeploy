@@ -5,15 +5,16 @@ import {
   Space,
   Tooltip,
   Button,
-  InputNumber,
   message,
   Modal,
 } from 'antd';
 import { QuestionCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useRequest } from 'ahooks';
+import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import { useModel } from 'umi';
 
 import * as Metadb from '@/services/ocp_installer_backend/Metadb';
+import { encrypt } from '@/utils/encrypt';
 import CustomFooter from '../CustomFooter';
 import InputPort from '../InputPort';
 import ExitBtn from '../ExitBtn';
@@ -78,15 +79,16 @@ export default function ConnectConfig({ setCurrent, current }: API.StepProp) {
   const nextStep = () => {
     form
       .validateFields()
-      .then((values) => {
+      .then(async (values) => {
         const { host, port, user, password } = values.metadb;
+        const { data: publicKey } = await getPublicKey();
         createMetadbConnection(
           { sys: true },
           {
             host,
             port,
             user,
-            password,
+            password: encrypt(password, publicKey) || password,
             cluster_name,
           },
         ).then(() => {

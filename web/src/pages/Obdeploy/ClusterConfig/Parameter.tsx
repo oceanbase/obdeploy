@@ -1,10 +1,10 @@
-import { intl } from '@/utils/intl';
-import { useEffect, useRef, useState } from 'react';
-import { Space, InputNumber, Input, Select } from 'antd';
-import { getLocale } from 'umi';
-import { changeUnit, isTakeUnit, takeNewUnit } from '@/constant/unit';
 import { PARAMETER_TYPE } from '@/constant/configuration';
+import { changeUnit, isTakeUnit, takeNewUnit } from '@/constant/unit';
 import { CONFIGSERVER_LOG_LEVEL } from '@/pages/constants';
+import { intl } from '@/utils/intl';
+import { Input, InputNumber, Select, Space } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { getLocale } from 'umi';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 
@@ -82,8 +82,11 @@ const AdaptiveInput = ({
   setUnit,
 }: AdaptiveInputProps) => {
   const { type, value } = parameterValue;
-  
-  if (type === PARAMETER_TYPE.numberLogogram || type === PARAMETER_TYPE.number) {
+
+  if (
+    type === PARAMETER_TYPE.numberLogogram ||
+    type === PARAMETER_TYPE.number
+  ) {
     return (
       <InputNumber
         placeholder={intl.formatMessage({
@@ -95,22 +98,20 @@ const AdaptiveInput = ({
         min="0"
         disabled={parameterValue?.adaptive}
         onBlur={onBlur}
-        onChange={(value) =>
-          {
-            setParameterValue({ 
-              ...parameterValue, 
-              value, 
-              isChanged: true 
-            })
-          }
-        }
+        onChange={(value) => {
+          setParameterValue({
+            ...parameterValue,
+            value,
+            isChanged: true,
+          });
+        }}
         value={parameterValue.value}
       />
     );
   }
   if (type === PARAMETER_TYPE.capacity || type === PARAMETER_TYPE.capacityMB) {
     return (
-      <div style={{ maxWidth: 126 }}>
+      <div style={{ width: 126 }}>
         <InputNumber
           placeholder={intl.formatMessage({
             id: 'OBD.pages.components.Parameter.PleaseEnter',
@@ -129,7 +130,7 @@ const AdaptiveInput = ({
             if (value !== null) {
               setParameterValue({
                 ...parameterValue,
-                value: String(value) + unit,
+                value: String(value?.toFixed()) + unit,
                 isChanged: true,
               });
             }
@@ -197,7 +198,7 @@ const AdaptiveInput = ({
     );
   }
 
-  if(value && CONFIGSERVER_LOG_LEVEL.includes(value)){
+  if (value && CONFIGSERVER_LOG_LEVEL.includes(value)) {
     return (
       <Select
         defaultValue={value}
@@ -232,11 +233,11 @@ const AdaptiveInput = ({
       disabled={parameterValue?.adaptive}
       onBlur={onBlur}
       onChange={(e) =>
-        setParameterValue({ 
-           ...parameterValue,
-           value: e.target.value,
-           isChanged: true,
-         })
+        setParameterValue({
+          ...parameterValue,
+          value: e.target.value,
+          isChanged: true,
+        })
       }
     />
   );
@@ -270,7 +271,7 @@ export default function Parameter({
     }
   }, [parameterValue]);
   return (
-    <Space size={4}>
+    <Space className={parameterValue?.auto && styles.paramContent} size={8}>
       <Select
         defaultValue={parameterValue?.adaptive}
         // className={styles.paramterSelect}
@@ -284,8 +285,8 @@ export default function Parameter({
             });
             setUnit(defaultUnit.current);
           } else {
-            setParameterValue({ 
-              ...parameterValue, 
+            setParameterValue({
+              ...parameterValue,
               adaptive: isAuto,
               isChanged: true,
             });

@@ -23,7 +23,6 @@ from __future__ import absolute_import, division, print_function
 
 import re, os
 import time
-from math import sqrt
 
 from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED, EC_OBSERVER_GET_MEMINFO_FAIL
 import _errno as err
@@ -31,23 +30,24 @@ from _types import Capacity
 from tool import ConfigUtil
 
 
-def get_system_memory(memory_limit, min_pool_memory, generate_config_mini):
-    if generate_config_mini and memory_limit <= 6 << 30:
+def get_system_memory(memory_limit):
+    if memory_limit < 12 << 30:
         system_memory = 1 << 30
-    elif memory_limit <= 8 << 30:
-        system_memory = 2 << 30
-    elif memory_limit <= 16 << 30:
-        system_memory = 3 << 30
-    elif memory_limit <= 32 << 30:
+    elif memory_limit < 20 << 30:
         system_memory = 5 << 30
-    elif memory_limit <= 48 << 30:
+    elif memory_limit < 40 << 30:
+        system_memory = 6 << 30
+    elif memory_limit < 60 << 30:
         system_memory = 7 << 30
-    elif memory_limit <= 64 << 30:
+    elif memory_limit < 80 << 30:
+        system_memory = 8 << 30
+    elif memory_limit < 100 << 30:
+        system_memory = 9 << 30
+    elif memory_limit < 130 << 30:
         system_memory = 10 << 30
     else:
-        memory_limit_gb = memory_limit >> 30
-        system_memory = int(3 * (sqrt(memory_limit_gb) - 3)) << 30
-    return max(system_memory, min_pool_memory)
+        system_memory = int(memory_limit * 0.08)
+    return system_memory
 
 
 def generate_config(plugin_context, generate_config_mini=False, auto_depend=False, generate_check=True, return_generate_keys=False, generate_consistent_config=False, only_generate_password=False, generate_password=True, *args, **kwargs):
@@ -56,7 +56,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
         if not only_generate_password:
             generate_keys += [
                 'memory_limit', 'datafile_size', 'log_disk_size', 'devname', 'system_memory', 'cpu_count', 'production_mode',
-                'syslog_level', 'enable_syslog_recycle', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size'
+                'syslog_level', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size'
             ]
         if generate_password:
             generate_keys += ['root_password', 'proxyro_password', 'ocp_meta_password', 'ocp_agent_monitor_password']
@@ -68,8 +68,8 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
         cluster_config.update_global_conf('appname', plugin_context.deploy_name)
     if original_global_conf.get('cluster_id') is None:
         cluster_config.update_global_conf('cluster_id', round(time.time()) % 4294901759, False)
-    if generate_password:
-        generate_random_password(cluster_config)
+    if generate_password or only_generate_password:
+        generate_random_password(cluster_config, auto_depend)
     if only_generate_password:
         return plugin_context.return_true()
 
@@ -101,8 +101,6 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
 
     global_config = cluster_config.get_global_conf()
     max_syslog_file_count_default = 4
-    if global_config.get('enable_syslog_recycle') is None:
-        update_global_conf('enable_syslog_recycle', True)
     if global_config.get('enable_syslog_wf') is None:
         update_global_conf('enable_syslog_wf', False)
     if global_config.get('max_syslog_file_count') is None:
@@ -151,7 +149,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
         auto_set_min_pool_memory = False
         system_memory = 0
         if user_server_config.get('system_memory'):
-            system_memory = Capacity(user_server_config.get('system_memory')).btyes
+            system_memory = Capacity(user_server_config.get('system_memory')).bytes
         if generate_config_mini and '__min_full_resource_pool_memory' not in user_server_config:
             auto_set_min_pool_memory = True
         min_pool_memory = server_config['__min_full_resource_pool_memory']
@@ -172,11 +170,11 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                 for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
                     if k in memory_key_map:
                         key = memory_key_map[k]
-                        server_memory_stats[key] = Capacity(str(v)).btyes
+                        server_memory_stats[key] = Capacity(str(v)).bytes
 
         if user_server_config.get('memory_limit_percentage'):
             if ip in ip_server_memory_info:
-                total_memory = Capacity(ip_server_memory_info[ip]['total']).btyes
+                total_memory = Capacity(ip_server_memory_info[ip]['total']).bytes
                 memory_limit = int(total_memory * user_server_config.get('memory_limit_percentage') / 100)
             elif generate_check:
                 stdio.error(EC_OBSERVER_GET_MEMINFO_FAIL.format(server=server))
@@ -215,11 +213,11 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                 else:
                     memory_limit = MIN_MEMORY
         else:
-            memory_limit = Capacity(server_config.get('memory_limit')).btyes
+            memory_limit = Capacity(server_config.get('memory_limit')).bytes
 
         if system_memory == 0:
             auto_set_system_memory = True
-            system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+            system_memory = get_system_memory(memory_limit)
             update_server_conf(server, 'system_memory', str(Capacity(system_memory, 0)))
 
         # cpu
@@ -236,8 +234,8 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
             stdio.warn('(%s): automatically adjust the cpu_count %s' % (server, MIN_CPU_COUNT))
 
         # disk
-        datafile_size = Capacity(server_config.get('datafile_size', 0)).btyes
-        log_disk_size = Capacity(server_config.get('log_disk_size', 0)).btyes
+        datafile_size = Capacity(server_config.get('datafile_size', 0)).bytes
+        log_disk_size = Capacity(server_config.get('log_disk_size', 0)).bytes
         if not server_config.get('datafile_size') or not server_config.get('log_disk_size'):
             disk = {'/': 0}
             ret = client.execute_command('df --block-size=1024')
@@ -303,10 +301,11 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                 else:
                     auto_set_log_disk_size = True
 
-            if user_server_config.get('enable_syslog_recycle') is False:
-                log_size = 1 << 30 # 默认先给1G普通日志空间
-            else:
+            if int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) != 0:
                 log_size = (256 << 20) * int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) * 4
+            else:
+                log_size = 1 << 30  # 默认先给1G普通日志空间
+
 
             if clog_dir_mount == data_dir_mount:
                 min_log_size = log_size if clog_dir_mount == home_path_mount else 0
@@ -316,14 +315,14 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                     MIN_NEED += min_memory * 3
                 else:
                     min_datafile_size = datafile_size
-                    MIN_NEED += Capacity(datafile_size).btyes
+                    MIN_NEED += Capacity(datafile_size).bytes
                 if auto_set_log_disk_size:
                     min_log_disk_size = memory_limit * 3
                     MIN_NEED += min_memory * 3
                 else:
                     min_log_disk_size = log_disk_size
-                    MIN_NEED += Capacity(min_log_disk_size).btyes
-                min_need = min_log_size + Capacity(min_datafile_size).btyes + Capacity(min_log_disk_size).btyes
+                    MIN_NEED += Capacity(min_log_disk_size).bytes
+                min_need = min_log_size + Capacity(min_datafile_size).bytes + Capacity(min_log_disk_size).bytes
 
                 disk_free = data_dir_disk['avail']
                 if MIN_NEED > disk_free:
@@ -340,7 +339,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                             memory_limit = MIN_MEMORY
                             update_server_conf(server, 'memory_limit', str(Capacity(memory_limit, 0)))
                         if auto_set_system_memory:
-                            system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+                            system_memory = get_system_memory(memory_limit)
                             update_server_conf(server, 'system_memory', str(Capacity(system_memory, 0)))
                 elif min_need > disk_free:
                     if generate_check and not auto_set_memory:
@@ -358,9 +357,9 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                         memory_factor -= 3
                     memory_limit = str(Capacity(disk_free / max(1, memory_factor), 0))
                     update_server_conf(server, 'memory_limit', memory_limit)
-                    memory_limit = Capacity(memory_limit).btyes
+                    memory_limit = Capacity(memory_limit).bytes
                     if auto_set_system_memory:
-                        system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+                        system_memory = get_system_memory(memory_limit)
                         update_server_conf(server, 'system_memory', str(Capacity(system_memory, 0)))
                     log_disk_size = memory_limit * 3
                     datafile_size = max(disk_free - log_disk_size, log_disk_size)
@@ -389,7 +388,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                             stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=str(Capacity(disk_free)), need=str(Capacity(min_need))))
                             success = False
                             continue
-                        datafile_min_memory_limit = Capacity(str(Capacity(datafile_min_memory_limit, 0))).btyes
+                        datafile_min_memory_limit = Capacity(str(Capacity(datafile_min_memory_limit, 0))).bytes
                         datafile_size = datafile_min_memory_limit * 3
 
                 log_disk_min_memory_limit = memory_limit
@@ -408,13 +407,13 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                             stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=str(Capacity(disk_free)), need=str(Capacity(min_need))))
                             success = False
                             continue
-                        log_disk_min_memory_limit = Capacity(str(Capacity(log_disk_min_memory_limit, 0))).btyes
+                        log_disk_min_memory_limit = Capacity(str(Capacity(log_disk_min_memory_limit, 0))).bytes
                         log_disk_size = log_disk_min_memory_limit * 3
 
                 if auto_set_memory:
                     update_server_conf(server, 'memory_limit', str(Capacity(memory_limit, 0)))
                     if auto_set_system_memory:
-                        system_memory = get_system_memory(memory_limit, min_pool_memory, generate_config_mini)
+                        system_memory = get_system_memory(memory_limit)
                         update_server_conf(server, 'system_memory', system_memory)
 
                 if auto_set_datafile_size:
@@ -453,10 +452,10 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                     server_info = servers_info.get(server)
                     if not server_info:
                         continue
-                    memory_limit = Capacity(server_info['memory_limit']).btyes
-                    system_memory = Capacity(server_info['system_memory']).btyes
-                    log_disk_size = Capacity(server_info['log_disk_size']).btyes
-                    min_pool_memory = Capacity(server_info['min_pool_memory']).btyes
+                    memory_limit = Capacity(server_info['memory_limit']).bytes
+                    system_memory = Capacity(server_info['system_memory']).bytes
+                    log_disk_size = Capacity(server_info['log_disk_size']).bytes
+                    min_pool_memory = Capacity(server_info['min_pool_memory']).bytes
                     if not sys_log_disk_size:
                         if not sys_memory_size:
                             sys_memory_size = max(min_pool_memory, min(int((memory_limit - system_memory) * 0.25), 16 << 30))
@@ -472,7 +471,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
             update_global_conf('ocp_meta_tenant_memory_size', '1536M')
 
     if generate_password:
-        generate_random_password(cluster_config)
+        generate_random_password(cluster_config, auto_depend)
 
     if generate_consistent_config:
         generate_global_config = generate_configs['global']
@@ -486,7 +485,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
                 if key in generate_configs.get(server, {}):
                     value = generate_configs[server][key]
                     servers.append(server)
-                    values.append(Capacity(value).btyes if is_capacity_key else value)
+                    values.append(Capacity(value).bytes if is_capacity_key else value)
             if values:
                 if len(values) != server_num and key in generate_global_config:
                     continue
@@ -549,19 +548,33 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
     stdio.stop_loading('fail')
 
 
-def generate_random_password(cluster_config):
+def generate_random_password(cluster_config, auto_depend):
     add_components = cluster_config.get_deploy_added_components()
     be_depend = cluster_config.be_depends
     global_config = cluster_config.get_original_global_conf()
-    if cluster_config.name in add_components and 'root_password' not in global_config:
+    be_depends = {
+        component: (auto_depend or component in be_depend)
+        for component in ['obagent', 'obproxy', 'obproxy-ce', 'oblogproxy', 'ocp-express']
+    }
+    added_components = {
+        component: component in add_components
+        for component in ['oceanbase', 'oceanbase-ce', 'obagent', 'obproxy', 'obproxy-ce', 'oblogproxy', 'ocp-express']
+    }
+
+    if added_components[cluster_config.name] and 'root_password' not in global_config:
         cluster_config.update_global_conf('root_password', ConfigUtil.get_random_pwd_by_total_length(20), False)
-    if 'obagent' in add_components and 'obagent' in be_depend and 'ocp_agent_monitor_password' not in global_config:
+
+    if added_components['obagent'] and be_depends['obagent'] and 'ocp_agent_monitor_password' not in global_config:
         cluster_config.update_global_conf('ocp_agent_monitor_password', ConfigUtil.get_random_pwd_by_total_length(), False)
-    
+
     if 'proxyro_password' not in global_config:
         for component_name in ['obproxy', 'obproxy-ce']:
-            if component_name in add_components and component_name in be_depend:
+            if added_components[component_name] and be_depends[component_name]:
                 cluster_config.update_global_conf('proxyro_password', ConfigUtil.get_random_pwd_by_total_length(), False)
 
-    if 'ocp-express' in add_components and 'ocp-express' in be_depend and 'ocp_meta_password' not in global_config:
-        cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+    if (added_components['ocp-express'] and be_depends['ocp-express'] and 'ocp_meta_password' not in global_config) or \
+          any([key in global_config for key in ["ocp_meta_tenant", "ocp_meta_db", "ocp_meta_username", "ocp_meta_password"]]):
+            if 'ocp_root_password' not in global_config:
+                cluster_config.update_global_conf('ocp_root_password', ConfigUtil.get_random_pwd_by_total_length(), False) # 不支持在配置文件中中配置
+            if 'ocp_meta_password' not in global_config :
+                cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length(), False)

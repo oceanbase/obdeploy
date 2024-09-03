@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function
 import os
 
 from _rpm import Version
-from _stdio import FormtatText
+from _stdio import FormatText
 
 
 def upgrade_check(plugin_context, current_repository, upgrade_repositories, route, cursor, *args, **kwargs):
@@ -44,7 +44,7 @@ def upgrade_check(plugin_context, current_repository, upgrade_repositories, rout
                     need_upgrade_standbys.append(standby_deploy_name)
         if need_upgrade_standbys:
             stdio.warn('Found standby tenant in {0}, upgrade current cluster may cause data synchronization error with standby tenants'.format(need_upgrade_standbys))
-            stdio.warn(FormtatText.success('Recommendation: upgrade clusters {0} first or switchover standby tenant to primary tenant or you can rerun upgrade with "--ignore-standby" option if you want to proceed despite the risks'.format(need_upgrade_standbys)))
+            stdio.warn(FormatText.success('Recommendation: upgrade clusters {0} first or switchover standby tenant to primary tenant or you can rerun upgrade with "--ignore-standby" option if you want to proceed despite the risks'.format(need_upgrade_standbys)))
             stdio.error('Check standby tenant version error.')
             return False
 

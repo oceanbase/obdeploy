@@ -86,7 +86,7 @@ export default function DeployConfig({
     setDeployMemory,
     tableData,
     setTableData,
-    setNeedDestroy
+    setNeedDestroy,
   } = useModel('ocpInstallData');
 
   const {
@@ -103,6 +103,7 @@ export default function DeployConfig({
   const isUpdate = taiPath === 'update';
   const isNewDB = taiPath === 'install';
   const [form] = ProForm.useForm();
+  const [nextLoading, setNextLoading] = useState(false);
   const checkRegInfo = {
     reg: isUpdate ? updateClusterNameReg : clusterNameReg,
     msg: isUpdate
@@ -485,11 +486,14 @@ export default function DeployConfig({
     onSuccess: (res) => {
       if (res.success) {
         // res.data.name = ['aaa','bbb','ccc']
-        let clusterNames = res.data?.name.map((val: string) => ({
-          label: val,
-          value: val,
-        }));
-        setClusterOption(clusterNames || []);
+        let clusterNames = [];
+        if (Array.isArray(res.data?.name)) {
+          clusterNames = res.data?.name?.map((val: string) => ({
+            label: val,
+            value: val,
+          }));
+        }
+        setClusterOption(clusterNames);
       }
     },
   });
@@ -513,7 +517,7 @@ export default function DeployConfig({
     if (isUpdate) {
       history.push('/updateWelcome');
     } else {
-      history.push('/ocpInstaller');
+      history.push('/guide');
     }
   };
 
@@ -532,9 +536,10 @@ export default function DeployConfig({
     return oldName !== newName;
   };
 
-  const nextStep = () => {
+  const nextStep = async () => {
     if (form.getFieldsError(['appname'])[0].errors.length) return;
-    form.validateFields().then(async (values) => {
+    setNextLoading(true);
+    await form.validateFields().then(async (values) => {
       let newComponents: API.Components, newOcpConfigData: any;
       if (!isNewDB) {
         newComponents = {
@@ -592,7 +597,7 @@ export default function DeployConfig({
         !clusterOption.some((option) => option.value === values?.appname)
       ) {
         setNeedDestroy(true);
-      }else{
+      } else {
         setNeedDestroy(false);
       }
       if (isUpdate && changeClusterName(values?.appname)) {
@@ -622,6 +627,7 @@ export default function DeployConfig({
       setErrorVisible(false);
       setErrorsList([]);
     });
+    setNextLoading(false);
   };
 
   const oparete = (item: any, dataSource: any, memory: number) => {
@@ -827,6 +833,8 @@ export default function DeployConfig({
         <Space className={styles.spaceWidth} direction="vertical" size="middle">
           <ProCard className={styles.pageCard} split="horizontal">
             <ProCard
+              headStyle={{ color: '#132039' }}
+              bodyStyle={{ paddingBottom: 0 }}
               title={
                 isNewDB
                   ? intl.formatMessage({
@@ -870,6 +878,7 @@ export default function DeployConfig({
               </ProForm>
             </ProCard>
             <ProCard
+              headStyle={{ color: '#132039' }}
               title={
                 <>
                   {intl.formatMessage({
@@ -879,15 +888,13 @@ export default function DeployConfig({
 
                   <span className={styles.titleExtra}>
                     <InfoCircleOutlined style={{ marginRight: 4 }} />
-                    {intl.formatMessage({
-                      id: 'OBD.component.DeployConfig.EstimatedInstallationRequirements',
-                      defaultMessage: '预计安装需要',
-                    })}
-                    {caculateSize(deployMemory)}
-                    {intl.formatMessage({
-                      id: 'OBD.component.DeployConfig.MbSpace',
-                      defaultMessage: 'MB空间',
-                    })}
+                    {intl.formatMessage(
+                    {
+                      id: 'OBD.pages.components.InstallConfig.EstimatedInstallationRequiresSizeMb',
+                      defaultMessage: '预计安装需要 {size}MB 空间',
+                    },
+                    { size: caculateSize(deployMemory) },
+                  )}
                   </span>
                 </>
               }
@@ -973,13 +980,12 @@ export default function DeployConfig({
                   )
                 ) : null}
                 <ProCard
-                  type="inner"
+                  // type="inner"
                   className={`${styles.componentCard}`}
                   style={{ border: '1px solid #e2e8f3' }}
-                  //   key={oceanBaseInfo.group}
                 >
                   <Table
-                    className={styles.componentTable}
+                    // className={styles.componentTable}
                     columns={getColumns()}
                     pagination={false}
                     dataSource={tableData}
@@ -1019,6 +1025,7 @@ export default function DeployConfig({
           type="primary"
           disabled={existNoVersion || versionLoading || componentLoading}
           onClick={nextStep}
+          loading={nextLoading}
         >
           {intl.formatMessage({
             id: 'OBD.component.DeployConfig.NextStep',

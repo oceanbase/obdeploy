@@ -118,10 +118,11 @@ def bootstrap(plugin_context, *args, **kwargs):
     has_obagent = "obagent" in added_components and "obagent" in be_depend
     if has_obagent or ('ocp_agent_monitor_password' in global_conf and "obagent" not in changed_components):
         value = global_conf['ocp_agent_monitor_password'] if global_conf.get('ocp_agent_monitor_password') is not None else ''
-        sql = 'create user if not exists "ocp_monitor" IDENTIFIED BY %s'
+        agent_user = cluster_config.get_global_conf_with_default().get('ocp_agent_monitor_username')
+        sql = "create user if not exists '{username}' IDENTIFIED BY %s".format(username=agent_user)
         stdio.verbose(sql)
         raise_cursor.execute(sql, [value])
-        sql = 'grant select on oceanbase.* to ocp_monitor IDENTIFIED BY %s'
+        sql = "grant select on oceanbase.* to '{username}' IDENTIFIED BY %s".format(username=agent_user)
         stdio.verbose(sql)
         raise_cursor.execute(sql, [value])
 

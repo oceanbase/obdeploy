@@ -229,7 +229,7 @@
   description_local: OceanBase 监控指标采集状态，active 表示开启，inactive 表示关闭
 - name: target_sync_configs
   require: false
-  type: PARAM_LIST
+  type: LIST
   need_restart: true
   description_en:
   description_local: '''将地址同步至指定远端目录

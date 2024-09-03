@@ -2,14 +2,14 @@ variables:
   ssh:
     - name: host
       config_key: host
-      components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus']
+      components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     - name: user
       config_key: username
-      components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus']
+      components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
   server:
     - name: home_path
       config_key: home_path
-      components:  ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus']
+      components:  ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     - name: mysql_port
       config_key: mysql_port
       components: ['oceanbase', 'oceanbase-ce']
@@ -31,12 +31,12 @@ wrappers:
 
 commands:
   - name: ssh
-    components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus']
+    components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     command: "cd {home_path}/log; echo 'ssh {user}@{host}'; bash --login"
     wrapper: "ssh"
     interactive: true
   - name: log
-    components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus']
+    components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     command: "cd {home_path}/log; echo 'ssh {user}@{host}'; ls -l; bash --login"
     wrapper: "ssh"
     interactive: true

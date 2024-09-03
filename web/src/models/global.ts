@@ -6,12 +6,10 @@ import useRequest from '@/utils/useRequest';
 import { getLocale } from '@umijs/max';
 import { useRef, useState } from 'react';
 
-
-
-// export { docs };
-
 export default () => {
   const initAppName = 'myoceanbase';
+
+  let timerProgress: NodeJS.Timer | null = null;
   const [selectedConfig, setSelectedConfig] = useState([
     'obproxy',
     'ocp-express',
@@ -33,7 +31,10 @@ export default () => {
   const [errorVisible, setErrorVisible] = useState(false);
   const [errorsList, setErrorsList] = useState<API.ErrorInfo[]>([]);
   const [first, setFirst] = useState<boolean>(true);
+  const [loadTypeVisible, setLoadTypeVisible] = useState(false);
   const [token, setToken] = useState('');
+  const [scenarioParam, setScenarioParam] = useState<any>();
+  const [selectedLoadType, setSelectedLoadType] = useState('htap');
   const [clusterMoreConfig, setClusterMoreConfig] = useState<
     API.NewParameterMeta[]
   >([]);
@@ -88,6 +89,8 @@ export default () => {
     isDraft,
     setIsDraft,
     clusterMore,
+    scenarioParam,
+    setScenarioParam,
     setClusterMore,
     ocpClusterMore,
     setOcpClusterMore,
@@ -120,6 +123,11 @@ export default () => {
     token,
     setToken,
     aliveTokenTimer,
-    ...docs
+    loadTypeVisible,
+    setLoadTypeVisible,
+    selectedLoadType,
+    setSelectedLoadType,
+    timerProgress,
+    ...docs,
   };
 };

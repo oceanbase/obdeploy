@@ -344,6 +344,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             database = server_config.get('ocp_meta_db', '')
         connected = False
         retries = 300
+        tenant_map = {'meta@ocp_meta': {'user': 'meta@ocp', 'database': 'ocp_express'}, 'meta@ocp': {'user': 'meta@ocp_meta', 'database': 'ocp_meta'}}
         while not connected and retries:
             for connect_info in connect_infos:
                 retries -= 1
@@ -365,6 +366,9 @@ def start(plugin_context, start_env=None, *args, **kwargs):
                                 stdio.verbose("failed to update 'need_change_password' to true in user table")   
                     break
                 except:
+                    if tenant_map.get(jdbc_username, {}):
+                        database = tenant_map.get(jdbc_username, {}).get('database')
+                        jdbc_username = tenant_map.get(jdbc_username, {}).get('user')
                     time.sleep(1)
         if not connected:
             success = False
@@ -378,7 +382,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         else:
             public_key_str = ""
         memory_size = server_config['memory_size']
-        jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(Capacity(memory_size).btyes * 0.5, 0)).lower())
+        jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(Capacity(memory_size).bytes * 0.5, 0)).lower())
         java_bin = server_config['java_bin']
         client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
         cmd = '{java_bin} -jar {jvm_memory_option} -DJDBC_URL={jdbc_url} -DJDBC_USERNAME={jdbc_username}' \

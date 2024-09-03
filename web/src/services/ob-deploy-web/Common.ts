@@ -24,3 +24,7 @@ export async function exitProcess(options?: { [key: string]: any }) {
     ...(options || {}),
   });
 }
+
+export async function getPublicKey(){
+  return request<API.OBResponse>('api/v1/keys/rsa/public')
+}
