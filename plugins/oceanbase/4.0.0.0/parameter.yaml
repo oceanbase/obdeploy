@@ -1051,7 +1051,7 @@
   name_local: 集群系统内存
   essential: true
   type: CAPACITY_MB
-  default: 30G
+  default: 0
   min_value: 0M
   max_value: NULL
   section: OBSERVER

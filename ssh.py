@@ -52,7 +52,7 @@ __all__ = ("SshClient", "SshConfig", "LocalClient", "ConcurrentExecutor")
 
 class SshConfig(object):
 
-    def __init__(self, host, username='root', password=None, key_filename=None, port=22, timeout=30):
+    def __init__(self, host, username='root', password=None, key_filename=None, port=22, timeout=300):
         self.host = host
         self.username = username
         self.password = password if password is None else str(password)

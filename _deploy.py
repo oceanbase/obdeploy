@@ -55,7 +55,7 @@ class UserConfig(object):
         'password': None,
         'key_file': None,
         'port': 22,
-        'timeout': 30
+        'timeout': 300
     }
 
     def __init__(self, username=None, password=None, key_file=None, port=None, timeout=None):

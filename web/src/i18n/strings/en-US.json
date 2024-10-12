@@ -1067,5 +1067,8 @@
   "OBD.Obdeploy.ClusterConfig.PortObproxySql": "Port OBProxy SQL",
   "OBD.Obdeploy.ClusterConfig.PortObproxyRpc": "Port OBProxy RPC",
   "OBD.pages.ComponentUninstall.UninstallConfig.ByDefaultComponentsWithDependencies": "By default, components with dependencies are uninstalled.",
-  "OBD.pages.Obdeploy.InstallFinished.ConnectionString": "Connection string"
+  "OBD.pages.Obdeploy.InstallFinished.ConnectionString": "Connection string",
+  "OBD.component.DeployConfig.UnableToObtainTheAvailable": "Unable to obtain the available installation package",
+  "OBD.component.DeployConfig.ByDefaultTheDatabaseVersion": "By default, the database version of MetaDB is 4.2.1.8. You cannot modify the database version.",
+  "OBD.component.InsstallResult.TheSystemWillUpgradeOcp": "The system will upgrade OCP Agent by default. Please go to OCP Task Center to view the upgrade progress."
 }

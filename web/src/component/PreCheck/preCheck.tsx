@@ -82,6 +82,7 @@ export default function PreCehckComponent({
   hasManual,
   setOnlyManual,
   handleAutoRepair,
+  handelCheck,
   hasAuto,
   recoverLoading,
   showFailedList,
@@ -135,7 +136,7 @@ export default function PreCehckComponent({
     timelineContainer.onmousewheel = handleScrollTimeline; // ie , chrome
     timelineContainer?.addEventListener('DOMMouseScroll', handleScrollTimeline); // firefox
     return () => {
-      timelineContainer.onmousewheel = () => {};
+      timelineContainer.onmousewheel = () => { };
       timelineContainer?.removeEventListener(
         'DOMMouseScroll',
         handleScrollTimeline,
@@ -166,7 +167,7 @@ export default function PreCehckComponent({
     return () => {
       const failedContainer = document.getElementById('failed-container');
       if (failedContainer) {
-        failedContainer.onmousewheel = () => {};
+        failedContainer.onmousewheel = () => { };
         failedContainer?.removeEventListener(
           'DOMMouseScroll',
           handleScrollFailed,
@@ -212,17 +213,17 @@ export default function PreCehckComponent({
           checkStatus
             ? checkFinished
               ? intl.formatMessage({
-                  id: 'OBD.component.PreCheck.preCheck.CheckCompleted',
-                  defaultMessage: '检查完成',
-                })
-              : intl.formatMessage({
-                  id: 'OBD.component.PreCheck.preCheck.Checking',
-                  defaultMessage: '检查中',
-                })
-            : intl.formatMessage({
-                id: 'OBD.component.PreCheck.preCheck.CheckFailed',
-                defaultMessage: '检查失败',
+                id: 'OBD.component.PreCheck.preCheck.CheckCompleted',
+                defaultMessage: '检查完成',
               })
+              : intl.formatMessage({
+                id: 'OBD.component.PreCheck.preCheck.Checking',
+                defaultMessage: '检查中',
+              })
+            : intl.formatMessage({
+              id: 'OBD.component.PreCheck.preCheck.CheckFailed',
+              defaultMessage: '检查失败',
+            })
         }
         gutter={16}
         className="card-padding-bottom-24"
@@ -274,9 +275,9 @@ export default function PreCehckComponent({
                 percent={
                   statusData?.finished
                     ? NP.times(
-                        NP.divide(statusData?.finished, statusData?.total!),
-                        100,
-                      )
+                      NP.divide(statusData?.finished, statusData?.total!),
+                      100,
+                    )
                     : 0
                 }
                 status={checkStatus ? progressStatus : 'exception'}
@@ -294,9 +295,8 @@ export default function PreCehckComponent({
                     return (
                       <Timeline.Item
                         key={index}
-                        id={`${
-                          timelineData?.isRunning ? 'running-timeline-item' : ''
-                        }`}
+                        id={`${timelineData?.isRunning ? 'running-timeline-item' : ''
+                          }`}
                         color={statusColorConfig[timelineData?.result]}
                         dot={
                           timelineData?.result ? (
@@ -352,6 +352,11 @@ export default function PreCehckComponent({
                 type="primary"
                 disabled={!checkFinished || !hasAuto}
                 onClick={handleAutoRepair}
+                // 修复回滚，引发检查列表问题
+                // onClick={() => {
+                //   handelCheck()
+                //   handleAutoRepair()
+                // }}
                 loading={recoverLoading}
                 data-aspm-click="c307513.d317292"
                 data-aspm-desc={intl.formatMessage({
