@@ -1,0 +1,1963 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: PATH
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the work data file
+  description_local: OceanBase工作目录
+- name: cluster_id
+  name_local: 集群ID
+  require: true
+  essential: true
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: 4294901759
+  modify_limit: modify
+  need_redeploy: true
+  description_en: ID of the cluster
+  description_local: 本OceanBase集群ID
+- name: data_dir
+  name_local: 数据目录
+  essential: true
+  type: PATH
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the data file
+  description_local: 存储sstable等数据的目录
+- name: redo_dir
+  name_local: 日志目录
+  essential: true
+  type: PATH
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the redo file
+  description_local: 存储clog, iclog, slog数据的目录
+- name: clog_dir
+  type: PATH
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the clog file
+  description_local: 存储clog数据的目录, clog 应该与 ilog 同盘
+- name: slog_dir
+  type: PATH
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the slog file
+  description_local: 存储slog数据的目录. 4.0版本开始不支持配置该项
+- name: ilog_dir
+  type: PATH
+  min_value: NULL
+  max_value: NULL
+  need_redeploy: true
+  description_en: the directory for the ilog file
+  description_local: 存储ilog数据的目录
+- name: rpc_port
+  name_local: 内部通信端口
+  require: true
+  essential: true
+  type: INT
+  default: 2882
+  min_value: 1025
+  max_value: 65535
+  modify_limit: modify
+  need_restart: true
+  description_en: the port number for RPC protocol.
+  description_local: 集群内部通信的端口号
+- name: mysql_port
+  name_local: 服务端口
+  require: true
+  essential: true
+  type: INT
+  default: 2881
+  min_value: 1025
+  max_value: 65535
+  modify_limit: modify
+  need_restart: true
+  description_en: port number for mysql connection
+  description_local: SQL服务协议端口号
+- name: obshell_port
+  name_local: obshell 服务端口
+  require: true
+  essential: true
+  type: INT
+  default: 2886
+  min_value: 1025
+  max_value: 65535
+  modify_limit: modify
+  need_redeploy: true
+  description_en: The port for obshell agent
+  description_local: obshell agent 的端口号
+- name: zone
+  require: true
+  type: SAFE_STRING
+  default: zone1
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_redeploy: true
+  description_en: specifies the zone name
+  description_local: 节点所在的zone的名字。
+- name: sys_cpu_limit_trigger
+  require: false
+  type: INT
+  default: 80
+  min_value: 50
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: when the cpu usage percentage exceed the trigger, will limit the sys cpu usage
+  description_local: 当CPU利用率超过该阈值的时候，将暂停系统后台任务的执行
+- name: memory_limit_percentage
+  require: false
+  type: INT
+  default: 80
+  min_value: 10
+  max_value: 90
+  modify_limit: decrease
+  section: OBSERVER
+  need_restart: false
+  description_en: memory limit percentage of the total physical memory
+  description_local: 系统总可用内存大小占总内存大小的百分比
+- name: sys_bkgd_migration_retry_num
+  require: false
+  type: INT
+  default: 3
+  min_value: 3
+  max_value: 100
+  section: OBSERVER
+  need_restart: false
+  description_en: retry num limit during migration.
+  description_local: 副本迁移失败时最多重试次数
+- name: tableapi_transport_compress_func
+  require: false
+  type: SAFE_STRING
+  default: none
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: compressor used for tableAPI query result.
+  description_local: tableAPI查询结果传输使用的压缩算法
+- name: disk_io_thread_count
+  require: false
+  type: INT
+  default: 8
+  min_value: 2
+  max_value: 32
+  section: OBSERVER
+  need_restart: false
+  description_en: The number of io threads on each disk.
+  description_local: 磁盘IO线程数。必须为偶数。
+- name: location_cache_refresh_min_interval
+  require: false
+  type: TIME
+  default: 100ms
+  min_value: 0s
+  max_value: NULL
+  section: LOCATION_CACHE
+  need_restart: false
+  description_en: the time interval in which no request for location cache renewal will be executed.
+  description_local: 位置缓存刷新请求的最小间隔，防止产生过多刷新请求造成系统压力过大
+- name: trace_log_slow_query_watermark
+  type: TIME
+  default: 1s
+  min_value: 1ms
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the threshold of execution time (in milliseconds) of a query beyond which it is considered to be a slow query.
+  description_local: 执行时间超过该阈值的查询会被认为是慢查询，慢查询的追踪日志会被打印到系统日志中
+- name: max_string_print_length
+  require: false
+  type: INT
+  default: 500
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: truncate very long string when printing to log file
+  description_local: 打印系统日志时，单行日志最大长度
+- name: row_compaction_update_limit
+  require: false
+  type: INT
+  default: 6
+  min_value: 1
+  max_value: 6400
+  section: TRANS
+  need_restart: false
+  description_en: maximum update count before trigger row compaction
+  description_local: 触发内存中行内数据合并的修改次数
+- name: enable_rereplication
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: specifies whether the partition auto-replication is turned on.
+  description_local: 自动补副本开关
+- name: rootservice_async_task_thread_count
+  require: false
+  type: INT
+  default: 4
+  min_value: 1
+  max_value: 10
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: maximum of threads allowed for executing asynchronous task at rootserver.
+  description_local: RootService内部异步任务使用的线程池大小
+- name: major_compact_trigger
+  require: false
+  type: INT
+  default: 5
+  min_value: 0
+  max_value: 65535
+  section: TENANT
+  need_restart: false
+  description_en: major_compact_trigger alias to minor_freeze_times
+  description_local: 多少次小合并触发一次全局合并。值为0时，表示关闭小合并
+- name: default_compress
+  require: false
+  type: SAFE_STRING
+  default: archive
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: default compress function name for create new table
+  description_local: Oracle模式下，建表时使用的默认压缩策略
+- name: ssl_client_authentication
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: true
+  description_en: enable server supports SSL connection, takes effect only after server restart with all ca/cert/key file.
+  description_local: 是否开启SSL连接功能
+- name: datafile_size
+  name_local: 数据文件大小
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: size of the data file. Please enter an capacity, such as 20G
+  description_local: 数据文件大小。请输入带容量带单位的整数，如20G
+- name: datafile_maxsize
+  name_local: 数据文件最大空间
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend max size. Please enter an capacity, such as 20G
+  description_local: 数据文件最大空间。请输入带容量带单位的整数，如20G
+- name: datafile_next
+  name_local: 数据文件自增步长
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend step. Please enter an capacity, such as 2G
+  description_local: 数据文件自增步长。请输入带容量带单位的整数，如2G
+- name: log_disk_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 99
+  description_en: the percentage of disk space used by the clog files.
+  description_local: Redo 日志占用其所在磁盘总空间的百分比。
+- name: log_disk_size
+  name_local: Redo 日志大小
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  description_en: the size of disk space used by the clog files. Please enter an capacity, such as 20G
+  description_local: Redo 日志磁盘的大小。请输入带容量带单位的整数，如24G
+- name: merge_stat_sampling_ratio
+  require: false
+  type: INT
+  default: 100
+  min_value: 0
+  max_value: 100
+  section: OBSERVER
+  need_restart: false
+  description_en: column stats sampling ratio daily merge.
+  description_local: 合并时候数据列统计信息的采样率
+- name: cache_wash_threshold
+  require: false
+  type: CAPACITY_MB
+  default: 4GB
+  min_value: 0B
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: size of remaining memory at which cache eviction will be triggered.
+  description_local: 触发缓存清理的容量阈值
+- name: user_iort_up_percentage
+  require: false
+  type: INT
+  default: 100
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: variable to control sys io, the percentage of use io rt can raise
+  description_local: 用户磁盘IO时延超过该阈值后，系统后台IO任务将被限流
+- name: high_priority_net_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 100
+  section: OBSERVER
+  need_restart: true
+  description_en: the number of rpc I/O threads for high priority messages, 0 means set off
+  description_local: 高优先级网络线程数，值0表示关闭
+- name: max_kept_major_version_number
+  require: false
+  type: INT
+  default: 2
+  min_value: 1
+  max_value: 16
+  section: DAILY_MERGE
+  need_restart: false
+  description_en: the maximum number of kept major versions
+  description_local: 数据保留多少个冻结版本
+- name: enable_sys_unit_standalone
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: specifies whether sys unit standalone deployment is turned on.
+  description_local: 系统租户UNIT是否独占节点
+- name: freeze_trigger_percentage
+  require: false
+  type: INT
+  default: 50
+  min_value: 1
+  max_value: 99
+  section: TENANT
+  need_restart: false
+  description_en: the threshold of the size of the mem store when freeze will be triggered.
+  description_local: 触发全局冻结的租户使用内存阈值。另见enable_global_freeze_trigger。
+- name: enable_major_freeze
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: specifies whether major_freeze function is turned on.
+  description_local: 自动全局冻结开关
+- name: balancer_tolerance_percentage
+  require: false
+  type: INT
+  default: 10
+  min_value: 1
+  max_value: 99
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: specifies the tolerance (in percentage) of the unbalance of the disk space utilization among all units.
+  description_local: 租户内多个UNIT间磁盘不均衡程度的宽容度，在均值+-宽容度范围之内的不均衡不会触发执行均衡动作
+- name: server_cpu_quota_min
+  require: false
+  type: DOUBLE
+  default: 2.5
+  min_value: 0
+  max_value: 16
+  section: TENANT
+  need_restart: true
+  description_en: the number of minimal vCPUs allocated to the server tenant(a special internal tenant that exists on every observer)
+  description_local: 系统可以使用的最小CPU配额，将会预留
+- name: memory_reserved
+  require: false
+  type: CAPACITY_MB
+  default: 500M
+  min_value: 10M
+  max_value: NULL
+  section: SSTABLE
+  need_restart: false
+  description_en: the size of the system memory reserved for emergency internal use.
+  description_local: 系统预留内存大小
+- name: server_cpu_quota_max
+  require: false
+  type: DOUBLE
+  default: 5
+  min_value: 0
+  max_value: 16
+  section: TENANT
+  need_restart: true
+  description_en: the number of maximal vCPUs allocated to the server tenant
+  description_local: 系统可以使用的最大CPU配额
+- name: rootservice_ready_check_interval
+  require: false
+  type: TIME
+  default: 3s
+  min_value: 100000us
+  max_value: 1m
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the interval between the schedule of the task that checks on the status of the ZONE during restarting.
+  description_local: RootService启动后等待和检查集群状态的时间间隔
+- name: debug_sync_timeout
+  require: false
+  type: TIME
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: Enable the debug sync facility and optionally specify a default wait timeout in micro seconds. A zero value keeps the facility disabled
+  description_local: 打开debug sync调试开关，并设置其超时时间；值为0时，则关闭。
+- name: syslog_level
+  require: false
+  type: SAFE_STRING
+  default: INFO
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the current level of logging.
+  description_local: 系统日志级别
+- name: resource_hard_limit
+  require: false
+  type: INT
+  default: 100
+  min_value: 1
+  max_value: 10000
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: Used along with resource_soft_limit in unit allocation. If server utilization is less than resource_soft_limit, a policy of best fit will be used for unit allocation; otherwise, a least load policy will be employed. Ultimately,system utilization should not be large than resource_hard_limit.
+  description_local: CPU和内存等资源进行分配的时候，资源总量是实际数量乘以该百分比的值
+- name: leak_mod_to_check
+  require: false
+  type: SAFE_STRING
+  default: NONE
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the name of the module under memory leak checks
+  description_local: 内存泄露检查，用于内部调试目的
+- name: balancer_task_timeout
+  require: false
+  type: TIME
+  default: 20m
+  min_value: 1s
+  max_value: NULL
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: the time to execute the load-balancing task before it is terminated.
+  description_local: 负载均衡等后台任务的超时时间
+- name: enable_upgrade_mode
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether upgrade mode is turned on. If turned on, daily merger and balancer will be disabled.
+  description_local: 升级模式开关。在升级模式中，会暂停部分系统后台功能。
+- name: multiblock_read_size
+  require: false
+  type: CAPACITY_MB
+  default: 128K
+  min_value: 0K
+  max_value: 2M
+  section: SSTABLE
+  need_restart: false
+  description_en: multiple block batch read size in one read io request.
+  description_local: 读取数据时IO聚合大小
+- name: migration_disable_time
+  require: false
+  type: TIME
+  default: 3600s
+  min_value: 1s
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the duration in which the observer stays in the block_migrate_in status, which means no partition is allowed to migrate into the server.
+  description_local: 因磁盘满等原因导致某个节点数据迁入失败时，暂停迁入时长
+- name: tablet_size
+  require: false
+  type: CAPACITY_MB
+  default: 128M
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: default tablet size, has to be a multiple of 2M
+  description_local: 分区内部并行处理（合并、查询等）时每个分片的大小
+- name: dead_socket_detection_timeout
+  require: false
+  type: TIME
+  default: 10s
+  min_value: 0s
+  max_value: 2h
+  section: OBSERVER
+  need_restart: false
+  description_en: specify a tcp_user_timeout for RFC5482. A zero value makes the option disabled
+  description_local: 失效socket检测超时时间
+- name: server_check_interval
+  require: false
+  type: TIME
+  default: 30s
+  min_value: 1s
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the time interval between schedules of a task that examines the __all_server table.
+  description_local: server表一致性检查的时间间隔
+- name: lease_time
+  require: false
+  type: TIME
+  default: 10s
+  min_value: 1s
+  max_value: 5m
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: Lease for current heartbeat. If the root server does not received any heartbeat from an observer in lease_time seconds, that observer is considered to be offline.
+  description_local: RootService与其他服务节点之间的租约时长。一般请勿修改。
+- name: rootservice_async_task_queue_size
+  require: false
+  type: INT
+  default: 16384
+  min_value: 8
+  max_value: 131072
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the size of the queue for all asynchronous tasks at rootserver.
+  description_local: RootService内部异步任务队列的容量
+- name: location_refresh_thread_count
+  require: false
+  type: INT
+  default: 4
+  min_value: 2
+  max_value: 64
+  section: LOCATION_CACHE
+  need_restart: false
+  description_en: the number of threads that fetch the partition location information from the root service.
+  description_local: 用于位置缓存刷新的线程数
+- name: minor_compact_trigger
+  require: false
+  type: INT
+  default: 2
+  min_value: 0
+  max_value: 16
+  section: TENANT
+  need_restart: false
+  description_en: minor_compact_trigger
+  description_local: 触发小合并的迷你合并次数
+- name: major_freeze_duty_time
+  type: MOMENT
+  default: Disable
+  min_value: 00:00
+  max_value: 23:59
+  section: DAILY_MERGE
+  need_restart: false
+  description_en: the start time of system daily merge procedure.
+  description_local: 每日定时冻结和合并的触发时刻
+- name: ignore_replay_checksum_error
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: TRANS
+  need_restart: false
+  description_en: specifies whether error raised from the memtable replay checksum validation can be ignored.
+  description_local: 是否忽略回放事务日志时发生的校验和错误
+- name: user_block_cache_priority
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  description_en: user block cache priority
+  description_local: 数据块缓存在缓存系统中的优先级
+- name: syslog_io_bandwidth_limit
+  require: false
+  type: CAPACITY_MB
+  default: 30MB
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: Syslog IO bandwidth limitation, exceeding syslog would be truncated. Use 0 to disable ERROR log.
+  description_local: 系统日志所能占用的磁盘IO带宽上限，超过带宽的系统日志将被丢弃
+- name: workers_per_cpu_quota
+  require: false
+  type: INT
+  default: 10
+  min_value: 2
+  max_value: 20
+  section: TENANT
+  need_restart: false
+  description_en: the ratio(integer) between the number of system allocated workers vs the maximum number of threads that can be scheduled concurrently.
+  description_local: 每个CPU配额分配多少个工作线程
+- name: enable_record_trace_id
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether record app trace id is turned on.
+  description_local: 是否记录应用端设置的追踪ID
+- name: config_additional_dir
+  require: false
+  type: PATH_LIST
+  default: etc2;etc3
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: additional directories of configure file
+  description_local: 本地存储配置文件的多个目录，为了冗余存储多份配置文件
+- name: enable_syslog_recycle
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether to include the log files before restarting into the recycling space
+  description_local: 是否将重启前的日志文件纳入回收空间
+- name: max_syslog_file_count
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in. Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
+  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
+- name: px_task_size
+  require: false
+  type: CAPACITY_MB
+  default: 2M
+  min_value: 1K
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: min task access size of px task
+  description_local: SQL并行查询引擎每个任务处理的数据量大小
+- name: replica_safe_remove_time
+  require: false
+  type: TIME
+  default: 2h
+  min_value: 1m
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the time interval that replica not existed has not been modified beyond which a replica is considered can be safely removed
+  description_local: 已删除副本可以被清理的安全保留时间
+- name: builtin_db_data_verify_cycle
+  require: false
+  type: INT
+  default: 20
+  min_value: 0
+  max_value: 360
+  section: OBSERVER
+  need_restart: false
+  description_en: check cycle of db data.
+  description_local: 数据坏块自检周期，单位为天。值0表示不检查。
+- name: system_cpu_quota
+  require: false
+  type: DOUBLE
+  default: 10
+  min_value: 0
+  max_value: 16
+  section: TENANT
+  need_restart: false
+  description_en: the number of vCPUs allocated to the server tenant
+  description_local: 系统后台任务可使用CPU配额
+- name: enable_sys_table_ddl
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: specifies whether a system table is allowed be to created manually.
+  description_local: 是否允许新建和修改系统表。主要在系统升级过程中使用。
+- name: merge_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 256
+  section: OBSERVER
+  need_restart: false
+  description_en: worker thread num for compaction
+  description_local: 用于合并的线程数
+- name: net_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 128
+  section: OBSERVER
+  need_restart: true
+  description_en: the number of rpc/mysql I/O threads for Libeasy.
+  description_local: 网络IO线程数
+- name: max_stale_time_for_weak_consistency
+  require: false
+  type: TIME
+  default: 5s
+  min_value: 5s
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the max data stale time that observer can provide service when its parent is invalid.
+  description_local: 弱一致性读允许读到多旧的数据
+- name: backup_log_archive_option
+  require: false
+  type: SAFE_STRING
+  default: OPTIONAL
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: backup log archive option, support MANDATORY/OPTIONAL, COMPRESSION
+  description_local: 日志备份的参数
+- name: backup_concurrency
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 100
+  section: OBSERVER
+  need_restart: false
+  description_en: backup concurrency limit.
+  description_local: observer备份基线的并发度
+- name: balancer_log_interval
+  require: false
+  type: TIME
+  default: 1m
+  min_value: 1s
+  max_value: NULL
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: the time interval between logging the load-balancing tasks statistics.
+  description_local: 负载均衡等后台任务线程打印统计日志的间隔时间
+- name: restore_concurrency
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 512
+  section: OBSERVER
+  need_restart: false
+  description_en: the current work thread num of restore macro block.
+  description_local: 从备份恢复租户数据时最大并发度
+- name: micro_block_merge_verify_level
+  require: false
+  type: INT
+  default: 2
+  min_value: 0
+  max_value: 3
+  section: OBSERVER
+  need_restart: false
+  description_en: specify what kind of verification should be done when merging micro block. 0, no verification will be done; 1, verify encoding algorithm, encoded micro block will be read to ensure data is correct; 2, verify encoding and compression algorithm, besides encoding verification, compressed block will be decompressed to ensure data is correct; 3, verify encoding, compression algorithm and lost write protect
+
+  description_local: 控制合并时宏块的校验级别
+- name: bf_cache_miss_count_threshold
+  require: false
+  type: INT
+  default: 100
+  min_value: 0
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  description_en: bf cache miss count threshold, 0 means disable bf cache
+  description_local: 用于控制bloomfilter cache的触发次数，当宏块未命中次数达到这个值时，给创建bloomfilter缓存。0表示关闭。
+- name: weak_read_version_refresh_interval
+  require: false
+  type: TIME
+  default: 50ms
+  min_value: 0ms
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the time interval to refresh cluster weak read version
+  description_local: 弱一致性读版本号的刷新周期，影响弱一致性读数据的延时；值为0时，表示不再刷新弱一致性读版本号，不提供单调读功能
+- name: large_query_worker_percentage
+  require: false
+  type: DOUBLE
+  default: 30
+  min_value: 0
+  max_value: 100
+  section: TENANT
+  need_restart: false
+  description_en: the percentage of the workers reserved to serve large query request.
+  description_local: 预留给大查询处理的工作线程百分比
+- name: clog_transport_compress_all
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: TRANS
+  need_restart: false
+  description_en: If this option is set to true, use compression for clog transport. The default is false(no compression)
+  description_local: 事务日志传输时是否压缩
+- name: flush_log_at_trx_commit
+  require: false
+  type: INT
+  default: 1
+  min_value: 0
+  max_value: 2
+  section: TRANS
+  need_restart: false
+  description_en: 0 means commit transactions without waiting clog write to buffer cache, 1 means commit transactions after clog flush to disk, 2 means commit transactions after clog write to buffer cache
+  description_local: 事务提交时写事务日志策略。0表示不等待日志写入缓冲区，1表示等待日志写入磁盘，2表示等待日志写入缓冲区而不等落盘
+- name: global_major_freeze_residual_memory
+  require: false
+  type: INT
+  default: 40
+  min_value: 1
+  max_value: 99
+  section: OBSERVER
+  need_restart: false
+  description_en: post global major freeze when observer memsotre free memory(plus memory hold by frozen memstore and blockcache) reach this limit. limit calc by memory_limit * (1 - system_memory_percentage/100) * global_major_freeze_residual_memory/100
+  description_local: 当剩余内存小于这个百分比时，触发全局冻结
+- name: enable_sql_audit
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether SQL audit is turned on.
+  description_local: SQL审计功能开关
+- name: merger_switch_leader_duration_time
+  require: false
+  type: TIME
+  default: 3m
+  min_value: 0s
+  max_value: 30m
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: switch leader duration time for daily merge.
+  description_local: 合并时，批量切主的时间间隔
+- name: enable_record_trace_log
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether to always record the trace log.
+  description_local: 是否记录追踪日志
+- name: sys_bkgd_migration_change_member_list_timeout
+  require: false
+  type: TIME
+  default: 1h
+  min_value: 0s
+  max_value: 24h
+  section: OBSERVER
+  need_restart: false
+  description_en: the timeout for migration change member list retry.
+  description_local: 副本迁移时变更Paxos成员组操作的超时时间
+- name: rootservice_list
+  require: false
+  type: SAFE_STRING_LIST
+  default:
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: a list of servers which contains rootservice
+  description_local: RootService及其副本所在的机器列表
+- name: enable_syslog_wf
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether any log message with a log level higher than WARN would be printed into a separate file with a suffix of wf
+  description_local: 是否把WARN以上级别的系统日志打印到一个单独的日志文件中
+- name: global_index_build_single_replica_timeout
+  require: false
+  type: TIME
+  default: 48h
+  min_value: 1h
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: build single replica task timeout when rootservice schedule to build global index.
+  description_local: 建全局索引时，每个副本构建的超时时间
+- name: memstore_limit_percentage
+  require: false
+  type: INT
+  default: 50
+  min_value: 1
+  max_value: 99
+  section: TENANT
+  need_restart: false
+  description_en: used in calculating the value of MEMSTORE_LIMIT
+  description_local: 租户用于memstore的内存占其总可用内存的百分比
+- name: minor_deferred_gc_time
+  require: false
+  type: TIME
+  default: 0s
+  min_value: 0s
+  max_value: 24h
+  section: OBSERVER
+  need_restart: false
+  description_en: sstable deferred gc time after merge
+  description_local: 合并之后SSTable延迟回收间隔
+- name: data_disk_usage_limit_percentage
+  require: false
+  type: INT
+  default: 90
+  min_value: 50
+  max_value: 100
+  section: OBSERVER
+  need_restart: false
+  description_en: the safe use percentage of data disk
+  description_local: 数据文件最大可以写入的百分比，超过这个阈值后，禁止数据迁入
+- name: enable_perf_event
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether to enable perf event feature.
+  description_local: perf event调试特性开关
+- name: obconfig_url
+  require: false
+  type: STRING
+  default:
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: URL for OBConfig service
+  description_local: OBConfig服务的URL地址
+- name: cpu_quota_concurrency
+  require: false
+  type: DOUBLE
+  default: 4
+  min_value: 1
+  max_value: 10
+  section: TENANT
+  need_restart: false
+  description_en: max allowed concurrency for 1 CPU quota
+  description_local: 租户每个CPU配额允许的最大并发数
+- name: zone_merge_order
+  require: false
+  type: SAFE_STRING
+  default:
+  min_value: NULL
+  max_value: NULL
+  section: DAILY_MERGE
+  need_restart: false
+  description_en: the order of zone start merge in daily merge
+  description_local: 轮转合并的时候，多个Zone的顺序。不指定的时候，由系统自动决定。
+- name: backup_recovery_window
+  require: false
+  type: TIME
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: backup expired day limit, 0 means not expired
+  description_local: 恢复窗口大小
+- name: default_row_format
+  require: false
+  type: SAFE_STRING
+  default: compact
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: default row format in mysql mode
+  description_local: MySQL模式下，建表时使用的默认行格式
+- name: stack_size
+  require: false
+  type: CAPACITY_MB
+  default: 1M
+  min_value: 512K
+  max_value: 20M
+  section: OBSERVER
+  need_restart: true
+  description_en: the size of routine execution stack
+  description_local: 程序函数调用栈大小
+- name: balancer_idle_time
+  require: false
+  type: TIME
+  default: 5m
+  min_value: 10s
+  max_value: NULL
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: the time interval between the schedules of the partition load-balancing task.
+  description_local: 负载均衡等后台任务线程空闲时的唤醒间隔时间
+- name: memory_limit
+  name_local: 最大运行内存
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: NULL
+  max_value: NULL
+  modify_limit: decrease
+  section: OBSERVER
+  need_restart: false
+  description_en: the size of the memory reserved for internal use(for testing purpose). Please enter an capacity, such as 8G
+  description_local: 可用总内存大小。请输入带容量带单位的整数，如8G
+- name: system_memory
+  name_local: 集群系统内存
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the memory reserved for internal use which cannot be allocated to any outer-tenant, and should be determined to guarantee every server functions normally. Please enter an capacity, such as 2G
+  description_local: 系统预留内存大小，不能分配给普通租户使用。请输入带容量带单位的整数，如2G
+- name: __min_full_resource_pool_memory
+  require: true
+  type: INT
+  default: 2147483648
+  min_value: 1073741824
+  max_value: NULL
+  need_restart: false
+  description_en: the minimum memory limit of the resource pool
+  description_local: 资源池最小内存限制
+- name: virtual_table_location_cache_expire_time
+  require: false
+  type: TIME
+  default: 8s
+  min_value: 1s
+  max_value: NULL
+  section: LOCATION_CACHE
+  need_restart: false
+  description_en: expiration time for virtual table location info in partiton location cache.
+  description_local: 虚拟表的位置信息缓存过期时间
+- name: ssl_external_kms_info
+  require: false
+  type: SAFE_STRING
+  default:
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: when using the external key management center for ssl, this parameter will store some key management information
+  description_local: 配置ssl使用的主密钥管理服务
+- name: enable_sql_operator_dump
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether sql operators (sort/hash join/material/window function/interm result/...) allowed to write to disk
+  description_local: 是否允许SQL处理过程的中间结果写入磁盘以释放内存
+- name: enable_rich_error_msg
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether add ip:port, time and trace id to user error message.
+  description_local: 是否在客户端消息中添加服务器地址、时间、追踪ID等调试信息
+- name: log_archive_concurrency
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: concurrency  for log_archive_sender and log_archive_spiter
+  description_local: 日志归档并发度
+- name: server_balance_disk_tolerance_percent
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: 100
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: specifies the tolerance (in percentage) of the unbalance of the disk space utilization among all servers. The average disk space utilization is calculated by dividing the total space by the number of servers. server balancer will start a rebalancing task when the deviation between the average usage and some server load is greater than this tolerance
+  description_local: 节点负载均衡策略中，磁盘资源不均衡的容忍度
+- name: user_tab_col_stat_cache_priority
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  description_en: user tab col stat cache priority
+  description_local: 统计数据缓存在缓存系统中的优先级
+- name: recyclebin_object_expire_time
+  require: false
+  type: TIME
+  default: 0s
+  min_value: 0s
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: recyclebin object expire time, default 0 that means auto purge recyclebin off.
+  description_local: 回收站对象的有效期，超过有效的对象将被回收；0表示关闭回收功能；
+- name: minor_warm_up_duration_time
+  require: false
+  type: TIME
+  default: 30s
+  min_value: 0s
+  max_value: 60m
+  section: OBSERVER
+  need_restart: false
+  description_en: warm up duration time for minor freeze.
+  description_local: 小合并产生新转储文件的预热时间
+- name: migrate_concurrency
+  require: false
+  type: INT
+  default: 10
+  min_value: 0
+  max_value: 64
+  section: OBSERVER
+  need_restart: false
+  description_en: set concurrency of migration, set upper limit to migrate_concurrency and set lower limit to migrate_concurrency/2
+  description_local: 控制内部数据迁移的并发度
+- name: redundancy_level
+  require: false
+  type: SAFE_STRING
+  default: NORMAL
+  min_value: NULL
+  max_value: NULL
+  section: SSTABLE
+  need_restart: false
+  description_en: EXTERNAL, use extrernal redundancy; NORMAL, tolerate one disk failure, HIGH tolerate two disk failure if disk count is enough
+  description_local: OB内置本地磁盘RAID特性。暂勿使用
+- name: trx_2pc_retry_interval
+  require: false
+  type: TIME
+  default: 100ms
+  min_value: 1ms
+  max_value: 5000ms
+  section: TRANS
+  need_restart: false
+  description_en: the time interval between the retries in case of failure during a transactions two-phase commit phase
+  description_local: 两阶段提交失败时候自动重试的间隔
+- name: cpu_count
+  name_local: 系统CPU总数
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: true
+  description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be set according to sysconf; otherwise, this parameter is used.
+  description_local: 系统CPU总数，如果设置为0，将自动检测
+- name: devname
+  name_local: 网卡名
+  essential: true
+  type: SAFE_STRING
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: name of network adapter
+  description_local: 非必填, 服务进程绑定的网卡设备名, 默认通过配置的ip设置local_ip, 如果预检查失败可通过配置此项来指定网卡
+- name: local_ip
+  name_local: 本机ip
+  type: SAFE_STRING
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: local ip address
+  description_local: 本机ip地址
+- name: appname
+  require: false
+  type: SAFE_STRING
+  default: obcluster
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_redeploy: true
+  description_en: Name of the cluster
+  description_local: 本OceanBase集群名
+- name: use_large_pages
+  require: false
+  type: SAFE_STRING
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: true
+  description_en: used to manage the databases use of large pages, values are false, true, only
+  description_local: 控制内存大页的行为,"true"表示在操作系统开启内存大页并且有空闲大页时，数据库总是申请内存大页，否则申请普通内存页, "false"表示数据库不使用大页, "only"表示数据库总是分配大页
+- name: dtl_buffer_size
+  require: false
+  type: CAPACITY_MB
+  default: 64K
+  min_value: 4K
+  max_value: 2M
+  section: OBSERVER
+  need_restart: false
+  description_en: buffer size for DTL
+  description_local: SQL数据传输模块使用的缓存大小
+- name: server_balance_critical_disk_waterlevel
+  require: false
+  type: INT
+  default: 80
+  min_value: 0
+  max_value: 100
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: disk water level to determine server balance strategy
+  description_local: 磁盘水位线超过该阈值时，负载均衡策略将倾向于优先考虑磁盘均衡
+- name: location_fetch_concurrency
+  require: false
+  type: INT
+  default: 20
+  min_value: 1
+  max_value: 1000
+  section: LOCATION_CACHE
+  need_restart: false
+  description_en: the maximum number of the tasks which fetch the partition location information concurrently.
+  description_local: 位置缓存信息刷新的最大并发度
+- name: enable_async_syslog
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether use async syslog
+  description_local: 是否启用系统日志异步写
+- name: clog_sync_time_warn_threshold
+  require: false
+  type: TIME
+  default: 1s
+  min_value: 1ms
+  max_value: 10000ms
+  section: TRANS
+  need_restart: false
+  description_en: the time given to the commit log synchronization between a leader and its followers before a warning message is printed in the log file.
+  description_local: 事务日志同步耗时告警阈值，同步耗时超过该值产生WARN日志
+- name: location_cache_cpu_quota
+  require: false
+  type: DOUBLE
+  default: 5
+  min_value: 0
+  max_value: 10
+  section: TENANT
+  need_restart: false
+  description_en: the number of vCPUs allocated for the requests regarding location info of the core tables.
+  description_local: 位置缓存模块使用的CPU配额
+- name: bf_cache_priority
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  description_en: bloomfilter cache priority
+  description_local: 布隆过滤器占用缓存的优先级
+- name: merger_check_interval
+  require: false
+  type: TIME
+  default: 10m
+  min_value: 10s
+  max_value: 60m
+  section: DAILY_MERGE
+  need_restart: false
+  description_en: the time interval between the schedules of the task that checks on the progress of MERGE for each zone.
+  description_local: 合并状态检查线程的调度间隔
+- name: enable_rootservice_standalone
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: specifies whether the SYS tenant is allowed to occupy an observer exclusively, thus running in the standalone mode.
+  description_local: 是否让系统租户和RootService独占observer节点
+- name: px_workers_per_cpu_quota
+  require: false
+  type: INT
+  default: 10
+  min_value: 0
+  max_value: 20
+  section: TENANT
+  need_restart: false
+  description_en: the ratio between the number of system allocated px workers vs the maximum number of threads that can be scheduled concurrently.
+  description_local: 并行执行工作线程数的比例
+- name: large_query_threshold
+  require: false
+  type: TIME
+  default: 100ms
+  min_value: 1ms
+  max_value: NULL
+  section: TENANT
+  need_restart: false
+  description_en: threshold for execution time beyond which a request may be paused and rescheduled as large request
+  description_local: 一个查询执行时间超过该阈值会被判断为大查询，执行大查询调度策略
+- name: sys_bkgd_net_percentage
+  require: false
+  type: INT
+  default: 60
+  min_value: 0
+  max_value: 100
+  section: OBSERVER
+  need_restart: false
+  description_en: the net percentage of sys background net.
+  description_local: 后台系统任务可占用网络带宽百分比
+- name: fuse_row_cache_priority
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  description_en: fuse row cache priority
+  description_local: 融合行缓存在缓存系统中的优先级
+- name: rpc_timeout
+  require: false
+  type: TIME
+  default: 2s
+  min_value: NULL
+  max_value: NULL
+  section: RPC
+  need_restart: false
+  description_en: the time during which a RPC request is permitted to execute before it is terminated
+  description_local: 集群内部请求的超时时间
+- name: tenant_task_queue_size
+  require: false
+  type: INT
+  default: 65536
+  min_value: 1024
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the size of the task queue for each tenant.
+  description_local: 每个租户的请求队列大小
+- name: resource_soft_limit
+  require: false
+  type: INT
+  default: 50
+  min_value: 1
+  max_value: 10000
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: Used along with resource_hard_limit in unit allocation. If server utilization is less than resource_soft_limit, a policy of best fit will be used for unit allocation; otherwise, a least loadpolicy will be employed. Ultimately,system utilization should not be large than resource_hard_limit.
+  description_local: 当所有节点的资源水位低于该阈值时，不执行负载均衡
+- name: plan_cache_evict_interval
+  require: false
+  type: TIME
+  default: 1s
+  min_value: 0s
+  max_value: NULL
+  section: TENANT
+  need_restart: false
+  description_en: time interval for periodic plan cache eviction.
+  description_local: 执行计划缓存的淘汰间隔
+- name: server_balance_cpu_mem_tolerance_percent
+  require: false
+  type: INT
+  default: 5
+  min_value: 1
+  max_value: 100
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: specifies the tolerance (in percentage) of the unbalance of the cpu/memory utilization among all servers. The average cpu/memory utilization is calculated by dividing the total cpu/memory by the number of servers. server balancer will start a rebalancing task when the deviation between the average usage and some server load is greater than this tolerance
+  description_local: 节点负载均衡策略中，CPU和内存资源不均衡的容忍度
+- name: autoinc_cache_refresh_interval
+  require: false
+  type: TIME
+  default: 3600s
+  min_value: 100ms
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: auto-increment service cache refresh sync_value in this interval
+  description_local: 自动刷新自增列值的时间间隔
+- name: all_server_list
+  require: false
+  type: SAFE_STRING
+  default:
+  min_value: NULL
+  max_value: NULL
+  section: LOCATION_CACHE
+  need_restart: false
+  description_en: all server addr in cluster
+  description_local: 集群中所有机器的列表，不建议人工修改
+- name: enable_rebalance
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: specifies whether the partition load-balancing is turned on.
+  description_local: 自动负载均衡开关
+- name: internal_sql_execute_timeout
+  require: false
+  type: TIME
+  default: 30s
+  min_value: 1000us
+  max_value: 10m
+  section: OBSERVER
+  need_restart: false
+  description_en: the number of microseconds an internal DML request is permitted to execute before it is terminated.
+  description_local: 系统内部SQL请求的超时时间
+- name: user_row_cache_priority
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  description_en: user row cache priority
+  description_local: 基线数据行缓存在缓存系统中的优先级
+- name: server_permanent_offline_time
+  require: false
+  type: TIME
+  default: 3600s
+  min_value: 20s
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the time interval between any two heartbeats beyond which a server is considered to be permanently offline.
+  description_local: 节点心跳中断多久后认为其被“永久下线”，“永久下线”的节点上的数据副本需要被自动补足
+- name: schema_history_expire_time
+  require: false
+  type: TIME
+  default: 7d
+  min_value: 1m
+  max_value: 30d
+  section: OBSERVER
+  need_restart: false
+  description_en: the hour of expire time for schema history
+  description_local: 元数据历史数据过期时间
+- name: datafile_disk_percentage
+  require: false
+  type: INT
+  min_value: 0
+  max_value: 99
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the percentage of disk space used by the data files.
+  description_local: data_dir所在磁盘将被OceanBase系统初始化用于存储数据，本配置项表示占用该磁盘总空间的百分比
+- name: default_compress_func
+  require: false
+  type: SAFE_STRING
+  default: zstd_1.3.8
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: default compress function name for create new table
+  description_local: MySQL模式下，建表时使用的默认压缩算法
+- name: memory_chunk_cache_size
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: 0M
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the maximum size of memory cached by memory chunk cache.
+  description_local: 内存分配器缓存的内存块容量。值为0的时候表示系统自适应。
+- name: ob_event_history_recycle_interval
+  require: false
+  type: TIME
+  default: 7d
+  min_value: 1d
+  max_value: 180d
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the time to recycle event history.
+  description_local: OB事件表中事件条目的保存期限
+- name: enable_ddl
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: specifies whether DDL operation is turned on.
+  description_local: 是否允许执行DDL
+- name: balance_blacklist_failure_threshold
+  require: false
+  type: INT
+  default: 5
+  min_value: 0
+  max_value: 1000
+  section: LOAD_BALANCE
+  need_restart: false
+  description_en: a balance task failed count to be putted into blacklist
+  description_local: 副本迁移等后台任务连续失败超过该阈值后，将被放入黑名单
+- name: wait_leader_batch_count
+  require: false
+  type: INT
+  default: 1024
+  min_value: 128
+  max_value: 5000
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: leader batch count everytime leader coordinator wait.
+  description_local: RootService发送切主命令的批次大小
+- name: proxyro_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: password of observer proxyro user
+  description_local: proxyro用户的密码
+- name: root_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: password of observer root user
+  description_local: sys租户root用户的密码
+# todo： 等文档更新
+- name: sql_login_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 32
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'the number of threads for sql login request. Range: [0, 32] in integer, 0 stands for use default thread count defined in TG.the default thread count for login request in TG is normal:6 mini-mode:2'
+  description_local: ''
+- name: tcp_keepcnt
+  require: false
+  type: INT
+  default: 10
+  min_value: 1
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The maximum number of keepalive probes TCP should send before dropping the connection. Take effect for new established connections. Range: [1,+∞)'
+  description_local: 关闭一个非活跃连接之前的最大重试次数。
+- name: tcp_keepintvl
+  require: false
+  type: TIME
+  default: 6s
+  min_value: 1s
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The time (in seconds) between individual keepalive probes. Take effect for new established connections. Range: [1s, +∞]'
+  description_local: 开启客户端连接的探活机制后，前后两次探测之间的时间间隔，单位为秒。
+- name: tcp_keepidle
+  require: false
+  type: TIME
+  default: 7200s
+  min_value: 1s
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probe. Take effect for new established connections. Range: [1s, +∞]'
+  description_local: 客户端连接上服务器后，如果没有数据发送，多久后会发送 Keepalive 探测分组，单位为秒。
+- name: enable_tcp_keepalive
+  require: false
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: enable TCP keepalive for the TCP connection of sql protocol. Take effect for new established connections.
+  description_local: 开启或关闭客户端连接的探活机制。
+- name: ob_ratelimit_stat_period
+  require: false
+  type: TIME
+  default: 1s
+  min_value: 100ms
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: "the time interval to update observer's maximum bandwidth to a certain region. "
+  description_local: OBServer 计算和更新最大带宽的时间间隔。
+- name: enable_ob_ratelimit
+  require: false
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: enable ratelimit between regions for RPC connection.
+  description_local: 开启或关闭客户端连接的探活机制。
+- name: schema_history_recycle_interval
+  require: false
+  type: TIME
+  default: 10m
+  min_value: 0s
+  max_value: NULL
+  section: LOAD_BALANCE
+  need_restart: false
+  need_redeploy: false
+  description_en: 'the time interval between the schedules of schema history recyle task. Range: [0s, +∞)'
+  description_local: 系统内部执行 schema 多版本记录回收任务的时间间隔。
+- name: backup_data_file_size
+  require: false
+  type: CAPACITY_MB
+  default: 4G
+  min_value: 512M
+  max_value: 4G
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'backup data file size. Range: [512M, 4G] in integer'
+  description_local: 备份数据文件的容量。
+- name: data_storage_error_tolerance_time
+  require: false
+  type: TIME
+  default: 300s
+  min_value: 10s
+  max_value: 7200s
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: time to tolerate disk read failure, after that, the disk status will be set error. Range [10s,7200s]. The default value is 300s
+  description_local: 数据盘状态设为 ERROR 状态的容忍时间。
+- name: data_storage_warning_tolerance_time
+  require: false
+  type: TIME
+  default: 30s
+  min_value: 10s
+  max_value: 300s
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: time to tolerate disk read failure, after that, the disk status will be set warning. Range [10s,300s]. The default value is 30s
+  description_local: 数据盘状态设为 WARNING 状态的容忍时间。
+- name: index_block_cache_priority
+  require: false
+  type: INT
+  default: 10
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  need_redeploy: false
+  description_en: index cache priority. Range:[1, )
+  description_local:  Tablet 映射缓存优先级。
+- name: opt_tab_stat_cache_priority
+  require: false
+  type: INT
+  default: 1
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  need_redeploy: false
+  description_en: tab stat cache priority. Range:[1, )
+  description_local: 统计信息缓存优先级。
+- name: tablet_ls_cache_priority
+  require: false
+  type: INT
+  default: 1000
+  min_value: 1
+  max_value: NULL
+  section: CACHE
+  need_restart: false
+  need_redeploy: false
+  description_en: tablet ls cache priority. Range:[1, )
+  description_local: 元数据索引微块缓存优先级。
+- name: location_cache_refresh_sql_timeout
+  require: false
+  type: TIME
+  default: 1s
+  min_value: 1ms
+  max_value: NULL
+  section: LOCATION_CACHE
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The timeout used for refreshing location cache by SQL. Range: [1ms, +∞)'
+  description_local: 通过 SQL 刷新 location_cache 的超时时间。
+- name: location_cache_refresh_rpc_timeout
+  require: false
+  type: TIME
+  default: 500ms
+  min_value: 1ms
+  max_value: NULL
+  section: LOCATION_CACHE
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The timeout used for refreshing location cache by RPC. Range: [1ms, +∞)'
+  description_local: 通过 RPC 刷新 location_cache 的超时时间。
+- name: tablet_meta_table_check_interval
+  require: false
+  type: TIME
+  default: 30m
+  min_value: 1m
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  need_redeploy: false
+  description_en: 'the time interval that observer compares tablet meta table with local ls replica info and make adjustments to ensure the correctness of tablet meta table. Range: [1m,+∞)'
+  description_local: DBA_OB_TABLET_REPLICAS/CDB_OB_TABLET_REPLICAS 视图的后台巡检线程的检查间隔。
+- name: ls_meta_table_check_interval
+  require: false
+  type: TIME
+  default: 1s
+  min_value: 1ms
+  max_value: NULL
+  section: ROOT_SERVICE
+  need_restart: false
+  need_redeploy: false
+  description_en: 'the time interval that observer compares ls meta table with local ls replica info and make adjustments to ensure the correctness of ls meta table. Range: [1ms,+∞)'
+  description_local: DBA_OB_LS_LOCATIONS/CDB_OB_LS_LOCATIONS 视图的后台巡检线程的检查间隔。
+- name: tablet_meta_table_scan_batch_count
+  require: false
+  type: INT
+  default: 999
+  min_value: 1
+  max_value: 65536
+  section: ROOT_SERVICE
+  need_restart: false
+  need_redeploy: false
+  description_en: the number of tablet replica info that will be read by each request on the tablet-related system tables during procedures such as load-balancing, daily merge, election and etc. Range:(0,65536]
+  description_local: Tablet meta table 迭代器使用过程中在内存里缓存的 Tablet 数量。
+- name: rdma_io_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 8
+  section: OBSERVER
+  need_restart: true
+  need_redeploy: false
+  description_en: 'the number of RDMA I/O threads for Libreasy. Range: [0, 8] in integer, 0 stands for RDMA being disabled.'
+  description_local: Libreasy 的 RDMA I/O 线程数。
+- name: production_mode
+  name_local: 生产模式开关
+  essential: true
+  require: true
+  type: BOOL
+  default: true
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: Production mode switch, default True. Adjust the memory_limit and __min_full_resource_pool_memory The lower bound of memory is adjusted to 16G and 2147483648
+  description_local: 生产模式开关, 默认开启。开启后调整memory limit 和 __min_full_resource_pool_memory 下界调整为 16G 和 2147483648
+- name: ocp_meta_tenant
+  require: false
+  type: DICT
+  default:
+    tenant_name: ocp_meta
+    max_cpu: 1
+    memory_size: 2147483648
+  need_redeploy: true
+  description_en: The tenant specifications for ocp meta db
+  description_local: ocp express的元数据库使用的租户规格
+- name: ocp_meta_tenant_max_cpu
+  name_local: OCP express元数据库租户的CPU数
+  essential: true
+  require: false
+  type: INT
+  default: 1
+  need_redeploy: true
+  description_en: The tenant cpu count for ocp meta db
+  description_local: ocp express的元数据库使用的CPU数量
+- name: ocp_meta_tenant_memory_size
+  name_local: OCP express元数据库租户内存
+  essential: true
+  require: false
+  type: CAPACITY_MB
+  default: 2G
+  need_redeploy: true
+  description_en: The tenant memory size for ocp meta db
+  description_local: ocp express的元数据库使用的租户内存大小
+- name: ocp_meta_tenant_log_disk_size
+  name_local: OCP express元数据库租户日志磁盘大小
+  essential: true
+  require: false
+  type: CAPACITY_MB
+  default: 6656M
+  need_redeploy: true
+  description_en: The tenant log disk size for ocp meta db
+  description_local: ocp express的元数据库使用的租户日志磁盘大小
+- name: ocp_meta_db
+  require: false
+  type: SAFE_STRING
+  default: ocp_meta
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp express的元数据库使用的数据库名
+- name: ocp_meta_username
+  require: false
+  type: SAFE_STRING
+  default: meta
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp express的元数据库使用的数据库名
+- name: ocp_meta_password
+  require: false
+  type: STRING
+  default: oceanbase
+  need_redeploy: true
+  description_en: The database name for ocp meta db
+  description_local: ocp express的元数据库使用的数据库名
+- name: ocp_agent_monitor_password
+  require: false
+  type: STRING
+  default: ''
+  need_redeploy: true
+  description_en: The password for obagent monitor user
+  description_local: obagent 监控用户的密码
+- name: ocp_agent_monitor_username
+  require: false
+  type: STRING
+  default: ocp_monitor
+  need_redeploy: true
+  description_en: The user name for ocp meta db
+  description_local: obagent 监控用户名
+- name: scenario
+  require: true
+  type: STRING
+  default: 'htap'
+  essential: true
+  need_restart: true
+  description_en: 'scenarios: htap, express_oltp, complex_oltp, olap, kv.'
+  description_local: 业务场景：如 htap, express_oltp, complex_oltp, olap, kv.
+- name: ocp_monitor_tenant
+  require: false
+  type: DICT
+  default:
+    tenant_name: ocp_monitor
+    max_cpu: 1
+    memory_size: 2147483648
+  need_redeploy: true
+  description_en: The tenant specifications for ocp monitor db
+  description_local: ocp 的监控数据库使用的租户定义
+- name: ocp_monitor_tenant_max_cpu
+  name_local: OCP 监控数据库租户的CPU数
+  require: false
+  type: INT
+  default: 1
+  need_redeploy: true
+  description_en: The tenant cpu count for ocp monitor db
+  description_local: ocp 监控数据库使用的CPU数量
+- name: ocp_monitor_tenant_memory_size
+  name_local: OCP 监控数据库租户内存
+  require: false
+  type: CAPACITY_MB
+  default: 2G
+  need_redeploy: true
+  description_en: The tenant memory size for ocp monitor db
+  description_local: ocp 监控数据库使用的租户内存大小
+- name: ocp_monitor_tenant_log_disk_size
+  name_local: OCP 监控数据库租户日志磁盘大小
+  require: false
+  type: CAPACITY_MB
+  default: 6656M
+  need_redeploy: true
+  description_en: The tenant log disk size for ocp monitor db
+  description_local: ocp 监控数据库使用的租户日志磁盘大小
+- name: ocp_monitor_db
+  require: false
+  type: SAFE_STRING
+  default: ocp_monitor
+  need_redeploy: true
+  description_en: The database name for ocp monitor db
+  description_local: ocp 的监控数据库使用的数据库名
+- name: ocp_monitor_username
+  require: false
+  type: SAFE_STRING
+  default: monitor
+  need_redeploy: true
+  description_en: The user name for ocp meta db
+  description_local: ocp 的监控数据库使用的用户名
+- name: ocp_monitor_password
+  require: false
+  type: STRING
+  default: oceanbase
+  need_redeploy: true
+  description_en: The password for ocp monitor db
+  description_local: ocp 的监控数据库使用的密码
+- name: cdcro_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: true
+  description_en: password of observer cdcro user
+  description_local: cdcro用户的密码
