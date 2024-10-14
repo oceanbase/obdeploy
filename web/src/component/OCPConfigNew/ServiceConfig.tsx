@@ -61,8 +61,8 @@ export default function ServiceConfig({
   const defaultSiteUrl = ocpserver.ocp_site_url
     ? ocpserver.ocp_site_url
     : isSingleOcpNode === true && ip.length
-    ? `http://${ip[0]}:8080`
-    : '';
+      ? `http://${ip[0]}:8080`
+      : '';
   const [siteUrl, setSiteUrl] = useState<string>(defaultSiteUrl);
   const setPassword = (password: string) => {
     form.setFieldValue(['ocpserver', 'admin_password'], password);
@@ -86,18 +86,14 @@ export default function ServiceConfig({
     form.setFieldValue(['ocpserver', 'ocp_site_url'], value);
   };
 
+
   useEffect(() => {
-    if (typeof isSingleOcpNode !== 'undefined' && !ocpserver.ocp_site_url) {
-      if (isSingleOcpNode && ip.length) {
-        let url = `http://${ip[0]}:8080`;
-        setSiteUrl(url);
-        form.setFieldValue(['ocpserver', 'ocp_site_url'], url);
-      } else {
-        setSiteUrl('');
-        form.setFieldValue(['ocpserver', 'ocp_site_url'], '');
-      }
+    if (ip.length) {
+      let url = `http://${ip[0]}:8080`;
+      setSiteUrl(url);
+      form.setFieldValue(['ocpserver', 'ocp_site_url'], url);
     }
-  }, [isSingleOcpNode]);
+  }, []);
 
   useUpdateEffect(() => {
     form.setFieldsValue({
@@ -143,19 +139,19 @@ export default function ServiceConfig({
               title={
                 isLowVersion
                   ? intl.formatMessage(
-                      {
-                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                      },
-                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
-                    )
+                    {
+                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                    },
+                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
+                  )
                   : intl.formatMessage(
-                      {
-                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                      },
-                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
-                    )
+                    {
+                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                    },
+                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
+                  )
               }
             >
               <QuestionCircleOutlined className="ml-10" />

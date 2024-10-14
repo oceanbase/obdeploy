@@ -121,6 +121,7 @@ cd ${RPM_BUILD_ROOT}/usr/obd/optimize && ln -s obproxy obproxy-ce
 
 
 %post
+#!/bin/bash
 # chkconfig: 2345 10 90
 # description: obd ....
 chmod -R 755 /usr/obd/*
@@ -128,11 +129,46 @@ chown -R root:root /usr/obd/*
 find /usr/obd -type f -exec chmod 644 {} \;
 chmod +x /usr/bin/obd
 chmod +x /usr/obd/lib/executer/executer27/bin/executer
+if [[ $(DIRS=(/home /root); for dir in "${DIRS[@]}"; do [ -d "$dir" ] && find "$dir" -name "env.sh" |xargs -r grep 'OBD_INSTALL_PRE' | xargs -r echo; done) ]]; then
+    echo "Detected residual environment variables of oceanbase-all-in-one in the system. Please execute \`rm -rf ~/.obd/version && rm -rf ~/.oceanbase-all-in-one/obd && obd env set OBD_INSTALL_PRE / \` under the user who installed all-in-one and rerun."
+fi
 echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d/obd.sh to enable it'
 #/sbin/chkconfig --add obd
 #/sbin/chkconfig obd on
 
 %changelog
+* Tue Oct 12 2024 obd 2.10.1
+ - new features: adapt to Oceanbase-CE 4.3.3
+ - new features: add OCP MetaDB version verification functionality
+ - optimizations: refine default component configuration logic for white screen deployments
+ - enhancements: improve user experience on low-performance machines
+* Tue Sep 03 2024 obd 2.10.0
+ - new features: adapt to Oceanbase-CE 4.3.3
+ - new features: adapt to OBProxy 4.3.1
+ - enhancements: support component management in graphical interface
+ - enhancements: support selecting business type when deploying OceanBase database in graphical interface
+ - enhancements: optimize edit-config logic to prevent users from mistakenly redeploying the cluster
+ - enhancements: optimize restart parameter passing logic to avoid overwriting user configurations
+ - enhancements: optimize disk usage logic
+ - enhancem¸ents: print connection information when creating tenants
+ - enhancements: test command group supports automatic installation of toolkits
+ - enhancements: support sysbench testing multiple scenarios and threads in one run
+ - enhancements: support tpch testing for data import via bypass
+ - enhancements: support specifying monitor_user when deploying OBAgent
+ - enhancements: automatic log desensitization
+ - bug fixes: fixed an issue where deploying OCP with automatic takeover of MetaDB had unexpected SSH port behavior
+ - bug fixds: fixed an issue where unexpected parameters were passed when restarting OCP
+ - bug fixds: fixed an issue where the existing obconfig_url configuration did not take effect during Oceanbase deployment
+ - bug fixds: fixed an issue where destroying OCP resulted in directory deletion errors in specific scenarios
+ - bug fixds: fixed an issue where encountering a program interruption during upgrade caused unexpected re-upgrade behaviorfixed an issue where unexpected parameters were passed when restarting OCP
+ - bug fixds: fixed an issue where the existing obconfig_url configuration did not take effect during Oceanbase deployment
+ - bug fixds: fixed an issue where destroying OCP resulted in directory deletion errors in specific scenarios
+ - bug fixds: fixed an issue where encountering a program interruption during upgrade caused unexpected re-upgrade behavior
+* Tue Jun 18 2024 obd 2.9.2
+ - bug fixes: fixed an issue where OCP taken over encountered exceptions during upgrades.
+* Thu Jun 13 2024 obd 2.9.1
+ - bug fixes: fixed an issue where an exception occurred when deploying OCP and OceanBase simultaneously
+ - enhancements: optimize the OBShell deployment check
 * Fri Apr 19 2024 obd 2.9.0
  - new features: support for graphical deployment of ConfigServer
  - new features: supports custom production_mode, scenario configuration in graphical deployment of OceanBase

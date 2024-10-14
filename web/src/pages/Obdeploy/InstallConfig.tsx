@@ -240,7 +240,7 @@ export default function InstallConfig() {
               }
             }
           });
-          
+
           const noVersion =
             Object.keys(newComponentsVersionInfo).length !==
             allComponentsName.length;
@@ -666,6 +666,23 @@ export default function InstallConfig() {
     }
   };
 
+  useEffect(() => {
+    // 默认勾选项，只取 obproxy
+    // https://project.alipay.com/project/W24001004950/P24001006922/requirement?openWorkItemId=2024100800104636325&status=status&workItemView=72fcab42129ae1bd489e077d
+    setSelectedConfig(['obproxy'])
+  }, [])
+
+  const rowSelection = {
+    hideSelectAll: true,
+    onSelect: handleSelect,
+    // 默认勾选项，需排除掉缺少必要安装包
+    selectedRowKeys: selectedConfig?.filter((item: string) => {
+      return componentsVersionInfo[item]?.version
+    }),
+    getCheckboxProps: (record) => ({
+      disabled: !componentsVersionInfo[record.key]?.version,
+    }),
+  };
   const caculateSize = (originSize: number): string => {
     return NP.divide(NP.divide(originSize, 1024), 1024).toFixed(2);
   };
@@ -1119,11 +1136,7 @@ export default function InstallConfig() {
                   key={componentInfo.group}
                 >
                   <Table
-                    rowSelection={{
-                      hideSelectAll: true,
-                      selectedRowKeys: selectedConfig,
-                      onSelect: handleSelect,
-                    }}
+                    rowSelection={rowSelection}
                     className={styles.componentTable}
                     columns={getColumns(componentInfo.group, true)}
                     rowKey="key"
@@ -1169,7 +1182,6 @@ export default function InstallConfig() {
                 onClick={nextStep}
                 disabled={
                   lowVersion ||
-                  existNoVersion ||
                   versionLoading ||
                   componentLoading
                 }

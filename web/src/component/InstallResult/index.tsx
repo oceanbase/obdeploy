@@ -34,7 +34,7 @@ import styles from './index.less';
 
 const { Text } = Typography;
 
-export interface InsstallResultProps extends ResultProps {
+export interface InstallResultProps extends ResultProps {
   upgradeOcpInfo?: any;
   ocpInfo?: any;
   installStatus?: string; // RUNNING, FINISHED
@@ -45,7 +45,7 @@ export interface InsstallResultProps extends ResultProps {
   setCurrent: React.Dispatch<React.SetStateAction<number>>;
 }
 
-const InstallResult: React.FC<InsstallResultProps> = ({
+const InstallResult: React.FC<InstallResultProps> = ({
   ocpInfo = {},
   upgradeOcpInfo,
   installStatus,
@@ -568,13 +568,13 @@ const InstallResult: React.FC<InsstallResultProps> = ({
             <Space>
               {type === 'update'
                 ? intl.formatMessage({
-                    id: 'OBD.component.InstallResult.UpgradeLogs',
-                    defaultMessage: '升级日志',
-                  })
+                  id: 'OBD.component.InstallResult.UpgradeLogs',
+                  defaultMessage: '升级日志',
+                })
                 : intl.formatMessage({
-                    id: 'OBD.component.InstallResult.DeploymentLogs',
-                    defaultMessage: '部署日志',
-                  })}
+                  id: 'OBD.component.InstallResult.DeploymentLogs',
+                  defaultMessage: '部署日志',
+                })}
               <span
                 style={{
                   cursor: 'pointer',

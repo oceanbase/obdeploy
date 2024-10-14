@@ -1067,5 +1067,8 @@
   "OBD.Obdeploy.ClusterConfig.PortObproxySql": "OBProxy SQL 端口",
   "OBD.Obdeploy.ClusterConfig.PortObproxyRpc": "OBProxy RPC 端口",
   "OBD.pages.ComponentUninstall.UninstallConfig.ByDefaultComponentsWithDependencies": "系统会默认卸载存在相互依赖关系的组件",
-  "OBD.pages.Obdeploy.InstallFinished.ConnectionString": "连接字符串"
+  "OBD.pages.Obdeploy.InstallFinished.ConnectionString": "连接字符串",
+  "OBD.component.DeployConfig.UnableToObtainTheAvailable": "无法获取可用安装包",
+  "OBD.component.DeployConfig.ByDefaultTheDatabaseVersion": "系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。",
+  "OBD.component.InsstallResult.TheSystemWillUpgradeOcp": "系统将默认升级 OCP Agent，请前往 OCP 任务中心查看升级进度"
 }

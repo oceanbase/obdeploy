@@ -12,7 +12,7 @@ import NP from 'number-precision';
 import 'video.js/dist/video-js.css';
 import { getLocale } from 'umi';
 import styles from './index.less';
-import InsstallResult from '@/component/InsstallResult';
+import InstallResultDisplay from '@/component/InstallResultDisplay';
 
 export interface InstallProcessProps {
   id?: number;
@@ -81,7 +81,7 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
     installType === 'OCP'
       ? OCP.getOcpReinstallTaskLog
       : Metadb.getMetadbReinstallTaskLog;
-  
+
   const getTaskFn = isReinstall ? getReinstallTaskFn : OCP.getOcpUpgradeTask;
   const getTaskLogFn = isReinstall
     ? getreInstallTaskLogFn
@@ -90,7 +90,7 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
   const { run: getInstallTask, data: installResultData } = useRequest(
     getTaskFn,
     {
-      manual:true,
+      manual: true,
       onSuccess: ({ success, data }) => {
         if (success) {
           setOpenLog(data?.result === 'FAILED' || data?.result === 'RUNNING');
@@ -150,7 +150,7 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
   const { run: getInstallTaskLog, data: installLogData } = useRequest(
     getTaskLogFn,
     {
-      manual:true,
+      manual: true,
       onSuccess: ({ success }: API.OBResponseInstallLog_) => {
         if (success && installStatus === 'RUNNING') {
           setTimeout(() => {
@@ -229,7 +229,7 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
       path: '/assets/database/data.json',
     });
   };
-  
+
   useEffect(() => {
     if (installInfo.id) {
       if (type === 'update') {
@@ -310,7 +310,7 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
       bodyStyle={{
         padding:
           (installType === 'OCP' && installStatus === 'RUNNING') ||
-          installStatus === 'RUNNING'
+            installStatus === 'RUNNING'
             ? 24
             : 0,
       }}
@@ -329,13 +329,13 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
                   {installType}{' '}
                   {type === 'update'
                     ? intl.formatMessage({
-                        id: 'OBD.component.InstallProcess.Upgraded',
-                        defaultMessage: '升级中',
-                      })
+                      id: 'OBD.component.InstallProcess.Upgraded',
+                      defaultMessage: '升级中',
+                    })
                     : intl.formatMessage({
-                        id: 'OBD.component.InstallProcess.Deploying',
-                        defaultMessage: '部署中',
-                      })}
+                      id: 'OBD.component.InstallProcess.Deploying',
+                      defaultMessage: '部署中',
+                    })}
                 </span>
                 <div className={styles.computer}>
                   <div
@@ -382,7 +382,7 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
               </span>
             </div>
           ) : (
-            <InsstallResult
+            <InstallResultDisplay
               upgradeOcpInfo={upgradeOcpInfo}
               ocpInfo={ocpInfo}
               installResult={installResult?.result}
@@ -400,13 +400,13 @@ const InstallProcess: React.FC<InstallProcessProps> = ({
               <Space>
                 {type === 'update'
                   ? intl.formatMessage({
-                      id: 'OBD.component.InstallProcess.UpgradeLogs',
-                      defaultMessage: '升级日志',
-                    })
+                    id: 'OBD.component.InstallProcess.UpgradeLogs',
+                    defaultMessage: '升级日志',
+                  })
                   : intl.formatMessage({
-                      id: 'OBD.component.InstallProcess.DeploymentLogs',
-                      defaultMessage: '部署日志',
-                    })}
+                    id: 'OBD.component.InstallProcess.DeploymentLogs',
+                    defaultMessage: '部署日志',
+                  })}
                 <span
                   style={{
                     cursor: 'pointer',

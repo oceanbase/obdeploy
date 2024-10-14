@@ -55,15 +55,15 @@ export const formatConfigData = (
   if (formatedConfigData.components) isOBConfig = true;
   Object.keys(_configData).forEach((key) => {
     if (typeof _configData[key] === 'object') {
-      for (let i = 0; i < _configData[key].parameters.length; i++) {
-        const parameter = _configData[key].parameters[i];
+      for (let i = 0; i < _configData[key]?.parameters.length; i++) {
+        const parameter = _configData[key]?.parameters[i];
         // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
         if (
           (!parameter.adaptive && !isExist(parameter.value)) ||
           parameter.adaptive ||
           !parameter.isChanged
         ) {
-          _configData[key].parameters?.splice(i--, 1);
+          _configData[key]?.parameters?.splice(i--, 1);
         }
         if (parameter.key === 'ocp_meta_tenant_memory_size') {
           parameter.value = changeParameterUnit(parameter).value;
@@ -301,11 +301,11 @@ export default function CheckInfo() {
 
       more: oceanbase?.parameters?.length
         ? [
-            {
-              label: componentsConfig[oceanbaseComponent].labelName,
-              parameters: oceanbase?.parameters,
-            },
-          ]
+          {
+            label: componentsConfig[oceanbaseComponent].labelName,
+            parameters: oceanbase?.parameters,
+          },
+        ]
         : [],
     },
   ];
