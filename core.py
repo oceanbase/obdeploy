@@ -38,6 +38,7 @@ from _rpm import Version
 from _mirror import MirrorRepositoryManager, PackageInfo, RemotePackageInfo
 from _plugin import PluginManager, PluginType, InstallPlugin, PluginContextNamespace
 from _deploy import DeployManager, DeployStatus, DeployConfig, DeployConfigStatus, Deploy, ClusterStatus
+from _workflow import WorkflowManager, Workflows
 from _tool import Tool, ToolManager
 from _repository import RepositoryManager, LocalPackage, Repository, RepositoryVO
 import _errno as err
@@ -62,6 +63,7 @@ class ObdHome(object):
         self._repository_manager = None
         self._deploy_manager = None
         self._plugin_manager = None
+        self._workflow_manager = None
         self._lock_manager = None
         self._optimize_manager = None
         self._tool_manager = None
@@ -96,6 +98,12 @@ class ObdHome(object):
         if not self._plugin_manager:
             self._plugin_manager = PluginManager(self.home_path, self.dev_mode, self.stdio)
         return self._plugin_manager
+
+    @property
+    def workflow_manager(self):
+        if not self._workflow_manager:
+            self._workflow_manager = WorkflowManager(self.home_path, self.dev_mode, self.stdio)
+        return self._workflow_manager
 
     @property
     def deploy_manager(self):
@@ -170,7 +178,61 @@ class ObdHome(object):
             self.namespaces[spacename] = namespace
         return namespace 
 
-    def call_plugin(self, plugin, repository, spacename=None, target_servers=None, **kwargs):
+    def get_workflows(self, workflow_name, repositories=None, no_found_act='exit'):
+        if not repositories:
+            repositories = self.repositories
+        workflows = Workflows(workflow_name)
+        for repository in repositories:
+            workflows[repository.name] = self.get_workflow(repository, workflow_name, repository.name, repository.version, no_found_act=no_found_act)
+        return workflows
+
+    def get_workflow(self, repository, workflow_name, component_name, version=0.1, no_found_act='exit'):
+        if no_found_act == 'exit':
+            no_found_exit = True
+        else:
+            no_found_exit = False
+            msg_lv = 'warn' if no_found_act == 'warn' else 'verbose'
+        self._call_stdio('verbose', 'Searching %s template for components ...', workflow_name)
+        template = self.workflow_manager.get_workflow_template(workflow_name, component_name, version)
+        if template:
+            ret = self.call_workflow_template(template, repository)
+            if ret:
+                self._call_stdio('verbose', 'Found for %s for %s-%s' % (template, template.component_name, template.version))
+                return ret
+        if no_found_exit:
+            self._call_stdio('critical', 'No such %s template for %s-%s' % (template, template.component_name, template.version))
+            exit(1)
+        else:
+            self._call_stdio(msg_lv, 'No such %s template for %s-%s' % (template, template.component_name, template.version))
+
+    def run_workflow(self, workflows, deploy_config=None, repositories=None, no_found_act='exit'):
+        if not deploy_config:
+            deploy_config = self.deploy.deploy_config
+        if not repositories:
+            repositories = self.repositories
+        repositories = {repository.name: repository for repository in repositories}
+        for stages in workflows(deploy_config):
+            for component_name in stages:
+                for plugin_template in stages[component_name]:
+                    if 'repository' in plugin_template.kwargs:
+                        repository = plugin_template.kwargs['repository']
+                        del plugin_template.kwargs['repository']
+                    else:
+                        if plugin_template.component_name in repositories:
+                            repository = repositories[plugin_template.component_name]
+                        else:
+                            repository = repositories[component_name]
+                    if not plugin_template.version:
+                        if plugin_template.component_name in repositories:
+                            plugin_template.version = repositories[component_name].version
+                        else:
+                            plugin_template.version = repository.version
+                    plugin = self.search_py_script_plugin_by_template(plugin_template, no_found_act=no_found_act)
+                    if plugin and not self.call_plugin(plugin, repository, **plugin_template.kwargs):
+                            return False
+        return True
+
+    def _init_call_args(self, repository, spacename=None, target_servers=None, **kwargs):
         args = {
             'namespace': self.get_namespace(repository.name if spacename == None else spacename),
             'namespaces': self.namespaces,
@@ -192,9 +254,18 @@ class ObdHome(object):
             args['cluster_config'] = self.deploy.deploy_config.components[repository.name]
             if "clients" not in kwargs:
                 args['clients'] = self.get_clients(self.deploy.deploy_config, self.repositories)
+        args['clients'] = args.get('clients', {})
         args.update(kwargs)
-        
-        self._call_stdio('verbose', 'Call %s for %s' % (plugin, repository))
+        return args
+
+    def call_workflow_template(self, workflow_template, repository):
+        self._call_stdio('verbose', 'Call workflow %s for %s' % (workflow_template, repository))
+        args = self._init_call_args(repository, None, None, clients=None)
+        return workflow_template(**args)
+
+    def call_plugin(self, plugin, repository, spacename=None, target_servers=None, **kwargs):
+        self._call_stdio('verbose', 'Call plugin %s for %s' % (plugin, repository))
+        args = self._init_call_args(repository, spacename, target_servers, **kwargs)
         return plugin(**args)
 
     def _call_stdio(self, func, msg, *arg, **kwarg):
@@ -347,6 +418,11 @@ class ObdHome(object):
             elif no_found_exit:
                 return None
         return plugins
+
+    def search_py_script_plugin_by_template(self, template, no_found_act='exit'):
+        repository = self.repository_manager.get_repository_allow_shadow(template.component_name, template.version)
+        plugins = self.search_py_script_plugin([repository], template.name, no_found_act=no_found_act)
+        return plugins.get(repository)
 
     def search_py_script_plugin(self, repositories, script_name, no_found_act='exit'):
         if no_found_act == 'exit':
@@ -2674,8 +2750,8 @@ class ObdHome(object):
             cluster_config = deploy_config.components[repository.name]
             new_cluster_config = new_deploy_config.components[repository.name]
 
-            if not self.call_plugin(connect_plugins[repository], repository):
-                if not self.call_plugin(connect_plugins[repository], repository, components=new_deploy_config.components.keys(), cluster_config=new_cluster_config):
+            if not self.call_plugin(connect_plugins[repository], repository, retry_times=30):
+                if not self.call_plugin(connect_plugins[repository], repository, components=new_deploy_config.components.keys(), cluster_config=new_cluster_config, retry_times=30):
                     continue
 
             if not self.call_plugin(reload_plugins[repository], repository, new_cluster_config=new_cluster_config):
@@ -2715,34 +2791,13 @@ class ObdHome(object):
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
             
-        connect_plugins = self.search_py_script_plugin(repositories, 'connect')
-        display_plugins = self.search_py_script_plugin(repositories, 'display')
         self._call_stdio('stop_loading', 'succeed')
 
         # Get the client
-        ssh_clients = self.get_clients(deploy_config, repositories)
-
-        # Check the status for the deployed cluster
-        component_status = {}
-        self.cluster_status_check(repositories, component_status)
-            
-        for repository in repositories:
-            cluster_status = component_status[repository]
-            servers = []
-            for server in cluster_status:
-                if cluster_status[server] == 0:
-                    self._call_stdio('warn', '%s %s is stopped' % (server, repository.name))
-                else:
-                    servers.append(server)
-            if not servers:
-                continue
-
-            if not self.call_plugin(connect_plugins[repository], repository):
-                continue
-            self.call_plugin(display_plugins[repository], repository)
-
-        return True
-
+        self.get_clients(deploy_config, repositories)
+        workflows = self.get_workflows('display')
+        return self.run_workflow(workflows)
+        
     def stop_cluster(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)

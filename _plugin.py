@@ -385,6 +385,7 @@ class Null(object):
     def __init__(self):
         pass
 
+
 class ParamPlugin(Plugin):
 
 
@@ -807,13 +808,14 @@ class InstallPlugin(Plugin):
 class ComponentPluginLoader(object):
 
     PLUGIN_TYPE = None
+    MODULE_NAME = __name__
 
     def __init__(self, home_path, plugin_type=PLUGIN_TYPE, dev_mode=False, stdio=None):
         if plugin_type:
             self.PLUGIN_TYPE = plugin_type
         if not self.PLUGIN_TYPE:
             raise NotImplementedError
-        self.plguin_cls = getattr(sys.modules[__name__], self.PLUGIN_TYPE.value, False)
+        self.plguin_cls = getattr(sys.modules[self.MODULE_NAME], self.PLUGIN_TYPE.value, False)
         if not self.plguin_cls:
             raise ImportError(self.PLUGIN_TYPE.value)
         self.dev_mode = dev_mode
