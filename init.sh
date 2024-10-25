@@ -19,6 +19,7 @@ if [ ${FORCE_DEPLOY} == "1" ]; then
     rm -rf ${OBD_HOME}/config_parser
     rm -rf ${OBD_HOME}/optimize
     rm -rf ${OBD_HOME}/plugins
+    rm -rf ${OBD_HOME}/workflows
     sudo rm -rf /etc/profile.d/obd.sh
 fi
 
@@ -33,7 +34,7 @@ if [ ! -e "OceanBase.repo" ]; then
     wget -q https://mirrors.aliyun.com/oceanbase/OceanBase.repo
 fi
 
-mkdir -p ${OBD_HOME}/{plugins,optimize,config_parser}
+mkdir -p ${OBD_HOME}/{workflows,plugins,optimize,config_parser}
 
 mkdir -p ${OBD_HOME}/plugins/obproxy-ce/3.1.0
 
@@ -46,7 +47,7 @@ for DIR in ${WORK_DIR}/plugins/obproxy-ce/3.1.0/ ${WORK_DIR}/plugins/obproxy/3.1
     done
 done
 
-for DIR in plugins optimize config_parser; do
+for DIR in workflows plugins optimize config_parser; do
     FILE_LIST=$(ls ${WORK_DIR}/${DIR})
     for FILE in $FILE_LIST; do
         if [ ! -e "${OBD_HOME}/${DIR}/${FILE}" ]; then
@@ -59,7 +60,7 @@ if [ ! -e ${OBD_HOME}/optimize/obproxy-ce ]; then
     ln -s ${OBD_HOME}/optimize/obproxy ${OBD_HOME}/optimize/obproxy-ce
 fi
 
-for DIR in plugins config_parser; do
+for DIR in workflows plugins config_parser; do
     if [ ! -e ${OBD_HOME}/${DIR}/oceanbase-ce ]; then
         ln -s ${OBD_HOME}/${DIR}/oceanbase ${OBD_HOME}/${DIR}/oceanbase-ce
     fi
@@ -68,7 +69,7 @@ for DIR in plugins config_parser; do
     fi
 done
 
-echo '<VERSION>' >> ${OBD_HOME}/version
+echo -n '<VERSION>' > ${OBD_HOME}/version
 
 echo "============update .bashrc============"
 

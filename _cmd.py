@@ -197,7 +197,7 @@ class ObdCommand(BaseCommand):
         if not COMMAND_ENV.get(ENV.ENV_OBD_ID):
             COMMAND_ENV.set(ENV.ENV_OBD_ID, uuid())
         if VERSION != version:
-            for part in ['plugins', 'config_parser', 'optimize', 'mirror/remote']:
+            for part in ['workflows', 'config_parser', 'optimize', 'mirror/remote']:
                 obd_part_dir = os.path.join(self.OBD_PATH, part)
                 if DirectoryUtil.mkdir(self.OBD_PATH):
                     root_part_path = os.path.join(self.OBD_INSTALL_PATH, part)

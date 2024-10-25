@@ -1,0 +1,218 @@
+# coding: utf-8
+# OceanBase Deploy.
+# Copyright (C) 2021 OceanBase
+#
+# This file is part of OceanBase Deploy.
+#
+# OceanBase Deploy is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# OceanBase Deploy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+
+
+from __future__ import absolute_import, division, print_function
+
+import os
+import sys
+
+from _manager import Manager
+from _plugin import ComponentPluginLoader, pyScriptPluginExec, PyScriptPluginLoader, PyScriptPlugin
+from tool import OrderedDict
+
+
+class WorkflowsIter:
+
+    def __init__(self, workflows):
+        self.workflows = workflows
+        self.stages = []
+        for workflow in workflows:
+            self.stages += workflow.stages
+        self.stages = sorted(set(self.stages))
+        self.index = 0
+        self.lentgh = len(self.stages)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.index < self.lentgh:
+            stage = self.stages[self.index]
+            self.index += 1
+            stages = OrderedDict()
+            for workflow in self.workflows:
+                stages[workflow.component_name] = workflow[stage]
+            return stages
+        else:
+            raise StopIteration
+
+
+class Workflows(object):
+
+    def __init__(self, name):
+        self.name = name
+        self.workflows = {}
+
+    def __getitem__(self, component_name):
+        if component_name not in self.workflows:
+            self.workflows[component_name] = ComponentWorkflow(self.name, component_name)
+        return self.workflows[component_name]
+    
+    def __setitem__(self, component_name, component_workflow):
+        if not isinstance(component_workflow, ComponentWorkflow):
+            raise TypeError("%s must be a instance of ComponentWorkflow" % component_workflow.__class__.__name__)
+        if component_workflow.name != self.name:
+            raise ValueError("%s is not a %s workflow" % (component_workflow, self.name))
+        self.workflows[component_name] = component_workflow
+    
+    def __call__(self, dpeloy_config):
+        workflows = [
+            self[component] for component in dpeloy_config.sorted_components
+        ]
+        return WorkflowsIter(workflows)
+
+
+class PluginTemplate(object):
+
+    def __init__(self, name, component_name, version=None, kwargs=None):
+        self.name = name
+        self.component_name = component_name
+        self.version = version
+        self.kwargs = kwargs or {}
+
+
+class ComponentWorkflow(object):
+
+    def __init__(self, name, component_name):
+        self.name = name
+        self.component_name = component_name
+        self.stage = {}
+
+    def add(self, stage, *plugins):
+        return self.add_with_kwargs(stage, None, *plugins)
+
+    def add_with_component(self, stage, component_name, *plugins):
+        return self.add_with_component_version(stage, component_name, None, *plugins)
+
+    def add_with_component_version(self, stage, component_name, version, *plugins):
+        return self.add_with_component_version_kwargs(stage, component_name, version, None, *plugins)
+
+    def add_with_kwargs(self, stage, kwargs, *plugins):
+        return self.add_with_component_version_kwargs(stage, self.component_name, None, kwargs, *plugins)
+
+    def add_with_component_version_kwargs(self, stage, component_name, version, kwargs, *plugins):
+        stage = int(stage)
+        plugins = [PluginTemplate(plugin, component_name, version, kwargs) for plugin in plugins]
+        if stage not in self.stage:
+            self.stage[stage] = plugins
+        else:
+            self.stage[stage] += plugins
+
+    @property
+    def stages(self):
+        return sorted(self.stage.keys())
+    
+    def __getitem__(self, stage):
+        return self.stage.get(stage, [])
+
+
+class ComponentWorkflowLoader(ComponentPluginLoader):
+    MODULE_NAME = __name__
+
+
+def workflowTemplateExec(func):
+    def _new_func(
+        self, namespace, namespaces, deploy_name, deploy_status,
+        repositories, components, clients, cluster_config, cmd,
+        options, stdio, *arg, **kwargs
+        ):
+        workflow = ComponentWorkflow(self.name, self.component_name)
+        ret = pyScriptPluginExec(func)(self, namespace, namespaces, deploy_name, deploy_status,
+        repositories, components, [], cluster_config, cmd,
+        options, stdio, workflow, *arg, **kwargs)
+        return workflow if ret else None
+    return _new_func
+
+
+class WorkflowLoader(ComponentWorkflowLoader):
+
+    def __init__(self, home_path, workflow_name=None, dev_mode=False, stdio=None):
+        if not workflow_name:
+            raise NotImplementedError
+        type_name = 'PY_SCRIPT_WORKFLOW_%s' % workflow_name.upper()
+        type_value = 'PyScriptWorkflow%sPlugin' % ''.join([word.capitalize() for word in workflow_name.split('_')])
+        self.PLUGIN_TYPE = PyScriptPluginLoader.PyScriptPluginType(type_name, type_value)
+        if not getattr(sys.modules[__name__], type_value, False):
+            self._create_(workflow_name)
+        super(WorkflowLoader, self).__init__(home_path, dev_mode=dev_mode, stdio=stdio)
+        self.workflow_name = workflow_name
+
+    def _create_(self, workflow_name):
+        exec('''
+class %s(PyScriptPlugin):
+
+    FLAG_FILE = '%s.py'
+    PLUGIN_NAME = '%s'
+
+    def __init__(self, component_name, plugin_path, version, dev_mode):
+        super(%s, self).__init__(component_name, plugin_path, version, dev_mode)
+
+    @staticmethod
+    def set_plugin_type(plugin_type):
+        %s.PLUGIN_TYPE = plugin_type
+
+    @workflowTemplateExec
+    def %s(
+        self, namespace, namespaces, deploy_name, deploy_status,
+        repositories, components, clients, cluster_config, cmd,
+        options, stdio, *arg, **kwargs):
+        pass
+        ''' % (self.PLUGIN_TYPE.value, workflow_name, workflow_name, self.PLUGIN_TYPE.value, self.PLUGIN_TYPE.value, workflow_name))
+        clz = locals()[self.PLUGIN_TYPE.value]
+        setattr(sys.modules[__name__], self.PLUGIN_TYPE.value, clz)
+        clz.set_plugin_type(self.PLUGIN_TYPE)
+        return clz
+
+
+class ComponentWorkflowLoader(WorkflowLoader):
+
+    def __init__(self, home_path, component_name, workflow_name=None, dev_mode=False, stdio=None):
+        super(ComponentWorkflowLoader, self).__init__(os.path.join(home_path, component_name), workflow_name, dev_mode=dev_mode, stdio=stdio)
+        self._general_loader = WorkflowLoader(os.path.join(home_path, "general"), workflow_name, dev_mode=dev_mode, stdio=stdio)
+        self._general_loader.component_name = component_name
+
+
+    def get_workflow_template(self, version):
+        template = self.get_best_plugin(version)
+        if not template:
+            template = self._general_loader.get_best_plugin(version)
+        return template
+
+
+class WorkflowManager(Manager):
+
+    RELATIVE_PATH = 'workflows'
+    # The directory structure for plugin is ./workflows/{component_name}/{version}
+
+    def __init__(self, home_path, dev_mode=False, stdio=None):
+        super(WorkflowManager, self).__init__(home_path, stdio=stdio)
+        self.workflow_loaders = {}
+        self.dev_mode = dev_mode
+
+    def get_loader(self, workflow_name, component_name):
+        if component_name not in self.workflow_loaders:
+            self.workflow_loaders[component_name] = {}
+        if workflow_name not in self.workflow_loaders[component_name]:
+            self.workflow_loaders[component_name][workflow_name] = ComponentWorkflowLoader(self.path, component_name, workflow_name, self.dev_mode, stdio=self.stdio)
+        return self.workflow_loaders[component_name][workflow_name]
+
+    def get_workflow_template(self, workflow_name, component_name, version):
+        loader = self.get_loader(workflow_name, component_name)
+        return loader.get_workflow_template(version)
