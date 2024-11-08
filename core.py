@@ -38,7 +38,7 @@ from _rpm import Version
 from _mirror import MirrorRepositoryManager, PackageInfo, RemotePackageInfo
 from _plugin import PluginManager, PluginType, InstallPlugin, PluginContextNamespace
 from _deploy import DeployManager, DeployStatus, DeployConfig, DeployConfigStatus, Deploy, ClusterStatus
-from _workflow import WorkflowManager, Workflows
+from _workflow import WorkflowManager, Workflows, SubWorkflowTemplate, SubWorkflows
 from _tool import Tool, ToolManager
 from _repository import RepositoryManager, LocalPackage, Repository, RepositoryVO
 import _errno as err
@@ -183,10 +183,12 @@ class ObdHome(object):
             repositories = self.repositories
         workflows = Workflows(workflow_name)
         for repository in repositories:
-            workflows[repository.name] = self.get_workflow(repository, workflow_name, repository.name, repository.version, no_found_act=no_found_act)
+            template = self.get_workflow(repository, workflow_name, repository.name, repository.version, no_found_act=no_found_act)
+            if template:
+                workflows[repository.name] = template
         return workflows
 
-    def get_workflow(self, repository, workflow_name, component_name, version=0.1, no_found_act='exit'):
+    def get_workflow(self, repository, workflow_name, component_name, version=0.1, no_found_act='exit', **component_kwargs):
         if no_found_act == 'exit':
             no_found_exit = True
         else:
@@ -195,41 +197,78 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Searching %s template for components ...', workflow_name)
         template = self.workflow_manager.get_workflow_template(workflow_name, component_name, version)
         if template:
-            ret = self.call_workflow_template(template, repository)
+            ret = self.call_workflow_template(template, repository, **component_kwargs)
             if ret:
                 self._call_stdio('verbose', 'Found for %s for %s-%s' % (template, template.component_name, template.version))
                 return ret
         if no_found_exit:
-            self._call_stdio('critical', 'No such %s template for %s-%s' % (template, template.component_name, template.version))
+            self._call_stdio('critical', 'No such %s template for %s-%s' % (workflow_name, component_name, version))
             exit(1)
         else:
-            self._call_stdio(msg_lv, 'No such %s template for %s-%s' % (template, template.component_name, template.version))
+            self._call_stdio(msg_lv, 'No such %s template for %s-%s' % (workflow_name, component_name, version))
 
-    def run_workflow(self, workflows, deploy_config=None, repositories=None, no_found_act='exit'):
-        if not deploy_config:
-            deploy_config = self.deploy.deploy_config
+    def run_workflow(self, workflows, sorted_components=[], repositories=None, no_found_act='exit', error_exit=True, **kwargs):
+        if not sorted_components and self.deploy:
+            sorted_components = self.deploy.deploy_config.sorted_components
         if not repositories:
-            repositories = self.repositories
-        repositories = {repository.name: repository for repository in repositories}
-        for stages in workflows(deploy_config):
+            repositories = self.repositories if self.repositories else []
+        if not sorted_components:
+            sorted_components = [repository.name for repository in repositories]
+
+        repositories_map = {repository.name: repository for repository in repositories}
+        for stages in workflows(sorted_components):
+            if not self.hanlde_sub_workflows(stages, sorted_components, repositories, no_found_act=no_found_act, **kwargs):
+                return False
             for component_name in stages:
-                for plugin_template in stages[component_name]:
-                    if 'repository' in plugin_template.kwargs:
-                        repository = plugin_template.kwargs['repository']
-                        del plugin_template.kwargs['repository']
-                    else:
-                        if plugin_template.component_name in repositories:
-                            repository = repositories[plugin_template.component_name]
-                        else:
-                            repository = repositories[component_name]
-                    if not plugin_template.version:
-                        if plugin_template.component_name in repositories:
-                            plugin_template.version = repositories[component_name].version
-                        else:
-                            plugin_template.version = repository.version
-                    plugin = self.search_py_script_plugin_by_template(plugin_template, no_found_act=no_found_act)
-                    if plugin and not self.call_plugin(plugin, repository, **plugin_template.kwargs):
-                            return False
+                for template in stages[component_name]:
+                    if isinstance(template, SubWorkflowTemplate):
+                        continue
+                    if component_name in kwargs:
+                        template.kwargs.update(kwargs[component_name])
+                    if not self.run_plugin_template(template, component_name, repositories_map, no_found_act=no_found_act) and error_exit:
+                        return False
+        return True
+
+    def hanlde_sub_workflows(self, stages, sorted_components, repositories, no_found_act='exit', **kwargs):
+        sub_workflows = SubWorkflows()
+        for repository in repositories:
+            component_name = repository.name
+            if component_name not in stages:
+                continue
+            for template in stages[component_name]:
+                if not isinstance(template, SubWorkflowTemplate):
+                    continue
+                if component_name in kwargs:
+                    template.kwargs.update(kwargs[component_name])
+                version = template.version if template.version else repository.version
+                workflow = self.get_workflow(repository, template.name, template.component_name, version, no_found_act=no_found_act, **template.kwargs)
+                if workflow:
+                    workflow.set_global_kwargs(**template.kwargs)
+                    sub_workflows.add(workflow)
+        
+        for workflows in sub_workflows:
+            if not self.run_workflow(workflows, sorted_components, repositories, no_found_act=no_found_act, **kwargs):
+                return False
+        return True
+
+    def run_plugin_template(self, plugin_template, component_name, repositories=None, no_found_act='exit', **kwargs):
+        if 'repository' in plugin_template.kwargs:
+            repository = plugin_template.kwargs['repository']
+            del plugin_template.kwargs['repository']
+        else:
+            if plugin_template.component_name in repositories:
+                repository = repositories[plugin_template.component_name]
+            else:
+                repository = repositories[component_name]
+        if not plugin_template.version:
+            if plugin_template.component_name in repositories:
+                plugin_template.version = repositories[component_name].version
+            else:
+                plugin_template.version = repository.version
+        plugin = self.search_py_script_plugin_by_template(plugin_template, no_found_act=no_found_act)
+        plugin_template.kwargs.update(kwargs)
+        if plugin and not self.call_plugin(plugin, repository, **plugin_template.kwargs):
+            return False
         return True
 
     def _init_call_args(self, repository, spacename=None, target_servers=None, **kwargs):
@@ -245,7 +284,14 @@ class ObdHome(object):
             'cmd': self.cmds,
             'options': self.options,
             'stdio': self.stdio,
-            'target_servers': target_servers
+            'target_servers': target_servers,
+            'mirror_manager': self.mirror_manager,
+            'repository_manager': self.repository_manager,
+            'plugin_manager': self.plugin_manager,
+            'deploy_manager': self.deploy_manager,
+            'lock_manager': self.lock_manager,
+            'optimize_manager': self.optimize_manager,
+            'tool_manager': self.tool_manager
         }
         if self.deploy:
             args['deploy_name'] = self.deploy.name
@@ -258,9 +304,9 @@ class ObdHome(object):
         args.update(kwargs)
         return args
 
-    def call_workflow_template(self, workflow_template, repository):
+    def call_workflow_template(self, workflow_template, repository, spacename=None, target_servers=None, **kwargs):
         self._call_stdio('verbose', 'Call workflow %s for %s' % (workflow_template, repository))
-        args = self._init_call_args(repository, None, None, clients=None)
+        args = self._init_call_args(repository, spacename, target_servers, clients=None, **kwargs)
         return workflow_template(**args)
 
     def call_plugin(self, plugin, repository, spacename=None, target_servers=None, **kwargs):
