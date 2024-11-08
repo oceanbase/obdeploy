@@ -22,13 +22,14 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import sys
+from copy import deepcopy
 
 from _manager import Manager
 from _plugin import ComponentPluginLoader, pyScriptPluginExec, PyScriptPluginLoader, PyScriptPlugin
 from tool import OrderedDict
 
 
-class WorkflowsIter:
+class WorkflowsIter(object):
 
     def __init__(self, workflows):
         self.workflows = workflows
@@ -65,6 +66,9 @@ class Workflows(object):
             self.workflows[component_name] = ComponentWorkflow(self.name, component_name)
         return self.workflows[component_name]
     
+    def __len__(self):
+        return len(self.workflows)
+    
     def __setitem__(self, component_name, component_workflow):
         if not isinstance(component_workflow, ComponentWorkflow):
             raise TypeError("%s must be a instance of ComponentWorkflow" % component_workflow.__class__.__name__)
@@ -72,11 +76,39 @@ class Workflows(object):
             raise ValueError("%s is not a %s workflow" % (component_workflow, self.name))
         self.workflows[component_name] = component_workflow
     
-    def __call__(self, dpeloy_config):
+    def __call__(self, sorted_components):
         workflows = [
-            self[component] for component in dpeloy_config.sorted_components
+            self[component] for component in sorted_components
         ]
         return WorkflowsIter(workflows)
+    
+
+class SubWorkflows(object):
+
+    def __init__(self) -> None:
+        self.workflows = OrderedDict()
+
+    def add(self, workflow):
+        if not isinstance(workflow, ComponentWorkflow):
+            raise TypeError("%s must be a instance of ComponentWorkflow" % workflow.__class__.__name__)
+        if workflow.name not in self.workflows:
+            self.workflows[workflow.name] = Workflows(workflow.name)
+        self.workflows[workflow.name][workflow.component_name] = workflow
+
+    def __getitem__(self, workflow_name):
+        return self.workflows[workflow_name]
+    
+    def __iter__(self):
+        return iter(self.workflows.values())
+
+
+class SubWorkflowTemplate(object):
+    
+    def __init__(self, name, component_name, version=None, kwargs=None):
+        self.name = name
+        self.component_name = component_name
+        self.version = version
+        self.kwargs = kwargs or {}
 
 
 class PluginTemplate(object):
@@ -94,6 +126,11 @@ class ComponentWorkflow(object):
         self.name = name
         self.component_name = component_name
         self.stage = {}
+        self.sub_workflow = {}
+        self.global_kwargs = {}
+
+    def set_global_kwargs(self, **kwargs):
+        self.global_kwargs = kwargs
 
     def add(self, stage, *plugins):
         return self.add_with_kwargs(stage, None, *plugins)
@@ -113,14 +150,45 @@ class ComponentWorkflow(object):
         if stage not in self.stage:
             self.stage[stage] = plugins
         else:
+            if stage in self.sub_workflow:
+                raise Exception("stage %s already has a workflow" % stage)
             self.stage[stage] += plugins
 
+    def add_workflow(self, stage, workflow):
+        return self.add_workflow_with_kwargs(stage, None, workflow)
+    
+    def add_workflow_with_component(self, stage, component_name, workflow):
+        return self.add_workflow_with_component_version(stage, component_name, None, workflow)
+    
+    def add_workflow_with_component_version(self, stage, component_name, version, workflow):
+        return self.add_workflow_with_component_version_kwargs(stage, component_name, version, None, workflow)
+    
+    def add_workflow_with_kwargs(self, stage, kwargs, workflow):
+        return self.add_workflow_with_component_version_kwargs(stage, self.component_name, None, kwargs, workflow)
+    
+    def add_workflow_with_component_version_kwargs(self, stage, component_name, version, kwargs, workflow):
+        stage = int(stage)
+        workflow = SubWorkflowTemplate(workflow, component_name, version, kwargs)
+        if stage not in self.stage:
+            self.stage[stage] = [workflow]
+            self.sub_workflow[stage] = workflow
+        else:
+            raise Exception("stage %s already has a workflow" % stage)
+                            
     @property
     def stages(self):
         return sorted(self.stage.keys())
     
     def __getitem__(self, stage):
-        return self.stage.get(stage, [])
+        if self.global_kwargs:
+            stages = []
+            for template in self.stage.get(stage, []):
+                template = deepcopy(template)
+                template.kwargs.update(self.global_kwargs)
+                stages.append(template)
+            return stages
+        else:
+            return self.stage.get(stage, [])
 
 
 class ComponentWorkflowLoader(ComponentPluginLoader):

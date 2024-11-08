@@ -70,12 +70,13 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd
 pip install -r plugins-requirements3.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 pip install -r service/service-requirements.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 # pyinstaller -y --clean -n obd-web -p $BUILD_DIR/SOURCES/site-packages -F service/app.py
-pyinstaller --hidden-import=decimal -p $BUILD_DIR/SOURCES/site-packages --hidden-import service/app.py --hidden-import=configparser --hidden-import=Crypto.Hash.SHA --hidden-import=Crypto.PublicKey.RSA --hidden-import=Crypto.Signature.PKCS1_v1_5 --hidden-import=Crypto.Cipher.PKCS1_OAEP -F obd.py
+pyinstaller --hidden-import=decimal -p $BUILD_DIR/SOURCES/site-packages --hidden-import service.app --hidden-import=configparser --hidden-import=Crypto.Hash.SHA --hidden-import=Crypto.PublicKey.RSA --hidden-import=Crypto.Signature.PKCS1_v1_5 --hidden-import=Crypto.Cipher.PKCS1_OAEP -F obd.py
 rm -f obd.py obd.spec
 \mkdir -p $BUILD_DIR/SOURCES/web
 \cp -rf $SRC_DIR/dist/obd ${RPM_BUILD_ROOT}/usr/bin/obd
 \cp -rf $SRC_DIR/web/dist $BUILD_DIR/SOURCES/web
 \cp -rf $SRC_DIR/plugins $BUILD_DIR/SOURCES/plugins
+\cp -rf $SRC_DIR/workflows $BUILD_DIR/SOURCES/workflows
 \cp -rf $SRC_DIR/optimize $BUILD_DIR/SOURCES/optimize
 \cp -rf $SRC_DIR/example $BUILD_DIR/SOURCES/example
 \cp -rf $SRC_DIR/config_parser $BUILD_DIR/SOURCES/config_parser
@@ -85,6 +86,7 @@ rm -f obd.py obd.spec
 \cp -rf $SRC_DIR/mirror/ $BUILD_DIR/SOURCES/
 \cp -rf $BUILD_DIR/SOURCES/web ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/plugins ${RPM_BUILD_ROOT}/usr/obd/
+\cp -rf $BUILD_DIR/SOURCES/workflows ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/optimize ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/config_parser ${RPM_BUILD_ROOT}/usr/obd/
 \cp -rf $BUILD_DIR/SOURCES/mirror ${RPM_BUILD_ROOT}/usr/obd/
@@ -95,8 +97,8 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
 \cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
-cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
-cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -sf ocp-server ocp-server-ce
+cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
+cd ${RPM_BUILD_ROOT}/usr/obd/workflows && ln -s oceanbase oceanbase-ce && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/ obproxy-ce/
 mv obproxy/3.1.0 obproxy/3.2.1
 cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce
 cd ${RPM_BUILD_ROOT}/usr/obd/optimize && ln -s obproxy obproxy-ce
