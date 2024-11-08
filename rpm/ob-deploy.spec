@@ -98,7 +98,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
 \cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
 cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
-cd ${RPM_BUILD_ROOT}/usr/obd/workflows && ln -s oceanbase oceanbase-ce && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/workflows/obproxy-ce/* obproxy-ce/
+cd ${RPM_BUILD_ROOT}/usr/obd/workflows && ln -s oceanbase oceanbase-ce && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/ obproxy-ce/ && \cp -rf $SRC_DIR/workflows/obproxy-ce/* obproxy-ce/
 mv obproxy/3.1.0 obproxy/3.2.1
 cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce
 cd ${RPM_BUILD_ROOT}/usr/obd/optimize && ln -s obproxy obproxy-ce
