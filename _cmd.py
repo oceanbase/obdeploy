@@ -2025,7 +2025,8 @@ class ObdiagAnalyzeMirrorCommand(ObdCommand):
     def _do_command(self, obd):
         offline_args_sign = '--files'
         if self.args and (offline_args_sign in self.args):
-            return obd.obdiag_offline_func("analyze_%s" % self.name, self.opts)
+            # return obd.obdiag_offline_func("analyze_%s" % self.name, self.opts)
+            return obd.obdiag_offline_workflow("analyze_%s" % self.name)
         if self.cmds:
             return obd.obdiag_online_func(self.cmds[0], "analyze_%s" % self.name, self.opts)
         else:
