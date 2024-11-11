@@ -2156,7 +2156,8 @@ class ObdiagUpdateSceneCommand(ObdCommand):
         return self
 
     def _do_command(self, obd):
-        return obd.obdiag_offline_func("update_scene", self.opts)
+        # return obd.obdiag_offline_func("update_scene", self.opts)
+        return obd.obdiag_offline_workflow("update_scene")
 
 
 class ToolListCommand(ObdCommand):
