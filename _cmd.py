@@ -1948,7 +1948,8 @@ class ObdiagGatherSceneListCommand(ObdCommand):
         return LockMode.NO_LOCK
 
     def _do_command(self, obd):
-        return obd.obdiag_offline_func("gather_scene_list", self.opts)
+        # return obd.obdiag_offline_func("gather_scene_list", self.opts)
+        return obd.obdiag_offline_workflow("gather_scene_list")
 
 
 class ObdiagGatherSceneRunCommand(ObdCommand):
