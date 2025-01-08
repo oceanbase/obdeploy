@@ -20,22 +20,12 @@
 
 from __future__ import absolute_import, division, print_function
 
+from copy import copy
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, **kwargs):
-    namespace = plugin_context.namespace
-    namespaces = plugin_context.namespaces
-    deploy_name = plugin_context.deploy_name
-    deploy_status = plugin_context.deploy_status
-    repositories = plugin_context.repositories
-    plugin_name = plugin_context.plugin_name
 
-    components = plugin_context.components
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, run_workflow, get_workflows, *args, **kwargs):
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-    cmds = plugin_context.cmds
-    options = plugin_context.options
-    dev_mode = plugin_context.dev_mode
-    stdio = plugin_context.stdio
     upgrade_repositories = kwargs.get('upgrade_repositories')
 
     cur_repository = upgrade_repositories[0]
@@ -43,14 +33,12 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
     repository_dir = dest_repository.repository_dir
     kwargs['repository_dir'] = repository_dir
 
-    stop_plugin = search_py_script_plugin([cur_repository], 'stop')[cur_repository]
-    init_plugin = search_py_script_plugin([dest_repository], 'init')[dest_repository]
-    start_plugin = search_py_script_plugin([dest_repository], 'start')[dest_repository]
-    connect_plugin = search_py_script_plugin([dest_repository], 'connect')[dest_repository]
-    display_plugin = search_py_script_plugin([dest_repository], 'display')[dest_repository]
+    start_workflows = get_workflows("upgrade_start", repositories=[dest_repository])
+    init_workflows = get_workflows("init", repositories=[dest_repository])
+    stop_workflows = get_workflows("stop", repositories=[cur_repository])
 
     apply_param_plugin(cur_repository)
-    if not stop_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs):
+    if not run_workflow(stop_workflows, repositories=[cur_repository], **kwargs):
         return plugin_context.return_false()
 
     try:
@@ -64,15 +52,13 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, *args, 
         pass
 
     apply_param_plugin(dest_repository)
-    if not init_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, upgrade=True, *args, **kwargs):
+    init_kwargs = copy(kwargs)
+    init_kwargs['upgrade'] = True
+    if not run_workflow(init_workflows, repositories=[dest_repository], **{dest_repository.name: init_kwargs}):
         return plugin_context.return_false()
 
-    if not start_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, without_parameter=True, *args, **kwargs):
+    start_kwargs = copy(kwargs)
+    start_kwargs['without_parameter'] = True
+    if not run_workflow(start_workflows, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):
         return plugin_context.return_false()
-
-    ret = connect_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)
-    if ret:
-        meta_cursor = ret.get_return('cursor')
-        if display_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, cursor=meta_cursor, *args, **kwargs):
-            return plugin_context.return_true()
-    return plugin_context.return_false()
+    return plugin_context.return_true()

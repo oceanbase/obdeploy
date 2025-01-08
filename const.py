@@ -36,6 +36,8 @@ REVISION = '<CID>'
 BUILD_BRANCH = '<B_BRANCH>'
 # obdeploy build time
 BUILD_TIME = '<B_TIME>'
+# obdeploy build plugin list
+BUILD_PLUGIN_LIST = '<B_PLUGIN_LIST>'
 
 # obdeploy home path
 CONST_OBD_HOME = "OBD_HOME"
@@ -53,11 +55,26 @@ COMP_OCP_EXPRESS = 'ocp-express'
 COMP_OCP_SERVER = 'ocp-server'
 COMP_OCP_SERVER_CE = 'ocp-server-ce'
 COMPS_OCP = [COMP_OCP_SERVER, COMP_OCP_SERVER_CE]
+COMPS_OCP_CE_AND_EXPRESS = [COMP_OCP_SERVER_CE, COMP_OCP_EXPRESS]
 
 # ob
 COMP_OB = "oceanbase"
 COMP_OB_CE = "oceanbase-ce"
 COMPS_OB = [COMP_OB, COMP_OB_CE]
+
+# obproxy
+COMP_ODP = "obproxy"
+COMP_ODP_CE = "obproxy-ce"
+COMPS_ODP = [COMP_ODP, COMP_ODP_CE]
+
+# ob-configserver
+COMP_OB_CONFIGSERVER = "ob-configserver"
+
+# obagent
+COMP_OBAGENT = 'obagent'
+
+# oblogproxy
+COMP_OBLOGPROXY = 'oblogproxy'
 
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
@@ -79,3 +96,15 @@ TEST_TOOLS = {
     TOOL_SYSBENCH: 'sysbench',
 }
 TOOL_TPCC_BENCHMARKSQL = 'OB-BenchmarkSQL-5.0.jar'
+
+#workflow stages
+STAGE_FIRST = 10
+STAGE_SECOND = 20
+STAGE_THIRD = 30
+STAGE_FOURTH = 40
+STAGE_FIFTH = 50
+STAGE_SIXTH = 60
+STAGE_SEVENTH = 70
+STAGE_EIGHTH = 80
+STAGE_NINTH = 90
+STAGE_TENTH = 100

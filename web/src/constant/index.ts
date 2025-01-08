@@ -309,18 +309,67 @@ export const OCP_UPGRADE_STATUS_LIST = [
 ];
 
 export const DEL_STATUS_MAP = {
-  RUNNING: { status: 'processing', text: '卸载中' },
-  FAILED: { status: 'error', text: '卸载失败' },
-  SUCCESSFUL: { status: 'success', text: '卸载成功' },
-  PENDING: { status: 'warning', text: '待卸载' },
+  RUNNING: {
+    status: 'processing',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.Unmounting',
+      defaultMessage: '卸载中',
+    }),
+  },
+  FAILED: {
+    status: 'error',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.UninstallFailed',
+      defaultMessage: '卸载失败',
+    }),
+  },
+  SUCCESSFUL: {
+    status: 'success',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.Unmounted',
+      defaultMessage: '卸载成功',
+    }),
+  },
+  PENDING: {
+    status: 'warning',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.ToBeUninstalled',
+      defaultMessage: '待卸载',
+    }),
+  },
 };
 
 export const NO_CONNECT_COMP_STATUS = {
-  ERROR: { status: 'error', text: '不可卸载' },
-  PENDING: { status: 'error', text: '不可卸载' },
-  DELETING: { status: 'processing', text: '移除中' },
-  SUCCESSFUL: { status: 'success', text: '移除成功' },
+  ERROR: {
+    status: 'error',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.CannotBeUninstalled',
+      defaultMessage: '不可卸载',
+    }),
+  },
+  PENDING: {
+    status: 'error',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.CannotBeUninstalled',
+      defaultMessage: '不可卸载',
+    }),
+  },
+  DELETING: {
+    status: 'processing',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.Removing',
+      defaultMessage: '移除中',
+    }),
+  },
+  SUCCESSFUL: {
+    status: 'success',
+    text: intl.formatMessage({
+      id: 'OBD.src.constant.RemovedSuccessfully',
+      defaultMessage: '移除成功',
+    }),
+  },
 };
+
 export const PASSWORD_SUPPORT_CHARACTERS = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789${SPECIAL_SYMBOLS_OCP}`;
 
 export const PORT_MIN = 1025;
@@ -329,7 +378,7 @@ export const PORT_MAX = 65535;
 export const DEFAULT_PROXY_PWD = {
   key: 'obproxy_sys_password',
   description: 'password pf obproxy sys user',
-  value:'',
+  value: '',
   adaptive: false,
   auto: true,
   require: false,

@@ -37,15 +37,18 @@ def get_ip_list(cursor, deploy_name, tenant, stdio):
     return ip_list
 
 
-def get_standbys(plugin_context, primary_deploy_name, primary_tenant='', relation_tenants=[], all_tenant_names=[], exclude_tenant=[], cursors={}, skip_no_primary_cursor=False, *args, **kwargs):
+def get_standbys(plugin_context, primary_tenant='', relation_tenants=[], all_tenant_names=[], exclude_tenant=[], cursors={}, skip_no_primary_cursor=False, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
+    cmds = plugin_context.cmds
+    primary_deploy_name = cmds[0] if cmds else plugin_context.cluster_config.deploy_name
     primary_tenant = primary_tenant if primary_tenant else getattr(options, 'tenant_name', '')
     stdio.start_loading('Get standbys info')
     if skip_no_primary_cursor and (not cursors or not cursors.get(primary_deploy_name)):
         stdio.verbose('Connect to {} failed. skip get standby'.format(primary_deploy_name))
         plugin_context.set_variable('standby_tenants', [])
         plugin_context.set_variable('no_primary_cursor', True)
+        stdio.stop_loading('succeed')
         return plugin_context.return_true(standby_tenants=[])
 
     if not cursors:

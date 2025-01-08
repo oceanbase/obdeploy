@@ -20,17 +20,16 @@
 
 from __future__ import absolute_import, division, print_function
 
-from tool import ConfigUtil
-
 
 def generate_config(plugin_context, auto_depend=False,  generate_config_mini=False, return_generate_keys=False, only_generate_password=False, *args, **kwargs):
     if return_generate_keys:
-        generate_keys = ['system_password']
+        generate_keys = plugin_context.get_variable('generate_keys')
         if not only_generate_password:
             generate_keys += ['memory_size', 'log_dir', 'logging_file_max_history']
         return plugin_context.return_true(generate_keys=generate_keys)
 
     cluster_config = plugin_context.cluster_config
+    generate_random_password = plugin_context.get_variable('generate_random_password')
     generate_random_password(cluster_config)
     if only_generate_password:
         return plugin_context.return_true()
@@ -45,6 +44,8 @@ def generate_config(plugin_context, auto_depend=False,  generate_config_mini=Fal
     if auto_depend:
         for comps in depend_comps:
             for comp in comps:
+                if comp in cluster_config.depends:
+                    continue
                 if cluster_config.add_depend_component(comp):
                     break
     global_config = cluster_config.get_global_conf()
@@ -71,10 +72,3 @@ def generate_config(plugin_context, auto_depend=False,  generate_config_mini=Fal
 
     stdio.stop_loading('succeed')
     plugin_context.return_true()
-
-
-def generate_random_password(cluster_config):
-    add_components = cluster_config.get_deploy_added_components()
-    global_config = cluster_config.get_original_global_conf()
-    if cluster_config.name in add_components and 'system_password' not in global_config:
-        cluster_config.update_global_conf('system_password', ConfigUtil.get_random_pwd_by_total_length(), False)

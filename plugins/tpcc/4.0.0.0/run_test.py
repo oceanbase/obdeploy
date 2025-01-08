@@ -31,47 +31,41 @@ except:
     import subprocess
 from collections import OrderedDict
 from ssh import LocalClient
-from tool import FileUtil
-
-stdio = None
+from tool import FileUtil, get_option
 
 
-def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
-    def get_option(key, default=''):
-        value = getattr(options, key, default)
-        if value is None:
-            value = default
-        return value
-
-    def local_execute_command(command, env=None, timeout=None):
-        return LocalClient.execute_command(command, env, timeout, stdio)
-
-    global stdio
+def run_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
-    bmsql_jar = get_option('bmsql_jar')
-    bmsql_libs = get_option('bmsql_libs')
-    bmsql_classpath = kwargs.get('bmsql_classpath')
+
+    pre_test_ret = plugin_context.get_return("pre_test")
+
+    bmsql_jar = get_option(options, 'bmsql_jar')
+    bmsql_libs = get_option(options, 'bmsql_libs')
+    bmsql_classpath = pre_test_ret.get_return('bmsql_classpath')
     if not bmsql_classpath:
         jars = [bmsql_jar]
         jars.extend(bmsql_libs.split(','))
         bmsql_classpath = ':'.join(jars)
-    bmsql_prop_path = kwargs.get('bmsql_prop_path')
+    bmsql_prop_path = pre_test_ret.get_return('bmsql_prop_path')
     stdio.verbose('get bmsql_prop_path: {}'.format(bmsql_prop_path))
-    run_path = kwargs.get('run_path')
-    host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
-    db_name = get_option('database', 'test')
-    user = get_option('user', 'root')
-    password = get_option('password', '')
-    tenant_name = get_option('tenant', 'test')
-    obclient_bin = get_option('obclient_bin', 'obclient')
-    run_mins = get_option('run_mins', 10)
-    java_bin = get_option('java_bin', 'java')
-    tmp_dir = kwargs.get("tmp_dir")
-    warehouses = kwargs.get("warehouses")
+    run_path = pre_test_ret.get_return('run_path')
+    host = get_option(options, 'host', '127.0.0.1')
+    db_name = get_option(options, 'database', 'test')
+    user = get_option(options, 'user', 'root')
+    password = get_option(options, 'password', '')
+    tenant_name = get_option(options, 'tenant', 'test')
+    obclient_bin = get_option(options, 'obclient_bin', 'obclient')
+    run_mins = get_option(options, 'run_mins', 10)
+    java_bin = get_option(options, 'java_bin', 'java')
+    warehouses = pre_test_ret.get_return('warehouses')
     terminals = kwargs.get("terminals")
-    cpu_total = kwargs.get('cpu_total')
+    cpu_total = pre_test_ret.get_return('cpu_total')
+
+    sys_namespace = kwargs.get("sys_namespace")
+    get_db_and_cursor = kwargs.get("get_db_and_cursor")
+    db, cursor = get_db_and_cursor(sys_namespace)
+    port = db.port if db else 2881
 
     stdio.verbose('Check connect ready')
     exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A %s -e" % (
@@ -79,7 +73,7 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
     stdio.start_loading('Connect to tenant %s' % tenant_name)
     try:
         while True:
-            ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'))
+            ret = LocalClient.execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'), stdio=stdio)
             if ret:
                 break
             time.sleep(10)
@@ -89,7 +83,7 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
         stdio.exception('')
         return
 
-    tenant_id = kwargs.get('tenant_id')
+    tenant_id = pre_test_ret.get_return('tenant_id')
 
     # Major freeze
     stdio.start_loading('Merge')
@@ -184,3 +178,4 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
         verbose_msg = 'exited code 255, error output:\n%s' % error
         stdio.verbose(verbose_msg)
         stdio.exception('')
+        

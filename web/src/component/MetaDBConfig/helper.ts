@@ -10,11 +10,11 @@ const sortErrorFields = (errorFields: any, sortArr: string[]) => {
   for (let name of sortArr) {
     let target;
     if (name === 'dbNode') {
-      target = errorFields.find(
+      target = errorFields?.find(
         (errorField: any) => !isNaN(parseFloat(errorField.name[0])),
       );
     } else {
-      target = errorFields.find(
+      target = errorFields?.find(
         (errorField: any) => errorField.name[0] === name,
       );
     }

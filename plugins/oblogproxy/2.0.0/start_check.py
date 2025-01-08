@@ -24,19 +24,11 @@ import os
 import _errno as err
 from _rpm import Version
 
+from tool import get_port_socket_inode
+
 
 stdio = None
 success = True
-
-
-def get_port_socket_inode(client, port):
-    port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{if($4==\"0A\") print $2,$4,$10}' | grep ':%s' | awk -F' ' '{print $3}' | uniq" % port
-    res = client.execute_command(cmd)
-    if not res or not res.stdout.strip():
-        return False
-    stdio.verbose(res.stdout)
-    return res.stdout.strip().split('\n')
 
 
 def start_check(plugin_context, init_check_status=False, strict_check=False, work_dir_check=False, work_dir_empty_check=True, precheck=False, *args, **kwargs):

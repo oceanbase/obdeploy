@@ -46,7 +46,6 @@ class OcpExpressCursor(object):
         self.ip = ip
         self.port = port
         self.url_prefix = "http://{ip}:{port}/".format(ip=self.ip, port=self.port)
-
         self.auth = None
 
     def status(self, stdio=None):

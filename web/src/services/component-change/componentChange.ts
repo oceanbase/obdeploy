@@ -258,20 +258,20 @@ export async function componentChangeDeploymentsInfo(
   const formatComp = (componentsList?: API.BestComponentInfo[]) => {
     if (!componentsList || !componentsList.length) return componentsList;
     componentsList.sort((pre, cur) => pre.deployed - cur.deployed);
-    const prometheus = componentsList.find(
+    const prometheus = componentsList?.find(
       (item) => item.component_name === 'prometheus',
     );
-    const grafana = componentsList.find(
+    const grafana = componentsList?.find(
       (item) => item.component_name === 'grafana',
     );
     if (!prometheus?.deployed) {
-      const index = componentsList.findIndex(
+      const index = componentsList?.findIndex(
         (item) => item.component_name === 'prometheus',
       );
       componentsList.splice(index, 1);
     }
     if (!grafana?.deployed) {
-      const index = componentsList.findIndex(
+      const index = componentsList?.findIndex(
         (item) => item.component_name === 'grafana',
       );
       componentsList.splice(index, 1);
@@ -303,7 +303,7 @@ export async function componentChangeDepends(params: { name: string }) {
   );
 }
 
-export async function getCommondConfigPath(name:string){
+export async function getCommondConfigPath(name: string) {
   return request<API.CommondConfigPath>(
     `/api/v1/component_change/${name}/path`,
     {

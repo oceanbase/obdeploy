@@ -56,7 +56,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=Non
         return False
 
 
-def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenant, cursors={}, cluster_configs={}, *args, **kwargs):
+def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *args, **kwargs):
     def error(msg='', *arg, **kwargs):
         msg and stdio.error(msg, *arg, **kwargs)
         stdio.stop_loading('fail')
@@ -72,6 +72,9 @@ def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenan
     standby_deploy_name = plugin_context.cluster_config.deploy_name
     current_cluster_config = plugin_context.cluster_config
     plugin_context.cluster_config = current_cluster_config
+    cmds = plugin_context.cmds
+    primary_deploy_name = cmds[1]
+    primary_tenant = cmds[2]
     primary_cursor = cursors.get(primary_deploy_name)
     stdio.start_loading('Check primary tenant')
     if primary_tenant.lower() == 'sys':

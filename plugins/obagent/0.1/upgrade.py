@@ -38,7 +38,7 @@ def call_plugin(plugin, plugin_context, repositories, *args, **kwargs):
         stdio, *args, **kwargs)
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, run_workflow, get_workflow, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
 
@@ -51,18 +51,18 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
     repository_dir = dest_repository.repository_dir
     kwargs['repository_dir'] = repository_dir
 
-    stop_plugin = search_py_script_plugin([cur_repository], 'stop')[cur_repository]
-    start_plugin = search_py_script_plugin([dest_repository], 'start')[dest_repository]
+    stop_workflows = get_workflow(cur_repository, 'stop', )
+    start_workflows = get_workflow('upgrade_start', repositories=[dest_repository])
     connect_plugin = search_py_script_plugin([dest_repository], 'connect')[dest_repository]
     display_plugin = search_py_script_plugin([dest_repository], 'display')[dest_repository]
 
     apply_param_plugin(cur_repository)
-    if not call_plugin(stop_plugin, plugin_context, [cur_repository], *args, **kwargs):
+    if not run_workflow(stop_workflows, repositories=[cur_repository], **kwargs):
         return
     install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
 
     apply_param_plugin(dest_repository)
-    if not call_plugin(start_plugin, plugin_context, [dest_repository], *args, **kwargs):
+    if not run_workflow(start_workflows, repositories=[dest_repository], **kwargs):
         return
 
     ret = call_plugin(connect_plugin, plugin_context, [dest_repository], *args, **kwargs)

@@ -73,6 +73,8 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
 
     if auto_depend:
         for comp in ['oceanbase', 'oceanbase-ce', 'ob-configserver']:
+            if comp in cluster_config.depends:
+                continue
             if comp in plugin_context.components:
                 cluster_config.add_depend_component(comp)
 

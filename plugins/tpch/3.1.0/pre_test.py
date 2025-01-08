@@ -21,7 +21,6 @@
 from __future__ import absolute_import, division, print_function
 
 
-import re
 import os
 from glob import glob
 try:
@@ -63,9 +62,6 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
         stdio.verbose('get %s_path: %s' % (key, path))
         return path if path else default
 
-    def local_execute_command(command, env=None, timeout=None):
-        return LocalClient.execute_command(command, env, timeout, stdio)
-
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     options = plugin_context.options
@@ -79,19 +75,22 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     remote_tbl_dir = get_option('remote_tbl_dir')
     tenant_name = get_option('tenant', 'test')
     host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     password = get_option('password', '')
 
+    connect_cursor = plugin_context.get_return('connect')
+    cursor = connect_cursor.get_return("cursor") if not cursor else cursor
+    port = cursor.db.port
+
     if tenant_name == 'sys':
         stdio.error('DO NOT use sys tenant for testing.')
-        return 
+        return
 
     test_server = get_option('test_server')
     tmp_dir = os.path.abspath(get_option('tmp_dir', './tmp'))
     tbl_tmp_dir = os.path.join(tmp_dir, 's%s' % scale_factor)
-    ddl_path = get_path('ddl', [os.path.join(local_dir, 'create_tpch_mysql_table_part.ddl')])
+    ddl_path = get_path('ddl', [plugin_context.get_variable('ddl_path')])
     stdio.verbose('set ddl_path: %s' % ddl_path)
     setattr(options, 'ddl_path', ddl_path)
     tbl_path = get_path('tbl', glob(os.path.join(tbl_tmp_dir, '*.tbl')))
@@ -115,12 +114,14 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     stdio.verbose('set tmp_dir: %s' % tmp_dir)
     setattr(options, 'tmp_dir', tmp_dir)
 
-    sql = "select * from oceanbase.gv$tenant where tenant_name = %s"
-    tenant_meta = cursor.fetchone(sql, [tenant_name])
+    query_tenant_sql = plugin_context.get_variable('tenant_sql')
+    stdio.verbose('execute sql: %s' % (query_tenant_sql % tenant_name))
+    tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
     if not tenant_meta:
         stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
         return
-    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta['tenant_id']
+    tenant_id = plugin_context.get_variable('tenant_id')
+    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta[tenant_id]
     pool = cursor.fetchone(sql)
     if pool is False:
         return
@@ -129,7 +130,10 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     if tenant_unit is False:
         return
     max_cpu = tenant_unit['max_cpu']
-    min_memory = tenant_unit['min_memory']
+    memory_size = plugin_context.get_variable('memory_size', None)
+    if memory_size:
+        memory_size = tenant_unit['memory_size']
+    min_memory = plugin_context.get_variable('min_memory', default=tenant_unit.get('min_memory'))
     unit_count = pool['unit_count']
     server_num = len(cluster_config.servers)
     sql = "select count(1) server_num from oceanbase.__all_server where status = 'active'"
@@ -138,16 +142,18 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
         return
     server_num = ret.get("server_num", server_num)
 
+    format_size = plugin_context.get_variable('format_size')
+
     if get_option('test_only'):
         return plugin_context.return_true(
             max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
-            tenant_id=tenant_meta['tenant_id'], format_size=Capacity
+            tenant_id=tenant_meta[tenant_id], format_size=format_size if format_size else Capacity
         )
 
     if not remote_tbl_dir:
         stdio.error('Please use --remote-tbl-dir to set a dir for remote tbl files')
         return
-    
+
     if disable_transfer:
         ret = clients[test_server].execute_command('ls %s' % (os.path.join(remote_tbl_dir, '*.tbl')))
         tbl_path = ret.stdout.strip().split('\n') if ret else []
@@ -167,7 +173,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
             if not os.path.exists(dss_config):
                 dss_config = os.path.join(os.getenv('HOME'), TOOL_TPCH, 'tpch')
                 setattr(options, 'dss_config', dss_config)
-            
+
             dss_path = os.path.join(dss_config, 'dists.dss')
             if not os.path.exists(dss_path):
                 stdio.error('No such file: %s' % dss_path)
@@ -178,7 +184,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
                 return
 
             stdio.start_loading('Generate Data (Scale Factor: %s)' % scale_factor)
-            ret = local_execute_command('cd %s; %s -s %s -b %s' % (tbl_tmp_dir, dbgen_bin, scale_factor, dss_path))
+            ret = LocalClient.execute_command('cd %s; %s -s %s -b %s' % (tbl_tmp_dir, dbgen_bin, scale_factor, dss_path), stdio=stdio)
             if ret:
                 stdio.stop_loading('succeed')
                 tbl_path = glob(os.path.join(tbl_tmp_dir, '*.tbl'))
@@ -205,7 +211,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     return plugin_context.return_true(
         obclient_bin=obclient_bin, host=host, port=port, user=user, password=password, database=mysql_db,
         max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
-        tenant_id=tenant_meta['tenant_id'], format_size=Capacity
+        tenant_id=tenant_meta[tenant_id], format_size=format_size if format_size else Capacity, memory_size=memory_size
     )
 
 

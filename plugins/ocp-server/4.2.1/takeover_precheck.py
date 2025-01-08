@@ -37,11 +37,8 @@ def takeover_precheck(plugin_context, cursors=None, *args, **kwargs):
     try:
         # init variables, include get obcluster info from deploy config
         cluster_config = plugin_context.cluster_config
-        clients = plugin_context.clients
-        options = plugin_context.options
         stdio = plugin_context.stdio
-        stdio.verbose(vars(cluster_config))
-        cursors = plugin_context.get_return('connect').get_return('cursor') if not cursors else cursors
+        cursors = plugin_context.get_return('takeover_connect').get_return('cursor') if not cursors else cursors
         cursor = cursors[cluster_config.servers[0]]
         ocp_info = cursor.info(stdio=stdio)
         stdio.verbose("get ocp info %s", ocp_info)
@@ -64,5 +61,6 @@ def takeover_precheck(plugin_context, cursors=None, *args, **kwargs):
         stdio.verbose("precheck result %s" % precheck_result)
         return plugin_context.return_true(ocp_version=ocp_version)
     except Exception as ex:
+        stdio.exception('')
         stdio.error("do takeover precheck got exception:%s", ex)
         return plugin_context.return_false()

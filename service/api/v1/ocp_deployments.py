@@ -170,9 +170,9 @@ async def get_ocp_install_task_log(id: int = Path(description="deployment id"),
     task_info = handler.get_install_task_info(id, task_id)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(id))
-    log_content = handler.buffer.read()
-    # log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
-    return response_utils.new_ok_response(TaskLog(log=log_content, offset=offset))
+    origin_log = handler.buffer.read()
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    return response_utils.new_ok_response(TaskLog(log=masked_log, offset=offset))
 
 
 @router.post("/ocp/deployments/{id}/reinstall",
@@ -214,9 +214,9 @@ async def get_ocp_reinstall_task_log(id: int = Path(description="deployment id")
     task_info = handler.get_reinstall_task_info(id, task_id)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(id))
-    log_content = handler.buffer.read()
-    # log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
-    return response_utils.new_ok_response(TaskLog(log=log_content, offset=offset))
+    origin_log = handler.buffer.read()
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    return response_utils.new_ok_response(TaskLog(log=masked_log, offset=offset))
 
 
 @router.delete("/ocp/deployments/{id}",
@@ -349,9 +349,9 @@ async def get_ocp_upgrade_task_log(cluster_name: str = Path(description="ocp clu
     task_info = handler.get_ocp_upgrade_task(cluster_name, task_id)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(cluster_name))
-    log_content = handler.buffer.read()
-    # log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
-    return response_utils.new_ok_response(TaskLog(log=log_content, offset=offset))
+    origin_log = handler.buffer.read()
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    return response_utils.new_ok_response(TaskLog(log=masked_log, offset=offset))
 
 
 @router.get("/ocp/upgraade/agent/hosts",

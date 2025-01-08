@@ -28,19 +28,11 @@ else:
     import pymysql as mysql
 
 import _errno as err
+from tool import get_port_socket_inode
 
 
 stdio = None
 success = True
-
-
-def get_port_socket_inode(client, port):
-    port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/tcp*' | awk -F' ' '{if($4==\"0A\") print $2,$4,$10}' | grep ':%s' | awk -F' ' '{print $3}' | uniq" % port
-    res = client.execute_command(cmd)
-    if not res or not res.stdout.strip():
-        return False
-    return True
 
 
 def check_mysql_alive(url):

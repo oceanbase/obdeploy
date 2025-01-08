@@ -1097,6 +1097,27 @@ class DeployConfig(SafeStdio):
         self._mem_mode = False
 
     @property
+    def sorted_components(self):
+        available_depends = list(self.components.keys())
+        unsort_components = available_depends
+        sorted_components = []
+        while unsort_components:
+            components = unsort_components
+            unsort_components = []
+            for component in components:
+                cluster_config = self.components[component]
+                for component_name in cluster_config.depends:
+                    if component_name not in available_depends:
+                        continue
+                    if component_name not in sorted_components:
+                        unsort_components.append(component)
+                        break
+                else:
+                    sorted_components.append(component)
+        return sorted_components
+
+
+    @property
     def user(self):
         return self._user
 

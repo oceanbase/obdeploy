@@ -58,12 +58,12 @@ def tenant_check(tenant):
     return True
 
 
-def tenant_optimize(plugin_context, tenant_name='test', tenant_cursor=None, scenario=None, *args, **kwargs):
+def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
-    clients = plugin_context.clients
     stdio = plugin_context.stdio
+    options = plugin_context.options
     repositories = plugin_context.repositories
-
+    tenant_name = getattr(options, 'tenant_name', 'test')
     if tenant_name:
         check_result = tenant_check(tenant_name)
         if not check_result:

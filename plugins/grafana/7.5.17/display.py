@@ -30,6 +30,8 @@ def display(plugin_context, cursor, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
     results = []
+    if plugin_context.get_variable('is_restart'):
+        cursor = plugin_context.get_return('connect').get_return('cursor')
 
     for server in servers:
         server_config = cluster_config.get_server_conf(server)

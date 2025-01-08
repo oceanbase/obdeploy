@@ -57,7 +57,7 @@ export default function PreCheck({
         }
         if (
           data?.task_info?.result === 'FAILED' &&
-          data?.precheck_result.find((item: any) => item.result === 'RUNNING')
+          data?.precheck_result?.find((item: any) => item.result === 'RUNNING')
         ) {
           const newFailedList =
             data?.precheck_result?.filter(

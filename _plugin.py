@@ -78,6 +78,10 @@ class PluginContextNamespace:
         self._return = {}
 
     @property
+    def all_plugin_ret(self):
+        return self._return
+
+    @property
     def variables(self):
         return self._variables
 
@@ -198,9 +202,6 @@ class SubIO(object):
         self.stdio = getattr(stdio, 'sub_io', lambda: None)()
         self._func = {}
 
-    def __del__(self):
-        self.before_close()
-
     def _temp_function(self, *arg, **kwargs):
         pass
 
@@ -262,6 +263,9 @@ class ScriptPlugin(Plugin):
 
     def after_do(self, stdio, *arg, **kwargs):
         self._export(stdio)
+        if self.context.stdio.sync_obj:
+            self.context.stdio.warn("%s has animation not been closed" % self)
+        del self.context.stdio
         self.context = None
 
 
@@ -384,6 +388,7 @@ class Null(object):
 
     def __init__(self):
         pass
+
 
 class ParamPlugin(Plugin):
 
@@ -807,13 +812,14 @@ class InstallPlugin(Plugin):
 class ComponentPluginLoader(object):
 
     PLUGIN_TYPE = None
+    MODULE_NAME = __name__
 
     def __init__(self, home_path, plugin_type=PLUGIN_TYPE, dev_mode=False, stdio=None):
         if plugin_type:
             self.PLUGIN_TYPE = plugin_type
         if not self.PLUGIN_TYPE:
             raise NotImplementedError
-        self.plguin_cls = getattr(sys.modules[__name__], self.PLUGIN_TYPE.value, False)
+        self.plguin_cls = getattr(sys.modules[self.MODULE_NAME], self.PLUGIN_TYPE.value, False)
         if not self.plguin_cls:
             raise ImportError(self.PLUGIN_TYPE.value)
         self.dev_mode = dev_mode

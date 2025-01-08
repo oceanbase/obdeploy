@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
 
-import os
-import time
+from __future__ import absolute_import, division, print_function
 
-from _errno import EC_OBC_PROGRAM_START_ERROR
-from tool import YamlLoader, NetUtil, Cursor
+import os
+
+from tool import YamlLoader, NetUtil
 
 
 def check_home_path_pid(home_path, client):
@@ -82,54 +82,11 @@ def get_config_dict(home_path, server_config, ip):
     return config_dict
 
 
-def manual_register(added_components, cluster_config, config_dict, stdio):
-    if 'ob-configserver' not in added_components or not config_dict:
-        return True
-    ip = config_dict['vip']['address']
-    port = config_dict['vip']['port']
-
-    for comp in ["oceanbase-ce", "oceanbase"]:
-        if comp not in added_components and cluster_config.get_be_depend_servers(comp):
-            stdio.verbose('add_component(observer register in ob-configserver)')
-            server = cluster_config.get_be_depend_servers(comp)[0]
-            server_config = cluster_config.get_be_depend_config(comp, server)
-            mysql_port = server_config['mysql_port']
-            root_password = server_config['root_password']
-            appname = server_config['appname']
-            cursor = Cursor(ip=server.ip, port=mysql_port, tenant='', password=root_password, stdio=stdio)
-            cfg_url = 'http://%s:%s/services?Action=ObRootServiceInfo&ObCluster=%s' % (ip, port, appname)
-            try:
-                cursor.execute("alter system set obconfig_url = '%s'" % cfg_url)
-                cursor.execute("alter system reload server")
-            except:
-                stdio.error('Failed to register obconfig_url')
-                return False
-            
-    for comp in ["obproxy-ce", "obproxy"]:
-        if comp not in added_components and cluster_config.get_be_depend_servers(comp):
-            stdio.verbose('add_component(cfg_url register in proxyconfig)')
-            for server in cluster_config.get_be_depend_servers(comp):
-                server_config = cluster_config.get_be_depend_config(comp, server)
-                password = server_config.get('obproxy_sys_password', '')
-                proxy_port = server_config['listen_port']
-                cursor = Cursor(ip=server.ip, user='root@proxysys', port=proxy_port, tenant='', password=password, stdio=stdio)
-                obproxy_config_server_url = "http://{0}:{1}/services?Action=GetObProxyConfig".format(ip, port)
-                try:
-                    cursor.execute("alter proxyconfig set obproxy_config_server_url='%s'" % obproxy_config_server_url)
-                except:
-                    stdio.error('Failed to register obproxy_config_server_url')
-                    return False
-    return True
-
-
-
 def start(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
-    added_components = cluster_config.get_deploy_added_components()
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     stdio.start_loading('Start ob-configserver')
-    config_dict = {}
 
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
@@ -140,7 +97,6 @@ def start(plugin_context, *args, **kwargs):
         if check_home_path_pid(home_path, client):
             stdio.verbose('%s is runnning, skip' % server)
             continue
-
         config_dict = get_config_dict(home_path, server_config, ip)
         yaml = YamlLoader()
         file_path = os.path.join(home_path, 'conf/ob-configserver.yaml')
@@ -157,44 +113,4 @@ def start(plugin_context, *args, **kwargs):
             return
     stdio.stop_loading('succeed')
 
-
-    stdio.start_loading("ob-configserver program health check")
-    time.sleep(1)
-    failed = []
-    servers = cluster_config.servers
-    count = 20
-    while servers and count:
-        count -= 1
-        tmp_servers = []
-        for server in servers:
-            if server in tmp_servers:
-                continue
-            client = clients[server]
-            server_config = cluster_config.get_server_conf(server)
-            home_path = server_config["home_path"]
-            pid_path = '%s/run/ob-configserver.pid' % home_path
-            stdio.verbose('%s program health check' % server)
-            pid = client.execute_command("cat %s" % pid_path).stdout.strip()
-            if pid:
-                if client.execute_command('ls /proc/%s' % pid):
-                    stdio.verbose('%s ob-configserver[pid: %s] started', server, pid)
-                elif count:
-                    tmp_servers.append(server)
-                else:
-                    failed.append(server)
-            else:
-                failed.append(server)
-        servers = tmp_servers
-        if servers and count:
-            time.sleep(1)
-    if failed:
-        stdio.stop_loading('fail')
-        for server in failed:
-            stdio.error(EC_OBC_PROGRAM_START_ERROR.format(server=server))
-        plugin_context.return_false()
-    else:
-        if not manual_register(added_components, cluster_config, config_dict, stdio):
-            stdio.stop_loading('failed')
-            return
-        stdio.stop_loading('succeed')
-        plugin_context.return_true()
+    plugin_context.return_true()

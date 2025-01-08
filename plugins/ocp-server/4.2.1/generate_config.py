@@ -40,6 +40,8 @@ def generate_config(plugin_context, auto_depend=False, generate_config_mini=Fals
     if auto_depend:
         for comps in depend_comps:
             for comp in comps:
+                if comp in cluster_config.depends:
+                    continue
                 if cluster_config.add_depend_component(comp):
                     break
     global_config = cluster_config.get_global_conf()

@@ -50,7 +50,7 @@ export default function ExitPageWrapper(props: {
   };
   const toTargetPage = (path: PathType) => {
     sessionStorage.removeItem('pathInfo');
-    const targetHandler = PATH_HANDLES.find((item) =>
+    const targetHandler = PATH_HANDLES?.find((item) =>
       item.paths.includes(path),
     );
     if (targetHandler) {

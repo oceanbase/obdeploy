@@ -36,10 +36,10 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { FormInstance } from 'antd/lib/form';
 import copy from 'copy-to-clipboard';
+import { isEmpty } from 'lodash';
 import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
 import { getLocale, history, useModel } from 'umi';
-import { isEmpty } from 'lodash';
 import EnStyles from '../../pages/Obdeploy/indexEn.less';
 import ZhStyles from '../../pages/Obdeploy/indexZh.less';
 import CustomFooter from '../CustomFooter';
@@ -103,6 +103,7 @@ export default function DeployConfig({
   const taiPath = getTailPath();
   const isUpdate = taiPath === 'update';
   const isNewDB = taiPath === 'install';
+  const isConfiguration = taiPath === 'configuration';
   const [form] = ProForm.useForm();
   // 下一步按钮loading 手动设置
   const [nextLoading, setNextLoading] = useState(false);
@@ -110,15 +111,15 @@ export default function DeployConfig({
     reg: isUpdate ? updateClusterNameReg : clusterNameReg,
     msg: isUpdate
       ? intl.formatMessage({
-        id: 'OBD.component.DeployConfig.ItStartsWithALetter.1',
-        defaultMessage:
-          '以英文字母开头、英文或数字结尾，可包含英文、数字、连字符和下划线，且长度为 2 ~ 32',
-      })
+          id: 'OBD.component.DeployConfig.ItStartsWithALetter.1',
+          defaultMessage:
+            '以英文字母开头、英文或数字结尾，可包含英文、数字、连字符和下划线，且长度为 2 ~ 32',
+        })
       : intl.formatMessage({
-        id: 'OBD.component.DeployConfig.ItStartsWithALetter',
-        defaultMessage:
-          '以英文字母开头、英文或数字结尾，可包含英文、数字和下划线，且长度为 2 ~ 32',
-      }),
+          id: 'OBD.component.DeployConfig.ItStartsWithALetter',
+          defaultMessage:
+            '以英文字母开头、英文或数字结尾，可包含英文、数字和下划线，且长度为 2 ~ 32',
+        }),
   };
   const { components = {} } = ocpConfigData || {};
   const { oceanbase = {} } = components || {};
@@ -196,31 +197,26 @@ export default function DeployConfig({
           return (
             <>
               {name}
-              {
-                (
-                  !record?.versionInfo?.find(item => item.version === '4.2.1.8')
-                  || !record.versionInfo.length
-                ) &&
-                name === 'OceanBase' && isNewDB &&
+              {(!record?.versionInfo?.find(
+                (item) => item.version === '4.2.1.8',
+              ) ||
+                !record.versionInfo.length) &&
+              name === 'OceanBase' &&
+              isNewDB ? (
                 <ErrorCompToolTip
                   title={intl.formatMessage({
                     id: 'OBD.component.DeployConfig.UnableToObtainTheAvailable',
                     defaultMessage: '无法获取可用安装包',
-                  })
-
-                  }
+                  })}
                   status="error"
                 />
-              }
+              ) : null}
               {!record.versionInfo.length && name !== 'OceanBase' && (
                 <ErrorCompToolTip
-                  title={
-                    intl.formatMessage({
-                      id: 'OBD.component.DeployConfig.UnableToObtainTheInstallation',
-                      defaultMessage:
-                        '无法获取安装包，请检查安装程序配置。',
-                    })
-                  }
+                  title={intl.formatMessage({
+                    id: 'OBD.component.DeployConfig.UnableToObtainTheInstallation',
+                    defaultMessage: '无法获取安装包，请检查安装程序配置。',
+                  })}
                   status="error"
                 />
               )}
@@ -240,8 +236,8 @@ export default function DeployConfig({
             record.key === OCEANBASE
               ? obVersionInfo
               : record.key === OBPROXY
-                ? obproxyVersionInfo
-                : ocpVersionInfo;
+              ? obproxyVersionInfo
+              : ocpVersionInfo;
 
           if (selectVersion && !isEmpty(selectVersion.version)) {
             selectVersion.valueInfo = {
@@ -283,9 +279,7 @@ export default function DeployConfig({
 
           return (
             // 版本联动 ocp是社区版，ob也得是社区版，obproxy不支持选择并且版本号与ob前两位一致
-            <Tooltip
-              title={selectVersion?.value}
-            >
+            <Tooltip title={selectVersion?.value}>
               {record.key === OBPROXY ? (
                 // 用div包裹可以使Tooltip生效
                 <div>
@@ -305,9 +299,12 @@ export default function DeployConfig({
                   style={{ width: 207 }}
                   popupClassName={styles?.popupClassName}
                 >
-                  {_.map((item: any) => {
-                    const metaDBLimit = isNewDB && record.key === OCEANBASE && item.version !== '4.2.1.8'
-                    const OptionValue = `${item.version}-${item?.release}-${item.md5}`
+                  {_.map((item: {}) => {
+                    const metaDBLimit =
+                      isNewDB &&
+                      record.key === OCEANBASE &&
+                      item.version !== '4.2.1.8';
+                    const OptionValue = `${item.version}-${item?.release}-${item.md5}`;
                     return (
                       <Select.Option
                         value={OptionValue}
@@ -315,11 +312,17 @@ export default function DeployConfig({
                         disabled={metaDBLimit}
                         key={OptionValue}
                       >
-                        <Tooltip title={metaDBLimit && isNewDB && intl.formatMessage({
-                          id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
-                          defaultMessage:
-                            '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
-                        })}>
+                        <Tooltip
+                          title={
+                            metaDBLimit &&
+                            isNewDB &&
+                            intl.formatMessage({
+                              id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
+                              defaultMessage:
+                                '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
+                            })
+                          }
+                        >
                           <span
                             style={{
                               textOverflow: 'ellipsis',
@@ -476,7 +479,7 @@ export default function DeployConfig({
         const maxRelease = temp.sort(
           (pre: number, next: number) => next - pre,
         )[0];
-        return stableVersionArr.find(
+        return stableVersionArr?.find(
           (stableVersion: any) =>
             Number(stableVersion?.release?.split('.')[0]) === maxRelease,
         );
@@ -509,7 +512,7 @@ export default function DeployConfig({
       value: `${versionInfo?.version}-${versionInfo?.release}`,
     };
     if (data.name === OCEANBASE) {
-      setObVersionInfo(!versionInfo?.version ? {} : detail)
+      setObVersionInfo(!versionInfo?.version ? {} : detail);
     }
     if (data.name === OCP) {
       setOcpVersionInfo(detail);
@@ -656,7 +659,7 @@ export default function DeployConfig({
               });
             }
           }
-        } catch (err) { }
+        } catch (err) {}
       }
 
       setOcpConfigData({ ...newOcpConfigData });
@@ -669,7 +672,7 @@ export default function DeployConfig({
   };
 
   const oparete = (item: any, dataSource: any, memory: number) => {
-    const component = CompoentsInfo.find(
+    const component = CompoentsInfo?.find(
       (compoentInfo) => compoentInfo.key === item.name,
     );
     let temp: TableDataType = {
@@ -685,9 +688,9 @@ export default function DeployConfig({
   };
 
   const sortComponent = (dataSource: any[]) => {
-    let OCPComp = dataSource.find((comp) => comp.key === OCP);
-    let OBComp = dataSource.find((comp) => comp.key === OCEANBASE);
-    let ProxyComp = dataSource.find((comp) => comp.key === OBPROXY);
+    let OCPComp = dataSource?.find((comp) => comp.key === OCP);
+    let OBComp = dataSource?.find((comp) => comp.key === OCEANBASE);
+    let ProxyComp = dataSource?.find((comp) => comp.key === OBPROXY);
     dataSource[0] = OCPComp;
     dataSource[1] = OBComp;
     dataSource[2] = ProxyComp;
@@ -695,13 +698,15 @@ export default function DeployConfig({
 
   const completionComponent = (dataSource: any[]) => {
     for (let component of wholeComponents.current) {
-      if (!dataSource.find((item) => item.name === component.name)) {
+      if (!dataSource?.find((item) => item.name === component.name)) {
         dataSource.push(component);
       }
     }
   };
 
-  const OceanBaseNoVersion = !tableData?.find(item => item.key === "oceanbase")?.versionInfo?.find(item1 => item1.version === '4.2.1.8')
+  const OceanBaseNoVersion = !tableData
+    ?.find((item) => item.key === 'oceanbase')
+    ?.versionInfo?.find((item1) => item1.version === '4.2.1.8');
 
   const { run: fetchListRemoteMirrors } = useRequest(listRemoteMirrors, {
     onSuccess: () => {
@@ -866,16 +871,18 @@ export default function DeployConfig({
     }),
     validateTrigger: ['onBlur', 'onChange'],
   };
-  const metaDbAlert = <Alert
-    message={intl.formatMessage({
-      id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
-      defaultMessage:
-        '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
-    })}
-    type="warning"
-    showIcon
-    style={{ marginTop: '8px' }}
-  />
+  const metaDbAlert = (
+    <Alert
+      message={intl.formatMessage({
+        id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
+        defaultMessage:
+          '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
+      })}
+      type="warning"
+      showIcon
+      style={{ marginTop: '8px' }}
+    />
+  );
   return (
     <>
       <Spin spinning={componentLoading}>
@@ -887,19 +894,23 @@ export default function DeployConfig({
               title={
                 isNewDB
                   ? intl.formatMessage({
-                    id: 'OBD.component.DeployConfig.BasicConfiguration',
-                    defaultMessage: '基础配置',
-                  })
+                      id: 'OBD.component.DeployConfig.BasicConfiguration',
+                      defaultMessage: '基础配置',
+                    })
                   : intl.formatMessage({
-                    id: 'OBD.component.DeployConfig.DeploymentConfiguration',
-                    defaultMessage: '部署配置',
-                  })
+                      id: 'OBD.component.DeployConfig.DeploymentConfiguration',
+                      defaultMessage: '部署配置',
+                    })
               }
               className="card-padding-bottom-24"
             >
               <ProForm
                 form={form}
-                initialValues={{ appname: oceanbase?.appname || '' }}
+                initialValues={{
+                  appname:
+                    oceanbase?.appname ||
+                    (isNewDB || isConfiguration ? 'myocp' : ''),
+                }}
                 submitter={false}
               >
                 {isUpdate ? (
@@ -1029,10 +1040,9 @@ export default function DeployConfig({
                       style={{ marginTop: '16px' }}
                     />
                   )
-                ) :
-                  OceanBaseNoVersion && isNewDB &&
-                  metaDbAlert
-                }
+                ) : (
+                  OceanBaseNoVersion && isNewDB && metaDbAlert
+                )}
                 <ProCard
                   // type="inner"
                   className={`${styles.componentCard}`}
@@ -1077,7 +1087,12 @@ export default function DeployConfig({
           data-aspm-param={``}
           data-aspm-expo
           type="primary"
-          disabled={existNoVersion || versionLoading || componentLoading || (isNewDB && OceanBaseNoVersion)}
+          disabled={
+            existNoVersion ||
+            versionLoading ||
+            componentLoading ||
+            (isNewDB && OceanBaseNoVersion)
+          }
           onClick={nextStep}
           loading={nextLoading}
         >
