@@ -1,5 +1,11 @@
 import { getObdInfo } from '@/services/ob-deploy-web/Info';
-import { getErrorInfo, handleQuit, serverReg, serversValidator } from '@/utils';
+import {
+  getErrorInfo,
+  handleQuit,
+  IPserversValidator,
+  serverReg,
+  serversValidator,
+} from '@/utils';
 import { getAllServers } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
@@ -59,7 +65,12 @@ export default function NodeConfig() {
     errorsList,
   } = useModel('global');
   const { components = {}, auth, home_path } = configData || {};
-  const { oceanbase = {}, ocpexpress = {}, obproxy = {}, obconfigserver = {} } = components;
+  const {
+    oceanbase = {},
+    ocpexpress = {},
+    obproxy = {},
+    obconfigserver = {},
+  } = components;
   const [form] = ProForm.useForm();
   const [editableForm] = ProForm.useForm();
   const finalValidate = useRef<boolean>(false);
@@ -167,7 +178,6 @@ export default function NodeConfig() {
         servers: item?.servers?.map((server) => ({ ip: server })),
       })),
     };
-    
     setConfigData({
       ...configData,
       components: newComponents,
@@ -458,7 +468,14 @@ export default function NodeConfig() {
           },
           {
             validator: (_: any, value: string[]) =>
-              serversValidator(_, value, 'OBServer'),
+              IPserversValidator(
+                _,
+                value,
+                allOBServer,
+                'OBServer',
+                allZoneOBServer,
+                finalValidate,
+              ),
           },
         ],
       },
@@ -643,7 +660,6 @@ export default function NodeConfig() {
                   editableItem?.id,
                   'servers',
                 ]);
-
                 if (editorServers.length) {
                   if (!rootService || !editorServers.includes(rootService)) {
                     newRootService = editorServers[0];
