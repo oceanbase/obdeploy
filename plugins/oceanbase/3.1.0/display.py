@@ -57,6 +57,8 @@ def display(plugin_context, cursor, *args, **kwargs):
     stdio = plugin_context.stdio
     stdio.start_loading('Wait for observer init')
     cluster_config = plugin_context.cluster_config
+    if plugin_context.get_variable('restart_manager'):
+        cursor = plugin_context.get_return('connect').get_return('cursor')
     try:
         while True:
             try:

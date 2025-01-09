@@ -28,6 +28,8 @@ def init(plugin_context, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     deploy_name = plugin_context.deploy_name
+    kill_cmd = plugin_context.get_variable('kill_cmd')
+    mkdir_keys = plugin_context.get_variable('mkdir_keys')
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
     clean = getattr(plugin_context.options, 'clean', False)
@@ -48,7 +50,7 @@ def init(plugin_context, *args, **kwargs):
             need_clean = True
 
         if need_clean:
-            client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/monagent -c conf/monagent.yaml'" % home_path)
+            client.execute_command(kill_cmd % home_path)
             if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
                 owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
                 global_ret = False
@@ -58,7 +60,6 @@ def init(plugin_context, *args, **kwargs):
             need_clean = True
 
         if need_clean:
-            client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/monagent -c conf/monagent.yaml'" % home_path)
             ret = client.execute_command('rm -fr %s' % home_path, timeout=-1)
             if not ret:
                 global_ret = False
@@ -77,7 +78,7 @@ def init(plugin_context, *args, **kwargs):
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
                 continue
 
-        if not client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib,conf,log}'" % home_path):
+        if not client.execute_command(mkdir_keys % home_path):
             global_ret = False
             stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.PATH_ONLY.format(path=home_path)))
             

@@ -3,7 +3,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
 import { Button, Card, Col, Dropdown, Row, Space, Tag, Tooltip } from 'antd';
 import { useRef } from 'react';
-import { history, useModel } from 'umi';
+import { getLocale, history, useModel } from 'umi';
 
 import Banner from '@/component/Banner';
 import compManageGuideIcon from '../../../public/assets/welcome/component-manage.svg';
@@ -12,6 +12,8 @@ import ocpGuideIcon from '../../../public/assets/welcome/ocp-guide.png';
 import omsGuideDisableIcon from '../../../public/assets/welcome/oms-guide-disable.png';
 
 import styles from './index.less';
+
+const locale = getLocale();
 
 interface CustomCardProps {
   disable: boolean;
@@ -26,6 +28,8 @@ interface CustomCardProps {
 }
 
 export default function Guide() {
+  const isCN = locale === 'zh-CN';
+  const buttonStyle = isCN ? styles.guideBtn : styles.guideBtnUS;
   const guideConfigListRef = useRef<CustomCardProps[]>([
     {
       disable: false,
@@ -45,8 +49,8 @@ export default function Guide() {
             setOBCurrentStep(1);
             history.push('/obdeploy');
           }}
-          className={styles.guideBtn}
-          style={{ width: 63 }}
+          className={buttonStyle}
+          style={locale === 'zh-CN' ? { width: 63 } : { width: 100 }}
         >
           {intl.formatMessage({
             id: 'OBD.pages.Guide.Installation',
@@ -126,7 +130,10 @@ export default function Guide() {
             },
           }}
         >
-          <Button className={styles.guideBtn} style={{ width: 84 }}>
+          <Button
+            className={buttonStyle}
+            style={locale === 'zh-CN' ? { width: 84 } : { width: 120 }}
+          >
             <Space>
               {intl.formatMessage({
                 id: 'OBD.pages.Guide.Installation',
@@ -153,7 +160,7 @@ export default function Guide() {
       }),
       action: (
         <Dropdown
-          getPopupContainer={() => document.getElementById('component-manage')}
+          // getPopupContainer={() => document.getElementById('component-manage')}
           menu={{
             items: [
               {
@@ -177,7 +184,10 @@ export default function Guide() {
             },
           }}
         >
-          <Button className={styles.guideBtn} style={{ width: 84 }}>
+          <Button
+            className={buttonStyle}
+            style={locale === 'zh-CN' ? { width: 84 } : { width: 130 }}
+          >
             <Space>
               {intl.formatMessage({
                 id: 'OBD.pages.Guide.Management',

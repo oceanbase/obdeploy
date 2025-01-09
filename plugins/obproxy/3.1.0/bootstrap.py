@@ -25,6 +25,9 @@ def bootstrap(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     cursor = plugin_context.get_return('connect').get_return('cursor')
+    if not cursor:
+        stdio.error('obproxy bootstrap need oceanbase')
+        return plugin_context.return_false()
     global_ret = True
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)

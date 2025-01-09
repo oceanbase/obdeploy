@@ -75,6 +75,8 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         return plugin_context.return_true(**kwargs)
     
     cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get("new_cluster_config")
+    count = kwargs.get("retry_times", 10)
     stdio = plugin_context.stdio
     if target_server:
         servers = [target_server]
@@ -83,21 +85,31 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         servers = cluster_config.servers
         stdio.start_loading('Connect to Prometheus')
     cursors = {}
-    for server in servers:
-        config = cluster_config.get_server_conf(server)
-        ssl = False
-        username = None
-        password = None
-        if config.get('basic_auth_users'):
-            username, password = list(config['basic_auth_users'].items())[0]
-        if config.get('web_config', {}).get('tls_server_config'):
-            if config['web_config']['tls_server_config'] and config['web_config']['tls_server_config'].get('cert_file'):
-                ssl = True
-        stdio.verbose('connect prometheus ({}:{} by user {})'.format(server.ip, config['port'], username))
-        api_cursor = PrometheusAPICursor(ip=server.ip, port=config['port'], username=username, password=password,
-                                         ssl=ssl)
-        if api_cursor.connect(stdio=stdio):
-            cursors[server] = api_cursor
+    while count and servers:
+        count -= 1
+        for server in servers:
+            config = cluster_config.get_server_conf(server)
+            ssl = False
+            username = None
+            password = None
+            if config.get('basic_auth_users'):
+                username, password = list(config['basic_auth_users'].items())[0]
+
+            new_config = None
+            if new_cluster_config:
+                new_config = new_cluster_config.get_server_conf(server)
+                if new_config:
+                    new_username, new_password = list(new_config['basic_auth_users'].items())[0]
+            password = new_password if new_config and count % 2 else password
+
+            if config.get('web_config', {}).get('tls_server_config'):
+                if config['web_config']['tls_server_config'] and config['web_config']['tls_server_config'].get('cert_file'):
+                    ssl = True
+            stdio.verbose('connect prometheus ({}:{} by user {})'.format(server.ip, config['port'], username))
+            api_cursor = PrometheusAPICursor(ip=server.ip, port=config['port'], username=username, password=password,
+                                             ssl=ssl)
+            if api_cursor.connect(stdio=stdio):
+                cursors[server] = api_cursor
     if not cursors:
         stdio.error(EC_FAIL_TO_CONNECT.format(component=cluster_config.name))
         stdio.stop_loading('fail')

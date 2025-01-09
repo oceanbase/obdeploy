@@ -103,7 +103,8 @@ def prepare_variables(plugin_context, name, context, component, server, *args, *
             return plugin_context.return_false()
         else:
             stdio.verbose("{} is not a server in {}".format(server, component))
-            return plugin_context.return_true(skip=True)
+            plugin_context.set_variable('skip_commands', True)
+            return plugin_context.return_true()
 
     global_config = cluster_config.get_global_conf()
     server_config = cluster_config.get_server_conf(server)

@@ -1039,7 +1039,7 @@
   "OBD.pages.Guide.ItIsAOneStop": "It is a one-stop data transmission and synchronization product for databases.",
   "OBD.component.SelectCluster.Cluster": "Cluster",
   "OBD.component.SelectCluster.PleaseSelect": "Please select",
-  "OBD.component.SelectCluster.OceanbaseVersionNumber": "OceanBase version number",
+  "OBD.component.SelectCluster.OceanbaseVersionNumber": "version",
   "OBD.component.SelectCluster.CreationDate": "Creation date",
   "OBD.pages.ComponentUninstall.UninstallConfig.CurrentlyConfigserverCannotBeUninstalled": "Currently, configserver cannot be uninstalled.",
   "OBD.component.InstallResultComp.ComponentDeploymentSucceeded": "Component deployment succeeded",
@@ -1070,5 +1070,15 @@
   "OBD.pages.Obdeploy.InstallFinished.ConnectionString": "Connection string",
   "OBD.component.DeployConfig.UnableToObtainTheAvailable": "Unable to obtain the available installation package",
   "OBD.component.DeployConfig.ByDefaultTheDatabaseVersion": "By default, the database version of MetaDB is 4.2.1.8. You cannot modify the database version.",
-  "OBD.component.InsstallResult.TheSystemWillUpgradeOcp": "The system will upgrade OCP Agent by default. Please go to OCP Task Center to view the upgrade progress."
+  "OBD.component.InsstallResult.TheSystemWillUpgradeOcp": "The system will upgrade OCP Agent by default. Please go to OCP Task Center to view the upgrade progress.",
+  "OBD.src.constant.CannotBeUninstalled": "Cannot be uninstalled",
+  "OBD.src.constant.Removing": "Removing",
+  "OBD.src.constant.RemovedSuccessfully": "Removed successfully",
+  "OBD.src.constant.Unmounting": "Unmounting",
+  "OBD.src.constant.UninstallFailed": "Uninstall failed",
+  "OBD.src.constant.Unmounted": "Unmounted",
+  "OBD.src.constant.ToBeUninstalled": "To be uninstalled",
+  "OBD.src.constant.configuration.ComponentConfiguration": "Component configuration",
+  "OBD.src.constant.configuration.UninstallConfiguration": "Uninstall configuration",
+  "OBD.src.constant.configuration.Uninstall": "Uninstall"
 }

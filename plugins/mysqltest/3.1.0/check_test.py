@@ -29,23 +29,6 @@ import tool
 from mysqltest_lib import succtest
 
 
-def get_variable_from_python_file(file_path, var_name, default_file=None, default_value=None, stdio=None):
-    global_vars = {}
-    try:
-        stdio and stdio.verbose('read variable {} from {}'.format(var_name, file_path))
-        exec(open(file_path).read(), global_vars, global_vars)
-    except Exception as e:
-        stdio and stdio.warn(str(e))
-        if default_file:
-            try:
-                default_path = os.path.join(os.path.dirname(__file__), 'mysqltest_lib', default_file)
-                stdio and stdio.verbose('read variable {} from {}'.format(var_name, file_path))
-                exec(open(default_path).read(), global_vars, global_vars)
-            except Exception as ex:
-                stdio and stdio.warn(str(ex))
-    return global_vars.get(var_name, default_value)
-
-
 def find_tag_test_with_file_pat(file_pattern, flag_pattern, tag, filelist):
     for test in glob(file_pattern):
         if "test_suite/" in test:
@@ -101,6 +84,9 @@ def check_test(plugin_context, env, *args, **kwargs):
     has_test_point = False
     basename = lambda path: os.path.basename(path)
     dirname =lambda path: os.path.dirname(path)
+
+    get_variable_from_python_file = plugin_context.get_variable("get_variable_from_python_file")
+
     if 'all' in opt and opt['all'] and os.path.isdir(os.path.realpath(opt['suite_dir'])):
         opt['suite'] = ','.join(os.listdir(os.path.realpath(opt['suite_dir'])))
     if 'psmall' in opt and opt['psmall']:
@@ -151,8 +137,8 @@ def check_test(plugin_context, env, *args, **kwargs):
             opt["filter"] = 'proxy'
         else:
             test_zone = cluster_config.get_server_conf(opt['test_server'])['zone']
-            query = 'select zone, count(*) as a from oceanbase.__all_virtual_zone_stat group by region order by a desc limit 1'
-            cursor = opt['cursor']
+            query = plugin_context.get_variable('query_sql')
+            cursor = plugin_context.get_return('connect').get_return('cursor')
             ret = cursor.fetchone(query)
             if ret is False:
                 return
@@ -197,11 +183,8 @@ def check_test(plugin_context, env, *args, **kwargs):
         opt['exclude'] = []
     test_set = filter(lambda k: k not in opt['exclude'], test_set)
     if 'filter' in opt and opt['filter']:
-        if opt.get('case_filter'):
-            exclude_list = get_variable_from_python_file(opt['case_filter'], var_name='%s_list' % opt['filter'],
-                                                     default_file='case_filter.py', default_value=[], stdio=stdio)
-        else:
-            exclude_list = []
+        exclude_test = plugin_context.get_variable('exclude_test')
+        exclude_list = exclude_test(opt, stdio)
         test_set = filter(lambda k: k not in exclude_list, test_set)
     ##有all参数时重新排序,保证运行case的顺序
     if 'all' in opt and opt['all'] == 'all':
@@ -240,4 +223,8 @@ def check_test(plugin_context, env, *args, **kwargs):
         opt['reboot_cases'] = list(set(test_set).intersection(set(reboot_cases)))
     else:
         opt['reboot_cases'] = []
+
+    if opt['test_set'] is None:
+        stdio.error('Test set is empty')
+        return plugin_context.return_false()
     return plugin_context.return_true(test_set=test_set)

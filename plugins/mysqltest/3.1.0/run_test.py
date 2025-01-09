@@ -194,7 +194,7 @@ def run_test(plugin_context, env, *args, **kwargs):
     stdio = plugin_context.stdio
     slb_host = env.get('slb_host')
     exec_id = env.get('exec_id')
-    cursor = env.get('cursor')
+    cursor = plugin_context.get_return('connect').get_return('cursor')
     run_test_cases = env.get('run_test_cases', [])
     index = env.get('index', 0)
     test_set = env.get('test_set', [])
@@ -206,6 +206,8 @@ def run_test(plugin_context, env, *args, **kwargs):
     collect_all = env.get('collect_all', False)
     collect_log = False
     total_test_count = len(test_set)
+    db = plugin_context.get_return("connect").get_return("connect")
+
     while index < total_test_count:
         test = test_set[index]
         if test not in run_test_cases:
@@ -228,6 +230,7 @@ def run_test(plugin_context, env, *args, **kwargs):
             if key != 'cursor':
                 opt[key] = env[key]
 
+        opt['port'] = db.port if db else opt.get("port")
         opt['connector'] = 'ob'
         opt['mysql_mode'] = True
         test_file_suffix = opt['test_file_suffix']

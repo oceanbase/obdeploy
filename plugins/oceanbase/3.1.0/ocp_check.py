@@ -24,10 +24,16 @@ from _rpm import Version
 from _deploy import InnerConfigItem
 
 
-def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_clients=None, *args, **kwargs):
+def ocp_check(plugin_context, cursor, *args, **kwargs):
+    cluster_config = plugin_context.cluster_config
+    new_deploy_config = kwargs.get('new_deploy_config')
+    new_cluster_config = new_deploy_config.components.get(cluster_config.name) if new_deploy_config else None
     cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
+    new_clients = kwargs.get('new_clients')
     clients = new_clients if new_clients else plugin_context.clients
     stdio = plugin_context.stdio
+    ocp_version = plugin_context.get_return('takeover_precheck', spacename='ocp-server-ce').get_return('ocp_version') if not kwargs.get('ocp_version', '') else kwargs.get('ocp_version')
+
     
     is_admin = True
     can_sudo = True
@@ -87,4 +93,4 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
     # if ocp version is greater than 4.2.0, then admin and zone idc check is not needed
     if can_sudo and only_one and pwd_not_empty and is_admin and not zones:
         stdio.print('Configurations of the %s can be taken over by OCP after they take effect.' % cluster_config.name if new_cluster_config else 'Configurations of the %s can be taken over by OCP.' % cluster_config.name)
-        return plugin_context.return_true()
+    return plugin_context.return_true()

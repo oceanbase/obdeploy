@@ -199,8 +199,9 @@ async def get_component_change_log(
     task_info = handler.get_component_change_task_info(name)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(name))
-    log_content = handler.buffer.read() if components is None else handler.get_component_change_log_by_component(components, 'add_component')
-    log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
+    origin_log = handler.buffer.read() if components is None else handler.get_component_change_log_by_component(components, 'add_component')
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    log_info = InstallLog(log=masked_log[offset:], offset=len(masked_log))
     return response_utils.new_ok_response(log_info)
 
 
@@ -285,8 +286,11 @@ async def get_del_component_log(
     task_info = handler.get_del_component_task_info(name)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(name))
-    log_content = handler.buffer.read() if components is None else handler.get_component_change_log_by_component(components, 'del_component')
-    return response_utils.new_ok_response(log_content)
+    origin_log = handler.get_component_change_log_by_component(components, 'del_component')
+    for component_log in origin_log:
+        if component_log.log:
+            component_log.log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(component_log.log))
+    return response_utils.new_ok_response(origin_log)
 
 
 @router.post("/component_change/{name}/remove",

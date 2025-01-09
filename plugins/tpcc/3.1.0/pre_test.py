@@ -25,7 +25,10 @@ import re
 
 from ssh import LocalClient
 from tool import DirectoryUtil
-from const import TOOL_TPCC, TOOL_TPCC_BENCHMARKSQL, COMP_OBCLIENT
+
+from ssh import LocalClient
+from const import TOOL_TPCC, TOOL_TPCC_BENCHMARKSQL, COMP_OBCLIENT, COMPS_ODP, COMPS_OB
+from tool import get_option
 
 PROPS4OB_TEMPLATE = """
 db=oceanbase
@@ -51,6 +54,7 @@ osCollectorScript=./misc/os_collector_linux.py
 osCollectorInterval=1
 """
 
+
 def file_path_check(bin_path, tool_name, tool_path, cmd, stdio):
     result = None
     tool_path = os.path.join(os.getenv('HOME'), tool_name, tool_path)
@@ -63,31 +67,26 @@ def file_path_check(bin_path, tool_name, tool_path, cmd, stdio):
         return None, result
     return path, None
 
-def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
-    def get_option(key, default=''):
-        value = getattr(options, key, default)
-        if value is None:
-            value = default
-        stdio.verbose('get option: {} value {}'.format(key, value))
-        return value
 
-    def local_execute_command(command, env=None, timeout=None):
-        return LocalClient.execute_command(command, env, timeout, stdio)
-
+def pre_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
 
-    tmp_dir = os.path.abspath(get_option('tmp_dir', './tmp'))
-    tenant_name = get_option('tenant', 'test')
+    tmp_dir = os.path.abspath(get_option(options, 'tmp_dir', './tmp'))
+    tenant_name = get_option(options, 'tenant', 'test')
+
+    sys_namespace = kwargs.get("sys_namespace")
+    get_db_and_cursor = kwargs.get("get_db_and_cursor")
+    db, cursor = get_db_and_cursor(sys_namespace)
 
     if tenant_name == 'sys':
         stdio.error('DO NOT use sys tenant for testing.')
         return
 
-    bmsql_path = get_option('bmsql_dir')
-    bmsql_jar = get_option('bmsql_jar', None)
-    bmsql_libs = get_option('bmsql_libs', None)
-    bmsql_sql_path = get_option('bmsql_sql_dir')
+    bmsql_path = get_option(options, 'bmsql_dir')
+    bmsql_jar = get_option(options, 'bmsql_jar', None)
+    bmsql_libs = get_option(options, 'bmsql_libs', None)
+    bmsql_sql_path = get_option(options, 'bmsql_sql_dir')
     if bmsql_path:
         if bmsql_jar is None:
             bmsql_jar = os.path.join(bmsql_path, 'dist') if bmsql_path else '/usr/ob-benchmarksql/OB-BenchmarkSQL-5.0.jar'
@@ -126,7 +125,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
                     jars.append(lib)
     bmsql_classpath = ':'.join(jars)
 
-    obclient_bin = get_option('obclient_bin', 'obclient')
+    obclient_bin = get_option(options, 'obclient_bin', 'obclient')
     cmd = '%s --help'
     path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd, stdio)
     if result:
@@ -137,7 +136,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     obclient_bin = path
     setattr(options, 'obclient_bin', obclient_bin)
 
-    java_bin = get_option('java_bin', 'java')
+    java_bin = get_option(options, 'java_bin', 'java')
     cmd = '%s -version'
     path, result = file_path_check(java_bin, TOOL_TPCC, 'lib/bin/java', cmd, stdio)
     if result:
@@ -151,7 +150,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     exec_classes = ['jTPCC', 'LoadData', 'ExecJDBC']
     passed = True
     for exec_class in exec_classes:
-        ret = local_execute_command('%s -cp %s %s' % (java_bin, bmsql_classpath, exec_class))
+        ret = LocalClient.execute_command('%s -cp %s %s' % (java_bin, bmsql_classpath, exec_class), stdio=stdio)
         if 'Could not find or load main class %s' % exec_class in ret.stderr:
             stdio.error('Main class %s not found.' % exec_class)
             passed = False
@@ -178,15 +177,16 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
     cpu_total = 0
     min_cpu = None
     try:
-        sql = "select a.id , b.cpu_total from oceanbase.__all_server a " \
-              "join oceanbase.__all_virtual_server_stat b on a.id=b.id " \
-              "where a.status = 'active' and a.stop_time = 0 and a.start_service_time > 0;"
-        all_services = cursor.fetchall(sql)
+        cpu_count_key = plugin_context.get_variable('cpu_count_key')
+        cpu_count_value = plugin_context.get_variable('cpu_count_value', 0)
+        query_sql = plugin_context.get_variable('active_sql')
+
+        all_services = cursor.fetchall(query_sql)
         if not all_services:
             stdio.error('No active server available.')
             return
         for serv in all_services:
-            cpu_count = int(serv.get('cpu_total', 0) + 2)
+            cpu_count = int(serv.get(cpu_count_key, 0) + cpu_count_value)
             min_cpu = cpu_count if min_cpu is None else min(cpu_count, min_cpu)
             cpu_total += cpu_count
         server_num = len(all_services)
@@ -197,48 +197,58 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
 
     stdio.verbose('cpu total in all servers is %d' % cpu_total)
     if not bmsql_sql_path:
+        sql_oceanbase_path = plugin_context.get_variable('sql_oceanbase_path')
         bmsql_sql_path = os.path.join(tmp_dir, 'sql.oceanbase')
-        if not DirectoryUtil.copy(os.path.join(local_dir, 'sql.oceanbase'), bmsql_sql_path, stdio):
+        if not DirectoryUtil.copy(sql_oceanbase_path, bmsql_sql_path, stdio):
             return
         create_table_sql = os.path.join(bmsql_sql_path, 'tableCreates.sql')
-        local_execute_command("sed -i 's/{{partition_num}}/%d/g' %s" % (cpu_total, create_table_sql))
+        LocalClient.execute_command("sed -i 's/{{partition_num}}/%d/g' %s" % (cpu_total, create_table_sql), stdio=stdio)
 
-    sql = "select * from oceanbase.gv$tenant where tenant_name = %s"
-    tenant_meta = cursor.fetchone(sql, [tenant_name])
+    query_tenant_sql = plugin_context.get_variable('tenant_sql')
+    tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
     if not tenant_meta:
         stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
         return
-    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta['tenant_id']
+
+    query_resource_sql = plugin_context.get_variable('resource_sql')
+    tenant_id = plugin_context.get_variable('tenant_id')
+
+    sql = query_resource_sql % tenant_meta[tenant_id]
     pool = cursor.fetchone(sql)
     if pool is False:
         return
-    sql = "select * from oceanbase.__all_unit_config where unit_config_id = %d" % pool['unit_config_id']
+
+    query_unit_sql = plugin_context.get_variable('unit_sql')
+    unit_config_id = plugin_context.get_variable('unit_config_id')
+
+    sql = query_unit_sql % pool[unit_config_id]
     tenant_unit = cursor.fetchone(sql)
     if tenant_unit is False:
         return
-    max_memory = tenant_unit['max_memory']
-    max_cpu = int(tenant_unit['max_cpu'])
 
-    host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
-    db_name = get_option('database', 'test')
-    user = get_option('user', 'root')
-    password = get_option('password', '')
-    warehouses = get_option('warehouses', cpu_total * 20)
-    load_workers = get_option('load_workers', int(max(min(min_cpu, (max_memory >> 30) / 2), 1)))
-    terminals = get_option('terminals', min(cpu_total * 15, warehouses * 10))
-    run_mins = get_option('run_mins', 10)
-    test_only = get_option('test_only')
+    max_memory = tenant_unit[plugin_context.get_variable('max_memory')]
+    max_cpu = int(tenant_unit[plugin_context.get_variable('max_cpu')])
+
+    host = get_option(options, 'host', '127.0.0.1')
+    port = db.port if db else 2881
+    db_name = get_option(options, 'database', 'test')
+    user = get_option(options, 'user', 'root')
+    password = get_option(options, 'password', '')
+    warehouses = get_option(options, 'warehouses', cpu_total * 20)
+    load_workers = get_option(options, 'load_workers', int(max(min(min_cpu, (max_memory >> 30) / 2), 1)))
+    terminals = get_option(options, 'terminals', min(cpu_total * 15, warehouses * 10))
+    run_mins = get_option(options, 'run_mins', 10)
+    test_only = get_option(options, 'test_only')
 
     stdio.verbose('Check connect ready')
     if not test_only:
         exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A -e" % (
             obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
-        ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'create database if not exists %s' % db_name))
+        ret = LocalClient.execute_command('%s "%s" -E' % (exec_sql_cmd, 'create database if not exists %s' % db_name), stdio=stdio)
     else:
         exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A %s -e" % (
             obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '', db_name)
-        ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'))
+        ret = LocalClient.execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'), stdio=stdio)
     if not ret:
         stdio.error('Connect to tenant %s failed' % tenant_name)
         return
@@ -256,7 +266,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
         exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A %s -e" % (
             obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '', db_name)
         table_rows = 0
-        ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select count(*) from bmsql_warehouse'))
+        ret = LocalClient.execute_command('%s "%s" -E' % (exec_sql_cmd, 'select count(*) from bmsql_warehouse'), stdio=stdio)
         matched = re.match(r'.*count\(\*\):\s?(\d+)', ret.stdout, re.S)
         if matched:
             table_rows = int(matched.group(1))
@@ -280,7 +290,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
                 load_workers=load_workers,
                 terminals=terminals,
                 run_mins=run_mins
-                ))
+            ))
     except Exception as e:
         stdio.exception(e)
         stdio.error('Failed to generate config file props.oceanbase.')
@@ -297,7 +307,7 @@ def pre_test(plugin_context, cursor, odp_cursor, *args, **kwargs):
         cpu_total=cpu_total,
         max_memory=max_memory,
         max_cpu=max_cpu,
-        tenant_id=tenant_meta['tenant_id'],
+        tenant_id=tenant_meta[tenant_id],
         tenant=tenant_name,
         tmp_dir=tmp_dir,
         server_num=server_num,

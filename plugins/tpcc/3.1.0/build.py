@@ -29,20 +29,11 @@ import time
 import re
 
 from ssh import LocalClient
-from _errno import EC_TPCC_LOAD_DATA_FAILED
+from const import COMPS_ODP, COMPS_OB
+from tool import get_option
 
 
-def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
-    def get_option(key, default=''):
-        value = getattr(options, key, default)
-        if value is None:
-            value = default
-        stdio.verbose('get option: {} value {}'.format(key, value))
-        return value
-
-    def local_execute_command(command, env=None, timeout=None):
-        return LocalClient.execute_command(command, env, timeout, stdio)
-
+def build(plugin_context, *args, **kwargs):
     def run_sql(sql_file, force=False):
         sql_cmd = "{obclient} -h{host} -P{port} -u{user}@{tenant} {password_arg} -A {db} {force_flag} < {sql_file}".format(
             obclient=obclient_bin, host=host, port=port, user=user, tenant=tenant_name,
@@ -50,11 +41,11 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
             db=db_name,
             force_flag='-f' if force else '',
             sql_file=sql_file)
-        return local_execute_command(sql_cmd)
+        return LocalClient.execute_command(sql_cmd, stdio=stdio)
 
     def get_table_rows(table_name):
         table_rows = 0
-        ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select count(*) from %s' % table_name))
+        ret = LocalClient.execute_command('%s "%s" -E' % (exec_sql_cmd, 'select count(*) from %s' % table_name), stdio=stdio)
         matched = re.match(r'.*count\(\*\):\s?(\d+)', ret.stdout, re.S)
         if matched:
             table_rows = int(matched.group(1))
@@ -62,27 +53,37 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
 
     stdio = plugin_context.stdio
     options = plugin_context.options
+    pre_test_ret = plugin_context.get_return("pre_test")
 
-    bmsql_jar = get_option('bmsql_jar')
-    bmsql_libs = get_option('bmsql_libs')
+    server_state = plugin_context.get_variable('server_state')
+    merge = plugin_context.get_variable('merge')
 
-    host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
-    db_name = get_option('database', 'test')
-    user = get_option('user', 'root')
-    password = get_option('password', '')
-    tenant_name = get_option('tenant', 'test')
-    obclient_bin = get_option('obclient_bin', 'obclient')
-    java_bin = get_option('java_bin', 'java')
+    bmsql_jar = get_option(options, 'bmsql_jar')
+    bmsql_libs = get_option(options, 'bmsql_libs')
 
-    bmsql_classpath = kwargs.get('bmsql_classpath')
+    host = get_option(options, 'host', '127.0.0.1')
+    db_name = get_option(options, 'database', 'test')
+    user = get_option(options, 'user', 'root')
+    password = get_option(options, 'password', '')
+    tenant_name = get_option(options, 'tenant', 'test')
+    obclient_bin = get_option(options, 'obclient_bin', 'obclient')
+    java_bin = get_option(options, 'java_bin', 'java')
+
+    sys_namespace = kwargs.get("sys_namespace")
+    proxysys_namespace = kwargs.get("proxysys_namespace")
+    get_db_and_cursor = kwargs.get("get_db_and_cursor")
+    db, cursor = get_db_and_cursor(sys_namespace)
+    odp_db, odp_cursor = get_db_and_cursor(proxysys_namespace)
+    port = db.port if db else 2881
+
+    bmsql_classpath = pre_test_ret.get_return("bmsql_classpath")
     if not bmsql_classpath:
         jars = [bmsql_jar]
         jars.extend(bmsql_libs.split(','))
         bmsql_classpath = '.:' + ':'.join(jars)
-    bmsql_prop_path = kwargs.get('bmsql_prop_path')
+    bmsql_prop_path = pre_test_ret.get_return("bmsql_prop_path")
     stdio.verbose('get bmsql_prop_path: {}'.format(bmsql_prop_path))
-    warehouses = kwargs.get('warehouses', 0)
+    warehouses = pre_test_ret.get_return("warehouses", 0)
 
     stdio.verbose('Check connect ready')
     exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A %s -e" % (
@@ -90,7 +91,7 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     stdio.start_loading('Connect to tenant %s' % tenant_name)
     try:
         while True:
-            ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'))
+            ret = LocalClient.execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'), stdio=stdio)
             if ret:
                 break
             time.sleep(10)
@@ -102,8 +103,8 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     stdio.start_loading('Server check')
     # check for observer
     while True:
-        sql = "select * from oceanbase.__all_server where status != 'active' or stop_time > 0 or start_service_time = 0"
-        ret = cursor.fetchone(sql)
+        query_sql = plugin_context.get_variable('server_status_sql')
+        ret = cursor.fetchone(query_sql)
         if ret is False:
             stdio.stop_loading('fail')
             return
@@ -120,7 +121,7 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
                 return
             passed = True
             for proxy_congestion in proxy_congestions:
-                if proxy_congestion.get('dead_congested') != 0 or proxy_congestion.get('server_state') != 'ACTIVE':
+                if proxy_congestion.get('dead_congested') != 0 or proxy_congestion.get('server_state') not in server_state:
                     passed = False
                     break
             if passed:
@@ -130,37 +131,11 @@ def build(plugin_context, cursor, odp_cursor, *args, **kwargs):
     stdio.stop_loading('succeed')
 
     # drop old tables
-    bmsql_sql_path = kwargs.get('bmsql_sql_path', '')
+    bmsql_sql_path = pre_test_ret.get_return("bmsql_sql_path", '')
     run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableDrops.sql'), force=True)
 
-    merge_version = cursor.fetchone("select value from oceanbase.__all_zone where name='frozen_version'")
-    if merge_version is False:
-        return
-    merge_version = merge_version['value']
-    stdio.start_loading('Merge')
-    if cursor.fetchone('alter system major freeze') is False:
-        return
-    sql = "select value from oceanbase.__all_zone where name='frozen_version' and value != %s" % merge_version
-    while True:
-        res = cursor.fetchone(sql)
-        if res is False:
-            return
-        if res:
-            break
-        time.sleep(1)
-
-    while True:
-        res = cursor.fetchone("""select * from  oceanbase.__all_zone 
-                                 where name='last_merged_version'
-                                 and value != (select value from oceanbase.__all_zone where name='frozen_version' limit 1)
-                                 and zone in (select zone from  oceanbase.__all_zone where name='status' and info = 'ACTIVE')
-                              """)
-        if res is False:
-            return
-        if not res:
-            break
-        time.sleep(5)
-    stdio.stop_loading('succeed')
+    if not merge(plugin_context, stdio, cursor, tenant_name):
+        return False
 
     # create new tables
     if not run_sql(sql_file=os.path.join(bmsql_sql_path, 'tableCreates.sql')):

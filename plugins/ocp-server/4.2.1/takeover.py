@@ -41,7 +41,6 @@ def takeover(plugin_context, cursors=None, *args, **kwargs):
         clients = plugin_context.clients
         options = plugin_context.options
         stdio = plugin_context.stdio
-        stdio.verbose(vars(cluster_config))
         host_type = getattr(options, 'host_type', '')
         credential_name = getattr(options, 'credential_name', '')
         if len(clients) == 0:
@@ -52,7 +51,7 @@ def takeover(plugin_context, cursors=None, *args, **kwargs):
             if ssh_client != None:
                 break
         ssh_config = ssh_client.config
-        cursors = plugin_context.get_return('connect').get_return('cursor') if not cursors else cursors
+        cursors = plugin_context.get_return('takeover_connect').get_return('cursor') if not cursors else cursors
         cursor = cursors[cluster_config.servers[0]]
         # query host types, add host type if current host_type is not empty and no matched record in ocp, otherwise use the first one
         host_types = cursor.get_host_types(stdio=stdio)['data']['contents']
@@ -107,6 +106,7 @@ def takeover(plugin_context, cursors=None, *args, **kwargs):
         stdio.verbose("takeover result %s" % takeover_result)
         task_id = takeover_result['data']['id']
         cluster_id = takeover_result['data']['clusterId']
+        stdio.print("takeover task successfully submitted to ocp, you can check task at %s/task/%d" % (getattr(options, 'address', ''), task_id))
         return plugin_context.return_true(task_id=task_id, cluster_id=cluster_id)
     except Exception as ex:
         stdio.error("do takeover got exception:%s", ex)

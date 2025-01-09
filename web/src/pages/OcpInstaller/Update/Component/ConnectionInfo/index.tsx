@@ -108,7 +108,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
         password: encrypt(password, publicKey) || password,
         port,
         servers:
-          updateInfo?.component.find(
+          updateInfo?.component?.find(
             (item: any) =>
               item.name === 'ocp-server' || item.name === 'ocp-server-ce',
           ).ip || [],

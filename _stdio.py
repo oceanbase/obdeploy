@@ -376,6 +376,7 @@ class IO(object):
     VERBOSE_LEVEL = 0
     WARNING_PREV = FormatText.warning('[WARN]')
     ERROR_PREV = FormatText.error('[ERROR]')
+    INFO_PREV = FormatText.info('[INFO]')
 
     def __init__(self,
         level,
@@ -489,7 +490,9 @@ class IO(object):
         return self._log_cache
 
     def before_close(self):
-        if self._before_critical:
+        if self._root_io:
+            self.sync_obj and self._root_io.before_close()
+        elif self._before_critical:
             try:
                self._before_critical(self)
             except:
@@ -759,7 +762,8 @@ class IO(object):
     def _cache_log(self, levelno, msg, *args, **kwargs):
         if self.trace_logger:
             log_cache = self.log_cache
-            lines = str(msg).split('\n')
+            str_msg = self.table_log_masking(msg)
+            lines = str_msg.split('\n')
             for line in lines:
                 if log_cache is None:
                     self._log(levelno, line, *args, **kwargs)
@@ -785,6 +789,9 @@ class IO(object):
     def print(self, msg, *args, **kwargs):
         self._print(MsgLevel.INFO, msg, *args, **kwargs)
 
+    def info(self, msg, *args, **kwargs):
+        self._print(MsgLevel.INFO, msg, prev_msg=self.INFO_PREV.format(self.isatty()), *args, **kwargs)
+
     def warn(self, msg, *args, **kwargs):
         self._print(MsgLevel.WARN, msg, prev_msg=self.WARNING_PREV.format(self.isatty()), *args, **kwargs)
 
@@ -802,14 +809,55 @@ class IO(object):
             self.exit(code)
 
     def contains_keys(self, msg):
-        keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT"]
+        keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT", "PASSWD"]
         return any(keyword in msg.upper() for keyword in keywords)
+    
+    def table_log_masking(self, msg):
+        regex = r'(\|\s*(http://[^\s]+)\s*\|\s*admin\s*\|\s*)(\S+)(\s*\|\s*active\s*\|)'
+        pattern = re.compile(regex)
+        str_msg = str(msg)
+        if 'active' in str_msg:
+            match = re.search(pattern, str_msg)
+            if match:
+                masked_password = "*"*len(match.group(3))
+                str_msg = pattern.sub(rf"\1{masked_password}\4", str_msg)
+        return str_msg
 
     def log_masking(self, msg):
-        regex = r"(-P\s*\S+\s+.*?-p\s*['\"]?|_PASSWORD\s*(=|to)\s*['\"]*|IDENTIFIED BY \S+.*args:\s*\[['\"]?|_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
-        pattern = re.compile(regex)
+        log_regex = [
+            r"((-P\s*\S+\s+.*?)-p\s*['\"]?)([^\s'\"']+)(['\"]*)",
+            r"(_PASSWORD\s*(=|to)\s*['\"]*)([^\s'\"']+)(['\"]*)",
+            r'(?i)(password([:|=]))(?! \S)(.*?)(,|\s)'
+        ]
+        patterns = []
+        is_match = False
+
+        for regex in log_regex:
+            patterns.append(re.compile(regex))
         if isinstance(msg, str) and self.contains_keys(msg):
-            msg = pattern.sub(r"\1******\4", msg)
+            if "--prompt" in msg:
+                prompt_regex = r"((-P\s*\S+\s+.*?)-p\s*['\"]+)([^\s'\"']+)(['\"]*)"
+                pattern = re.compile(prompt_regex)
+                return pattern.sub(r"\1******\4", msg)
+            for pattern in patterns:
+                is_match = pattern.search(msg)
+                msg = pattern.sub(r"\1******\4", msg)
+            if is_match:
+                return msg
+            pwd_args_regex = r"(IDENTIFIED BY \S+.*args:\s*\[['\"]?|_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
+            arg_pattern = re.compile(pwd_args_regex)
+            if arg_pattern.search(msg):
+                return arg_pattern.sub(r"\1******\3", msg)
+
+            passwd_regex = r'(?i)((password|passwd)[:|=]\s*)(.*)'
+            pwd_pattern = re.compile(passwd_regex)
+            if pwd_pattern.search(msg):
+                return pwd_pattern.sub(r"\1******", msg)
+
+            http_regex = r'(?i)((password)\s*\":\s*\")(.*?)(\")'
+            http_pattern = re.compile(http_regex)
+            if http_pattern.search(msg):
+                return http_pattern.sub(r"\1******\4", msg)
         return msg
 
     def verbose(self, msg, *args, **kwargs):

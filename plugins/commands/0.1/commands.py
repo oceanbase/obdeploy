@@ -36,6 +36,9 @@ def commands(plugin_context, context, *args, **kwargs):
         value = context.get(key, default)
         stdio.verbose('get value from context: %s value %s' % (key, value))
         return value
+    
+    if plugin_context.get_variable('skip_commands'):
+        return plugin_context.return_true()
 
     stdio = plugin_context.stdio
 
@@ -68,9 +71,9 @@ def commands(plugin_context, context, *args, **kwargs):
             ret = client.execute_command(cmd, stdio=stdio)
         else:
             ret = LocalClient.execute_command(cmd, env=client.env, stdio=stdio)
-        if ret and ret.stdout:
+        if ret and ret.stdout and [component, server, ret.stdout.strip()] not in results:
             results.append([component, server, ret.stdout.strip()])
         elif not no_exception:
             failed = True
         context.update(results=results, failed=failed)
-        return plugin_context.return_true(context=context)
+        return plugin_context.return_true()

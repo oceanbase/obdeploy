@@ -27,7 +27,6 @@ import {
   SafetyCertificateFilled,
 } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormText } from '@ant-design/pro-components';
-import { useUpdateEffect } from 'ahooks';
 import {
   Alert,
   Button,
@@ -669,15 +668,15 @@ export default function InstallConfig() {
   useEffect(() => {
     // 默认勾选项，只取 obproxy
     // https://project.alipay.com/project/W24001004950/P24001006922/requirement?openWorkItemId=2024100800104636325&status=status&workItemView=72fcab42129ae1bd489e077d
-    setSelectedConfig(['obproxy'])
-  }, [])
+    setSelectedConfig(['obproxy']);
+  }, []);
 
   const rowSelection = {
     hideSelectAll: true,
     onSelect: handleSelect,
     // 默认勾选项，需排除掉缺少必要安装包
     selectedRowKeys: selectedConfig?.filter((item: string) => {
-      return componentsVersionInfo[item]?.version
+      return componentsVersionInfo[item]?.version;
     }),
     getCheckboxProps: (record) => ({
       disabled: !componentsVersionInfo[record.key]?.version,
@@ -1045,7 +1044,6 @@ export default function InstallConfig() {
               >
                 <CustomAlert
                   type="info"
-                  style={{ height: 40 }}
                   description={intl.formatMessage({
                     id: 'OBD.pages.Obdeploy.InstallConfig.TheLoadTypeMainlyAffects',
                     defaultMessage:
@@ -1180,11 +1178,7 @@ export default function InstallConfig() {
               <Button
                 type="primary"
                 onClick={nextStep}
-                disabled={
-                  lowVersion ||
-                  versionLoading ||
-                  componentLoading
-                }
+                disabled={lowVersion || versionLoading || componentLoading}
                 data-aspm-click="c307507.d317280"
                 data-aspm-desc={intl.formatMessage({
                   id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationNextStep',

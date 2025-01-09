@@ -55,7 +55,7 @@ def verify_password(cursor, tenant_name, stdio, key='', password='', user='root'
     return False
 
 
-def failover_decouple_tenant(plugin_context, option_type, cursors={}, *args, **kwargs):
+def failover_decouple_tenant(plugin_context, cursors={}, *args, **kwargs):
     def error(msg='', *arg, **kwargs):
         msg and stdio.error(msg, *arg, **kwargs)
         stdio.stop_loading('fail')
@@ -63,6 +63,8 @@ def failover_decouple_tenant(plugin_context, option_type, cursors={}, *args, **k
     stdio = plugin_context.stdio
     deploy_name = plugin_context.cluster_config.deploy_name
     options = plugin_context.options
+    cmds = plugin_context.cmds
+    option_type = cmds[2]
     tenant_name = getattr(options, 'tenant_name', '')
     standby_cursor = cursors.get(deploy_name)
     # do inner check

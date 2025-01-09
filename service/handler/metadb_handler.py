@@ -313,16 +313,14 @@ class MetadbHandler(BaseHandler):
         self.obd.search_param_plugin_and_apply(repositories, deploy_config)
         self.obd.set_repositories(repositories)
 
-        start_check_plugins = self.obd.search_py_script_plugin(repositories, 'start_check', no_found_act='warn')
-
-        self._precheck(cluster_name, repositories, start_check_plugins, init_check_status=True)
+        self._precheck(cluster_name, repositories, init_check_status=True)
         info = task_manager.get_task_info(cluster_name, task_type="precheck")
         if info is not None and info.exception is not None:
             exception = copy.deepcopy(info.exception)
             info.exception = None
             raise exception
         task_manager.del_task_info(cluster_name, task_type="precheck")
-        background_tasks.add_task(self._precheck, cluster_name, repositories, start_check_plugins, init_check_status=False)
+        background_tasks.add_task(self._precheck, cluster_name, repositories, init_check_status=False)
         self.context['deployment']['task_id'] = self.context['deployment']['task_id'] + 1 if self.context['deployment']['task_id'] else 1
         task_status = TaskStatus.RUNNING.value
         task_res = TaskResult.RUNNING.value
@@ -350,22 +348,25 @@ class MetadbHandler(BaseHandler):
         return DatabaseConnection(id=id, host=info['ip'], port=info['port'], user=info['user'], password=info['password'], database='oceanbase')
 
     @auto_register('precheck')
-    def _precheck(self, name, repositories, start_check_plugins, init_check_status=False):
+    def _precheck(self, name, repositories, init_check_status=False):
         if init_check_status:
-            self._init_precheck(repositories, start_check_plugins)
+            self._init_precheck(repositories)
         else:
-            self._do_precheck(repositories, start_check_plugins)
+            self._do_precheck(repositories)
 
-    def _init_precheck(self, repositories, start_check_plugins):
+    def _init_precheck(self, repositories):
         param_check_status = {}
         servers_set = set()
+
+        component_kwargs = {repository.name: {"clients": {}} for repository in repositories}
+        init_check_status_workflows = self.obd.get_workflows('init_check_status', no_found_act='ignore', repositories=repositories)
+        workflows_ret = self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore', repositories=repositories, **component_kwargs)
         for repository in repositories:
-            if repository not in start_check_plugins:
+            if not self.obd.namespaces.get(repository.name):
                 continue
+            if not workflows_ret and self.obd.namespaces.get(repository.name).get_return('exception'):
+                raise self.obd.namespaces.get(repository.name).get_return('exception')
             repository_status = {}
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=True, work_dir_check=True, clients={})
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
             servers = self.obd.deploy.deploy_config.components.get(repository.name).servers
             for server in servers:
                 repository_status[server] = {'param': CheckStatus()}
@@ -379,18 +380,15 @@ class MetadbHandler(BaseHandler):
         self.context['deployment']['connect_check_status'] = {'ssh': server_connect_status}
         self.context['deployment']['servers_set'] = servers_set
 
-    def _do_precheck(self, repositories, start_check_plugins):
+    def _do_precheck(self, repositories):
         ssh_clients, connect_status = self.obd.get_clients_with_connect_status(self.obd.deploy.deploy_config, repositories, fail_exit=False)
         check_status = self._init_check_status('ssh', self.context['deployment']['servers_set'], connect_status)
         self.context['deployment']['connect_check_status'] = {'ssh': check_status}
         for k, v in connect_status.items():
             if v.status == v.FAIL:
                 return
-        gen_config_plugins = self.obd.search_py_script_plugin(repositories, 'generate_config')
-        if len(repositories) != len(gen_config_plugins):
-            raise Exception("param_check: config error, check stop!")
 
-        param_check_status, check_pass = self.obd.deploy_param_check_return_check_status(repositories, self.obd.deploy.deploy_config, gen_config_plugins=gen_config_plugins)
+        param_check_status, check_pass = self.obd.deploy_param_check_return_check_status(repositories, self.obd.deploy.deploy_config)
         param_check_status_result = {}
         for comp_name in param_check_status:
             status_res = param_check_status[comp_name]
@@ -401,20 +399,26 @@ class MetadbHandler(BaseHandler):
             return
 
         components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
-        for repository in repositories:
-            ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False,
-                generate_consistent_config=True, auto_depend=True, components=components)
-            if ret is None:
-                raise Exception("generate config error")
-            elif not ret and ret.get_return("exception"):
-                raise ret.get_return("exception")
-            if not self.obd.deploy.deploy_config.dump():
-                raise Exception('generate config dump error,place check disk space!')
+        workflows = self.obd.get_workflows('generate_config', repositories=repositories)
+        component_kwargs = {repository.name: {"generate_check": False, "generate_consistent_config": True, "auto_depend": True, "components": components} for repository in repositories}
+        workflow_ret = self.obd.run_workflow(workflows, repositories=repositories, **component_kwargs)
+        if not workflow_ret:
+            for repository in repositories:
+                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                    if plugin_ret.get_return("exception"):
+                        raise plugin_ret.get_return("exception")
+            raise Exception('generate config error!')
+        if not self.obd.deploy.deploy_config.dump():
+            raise Exception('generate config dump error,place check disk space!')
 
-        for repository in repositories:
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False, work_dir_check=True, precheck=True)
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
+        workflows = self.obd.get_workflows('start_check', repositories=repositories)
+        component_kwargs = {repository.name: {"work_dir_check": True, "precheck": True, "init_check_status": False} for repository in repositories}
+        workflow_ret = self.obd.run_workflow(workflows, repositories=repositories, **component_kwargs)
+        if not workflow_ret:
+            for repository in repositories:
+                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                    if plugin_ret.get_return("exception"):
+                        raise plugin_ret.get_return("exception")
 
     def get_precheck_result(self, id, task_id):
         precheck_result = PrecheckTaskInfo()
@@ -600,6 +604,7 @@ class MetadbHandler(BaseHandler):
         log.get_logger().info("clean namespace for start")
         for component in self.obd.deploy.deploy_config.components:
             for plugin in const.START_PLUGINS:
+                self.obd.namespaces[component]._variables = {'run_result': self.obd.namespaces[component].variables['run_result']}
                 self.obd.namespaces[component].set_return(plugin, None)
 
         log.get_logger().info("start do deploy %s", name)

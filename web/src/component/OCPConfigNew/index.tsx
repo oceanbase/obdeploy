@@ -166,7 +166,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
   const sortErrorFields = (errorFields: any, sortArr: string[]) => {
     let res: any[] = [];
     for (let name of sortArr) {
-      let target = errorFields.find((errorField: any) => {
+      let target = errorFields?.find((errorField: any) => {
         if (errorField.name[0] === 'ocpserver') {
           return name === errorField.name[1];
         } else {
@@ -260,7 +260,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
       validatePromise = validateFields();
     }
     validatePromise.then((result) => {
-      if (result.find((item: any) => item.status === 'rejected')) {
+      if (result?.find((item: any) => item.status === 'rejected')) {
         formValidScrollHelper(result);
         return;
       }

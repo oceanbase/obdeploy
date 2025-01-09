@@ -21,9 +21,10 @@
 from __future__ import absolute_import, division, print_function
 
 import random
+from copy import copy
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, run_workflow, get_workflows, *args, **kwargs):
     namespace = plugin_context.namespace
     namespaces = plugin_context.namespaces
     deploy_name = plugin_context.deploy_name
@@ -48,14 +49,14 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
     repository_dir = dest_repository.repository_dir
     kwargs['repository_dir'] = repository_dir
 
-    stop_plugin = search_py_script_plugin([cur_repository], 'stop')[cur_repository]
-    start_plugin = search_py_script_plugin([dest_repository], 'start')[dest_repository]
+    stop_workflows = get_workflows('stop', repositories=[cur_repository])
+    start_workflows = get_workflows('upgrade_start', repositories=[dest_repository])
     connect_plugin = search_py_script_plugin([dest_repository], 'connect')[dest_repository]
     display_plugin = search_py_script_plugin([dest_repository], 'display')[dest_repository]
     bootstrap_plugin = search_py_script_plugin([dest_repository], 'bootstrap')[dest_repository]
 
     apply_param_plugin(cur_repository)
-    if not stop_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs):
+    if not run_workflow(stop_workflows, repositories=[cur_repository], **kwargs):
         return
     install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
 
@@ -75,7 +76,9 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
             num += 1
 
     apply_param_plugin(dest_repository)
-    if not start_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, need_bootstrap=True, *args, **kwargs):
+    start_kwargs = copy(kwargs)
+    start_kwargs['bootstrap'] = True
+    if not run_workflow(start_workflows, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):
         return
 
     ret = connect_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)

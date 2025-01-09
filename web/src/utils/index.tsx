@@ -1,3 +1,4 @@
+import { PASSWORD_SUPPORT_CHARACTERS } from '@/constant';
 import { intl } from '@/utils/intl';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { message, Modal, notification } from 'antd';
@@ -5,7 +6,6 @@ import type { FormInstance } from 'antd/lib/form';
 import RandExp from 'randexp';
 import { getLocale, history } from 'umi';
 import { SPECIAL_SYMBOLS_OCP } from './helper';
-import { PASSWORD_SUPPORT_CHARACTERS } from '@/constant';
 
 export const handleResponseError = (desc: any, msg?: string | undefined) => {
   notification.error({
@@ -69,7 +69,7 @@ export const handleQuit = (
   handleQuitProgress: () => void,
   setCurrentStep: (step: number) => void,
   isFinshed?: boolean,
-  finalStep?: number
+  finalStep?: number,
 ) => {
   const quitRequest = async () => {
     await handleQuitProgress();
@@ -267,6 +267,20 @@ export const validateErrors = async (
 
 export const serversValidator = (_: any, value: string[], type: string) => {
   let validtor = true;
+
+  // 当用127.0.0.1部署的集群后期没法扩容，强制扩容可能引发非预期问题
+  // 白屏禁止127.0.0.1 ip输入
+  if (value.some((item) => item === '127.0.0.1')) {
+    return Promise.reject(
+      new Error(
+        intl.formatMessage({
+          id: 'OBD.src.utils.EnterTheCorrectIpAddress',
+          defaultMessage: '请输入正确的 IP 地址',
+        }),
+      ),
+    );
+  }
+
   if (value && value.length) {
     value.some((item) => {
       validtor = serverReg.test(item.trim());
@@ -318,7 +332,9 @@ export function generateRandomPassword() {
 
   // 生成随机密码
   for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * PASSWORD_SUPPORT_CHARACTERS.length);
+    const randomIndex = Math.floor(
+      Math.random() * PASSWORD_SUPPORT_CHARACTERS.length,
+    );
     const randomChar = PASSWORD_SUPPORT_CHARACTERS[randomIndex];
     password += randomChar;
 
