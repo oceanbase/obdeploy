@@ -10,9 +10,9 @@ import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 
 import ServerTags from '@/pages/Obdeploy/ServerTags';
-import { serversValidator } from '@/utils';
 import { getAllServers } from '@/utils/helper';
 import styles from './index.less';
+import { IPserversValidator } from '@/utils';
 
 interface DataBaseNodeConfigProps {
   tableFormRef: React.MutableRefObject<
@@ -151,7 +151,14 @@ export default function DataBaseNodeConfig({
           },
           {
             validator: (_: any, value: string[]) => {
-              return serversValidator(_, value, 'OBServer');
+              return IPserversValidator(
+                _,
+                value,
+                allOBServer,
+                'OBServer',
+                allZoneOBServer,
+                finalValidate,
+              );
             },
           },
         ],

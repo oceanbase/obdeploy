@@ -25,5 +25,7 @@ import const
 
 def reinstall(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'parameter_pre')
-    workflow.add_with_kwargs(const.STAGE_FIRST, {'is_reinstall': True}, 'cursor_check', 'start', 'health_check', 'stop', 'start', 'health_check')
+    workflow.add_with_kwargs(const.STAGE_FIRST, {'is_reinstall': True}, 'cursor_check', 'start')
+    workflow.add_with_component(const.STAGE_FIRST, 'general', 'stop')
+    workflow.add_with_kwargs(const.STAGE_FIRST, {'is_reinstall': True, 'multi_process_flag': True}, 'start', 'health_check')
     plugin_context.return_true()

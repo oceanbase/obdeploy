@@ -36,5 +36,6 @@ def start(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'start', 'health_check')
     workflow.add(const.STAGE_FIRST, 'stop_pre')
     workflow.add_with_component(const.STAGE_FIRST, 'general', 'stop')
-    workflow.add(const.STAGE_FIRST, 'start', 'health_check', 'bootstrap', 'connect', 'upload_packages')
+    workflow.add_with_kwargs(const.STAGE_FIRST, {'multi_process_flag': True}, 'start')
+    workflow.add(const.STAGE_FIRST, 'health_check', 'bootstrap', 'connect', 'upload_packages')
     plugin_context.return_true()

@@ -72,6 +72,7 @@ def chown_dir(plugin_context, new_clients, *args, **kwargs):
             if not new_client.execute_command(chown_cmd):
                 stdio.stop_loading('stop_loading', 'fail')
                 return False
+            chown_dir_flags = False
         dir_read_check(new_client, server_config['home_path'])
 
     return plugin_context.return_true()
