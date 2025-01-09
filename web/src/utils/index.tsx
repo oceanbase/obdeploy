@@ -225,6 +225,125 @@ export const updateClusterNameReg = /^[a-zA-Z][a-zA-Z0-9_-]{0,30}[a-zA-Z0-9]$/;
 //用户格式：以英文字母开头，可包含英文、数字、下划线和连字符，且不超过32位
 export const nameReg = /^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/;
 
+const checkIsRepeatByAllServers = (allZoneServers: any, id: string) => {
+  let currentServers: string[] = [],
+    otherServers: string[] = [];
+  Object.keys(allZoneServers).forEach((key) => {
+    if (id === key) {
+      currentServers = [...allZoneServers[key]];
+    } else {
+      otherServers = [...otherServers, ...allZoneServers[key]];
+    }
+  });
+  for (let server of currentServers) {
+    if (otherServers.includes(server)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const checkIp = (value: string[], type: 'OBServer' | 'OBProxy'): ResultType => {
+  let response: ResultType = { success: false, msg: '' };
+  if (value && value.length) {
+    value.some((item) => {
+      response.success = serverReg.test(item.trim());
+      return !serverReg.test(item.trim());
+    });
+  }
+  if (!response.success) {
+    response.msg =
+      type === 'OBServer'
+        ? intl.formatMessage({
+            id: 'OBD.src.utils.EnterTheCorrectIpAddress',
+            defaultMessage: '请输入正确的 IP 地址',
+          })
+        : intl.formatMessage({
+            id: 'OBD.src.utils.SelectTheCorrectObproxyNode',
+            defaultMessage: '请选择正确的 OBProxy 节点',
+          });
+  }
+  return response;
+};
+
+const checkIsRepeatByPreServers = (
+  preAllServers: string[],
+  inputServer: string,
+) => {
+  if (preAllServers.includes(inputServer)) {
+    return true;
+  }
+  return false;
+};
+
+const checkRepeat = (
+  finalValidate,
+  allZoneServers,
+  id,
+  inputServer,
+  preAllServers,
+  type,
+) => {
+  let response: ResultType = { msg: '', success: true };
+  if (type === 'OBProxy') return response;
+  if (finalValidate.current) {
+    response.success = !checkIsRepeatByAllServers(allZoneServers, id);
+  } else {
+    response.success = !checkIsRepeatByPreServers(preAllServers, inputServer);
+  }
+  if (!response.success) {
+    response.msg = intl.formatMessage({
+      id: 'OBD.src.utils.DoNotEnterDuplicateNodes',
+      defaultMessage: '禁止输入重复节点',
+    });
+  }
+  return response;
+};
+
+type ResultType = {
+  success: boolean;
+  msg: string;
+};
+const resultHandlePipeline = (...results: ResultType[]): ResultType => {
+  for (let result of results) {
+    if (!result.success) {
+      return result;
+    }
+  }
+  return {
+    success: true,
+    msg: '',
+  };
+};
+export const IPserversValidator = (
+  _: any,
+  value: string[],
+  preAllServers: string[],
+  type: 'OBServer' | 'OBProxy',
+  allZoneServers?: any,
+  finalValidate?: any,
+) => {
+  let result: ResultType = {
+      success: false,
+      msg: '',
+    },
+    inputServer = value[0];
+  let id = _.field?.split('.')[0];
+  result = resultHandlePipeline(
+    checkIp(value, type),
+    checkRepeat(
+      finalValidate,
+      allZoneServers,
+      id,
+      inputServer,
+      preAllServers,
+      type,
+    ),
+  );
+  if (!result.success) return Promise.reject(new Error(result.msg));
+  return Promise.resolve();
+};
+
 export const ocpServersValidator = (_: any, value: string[]) => {
   let validtor = true;
   if (value && value.length) {

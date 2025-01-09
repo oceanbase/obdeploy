@@ -72,27 +72,27 @@ class OcpCursor(object):
             return False
 
     def info(self, stdio=None):
-        resp = self._request('GET', '/api/v2/info', stdio=stdio)
+        resp = self._request('GET', '/api/v2/info', stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
 
     def upload_packages(self, files, stdio=None):
-        resp = self._request('POST', '/api/v2/software-packages', files=files, stdio=stdio)
+        resp = self._request('POST', '/api/v2/software-packages', files=files, stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
 
     def take_over_precheck(self, data, stdio=None):
-        resp = self._request('POST', '/api/v2/ob/clusters/takeOverPreCheck', data=data, stdio=stdio)
+        resp = self._request('POST', '/api/v2/ob/clusters/takeOverPreCheck', data=data, stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
 
     def get_host_types(self, stdio=None):
-        resp = self._request('GET', '/api/v2/compute/hostTypes', stdio=stdio)
+        resp = self._request('GET', '/api/v2/compute/hostTypes', stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
 
     def create_host_type(self, data, stdio=None):
-        resp = self._request('POST', '/api/v2/compute/hostTypes', data=data, stdio=stdio)
+        resp = self._request('POST', '/api/v2/compute/hostTypes', data=data, stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
         else:
@@ -102,7 +102,7 @@ class OcpCursor(object):
             raise Exception("failed to create host type: %s" % msg)
 
     def list_credentials(self, stdio=None):
-        resp = self._request('GET', '/api/v2/profiles/me/credentials', stdio=stdio)
+        resp = self._request('GET', '/api/v2/profiles/me/credentials', stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
         else:
@@ -112,7 +112,7 @@ class OcpCursor(object):
             raise Exception("failed to query credentials: %s" % msg)
 
     def create_credential(self, data, stdio=None):
-        resp = self._request('POST', '/api/v2/profiles/me/credentials', data=data, stdio=stdio)
+        resp = self._request('POST', '/api/v2/profiles/me/credentials', data=data, stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
         else:
@@ -122,7 +122,7 @@ class OcpCursor(object):
             raise Exception("failed to create credential: %s" % msg)
 
     def take_over(self, data, stdio=None):
-        resp = self._request('POST', '/api/v2/ob/clusters/takeOver', data=data, stdio=stdio)
+        resp = self._request('POST', '/api/v2/ob/clusters/takeOver', data=data, stdio=stdio, auth=self.auth)
         if resp.code == 200:
             return resp.content
         else:
@@ -131,14 +131,14 @@ class OcpCursor(object):
                 msg = resp.content['error']['message']
             raise Exception("failed to do take over: %s" % msg)
 
-    def _request(self, method, api, data=None, files=None, retry=5, stdio=None):
+    def _request(self, method, api, data=None, files=None, retry=5, stdio=None, auth=None):
         url = self.url_prefix + api
         headers = {'Content-Type': 'application/json'} if not files else {}
         try:
             if data is not None:
                 data = json.dumps(data)
             stdio.verbose('send http request method: {}, url: {}, data: {}, files: {}'.format(method, url, data, files))
-            resp = requests.request(method, url, data=data, files=files, verify=False, headers=headers, auth=self.auth)
+            resp = requests.request(method, url, data=data, files=files, verify=False, headers=headers, auth=auth)
             return_code = resp.status_code
             content = resp.content
         except Exception as e:

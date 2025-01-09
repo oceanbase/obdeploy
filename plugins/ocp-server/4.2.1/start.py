@@ -25,7 +25,7 @@ from _types import Capacity, CapacityWithB
 from tool import get_option
 
 
-def start(plugin_context, start_env=None, *args, **kwargs):
+def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwargs):
 
     EXCLUDE_KEYS = plugin_context.get_variable('EXCLUDE_KEYS')
     CONFIG_MAPPER = plugin_context.get_variable('CONFIG_MAPPER')
@@ -142,7 +142,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
                 success = False
                 continue
             client.write_file(server_pid[server], os.path.join(home_path, 'run/ocp-server.pid'))
-            if len(cluster_config.servers) > 1:
+            if not multi_process_flag and len(cluster_config.servers) > 1:
                 break
             if len(cluster_config.servers) > 1 and node_num == 1:
                 time.sleep(60)

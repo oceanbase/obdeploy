@@ -1306,6 +1306,7 @@ class ObdHome(object):
             return False
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
+        self.set_deploy(deploy)
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
@@ -1324,12 +1325,6 @@ class ObdHome(object):
         self.set_repositories(repositories)
         ssh_clients = self.get_clients(deploy_config, repositories)
 
-        self._call_stdio('verbose', 'get plugins by mocking an ocp repository.')
-        # search and get all related plugins using a mock ocp repository
-        mock_ocp_repository = Repository(const.COMP_OCP_SERVER_CE, "/")
-        mock_ocp_repository.version = "4.2.1"
-        repositories.extend([mock_ocp_repository])
-
         # search and install oceanbase-ce-utils, just log warning when failed since it can be installed after takeover
         repositories_utils_map = self.get_repositories_utils(repositories)
         if not repositories_utils_map:
@@ -1338,6 +1333,12 @@ class ObdHome(object):
             if not self.install_utils_to_servers(repositories, repositories_utils_map):
                 self._call_stdio('warn', 'Failed to install utils to servers')
 
+        self._call_stdio('verbose', 'get plugins by mocking an ocp repository.')
+        # search and get all related plugins using a mock ocp repository
+        mock_ocp_repository = Repository(const.COMP_OCP_SERVER_CE, "/")
+        mock_ocp_repository.version = "4.2.1"
+        repositories.extend([mock_ocp_repository])
+        self.set_deploy(None)
         workflow = self.get_workflows('take_over', repositories=[mock_ocp_repository] + self.repositories, no_found_act='ignore')
         if not self.run_workflow(workflow, deploy_config=deploy_config, repositories=[mock_ocp_repository] + self.repositories, no_found_act='ignore', **{mock_ocp_repository.name: {'cluster_config': cluster_config, 'clients': ssh_clients}}):
             return False
