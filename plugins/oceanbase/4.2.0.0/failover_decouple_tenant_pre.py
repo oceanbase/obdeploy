@@ -33,10 +33,12 @@ else:
         return db.cursor()
 
 
-def failover_decouple_tenant_pre(plugin_context, option_type, cursors={}, *args, **kwargs):
+def failover_decouple_tenant_pre(plugin_context, cursors={}, *args, **kwargs):
     stdio = plugin_context.stdio
     standby_deploy_name = plugin_context.cluster_config.deploy_name
     options = plugin_context.options
+    cmds = plugin_context.cmds
+    option_type = cmds[2]
     standby_tenant = getattr(options, 'tenant_name', '')
     if not standby_tenant:
         stdio.error('Standby tenant name is empty.')

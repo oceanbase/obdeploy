@@ -48,7 +48,7 @@ no_generate_comps = ['ob-configserver']
 
 DESTROY_PLUGIN = "destroy"
 INIT_PLUGINS = ("init",)
-START_PLUGINS = ("start_check", "start", "connect", "bootstrap", "display")
+START_PLUGINS = ("start_check_pre", "start", "connect", "health_check", "display")
 DEL_COMPONENT_PLUGINS = ("stop", "destroy")
 CHANGED_COMPONENTS = ('obproxy-ce', 'obagent', 'ocp-express', 'ob-configserver', 'prometheus', 'grafana')
 UPGRADE_PLUGINS = ("upgrade")

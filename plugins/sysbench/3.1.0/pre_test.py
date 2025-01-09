@@ -42,7 +42,7 @@ def file_path_check(bin_path, tool_name, tool_path, cmd):
     return path, None
 
 
-def pre_test(plugin_context, cursor, *args, **kwargs):
+def pre_test(plugin_context, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if value is None:
@@ -54,8 +54,12 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     options = plugin_context.options
 
+    sys_namespace = kwargs.get("sys_namespace")
+    get_db_and_cursor = kwargs.get("get_db_and_cursor")
+    db, cursor = get_db_and_cursor(sys_namespace)
+
     host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
+    port = db.port if db else 2881
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test')
@@ -107,12 +111,14 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
             stdio.error("Illegal characters in threads: %s" % thread)
             return
 
-    sql = "select * from oceanbase.gv$tenant where tenant_name = %s"
-    tenant_meta = cursor.fetchone(sql, [tenant_name])
+    query_tenant_sql = plugin_context.get_variable("tenant_sql")
+    stdio.verbose('execute sql: %s' % (query_tenant_sql % tenant_name))
+    tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
     if not tenant_meta:
         stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
         return
-    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta['tenant_id']
+    tenant_id = plugin_context.get_variable("tenant_id")
+    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta[tenant_id]
     pool = cursor.fetchone(sql)
     if pool is False:
         return
@@ -137,7 +143,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     if ret:
         server_num = ret.get("server_num", server_num)
     return plugin_context.return_true(
-        max_cpu=max_cpu, threads=threads, Capacity=Capacity, tenant=tenant_name, tenant_id=tenant_meta['tenant_id'],
+        max_cpu=max_cpu, threads=threads, Capacity=Capacity, tenant=tenant_name, tenant_id=tenant_meta[tenant_id],
         format_size=Capacity, server_num=server_num, obclient_bin=obclient_bin, host=host, port=port, user=user,
         password=password, database=mysql_db
     )

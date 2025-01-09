@@ -140,8 +140,9 @@ async def get_install_log(name: str = Path(description='deployment name'),
     task_info = handler.get_install_task_info(name)
     if task_info is None:
         return response_utils.new_not_found_exception("task {0} not found".format(name))
-    log_content = handler.buffer.read() if component_name is None else handler.get_install_log_by_component(component_name)
-    log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
+    origin_log = handler.buffer.read() if component_name is None else handler.get_install_log_by_component(component_name)
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    log_info = InstallLog(log=masked_log[offset:], offset=len(masked_log))
     return response_utils.new_ok_response(log_info)
 
 

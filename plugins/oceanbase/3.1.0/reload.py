@@ -57,7 +57,9 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
     cursor = plugin_context.get_return('connect').get_return('cursor')
-    
+    cursor = cursor.usable_cursor
+    cursor.execute('set session ob_query_timeout=1000000000')
+
     inner_config = {
         InnerConfigItem('$_zone_idc'): 'idc'
     }
@@ -68,6 +70,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
     change_conf = {}
     global_change_conf = {}
     global_ret = True
+    need_restart_key = []
     for server in servers:
         change_conf[server] = {}
         stdio.verbose('get %s old configuration' % (server))
@@ -86,6 +89,8 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
                 cfg_url = get_ob_configserver_cfg_url(n_value, cluster_config.name, stdio)
                 if cfg_url:
                     n_value = cfg_url
+            if key == 'data_dir' and not config.get(key) and n_value =='%s/store' % config['home_path']:
+                continue
             if key not in config or config[key] != n_value:
                 if isinstance(key, InnerConfigItem) and key in inner_keys:
                     zone = config['zone']
@@ -95,7 +100,13 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
                 else:
                     item = cluster_config.get_temp_conf_item(key)
                     if item:
-                        if item.need_redeploy or item.need_restart:
+                        if item.need_restart:
+                            need_restart_key.append(key)
+                            stdio.verbose('%s can not be reload' % key)
+                            if not plugin_context.get_return("restart_pre"):
+                                global_ret = False
+                                continue
+                        if item.need_redeploy:
                             stdio.verbose('%s can not be reload' % key)
                             global_ret = False
                             continue
@@ -113,7 +124,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
 
     servers_num = len(servers)
     stdio.verbose('apply new configuration')
-    stdio.start_load('Reload observer')
+    stdio.start_loading('Reload observer')
     for zone in zones_config:
         zone_config = zones_config[zone]
         for key in zone_config:
@@ -125,6 +136,8 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
     raise_cursor = cursor.raise_cursor
     for key in global_change_conf:
         try:
+            if key in set(need_restart_key):
+                continue
             if key in ['proxyro_password', 'root_password']:
                 if global_change_conf[key]['count'] != servers_num:
                     stdio.warn(EC_OBSERVER_INVALID_MODFILY_GLOBAL_KEY.format(key=key))
@@ -150,6 +163,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
                 raise_cursor.execute(sql, [value, cluster_server[server]])
                 cluster_config.update_server_conf(server, key, value, False)
         except:
+            stdio.exception("")
             global_ret = False
 
     try:
@@ -157,9 +171,12 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
         raise_cursor.execute('alter system reload zone')
         raise_cursor.execute('alter system reload unit')
     except:
+        stdio.exception("")
         global_ret = False
     
     if global_ret:
+        plugin_context.set_variable("change_conf", change_conf)
+        plugin_context.set_variable("global_change_conf", global_change_conf)
         stdio.stop_loading('succeed')
         return plugin_context.return_true()
     else:

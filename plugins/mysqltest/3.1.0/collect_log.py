@@ -82,6 +82,7 @@ def collect_log(plugin_context, env, test_name=None, *args, **kwargs):
                 stdio.stop_loading('succeed')
             else:
                 stdio.stop_loading('fail')
+                return plugin_context.return_false()
     if 'obproxy' in collect_components:
         if not is_obproxy:
             stdio.warn('No obproxy detected.')
@@ -99,3 +100,5 @@ def collect_log(plugin_context, env, test_name=None, *args, **kwargs):
                 stdio.stop_loading('succeed')
             else:
                 stdio.stop_loading('fail')
+                return plugin_context.return_false()
+    return plugin_context.return_true()

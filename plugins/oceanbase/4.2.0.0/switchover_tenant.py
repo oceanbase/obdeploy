@@ -79,7 +79,7 @@ def verify_password(cursor, tenant_name, stdio, key, password='', user='root', m
     return False
 
 
-def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cursors={}, primary_info={}, *args, **kwargs):
+def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info={}, *args, **kwargs):
     def error(msg='', *arg, **kwargs):
         msg and stdio.error(msg, *arg, **kwargs)
         stdio.stop_loading('fail') 
@@ -102,6 +102,7 @@ def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cur
 
     stdio = plugin_context.stdio
     options = plugin_context.options
+    repositories = plugin_context.repositories
     standby_tenant = getattr(options, 'tenant_name', '')
     if not cursors:
         error("Connect to OceanBase failed.")
@@ -117,16 +118,19 @@ def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cur
     # find primary and standby tenant`s others relationship
     stdio.start_loading('Find relationship')
     # 1.find primary tenant`s others standby tenant
-    for repository in get_standbys_plugins:
-        ret = call_plugin(get_standbys_plugins[repository], primary_deploy_name=primary_deploy_name, primary_tenant=primary_tenant, exclude_tenant=[standby_deploy_name, standby_tenant])
+    plugin_manager = kwargs.get('plugin_manager')
+    for repository in repositories:
+        get_standbys_plugin = plugin_manager.get_best_py_script_plugin('get_standbys', repository.name, repository.version)
+        ret = call_plugin(get_standbys_plugin, primary_deploy_name=primary_deploy_name, primary_tenant=primary_tenant, exclude_tenant=[standby_deploy_name, standby_tenant])
         if not ret:
             error("Find primary tenant {}:{}'s others standby tenants failed".format(primary_deploy_name, primary_tenant))
             return
     primary_standby_tenants = ret.get_return('standby_tenants')
     stdio.verbose("Primary tenant {}:{}'s others standby tenants:{}".format(primary_deploy_name, primary_tenant, primary_standby_tenants))
     # 2.find standby tenant`s standby tenant
-    for repository in get_standbys_plugins:
-        ret = call_plugin(get_standbys_plugins[repository], primary_deploy_name=standby_deploy_name, primary_tenant=standby_tenant, exclude_tenant=[primary_deploy_name, primary_tenant])
+    for repository in repositories:
+        get_standbys_plugin = plugin_manager.get_best_py_script_plugin('get_standbys', repository.name, repository.version)
+        ret = call_plugin(get_standbys_plugin, primary_deploy_name=standby_deploy_name, primary_tenant=standby_tenant, exclude_tenant=[primary_deploy_name, primary_tenant])
         if not ret:
             error("Find primary tenant {}:{}'s others standby tenants failed".format(primary_deploy_name, primary_tenant))
             return

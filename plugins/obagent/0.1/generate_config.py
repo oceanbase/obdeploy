@@ -70,6 +70,8 @@ def generate_config(plugin_context, auto_depend=False, return_generate_keys=Fals
         generate_configs['global']['ob_monitor_status'] = 'inactive'
         if auto_depend:
             for depend in depends:
+                if depend in cluster_config.depends:
+                    continue
                 if cluster_config.add_depend_component(depend):
                     cluster_config.update_global_conf('ob_monitor_status', 'active', False)
                     generate_configs['global']['ob_monitor_status'] = 'active'

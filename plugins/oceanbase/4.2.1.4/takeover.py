@@ -29,6 +29,7 @@ from  _mirror import get_use_centos_release
 from _deploy import DeployStatus, DeployConfigStatus
 from ssh import LocalClient
 from _types import CapacityMB
+from _rpm import Version
 
 
 stdio = None
@@ -73,7 +74,7 @@ def format_server(ip, port):
     return '{}_{}'.format(ip, port)
 
 
-def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwargs):
+def takeover(plugin_context, cursor='', *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -89,7 +90,18 @@ def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwar
     stdio = plugin_context.stdio
     stdio.start_loading('Takeover precheck')
     clients = plugin_context.clients
-    cursor = kwargs.get('cursor')
+    cmds = plugin_context.cmds
+    name = cmds[0] if cmds else plugin_context.cluster_config.deploy_name
+    obd_home = kwargs.get('obd_home')
+    user_config = kwargs.get('user_config')
+
+    ret = cursor.fetchone('select version() as version', raise_exception=True)
+    if ret is False:
+        return False
+    version = ret.get("version").split("-v")[-1]
+    if Version(version) < Version('4.2.1.4'):
+        return error('The current OceanBase does not support takeover, the version is less than 4.2.1.4.')
+
     available_sql = "show databases"
     available = exec_sql(available_sql, cursor, exec_type='fetchone', raise_exception=False)
     if not available:
@@ -100,7 +112,7 @@ def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwar
     check_ocs_sql = "show databases like 'ocs'"
     ocs = exec_sql(check_ocs_sql, cursor, exec_type='fetchone', raise_exception=True)
     if not ocs:
-        stdio.error('The current OceanBase does not support takeover, OCS is not installed.')
+        stdio.error('The current OceanBase does not support takeover, OBShell is not installed.')
         stdio.stop_loading('fail')
         return plugin_context.return_false()
 

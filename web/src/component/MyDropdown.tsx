@@ -67,7 +67,7 @@ const MyDropdown: React.FC<MyDropdownProps> = ({
   const [menuKey, setMenuKey] = useState(realDefaultMenuKey || firstMenuKey);
   // Dropdown 组件的 menuKey 是 string 类型，value 可能是非 string 类型的值，并且 menuKey 的初始化值可能不是 string 类型，统一转成 string 再做判断
   const menuItem =
-    newMenuList.find((item) => toString(item.value) === toString(menuKey)) ||
+    newMenuList?.find((item) => toString(item.value) === toString(menuKey)) ||
     {};
 
   useEffect(() => {

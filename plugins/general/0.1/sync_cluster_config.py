@@ -51,3 +51,5 @@ def sync_cluster_config(plugin_context, *args, **kwargs):
                     stdio.verbose("update config, key: {}, value: {}".format(key, ob_config.get(ob_key)))
                     cluster_config.update_global_conf(key, ob_config.get(ob_key), save=False)
             break
+
+    return plugin_context.return_true()

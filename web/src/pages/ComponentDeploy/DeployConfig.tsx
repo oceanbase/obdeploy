@@ -68,7 +68,7 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
   const componentsList = componentsListRes?.data;
 
   const getColumns = (component: API.BestComponentInfo) => {
-    const targetComponent = componentsGroupInfo.find((comp) =>
+    const targetComponent = componentsGroupInfo?.find((comp) =>
       comp.content.some(
         (item) =>
           item.key ===

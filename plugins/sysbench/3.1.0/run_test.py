@@ -60,8 +60,13 @@ def run_test(plugin_context, *args, **kwargs):
     for used_key in ['component', 'test_server', 'skip_cluster_status_check', 'obclient_bin', 'optimization']:
         opt_keys.remove(used_key)
 
+    sys_namespace = kwargs.get("sys_namespace")
+    get_db_and_cursor = kwargs.get("get_db_and_cursor")
+    db, cursor = get_db_and_cursor(sys_namespace)
+    port = db.port if db else 2881
+
+
     host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test')

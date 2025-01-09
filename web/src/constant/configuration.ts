@@ -77,30 +77,48 @@ export const METADB_OCP_INSTALL = [
 
 export const COMPONENT_INSTALL = [
   {
-    title: '部署配置',
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.DeploymentConfiguration',
+      defaultMessage: '部署配置',
+    }),
     key: 1,
   },
   {
-    title: '组件配置',
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.ComponentConfiguration',
+      defaultMessage: '组件配置',
+    }),
     key: 2,
   },
   {
-    title: '预检查',
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.PreCheck',
+      defaultMessage: '预检查',
+    }),
     key: 3,
   },
   {
-    title: '部署',
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.Deployment',
+      defaultMessage: '部署',
+    }),
     key: 4,
   },
 ];
 
 export const COMPONENT_UNINSTALL = [
   {
-    title: '卸载配置',
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.UninstallConfiguration',
+      defaultMessage: '卸载配置',
+    }),
     key: 1,
   },
   {
-    title: '卸载',
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.Uninstall',
+      defaultMessage: '卸载',
+    }),
     key: 2,
   },
 ];
@@ -172,6 +190,7 @@ export const showConfigKeys = {
     'prometheus_listen_port',
     'rpc_listen_port',
   ],
+
   obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
   ocpexpress: ['home_path', 'port'],
   obconfigserver: [

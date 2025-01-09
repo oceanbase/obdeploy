@@ -72,7 +72,7 @@ const getMoreColumns = (
         };
         if (defaultUnit) param.defaultUnit = defaultUnit;
         if (rulesList?.length) {
-          const targetRuleDetail = rulesList.find(
+          const targetRuleDetail = rulesList?.find(
             (item) => item.targetColumn === record.name,
           );
           if (targetRuleDetail) rules = targetRuleDetail.rules;

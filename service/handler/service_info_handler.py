@@ -135,7 +135,6 @@ class ServiceInfoHandler(BaseHandler):
         return env
 
     def generate_config(self, cluster_name):
-        log.get_logger().info('do command upgrade with context: {}'.format(self.context))
         servers = self.context['upgrade_servers']
         if len(servers) == 0:
             raise Exception("no server to upgrade")
@@ -188,7 +187,6 @@ class ServiceInfoHandler(BaseHandler):
                                home_path=home_path, servers=servers, port=server_port, memory_size=memory_xmx)
         components = OcpComponentConfig(ocpserver=ocp_server)
         data = OCPDeploymnetConfig(auth=auth, components=components)
-        log.get_logger().info('create deployment config: %s' % data)
 
         ocp_handler = OcpHandler()
         try:

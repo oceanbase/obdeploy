@@ -423,7 +423,7 @@ export default function CheckInfo() {
     const { obproxy = {} } = configData.components;
     if (obproxy?.parameters) {
       // 如果没有密码，前端来随机生成一个
-      const targetParam = obproxy?.parameters.find(
+      const targetParam = obproxy?.parameters?.find(
         (item) => item.key === 'obproxy_sys_password',
       );
       if (!targetParam || !targetParam.value) {

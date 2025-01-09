@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function
 import re
 
 
-def check_options(plugin_context, optimize_config, *args, **kwargs):
+def check_options(plugin_context, *args, **kwargs):
 
     def get_option(key, default=''):
         value = getattr(options, key, default)
@@ -33,6 +33,7 @@ def check_options(plugin_context, optimize_config, *args, **kwargs):
 
     stdio = plugin_context.stdio
     options = plugin_context.options
+    optimize_config = kwargs.get('optimize_config')
 
     sql_file_pattern = r'^optimize_(oceanbase|oceanbase_ce|obproxy|obproxy_ce)_stage_(\w+)_sql_file(_by_sys)?$'
     for key in vars(options):

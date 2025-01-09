@@ -23,6 +23,7 @@ from __future__ import absolute_import, division, print_function
 from subprocess import call, Popen, PIPE
 
 from ssh import LocalClient
+from tool import ConfigUtil
 
 
 def db_connect(plugin_context, *args, **kwargs):
@@ -47,7 +48,7 @@ def db_connect(plugin_context, *args, **kwargs):
         if need_password:
             cmd += " -p"
         elif password:
-            cmd += " -p{}".format(password)
+            cmd += " -p{}".format(ConfigUtil.passwd_format(password))
         if database:
             cmd += " -D{}".format(database)
         return cmd

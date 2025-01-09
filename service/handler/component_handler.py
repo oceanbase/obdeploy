@@ -19,6 +19,7 @@
 
 import uuid
 import tempfile
+from const import COMPS_OB
 from service.handler.base_handler import BaseHandler
 from service.model.components import Component, ComponentInfo, ConfigParameter, ParameterMeta
 from service.common import log
@@ -178,18 +179,23 @@ class ComponentHandler(BaseHandler):
             self.obd.set_deploy(deploy)
 
             spacename = "{0}_parameter".format(parameter_filter.component)
-            gen_config_plugin = self.obd.plugin_manager.get_best_py_script_plugin("generate_config", parameter_filter.component, parameter_filter.version)
             repository = Repository(parameter_filter.component, "")
             self.obd.set_repositories([repository])
-            ret = self.obd.call_plugin(gen_config_plugin, repository, return_generate_keys=True, generate_consistent_config=True, spacename=spacename, clients={})
-            del(self.obd.namespaces[spacename])
+            repository.set_version(parameter_filter.version)
+            workflows = self.obd.get_workflows('get_generate_keys', repositories=[repository])
+            component_kwargs = {repository.name: {"return_generate_keys": True, "generate_consistent_config": True, "spacename": spacename, "clients": {}}}
+            workflow_ret = self.obd.run_workflow(workflows, repositories=[repository], **component_kwargs)
             auto_keys = []
             if parameter_filter.component not in const.no_generate_comps:
-                if not ret:
+                if not workflow_ret:
                     self.obd.deploy_manager.remove_deploy_config(name)
                     raise Exception("genconfig failed for component: {0}".format(parameter_filter.component))
                 else:
-                    auto_keys = ret.get_return("generate_keys")
+                    if repository.name in COMPS_OB:
+                        auto_keys = self.obd.get_namespace(spacename).get_return("generate_password").kwargs.get('generate_keys', [])
+                    else:
+                        auto_keys = self.obd.get_namespace(spacename).get_return("generate_config").kwargs.get('generate_keys', [])
+            del(self.obd.namespaces[spacename])
             log.get_logger().info("auto keys for component %s are %s", parameter_filter.component, auto_keys)
 
             parameter_plugin = self.obd.plugin_manager.get_best_plugin(PluginType.PARAM, parameter_filter.component, parameter_filter.version)

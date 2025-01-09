@@ -22,7 +22,7 @@ from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
 
 
-def optimize(plugin_context, optimize_config, stage, ob_cursor, odp_cursor, optimize_envs=None, *args, **kwargs):
+def optimize(plugin_context, optimize_config, stage, optimize_envs=None, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if value is None:
@@ -45,10 +45,11 @@ def optimize(plugin_context, optimize_config, stage, ob_cursor, odp_cursor, opti
     restart_components = []
     optimize_envs['optimize_entrances_done'] = optimize_envs.get('optimize_entrances_done', {})
     for component in components:
-        if component in ['oceanbase', 'oceanbase-ce']:
-            cursor = ob_cursor
-        elif component in ['obproxy', 'obproxy-ce']:
-            cursor = odp_cursor
+        if component in ['oceanbase', 'oceanbase-ce', 'obproxy', 'obproxy-ce']:
+            connect = plugin_context.get_return('connect', spacename=component)
+            if not connect:
+                continue
+            cursor = connect.get_return('cursor')
         else:
             continue
         if not cursor:

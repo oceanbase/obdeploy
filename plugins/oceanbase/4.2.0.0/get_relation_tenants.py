@@ -20,10 +20,22 @@
 from queue import Queue
 
 
-def get_relation_tenants(plugin_context, repository, get_deploy, deployment_name='', tenant_name='', cluster_configs={}, *args, **kwargs):
-    deploy_name = deployment_name if deployment_name else plugin_context.cluster_config.deploy_name
+def get_relation_tenants(plugin_context, repository, cluster_configs={}, *args, **kwargs):
+    cmds = plugin_context.cmds
     options = plugin_context.options
-    tenant_name = tenant_name if tenant_name else getattr(options, 'tenant_name', '')
+    deploy_manager = kwargs.get('deploy_manager')
+    get_deploy = deploy_manager.get_deploy_config
+    deploy_name = plugin_context.cluster_config.deploy_name
+    tenant_name = getattr(options, 'tenant_name', '')
+    if kwargs.get('option_mode') == 'failover_decouple_tenant':
+        deploy_name = cmds[0]
+        tenant_name = cmds[1]
+    if kwargs.get('option_mode') == 'create_standby_tenant':
+        deploy_name = cmds[1]
+        tenant_name = cmds[2]
+    if kwargs.get('option_mode') == 'switchover_tenant':
+        deploy_name = cmds[0]
+        tenant_name = cmds[1]
     stdio = plugin_context.stdio
     visited_deployname_set = set()
     queue = Queue()

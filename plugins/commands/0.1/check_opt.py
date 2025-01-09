@@ -122,4 +122,5 @@ def check_opt(plugin_context, name, context, *args, **kwargs):
         stdio.error('{} not support. {} is allowed'.format(','.join(failed_components), deployed_components))
         return plugin_context.return_false()
     context.update(components=components, servers=list(servers), command_config=command_config)
-    return plugin_context.return_true(context=context)
+    plugin_context.set_variable('context', context)
+    return plugin_context.return_true()

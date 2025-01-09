@@ -2,3 +2,4 @@ PyMySQL==1.0.2
 pycryptodome==3.10.1
 bcrypt==4.0.0
 configparser>=5.2.0
+obshell

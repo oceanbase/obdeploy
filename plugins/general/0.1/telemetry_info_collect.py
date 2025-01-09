@@ -151,6 +151,8 @@ class DiskInfo:
         for _ in current_client.execute_command("df -h | awk '{if(NR>1)print}'").stdout.strip().split('\n'):
             _disk_info = {}
             _ = [i for i in _.split(' ') if i != '']
+            if len(_) < 5:
+                continue
             _disk_info['deviceName'] = _[0]
             _disk_info['total'] = _[1]
             _disk_info['used'] = _[2]
