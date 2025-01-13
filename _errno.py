@@ -1,22 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
-
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import, division, print_function
 
@@ -245,6 +240,10 @@ EC_OBC_MULTIPLE_SERVER_VIP_EMPTY_ERROR = OBDErrorCodeTemplate(4405, 'When you co
 
 # oblogproxy
 EC_OBLOGPROXY_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4501, 'OBLogProxy {oblogproxy_version} needs to use {comp} with version {comp_version} or above')
+
+# obbinlog
+EC_OBBINLOG_DEPENDS_COMP_MIN_VERSION = OBDErrorCodeTemplate(4601, 'OBBinlog {obbinlog_version} needs to use {comp} with version {min_version} or above.')
+EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER = OBDErrorCodeTemplate(4602, 'Deploy {target_oceanbase_deploy} need depends ob-configserver. You could use `obd cluster component add {target_oceanbase_deploy} -c <ob-configserver.config>` to add.')
 
 WC_PARAM_USELESS = OBDErrorCodeTemplate(4521, 'The config {key} in {current_comp} did not take effect, please config it in {comp}')
 

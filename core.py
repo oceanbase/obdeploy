@@ -1,22 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
-
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import, division, print_function
 
@@ -2102,6 +2097,7 @@ class ObdHome(object):
 
         update_deploy_status = True
         components = getattr(self.options, 'components', '')
+        sort_components = deploy.deploy_config.sorted_components
         if components:
             components = components.split(',')
             for component in components:
@@ -2110,8 +2106,10 @@ class ObdHome(object):
                     return False
             if len(components) != len(deploy_info.components):
                 update_deploy_status = False
+            sort_components_map = {value: index for index, value in enumerate(sort_components)}
+            components = sorted(components, key=lambda x: sort_components_map[x])
         else:
-            components = [repository.name for repository in repositories]
+            components = sort_components
 
         servers = getattr(self.options, 'servers', '')
         server_list = servers.split(',') if servers else []
@@ -2135,15 +2133,15 @@ class ObdHome(object):
         ssh_clients = self.get_clients(deploy_config, repositories)
 
         start_check_workflows = self.get_workflows('start_check')
-        if not self.run_workflow(start_check_workflows):
+        if not self.run_workflow(start_check_workflows, sorted_components=components):
             return False
 
         start_workflows = self.get_workflows('start', **{'new_clients': ssh_clients})
-        if not self.run_workflow(start_workflows):
+        if not self.run_workflow(start_workflows, sorted_components=components):
             return False
 
         display_workflows = self.get_workflows('display')
-        if not self.run_workflow(display_workflows):
+        if not self.run_workflow(display_workflows, sorted_components=components):
             return False
 
         if update_deploy_status:
@@ -2510,6 +2508,7 @@ class ObdHome(object):
         name = deploy.name
 
         components = getattr(self.options, 'components', '')
+        sort_components = deploy.deploy_config.sorted_components
         if components:
             components = components.split(',')
             dump = False
@@ -2517,8 +2516,10 @@ class ObdHome(object):
                 if component not in deploy_info.components:
                     self._call_stdio('error', 'No such component: %s' % component)
                     return False
+            sort_components_map = {value: index for index, value in enumerate(sort_components)}
+            components = sorted(components, key=lambda x: sort_components_map[x])
         else:
-            components = [repository.name for repository in repositories]
+            components = sort_components
 
         servers = getattr(self.options, 'servers', '')
         server_list = servers.split(',') if servers else []
@@ -2544,7 +2545,7 @@ class ObdHome(object):
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
         workflows = self.get_workflows('stop')
-        if not self.run_workflow(workflows):
+        if not self.run_workflow(workflows, sorted_components=components):
             return False
 
         if not dump:
@@ -3005,6 +3006,10 @@ class ObdHome(object):
                 if not component:
                     self._call_stdio('error', 'Specify the components you want to upgrade.')
                     return False
+
+            if const.COMP_OBBINLOG_CE in component:
+                self._call_stdio('error', 'The component %s is not support upgrade.' % const.COMP_OBBINLOG_CE)
+                return False
 
             for current_repository in repositories:
                 if current_repository.name == component:
@@ -5100,3 +5105,243 @@ class ObdHome(object):
             ret_pkgs = {'delete': delete_pkgs, 'cant_delete': cant_delete_pkgs}
 
         return ret_pkgs
+
+    def binlog_create_instance(self, binlog_deploy_name, ob_deploy_name, tenant_name):
+        # check tenant
+        if tenant_name == 'sys':
+            self._call_stdio('error', 'Creating binlog instance for the sys tenant is not support.')
+            return False
+
+        ob_deploy = self.get_deploy_with_allowed_status(ob_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not ob_deploy:
+            return False
+
+        binlog_deploy = self.get_deploy_with_allowed_status(binlog_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not binlog_deploy:
+            return False
+        self.set_deploy(binlog_deploy)
+
+        obproxy_deployname = getattr(self.options, 'obproxy_deployname', None)
+        if obproxy_deployname:
+            proxy_deploy = self.get_deploy_with_allowed_status(obproxy_deployname, DeployStatus.STATUS_RUNNING)
+            if not proxy_deploy:
+                return False
+        else:
+            proxy_deploy = ob_deploy
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        ob_cluster_repositories = self.load_local_repositories(ob_deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(ob_cluster_repositories, ob_deploy.deploy_config)
+        if obproxy_deployname:
+            proxy_cluster_repositories = self.load_local_repositories(proxy_deploy.deploy_info, False)
+            ob_cluster_repositories += proxy_cluster_repositories
+            self.search_param_plugin_and_apply(proxy_cluster_repositories, proxy_deploy.deploy_config)
+        binlog_deployed_repositories = self.load_local_repositories(binlog_deploy.deploy_info, False)
+        for repo in binlog_deployed_repositories:
+            if repo.name == const.COMP_OBBINLOG_CE:
+                break
+        else:
+            self._call_stdio('error', 'There must be "%s" component in deploy "%s".' % (const.COMP_OBBINLOG_CE, binlog_deploy_name))
+            return False
+        self.search_param_plugin_and_apply(binlog_deployed_repositories, binlog_deploy.deploy_config)
+        self.set_repositories(binlog_deployed_repositories)
+        self._call_stdio('stop_loading', 'succeed')
+
+        # check obproxy component
+        for repository in ob_cluster_repositories:
+            if repository.name in const.COMPS_ODP:
+                break
+        else:
+            self._call_stdio('error','There must be "obproxy" component in deploy "%s", or the options "proxy-cluster" needs to be provided.' % (ob_deploy_name))
+            return False
+
+
+        # create instance check
+        workflows = self.get_workflows('create_instance_check', no_found_act='ignore')
+        if not self.run_workflow(workflows, **{const.COMP_OBBINLOG_CE: {"tenant_name": tenant_name, "ob_deploy": ob_deploy, "proxy_deploy": proxy_deploy, "ob_cluster_repositories": ob_cluster_repositories}}):
+            return False
+
+        # create instance
+        workflows = self.get_workflows('create_instance', no_found_act='ignore')
+        if not self.run_workflow(workflows, **{const.COMP_OBBINLOG_CE: {"tenant_name": tenant_name, "ob_deploy": ob_deploy, "proxy_deploy": proxy_deploy, "ob_cluster_repositories": ob_cluster_repositories}}):
+            return False
+
+        return True
+
+    def show_binlog_instance(self, deploy_name):
+        deploy = self.get_deploy_with_allowed_status(deploy_name, DeployStatus.STATUS_RUNNING)
+        if not deploy:
+            return False
+        self.set_deploy(deploy)
+
+        ob_deploy = None
+        ob_deploy_name = getattr(self.options, 'deploy_name', None)
+        tenant_name = getattr(self.options, 'tenant_name', None)
+        if (not ob_deploy_name and tenant_name) or (ob_deploy_name and not tenant_name):
+            self._call_stdio('error', 'please specify `--deploy-name` and `--tenant-name` must be specified at the same time.')
+            return False
+
+        self._call_stdio('verbose', 'Deploy status judge')
+        if ob_deploy_name:
+            ob_deploy = self.get_deploy_with_allowed_status(ob_deploy_name, DeployStatus.STATUS_RUNNING)
+            if not ob_deploy:
+                return False
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        repositories = self.load_local_repositories(deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(repositories, deploy.deploy_config)
+        ob_repositories = None
+        if ob_deploy_name:
+            ob_repositories = self.load_local_repositories(ob_deploy.deploy_info, False)
+            self.search_param_plugin_and_apply(ob_repositories, ob_deploy.deploy_config)
+        self.set_repositories(repositories)
+        self._call_stdio('stop_loading', 'succeed')
+
+        for repo in repositories:
+            if repo.name == const.COMP_OBBINLOG_CE:
+                break
+        else:
+            self._call_stdio('error', 'There must be "%s" component in deploy "%s".' % (const.COMP_OBBINLOG_CE, deploy_name))
+            return False
+        if ob_repositories:
+            for repository in ob_repositories:
+                if repository.name in const.COMPS_OB:
+                    break
+            else:
+                self._call_stdio('error', 'There must be "oceanbase" component in deploy "%s".' % ob_deploy_name)
+                return False
+
+        workflows = self.get_workflows('show_binlog_instances', no_found_act='ignore', **{"tenant_name": tenant_name})
+        if not self.run_workflow(workflows, **{const.COMP_OBBINLOG_CE: {"tenant_name": tenant_name, "ob_deploy": ob_deploy, "ob_cluster_repositories": ob_repositories}}):
+            return False
+        return True
+
+    def start_binlog_instances(self, binlog_deploy_name, ob_deploy_name, tenant_name):
+        # check deploy name
+        ob_deploy = self.get_deploy_with_allowed_status(ob_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not ob_deploy:
+            return False
+
+        binlog_deploy = self.get_deploy_with_allowed_status(binlog_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not binlog_deploy:
+            return False
+        self.set_deploy(binlog_deploy)
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        binlog_deployed_repositories = self.load_local_repositories(binlog_deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(binlog_deployed_repositories, binlog_deploy.deploy_config)
+        self.set_repositories(binlog_deployed_repositories)
+        self._call_stdio('stop_loading', 'succeed')
+
+        ob_cluster_repositories = self.load_local_repositories(ob_deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(ob_cluster_repositories, ob_deploy.deploy_config)
+
+        for repo in binlog_deployed_repositories:
+            if repo.name == const.COMP_OBBINLOG_CE:
+                break
+        else:
+            self._call_stdio('error', 'There must be "%s" component in deploy "%s".' % (const.COMP_OBBINLOG_CE, binlog_deploy_name))
+            return False
+
+        for repository in ob_cluster_repositories:
+            if repository.name in const.COMPS_OB:
+                break
+        else:
+            self._call_stdio('error', 'There must be "oceanbase" component in deploy "%s".' % ob_deploy_name)
+            return False
+
+        workflows = self.get_workflows('instance_manager', no_found_act='ignore')
+        if not self.run_workflow(workflows, **{const.COMP_OBBINLOG_CE: {"tenant_name": tenant_name, "source_option": "start", "ob_deploy": ob_deploy, "ob_cluster_repositories": ob_cluster_repositories}}):
+            return False
+        return True
+
+    def stop_binlog_instances(self, binlog_deploy_name, ob_deploy_name, tenant_name):
+        # check deploy name
+        ob_deploy = self.get_deploy_with_allowed_status(ob_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not ob_deploy:
+            return False
+
+        binlog_deploy = self.get_deploy_with_allowed_status(binlog_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not binlog_deploy:
+            return False
+        self.set_deploy(binlog_deploy)
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        binlog_deployed_repositories = self.load_local_repositories(binlog_deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(binlog_deployed_repositories, binlog_deploy.deploy_config)
+        self.set_repositories(binlog_deployed_repositories)
+        self._call_stdio('stop_loading', 'succeed')
+
+        ob_cluster_repositories = self.load_local_repositories(ob_deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(ob_cluster_repositories, ob_deploy.deploy_config)
+
+        for repo in binlog_deployed_repositories:
+            if repo.name == const.COMP_OBBINLOG_CE:
+                break
+        else:
+            self._call_stdio('error', 'There must be "%s" component in deploy "%s".' % (const.COMP_OBBINLOG_CE, binlog_deploy_name))
+            return False
+
+        for repository in ob_cluster_repositories:
+            if repository.name in const.COMPS_OB:
+                break
+        else:
+            self._call_stdio('error', 'There must be "oceanbase" component in deploy "%s".' % ob_deploy_name)
+            return False
+
+        workflows = self.get_workflows('instance_manager', no_found_act='ignore')
+        if not self.run_workflow(workflows, **{const.COMP_OBBINLOG_CE: {"tenant_name": tenant_name, "source_option": "stop", "ob_deploy": ob_deploy, "ob_cluster_repositories": ob_cluster_repositories}}):
+            return False
+        return True
+
+    def drop_binlog_instances(self, binlog_deploy_name, ob_deploy_name, tenant_name):
+        # check deploy name
+        ob_deploy = self.get_deploy_with_allowed_status(ob_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not ob_deploy:
+            return False
+
+        binlog_deploy = self.get_deploy_with_allowed_status(binlog_deploy_name, DeployStatus.STATUS_RUNNING)
+        if not binlog_deploy:
+            return False
+        self.set_deploy(binlog_deploy)
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        binlog_deployed_repositories = self.load_local_repositories(binlog_deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(binlog_deployed_repositories, binlog_deploy.deploy_config)
+        self.set_repositories(binlog_deployed_repositories)
+        self._call_stdio('stop_loading', 'succeed')
+
+        ob_cluster_repositories = self.load_local_repositories(ob_deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(ob_cluster_repositories, ob_deploy.deploy_config)
+
+        for repo in binlog_deployed_repositories:
+            if repo.name == const.COMP_OBBINLOG_CE:
+                break
+        else:
+            self._call_stdio('error', 'There must be "%s" component in deploy "%s".' % (const.COMP_OBBINLOG_CE, binlog_deploy_name))
+            return False
+
+        for repository in ob_cluster_repositories:
+            if repository.name in const.COMPS_OB:
+                break
+        else:
+            self._call_stdio('error', 'There must be "oceanbase" component in deploy "%s".' % ob_deploy_name)
+            return False
+
+        workflows = self.get_workflows('instance_manager', no_found_act='ignore')
+        if not self.run_workflow(workflows, **{const.COMP_OBBINLOG_CE: {"tenant_name": tenant_name, "source_option": "drop", "ob_deploy": ob_deploy, "ob_cluster_repositories": ob_cluster_repositories}}):
+            return False
+        return True
+
+    def get_deploy_with_allowed_status(self, deploy_name, allowed_deploy_status):
+        deploy = self.deploy_manager.get_deploy_config(deploy_name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % deploy_name)
+            return None
+        deploy_info = deploy.deploy_info
+        self._call_stdio('verbose', 'Deploy status judge')
+        if deploy_info.status != allowed_deploy_status:
+            self._call_stdio('error', 'Deploy "%s" is %s. it needs to be %s.' % (deploy_name, deploy_info.status.value, allowed_deploy_status.value))
+            return None
+        return deploy
+

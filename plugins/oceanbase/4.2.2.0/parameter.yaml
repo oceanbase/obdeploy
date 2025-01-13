@@ -1953,3 +1953,16 @@
   need_restart: true
   description_en: password of observer cdcro user
   description_local: cdcro用户的密码
+- name: binlog_meta_tenant
+  require: false
+  type: DICT
+  default:
+    tenant_name: binlog
+    max_cpu: 1
+    memory_size: 2147483648
+    username: root
+    password: ''
+    database: binlog_database
+  need_redeploy: true
+  description_en: The tenant specifications for binlog meta db
+  description_local: binlog 的meta数据库使用的租户定义

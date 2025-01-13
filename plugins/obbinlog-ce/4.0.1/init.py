@@ -1,0 +1,91 @@
+# coding: utf-8
+# Copyright (c) 2025 OceanBase.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+from __future__ import absolute_import, division, print_function
+
+from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
+
+
+def init(plugin_context, *args, **kwargs):
+    def critical(*arg, **kwargs):
+        nonlocal global_ret
+        global_ret = False
+        stdio.error(*arg, **kwargs)
+
+    global_ret = True
+    cluster_config = plugin_context.cluster_config
+    clients = plugin_context.clients
+    deploy_name = plugin_context.deploy_name
+    stdio = plugin_context.stdio
+    force = getattr(plugin_context.options, 'force', False)
+    clean = getattr(plugin_context.options, 'clean', False)
+    stdio.start_loading('Initializes %s work home' % cluster_config.name)
+
+    for server in cluster_config.servers:
+        server_config = cluster_config.get_server_conf(server)
+        client = clients[server]
+        home_path = server_config['home_path']
+        binlog_dir = server_config.get('binlog_dir')
+        if not binlog_dir:
+            binlog_dir = '%s/run' % home_path
+        stdio.verbose('%s init cluster work home', server)
+        need_clean = force
+        if clean and not force:
+            if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
+                owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
+                global_ret = False
+                err_msg = ' {} is not empty, and the owner is {}'.format(home_path, owner)
+                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err_msg))
+                continue
+            need_clean = True
+
+        if need_clean:
+            remote_pid_path = "%s/run/%s-%s-%s.pid" % (home_path, cluster_config.name, server.ip, server_config['service_port'])
+            remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
+            if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
+                if client.execute_command('ls /proc/%s/fd' % remote_pid):
+                    stdio.verbose('%s %s[pid:%s] stopping ...' % (server, cluster_config.name, remote_pid))
+                    client.execute_command('kill -9 %s' % remote_pid)
+                else:
+                    stdio.verbose('failed to stop %s[pid:%s] in %s, permission deny' % (remote_pid, cluster_config.name, server))
+            else:
+                stdio.verbose('%s %s is not running' % (server, cluster_config.name))
+            ret = client.execute_command('rm -fr %s' % home_path, timeout=-1)
+            if not ret:
+                global_ret = False
+                stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=ret.stderr))
+                continue
+        else:
+            if client.execute_command('mkdir -p %s' % home_path):
+                ret = client.execute_command('ls %s' % (home_path))
+                if not ret or ret.stdout.strip():
+                    global_ret = False
+                    critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
+                    critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                    continue
+            else:
+                critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
+
+        if not client.execute_command("bash -c 'mkdir -p %s/{log,run}'" % home_path):
+            global_ret = False
+            stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=home_path)))
+        if not client.execute_command("bash -c 'mkdir -p %s'" % binlog_dir):
+            global_ret = False
+            stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='binlog dir', msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=binlog_dir)))
+
+    if global_ret:
+        stdio.stop_loading('succeed')
+        plugin_context.return_true()
+    else:
+        stdio.stop_loading('fail')

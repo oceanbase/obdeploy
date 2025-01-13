@@ -1,0 +1,24 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+obbinlog-ce:
+  servers:
+    - name: server1
+      ip: 192.168.0.1
+    - name: server2
+      ip: 192.168.0.2
+  version: 4.0.1
+  global:
+    home_path: /root/obbinlog-ce
+    service_port: 2983   # External port. The default value is 2983.
+    prometheus_port: 2984 # The Prometheus port. The default value is 2984.
+    meta_host: 192.168.0.3  #meta support ob/mysql
+    meta_port: 2883
+    meta_username: root@binlog # need tenant exist, if db is mysql, use root or other
+    meta_password: '******'
+    meta_db: binlog_database
+    #init_schema: true   # init meta db, default true

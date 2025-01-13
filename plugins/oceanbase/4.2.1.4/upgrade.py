@@ -1,22 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
-
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import, division, print_function
 
@@ -531,13 +526,20 @@ class Upgrader(object):
         repository = self.repositories[self.route_index]
         self.apply_param_plugin(repository)
         obshell_port_check_workflows = self.get_workflows('obshell_port_check', [repository])
-        if not self.run_workflow(obshell_port_check_workflows, repository, self.cluster_config, **{repository.name: {"upgrade_check": True}}):
+        upgrade_check = True
+        need_bootstrap = True
+        for repo in self.repositories[:self.route_index]:
+            if repo.version >= Version('4.2.1.4'):
+                upgrade_check = False
+                need_bootstrap = False
+                break
+        if not self.run_workflow(obshell_port_check_workflows, repository, self.cluster_config, **{repository.name: {"upgrade_check": upgrade_check}}):
             return False
         
         self.close()
         self._connect_plugin = self.search_py_script_plugin(self.route_index, 'connect')
         workflows = self.get_workflows('obshell_take_over', [repository])
-        return self.connect() and self.run_workflow(workflows, repository, self.cluster_config, **{repository.name: {"need_bootstrap": True}})
+        return self.connect() and self.run_workflow(workflows, repository, self.cluster_config, **{repository.name: {"need_bootstrap": need_bootstrap}})
 
 
 def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, unuse_lib_repository, get_workflows, run_workflow, *args, **kwargs):
