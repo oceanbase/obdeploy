@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -277,4 +276,4 @@ def start(plugin_context, *args, **kwargs):
     stdio.stop_loading('succeed')
     plugin_context.set_variable('servers_pid', servers_pid)
     time.sleep(1)
-    plugin_context.return_true(need_bootstrap=need_bootstrap)
+    return plugin_context.return_true(need_bootstrap=need_bootstrap)

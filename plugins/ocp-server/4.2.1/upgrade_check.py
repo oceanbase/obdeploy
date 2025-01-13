@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -22,9 +21,10 @@ import time
 
 import _errno as err
 from _rpm import Version
+from tool import Cursor
 
 
-def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_check_status=False, java_check=True, *args, **kwargs):
+def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', init_check_status=False, java_check=True, *args, **kwargs):
     def check_pass(item):
         status = check_status[server]
         if status[item].status == err.CheckStatus.WAIT:
@@ -59,6 +59,7 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
     plugin_context.set_variable('start_check_status', check_status)
+    start_env = plugin_context.get_variable('start_env')
 
     for server in cluster_config.servers:
         check_status[server] = {
@@ -105,7 +106,20 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
             stdio.error(e)
             error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
                   [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
-
+        if not meta_cursor:
+            server_config = start_env[server]
+            jdbc_url = server_config.get('jdbc_url', None)
+            if jdbc_url:
+                matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
+                if not matched:
+                    stdio.error('jdbc_url is not valid')
+                    return plugin_context.return_false()
+                host = matched.group(1)
+                port = matched.group(2)[1:]
+                meta_user = server_config['ocp_meta_username']
+                meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
+                meta_password = server_config['ocp_meta_password']
+                meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio)
         sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL', 'ABORTED');" % database
         if meta_cursor.fetchone(sql)['num'] > 0:
             success = False

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import os.path
@@ -171,6 +170,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
         if launch_user:
             res_home = client.execute_command("sudo chown -R %s %s" % (launch_user, home_path))
             res_log = client.execute_command("sudo chown -R %s %s" % (launch_user, log_dir))
+            client.execute_command('mkdir -p -m 775  %s' % soft_dir, timeout=-1)
             res_soft = client.execute_command("sudo chown -R %s %s" % (launch_user, soft_dir))
             if not (res_home and res_log and res_soft):
                 global_ret = False

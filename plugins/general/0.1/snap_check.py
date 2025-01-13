@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import hashlib
@@ -46,4 +45,4 @@ def snap_check(plugin_context, snap_config, env={}, *args, **kwargs):
             return 
     stdio.stop_loading('succeed')
 
-    plugin_context.return_true()
+    return plugin_context.return_true()

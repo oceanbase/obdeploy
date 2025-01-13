@@ -1,7 +1,6 @@
 # OceanBase Deployer
 
 <!--
-#
 # coding: utf-8
 # Copyright (c) 2025 OceanBase.
 #
@@ -16,7 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 -->
 
 <!-- TODO: some badges here -->
@@ -132,4 +130,4 @@ A：您可以使用 `obd update` 命令升级 OBD。当您升级完成后可以�
 
 ## 协议
 
-OBD 采用 [Apache-2.0](./LICENSE) 协议。
+OBD 采用 [GPL-3.0](./LICENSE) 协议。

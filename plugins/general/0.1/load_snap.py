@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import hashlib
@@ -81,4 +80,4 @@ done'''
         env['load_snap'] = True
 
     stdio.stop_loading('succeed')
-    plugin_context.return_true()
+    return plugin_context.return_true()

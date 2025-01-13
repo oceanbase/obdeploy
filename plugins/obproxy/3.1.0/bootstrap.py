@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 
@@ -36,6 +35,6 @@ def bootstrap(plugin_context, *args, **kwargs):
                 stdio.error('failed to set %s for obproxy(%s)' % (key, server))
                 global_ret = False
     if global_ret:
-        plugin_context.return_true()
+        return plugin_context.return_true()
     else:
-        plugin_context.return_false()
+        return plugin_context.return_false()

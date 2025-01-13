@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import _errno as err
@@ -33,7 +32,7 @@ def password_check(plugin_context, *args, **kwargs):
                     err.WC_PARAM_USELESS.format(key=key, current_comp=cluster_config.name, comp=comp),
                     [err.SUG_OB_SYS_PASSWORD.format()]
                 )
+            for server in cluster_config.servers:
+                check_pass(server, 'password')
             break
-    for server in cluster_config.servers:
-        check_pass(server, 'password')
     return plugin_context.return_true()

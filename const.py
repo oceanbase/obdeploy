@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 # OceanBase official website
 OB_OFFICIAL_WEBSITE = 'https://www.oceanbase.com/'
 
@@ -71,6 +70,14 @@ COMP_OBAGENT = 'obagent'
 
 # oblogproxy
 COMP_OBLOGPROXY = 'oblogproxy'
+
+# obbinlog
+COMP_OBBINLOG_CE = 'obbinlog-ce'
+BINLOG_INSTANCE_OPERATORS = ['start', 'stop', 'drop']
+BINLOG_INSTANCE_STATUS_OPERATORS_MAP = {
+    'start': 'Running',
+    'stop': 'Stop',
+}
 
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'

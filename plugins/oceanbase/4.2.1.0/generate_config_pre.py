@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import const
@@ -26,11 +25,11 @@ def generate_random_password(cluster_config, auto_depend):
     be_depend = cluster_config.be_depends
     added_components = {
         component: component in add_components
-        for component in const.COMPS_OB + const.COMPS_ODP + [const.COMP_OBAGENT, const.COMP_OBLOGPROXY]
+        for component in const.COMPS_OB + const.COMPS_ODP + [const.COMP_OBAGENT, const.COMP_OBLOGPROXY, const.COMP_OBBINLOG_CE]
     }
     be_depends = {
         component: (auto_depend or component in be_depend)
-        for component in const.COMPS_ODP + [const.COMP_OBAGENT, const.COMP_OBLOGPROXY]
+        for component in const.COMPS_ODP + [const.COMP_OBAGENT, const.COMP_OBLOGPROXY, const.COMP_OBBINLOG_CE]
     }
 
     if added_components[cluster_config.name] and 'root_password' not in global_config:
@@ -49,6 +48,12 @@ def generate_random_password(cluster_config, auto_depend):
 
     if added_components['oblogproxy'] and be_depends['oblogproxy'] and 'cdcro_password' not in global_config:
         cluster_config.update_global_conf('cdcro_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+
+    if added_components[const.COMP_OBBINLOG_CE] and be_depends[const.COMP_OBBINLOG_CE] and 'binlog_meta_tenant' not in global_config:
+        default_global_config = cluster_config.get_global_conf_with_default()
+        binlog_tenant = default_global_config.get('binlog_meta_tenant', {})
+        binlog_tenant['password'] = ConfigUtil.get_random_pwd_by_total_length(20)
+        cluster_config.update_global_conf('binlog_meta_tenant', binlog_tenant, False)
 
 
 def generate_config_pre(plugin_context, auto_depend=False, *args, **kwargs):

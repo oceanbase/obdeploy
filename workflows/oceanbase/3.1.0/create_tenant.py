@@ -13,12 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import const
 
 
 def create_tenant(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'scenario_check', 'connect', 'create_tenant', 'import_time_zone', 'tenant_optimize')
+    workflow.add(const.STAGE_FIRST, 'create_tenant_pre', 'scenario_check', 'connect', 'create_tenant', 'import_time_zone', 'tenant_optimize')
     plugin_context.return_true()

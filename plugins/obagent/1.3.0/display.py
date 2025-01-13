@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import absolute_import, division, print_function
 
 from tool import NetUtil
@@ -39,4 +38,4 @@ def display(plugin_context, cursor, *args, **kwargs):
         
     stdio.print_list(result, ['ip', 'mgragent_http_port', 'monagent_http_port', 'status'], 
         lambda x: [x['ip'], x['mgragent_http_port'], x['monagent_http_port'], x['status']], title=cluster_config.name)
-    plugin_context.return_true()
+    return plugin_context.return_true()

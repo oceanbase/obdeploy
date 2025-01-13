@@ -53,7 +53,7 @@ prometheus:
     #   - job_name: ob_extra
     #     basic_auth:
     #       username: admin
-    #       password: root
+    #       password: ********
     #     metrics_path: /metrics/ob/extra
     #     scheme: http
     #     file_sd_configs:

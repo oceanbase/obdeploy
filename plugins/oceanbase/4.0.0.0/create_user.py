@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import time
@@ -57,6 +56,8 @@ def create_user(plugin_context, create_tenant_options=[], cursor=None, scale_out
     cursor = plugin_context.get_return('connect', spacename=cluster_config.name).get_return('cursor') if not cursor else cursor
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
     if scale_out_component in const.COMPS_OCP_CE_AND_EXPRESS:
+        multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
+    if scale_out_component in ['obbinlog-ce']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     if not multi_options:
         multi_options = plugin_context.get_variable('create_tenant_options')

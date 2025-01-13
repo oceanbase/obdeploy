@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 def standby_version_check(plugin_context, repository, primary_repositories, *args, **kwargs):
     stdio = plugin_context.stdio
     if not primary_repositories:

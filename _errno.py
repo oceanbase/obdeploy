@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 from enum import Enum
@@ -241,6 +240,10 @@ EC_OBC_MULTIPLE_SERVER_VIP_EMPTY_ERROR = OBDErrorCodeTemplate(4405, 'When you co
 
 # oblogproxy
 EC_OBLOGPROXY_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4501, 'OBLogProxy {oblogproxy_version} needs to use {comp} with version {comp_version} or above')
+
+# obbinlog
+EC_OBBINLOG_DEPENDS_COMP_MIN_VERSION = OBDErrorCodeTemplate(4601, 'OBBinlog {obbinlog_version} needs to use {comp} with version {min_version} or above.')
+EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER = OBDErrorCodeTemplate(4602, 'Deploy {target_oceanbase_deploy} need depends ob-configserver. You could use `obd cluster component add {target_oceanbase_deploy} -c <ob-configserver.config>` to add.')
 
 WC_PARAM_USELESS = OBDErrorCodeTemplate(4521, 'The config {key} in {current_comp} did not take effect, please config it in {comp}')
 

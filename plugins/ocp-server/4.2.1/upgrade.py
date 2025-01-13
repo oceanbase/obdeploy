@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 from copy import copy
@@ -57,4 +56,6 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, run_wor
     start_kwargs['without_parameter'] = True
     if not run_workflow(start_workflows, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):
         return plugin_context.return_false()
+    upgrade_ctx = kwargs.get('upgrade_ctx')
+    upgrade_ctx['index'] += 1
     return plugin_context.return_true()

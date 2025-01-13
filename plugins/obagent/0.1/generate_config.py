@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 from tool import ConfigUtil
@@ -74,7 +73,7 @@ def generate_config(plugin_context, auto_depend=False, return_generate_keys=Fals
                     break
 
     stdio.stop_loading('succeed')
-    plugin_context.return_true()
+    return plugin_context.return_true()
 
 
 def generate_random_password(cluster_config):

@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -194,7 +193,7 @@ class ObdCommand(BaseCommand):
         version = version_fobj.read()
         if not COMMAND_ENV.get(ENV.ENV_OBD_ID):
             COMMAND_ENV.set(ENV.ENV_OBD_ID, uuid())
-        if VERSION != version:
+        if VERSION != version and BUILD_PLUGIN_LIST != '<B_PLUGIN_LIST>':
             for part in ['workflows', 'plugins', 'config_parser', 'optimize', 'mirror/remote']:
                 obd_part_dir = os.path.join(self.OBD_PATH, part)
                 root_part_path = os.path.join(self.OBD_INSTALL_PATH, part)
@@ -2196,6 +2195,103 @@ class ObdiagUpdateSceneCommand(ObdCommand):
         return obd.obdiag_offline_func("update_scene", self.opts)
 
 
+class BinlogCommand(MajorCommand):
+
+    def __init__(self):
+        super(BinlogCommand, self).__init__('binlog', 'binlog service tools')
+        self.register_command(BinlogCreateCommand())
+        self.register_command(BinlogStartCommand())
+        self.register_command(BinlogStopCommand())
+        self.register_command(BinlogShowCommand())
+        self.register_command(BinlogDropCommand())
+
+
+class BinlogCreateCommand(ObdCommand):
+
+    def __init__(self):
+        super(BinlogCreateCommand, self).__init__('create', 'Apply binlog to create instance')
+        self.parser.add_option('--replicate-num', type='int', help="Number of copies", default=1)
+        self.parser.add_option('-d', '--obproxy-deployname', '--odp', type='string', help='Obproxy deploy name')
+        self.parser.add_option('-p', '--cdcro-password', type='string', help='Password of user `cdcro`.If user already been created manually, you need to enter the password here.')
+
+    def init(self, cmd, args):
+        super(BinlogCreateCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <binlog deploy name>  <oceanbase deploy name> <ceanbase tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 3:
+            return obd.binlog_create_instance(self.cmds[0], self.cmds[1], self.cmds[2])
+        else:
+            return self._show_help()
+
+
+class BinlogShowCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(BinlogShowCommand, self).__init__('show', 'Show the list of binlog instances')
+        self.parser.add_option('-d', '--deploy-name', type='str', help="Oceanbase deploy name, must be entered together with `--tenant-name`")
+        self.parser.add_option('-t', '-n', '--tenant-name', type='str', help='Tenant name, must be entered together with `--deploy-name`')
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 1:
+            return obd.show_binlog_instance(self.cmds[0])
+        else:
+            return self._show_help()
+
+
+class BinlogStartCommand(ObdCommand):
+
+    def __init__(self):
+        super(BinlogStartCommand, self).__init__('start', 'Start binlog instance')
+
+    def init(self, cmd, args):
+        super(BinlogStartCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <binlog deploy name>  <oceanbase deploy name> <ceanbase tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 3:
+            return obd.start_binlog_instances(self.cmds[0], self.cmds[1], self.cmds[2])
+        else:
+            return self._show_help()
+
+
+class BinlogStopCommand(ObdCommand):
+
+    def __init__(self):
+        super(BinlogStopCommand, self).__init__('stop', 'Stop binlog instance')
+
+    def init(self, cmd, args):
+        super(BinlogStopCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <binlog deploy name>  <oceanbase deploy name> <ceanbase tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 3:
+            return obd.stop_binlog_instances(self.cmds[0], self.cmds[1], self.cmds[2])
+        else:
+            return self._show_help()
+
+
+class BinlogDropCommand(ObdCommand):
+
+    def __init__(self):
+        super(BinlogDropCommand, self).__init__('drop', 'Drop binlog instance')
+
+    def init(self, cmd, args):
+        super(BinlogDropCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <binlog deploy name>  <oceanbase deploy name> <ceanbase tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 3:
+            return obd.drop_binlog_instances(self.cmds[0], self.cmds[1], self.cmds[2])
+        else:
+            return self._show_help()
+
+
+
 class ToolListCommand(ObdCommand):
 
     def __init__(self):
@@ -2299,12 +2395,13 @@ class MainCommand(MajorCommand):
         self.register_command(TelemetryMajorCommand())
         self.register_command(ToolCommand())
         self.register_command(ObdiagCommand())
+        self.register_command(BinlogCommand())
         self.parser.version = '''OceanBase Deploy: %s
 REVISION: %s
 BUILD_BRANCH: %s
 BUILD_TIME: %s
-Copyright (c) 2025 OceanBase.
-Apache License, Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0>.
+Copyright (C) 2025 OceanBase
+License Apache 2.0: Apache version 2 or later <https://www.apache.org/licenses/LICENSE-2.0>.
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.''' % (VERSION, REVISION, BUILD_BRANCH, BUILD_TIME)
         self.parser._add_version_option()

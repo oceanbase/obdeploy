@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-
 def generate_config(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     stdio.verbose('Nothing to do for ob-configserver generate_config')

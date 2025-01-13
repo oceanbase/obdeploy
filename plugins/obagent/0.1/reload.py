@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -116,4 +115,4 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
         return plugin_context.return_true()
     else:
         stdio.stop_loading('fail')
-        return
+        return plugin_context.return_false()

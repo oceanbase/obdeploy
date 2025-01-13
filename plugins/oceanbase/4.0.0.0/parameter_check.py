@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -112,7 +111,7 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
                     if not client.execute_command("grep -e '^ *%s:' /proc/net/dev" % devname):
                         suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                         suggest.auto_fix = 'devname' not in global_generate_config and 'devname' not in server_generate_config
-                        success += critical('net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])
+                        success += critical(server, 'net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])
                 if devname not in interfaces:
                     interfaces[devname] = []
                 interfaces[devname].append(ip)

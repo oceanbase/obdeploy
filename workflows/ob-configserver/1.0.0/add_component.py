@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import const
@@ -27,10 +26,13 @@ def add_component(plugin_context, workflow, *args, **kwargs):
     repositories = plugin_context.repositories
     repository_names = [repository.name for repository in repositories]
     workflow.add_with_component(const.STAGE_FIRST, const.COMP_OB_CE if const.COMP_OB_CE in repository_names else const.COMP_OB, 'connect', 'configserver_pre', 'register_configserver')
+    has_obproxy = False
     for comp in const.COMPS_ODP:
         if comp in added_components:
             exist_obproxy = False
-    if exist_obproxy:
+        if comp in repository_names:
+            has_obproxy = True
+    if exist_obproxy and has_obproxy:
         workflow.add_with_component(const.STAGE_FIRST, const.COMP_ODP_CE if const.COMP_ODP_CE in repository_names else const.COMP_ODP,  'connect', 'parameter_pre', 'register_configserver')
 
     workflow.add(const.STAGE_THIRD, 'connect', 'display')

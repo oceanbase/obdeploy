@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
@@ -80,6 +79,7 @@ def init(plugin_context, *args, **kwargs):
             
     if global_ret:
         stdio.stop_loading('succeed')
-        plugin_context.return_true()
+        return plugin_context.return_true()
     else:
         stdio.stop_loading('fail')
+        return plugin_context.return_false()

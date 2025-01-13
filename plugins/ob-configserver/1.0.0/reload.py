@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-
 def reload(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     stdio.verbose('Nothing to do for ob-configserver reload')

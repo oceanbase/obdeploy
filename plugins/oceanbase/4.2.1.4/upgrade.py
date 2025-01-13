@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -527,13 +526,20 @@ class Upgrader(object):
         repository = self.repositories[self.route_index]
         self.apply_param_plugin(repository)
         obshell_port_check_workflows = self.get_workflows('obshell_port_check', [repository])
-        if not self.run_workflow(obshell_port_check_workflows, repository, self.cluster_config, **{repository.name: {"upgrade_check": True}}):
+        upgrade_check = True
+        need_bootstrap = True
+        for repo in self.repositories[:self.route_index]:
+            if repo.version >= Version('4.2.1.4'):
+                upgrade_check = False
+                need_bootstrap = False
+                break
+        if not self.run_workflow(obshell_port_check_workflows, repository, self.cluster_config, **{repository.name: {"upgrade_check": upgrade_check}}):
             return False
         
         self.close()
         self._connect_plugin = self.search_py_script_plugin(self.route_index, 'connect')
         workflows = self.get_workflows('obshell_take_over', [repository])
-        return self.connect() and self.run_workflow(workflows, repository, self.cluster_config, **{repository.name: {"need_bootstrap": True}})
+        return self.connect() and self.run_workflow(workflows, repository, self.cluster_config, **{repository.name: {"need_bootstrap": need_bootstrap}})
 
 
 def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, unuse_lib_repository, get_workflows, run_workflow, *args, **kwargs):

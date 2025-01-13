@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 
@@ -40,6 +39,7 @@ def change_repo(plugin_context, local_home_path, repository, *args, **kwargs):
     
     if global_ret:
         stdio.stop_loading('succeed')
-        plugin_context.return_true()
+        return plugin_context.return_true()
     else:
         stdio.stop_loading('failed')
+        return plugin_context.return_false()

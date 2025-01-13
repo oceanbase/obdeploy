@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import time
@@ -50,6 +49,8 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
     stdio = plugin_context.stdio
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
     if scale_out_component in ['ocp-server-ce', 'ocp-express']:
+        multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
+    if scale_out_component in ['obbinlog-ce']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     for options in multi_options:
         create_if_not_exists = get_option('create_if_not_exists', False)

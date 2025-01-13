@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import re
@@ -44,7 +43,6 @@ def bootstrap(plugin_context, cursor=None, *args, **kwargs):
             touch_path = os.path.join(home_path, 'run/.grafana')
             if client.execute_command("ls %s" % touch_path):
                 stdio.stop_loading('succeed')
-                plugin_context.return_true()
                 continue
             api_cursor = cursor.get(server)
             grafana_new_pwd = server_config['login_password']
@@ -68,5 +66,5 @@ def bootstrap(plugin_context, cursor=None, *args, **kwargs):
         return plugin_context.return_false()
     else:
         stdio.stop_loading('succeed')
-        plugin_context.return_true()
+        return plugin_context.return_true()
 

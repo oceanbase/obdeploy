@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import absolute_import, division, print_function
 import os
 from tool import OrderedDict
@@ -126,6 +125,7 @@ def init(plugin_context, *args, **kwargs):
 
     if global_ret:
         stdio.stop_loading('succeed')
-        plugin_context.return_true()
+        return plugin_context.return_true()
     else:
         stdio.stop_loading('fail')
+        return plugin_context.return_false()

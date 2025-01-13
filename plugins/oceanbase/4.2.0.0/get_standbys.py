@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 def get_ip_list(cursor, deploy_name, tenant, stdio):
     if not cursor:
         stdio.verbose("Connect to {} failed.".format(deploy_name))

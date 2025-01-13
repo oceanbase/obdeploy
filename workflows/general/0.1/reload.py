@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import const
 
 def reload(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'connect')
-    workflow.add(const.STAGE_SECOND, 'reload')
-    plugin_context.return_true()
+    stdio = plugin_context.stdio
+    cluster_config = plugin_context.cluster_config
+    stdio.print('Nothing to do for %s reload' % cluster_config.name)
+    return plugin_context.return_true()

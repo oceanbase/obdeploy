@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from service.handler.component_handler import ComponentHandler
 from service.handler.deployment_handler import DeploymentHandler
 from service.handler.service_info_handler import ServiceInfoHandler

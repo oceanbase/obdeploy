@@ -11,8 +11,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.
-### use to filter cases
+# limitations under the License.### use to filter cases
 ### regression name: c,cp,j,jp,o,op,slave,proxy
 
 #partition_range_test=["partition.ob_partition_hash_range", "partition.ndb_partition_range","partition.ob_partition_range", "partition.ob_partition_range_expr", "partition.ob_partition_trx", "partition.ob_partition_consistency", "partition.tc_partition_change_from_range_to_hash_key", "partition.partition_max_parts_range_innodb", "partition.ob_partition_hash_range", "partition.ob_partition_ddl", "partition.partition_max_sub_parts_range_innodb"]

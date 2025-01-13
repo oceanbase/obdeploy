@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -1008,3 +1007,36 @@ def confirm_port(client, pid, port):
 def set_plugin_context_variables(plugin_context, variable_dict):
     for key, value in variable_dict.items():
         plugin_context.set_variable(key, value)
+
+
+def get_disk_info(all_paths, client, stdio):
+    overview_ret = True
+    disk_info = get_disk_info_by_path('', client, stdio)
+    if not disk_info:
+        overview_ret = False
+        disk_info = get_disk_info_by_path('/', client, stdio)
+        if not disk_info:
+            disk_info['/'] = {'total': 0, 'avail': 0, 'need': 0, 'threshold': 2}
+    all_path_success = {}
+    for path in all_paths:
+        all_path_success[path] = False
+        cur_path = path
+        while cur_path not in disk_info:
+            disk_info_for_current_path = get_disk_info_by_path(cur_path, client, stdio)
+            if disk_info_for_current_path:
+                disk_info.update(disk_info_for_current_path)
+                all_path_success[path] = True
+                break
+            else:
+                cur_path = os.path.dirname(cur_path)
+    if overview_ret or all(all_path_success.values()):
+        return disk_info
+
+def get_disk_info_by_path(path, client, stdio):
+    disk_info = {}
+    ret = client.execute_command('df --block-size=1024 {}'.format(path))
+    if ret:
+        for total, used, avail, puse, path in re.findall(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
+            disk_info[path] = {'total': int(total) << 10, 'avail': int(avail) << 10, 'need': 0, 'threshold': 2}
+            stdio.verbose('get disk info for path {}, total: {} avail: {}'.format(path, disk_info[path]['total'], disk_info[path]['avail']))
+    return disk_info
