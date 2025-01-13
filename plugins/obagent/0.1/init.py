@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -28,6 +24,8 @@ def init(plugin_context, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     deploy_name = plugin_context.deploy_name
+    kill_cmd = plugin_context.get_variable('kill_cmd')
+    mkdir_keys = plugin_context.get_variable('mkdir_keys')
     global_ret = True
     force = getattr(plugin_context.options, 'force', False)
     clean = getattr(plugin_context.options, 'clean', False)
@@ -48,7 +46,7 @@ def init(plugin_context, *args, **kwargs):
             need_clean = True
 
         if need_clean:
-            client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/monagent -c conf/monagent.yaml'" % home_path)
+            client.execute_command(kill_cmd % home_path)
             if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):
                 owner = client.execute_command("ls -ld %s | awk '{print $3}'" % home_path).stdout.strip()
                 global_ret = False
@@ -58,7 +56,6 @@ def init(plugin_context, *args, **kwargs):
             need_clean = True
 
         if need_clean:
-            client.execute_command("pkill -9 -u `whoami` -f '^%s/bin/monagent -c conf/monagent.yaml'" % home_path)
             ret = client.execute_command('rm -fr %s' % home_path, timeout=-1)
             if not ret:
                 global_ret = False
@@ -77,7 +74,7 @@ def init(plugin_context, *args, **kwargs):
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=home_path)))
                 continue
 
-        if not client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib,conf,log}'" % home_path):
+        if not client.execute_command(mkdir_keys % home_path):
             global_ret = False
             stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.PATH_ONLY.format(path=home_path)))
             

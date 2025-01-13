@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2023 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -37,11 +33,8 @@ def takeover_precheck(plugin_context, cursors=None, *args, **kwargs):
     try:
         # init variables, include get obcluster info from deploy config
         cluster_config = plugin_context.cluster_config
-        clients = plugin_context.clients
-        options = plugin_context.options
         stdio = plugin_context.stdio
-        stdio.verbose(vars(cluster_config))
-        cursors = plugin_context.get_return('connect').get_return('cursor') if not cursors else cursors
+        cursors = plugin_context.get_return('takeover_connect').get_return('cursor') if not cursors else cursors
         cursor = cursors[cluster_config.servers[0]]
         ocp_info = cursor.info(stdio=stdio)
         stdio.verbose("get ocp info %s", ocp_info)
@@ -64,5 +57,6 @@ def takeover_precheck(plugin_context, cursors=None, *args, **kwargs):
         stdio.verbose("precheck result %s" % precheck_result)
         return plugin_context.return_true(ocp_version=ocp_version)
     except Exception as ex:
+        stdio.exception('')
         stdio.error("do takeover precheck got exception:%s", ex)
         return plugin_context.return_false()

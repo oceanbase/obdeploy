@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -42,7 +38,7 @@ def file_path_check(bin_path, tool_name, tool_path, cmd):
     return path, None
 
 
-def pre_test(plugin_context, cursor, *args, **kwargs):
+def pre_test(plugin_context, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if value is None:
@@ -54,8 +50,12 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     options = plugin_context.options
 
+    sys_namespace = kwargs.get("sys_namespace")
+    get_db_and_cursor = kwargs.get("get_db_and_cursor")
+    db, cursor = get_db_and_cursor(sys_namespace)
+
     host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
+    port = db.port if db else 2881
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test')
@@ -107,12 +107,14 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
             stdio.error("Illegal characters in threads: %s" % thread)
             return
 
-    sql = "select * from oceanbase.gv$tenant where tenant_name = %s"
-    tenant_meta = cursor.fetchone(sql, [tenant_name])
+    query_tenant_sql = plugin_context.get_variable("tenant_sql")
+    stdio.verbose('execute sql: %s' % (query_tenant_sql % tenant_name))
+    tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
     if not tenant_meta:
         stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
         return
-    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta['tenant_id']
+    tenant_id = plugin_context.get_variable("tenant_id")
+    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta[tenant_id]
     pool = cursor.fetchone(sql)
     if pool is False:
         return
@@ -137,7 +139,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     if ret:
         server_num = ret.get("server_num", server_num)
     return plugin_context.return_true(
-        max_cpu=max_cpu, threads=threads, Capacity=Capacity, tenant=tenant_name, tenant_id=tenant_meta['tenant_id'],
+        max_cpu=max_cpu, threads=threads, Capacity=Capacity, tenant=tenant_name, tenant_id=tenant_meta[tenant_id],
         format_size=Capacity, server_num=server_num, obclient_bin=obclient_bin, host=host, port=port, user=user,
         password=password, database=mysql_db
     )

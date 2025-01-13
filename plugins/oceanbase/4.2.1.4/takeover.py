@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -29,6 +25,7 @@ from  _mirror import get_use_centos_release
 from _deploy import DeployStatus, DeployConfigStatus
 from ssh import LocalClient
 from _types import CapacityMB
+from _rpm import Version
 
 
 stdio = None
@@ -73,7 +70,7 @@ def format_server(ip, port):
     return '{}_{}'.format(ip, port)
 
 
-def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwargs):
+def takeover(plugin_context, cursor='', *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -89,7 +86,18 @@ def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwar
     stdio = plugin_context.stdio
     stdio.start_loading('Takeover precheck')
     clients = plugin_context.clients
-    cursor = kwargs.get('cursor')
+    cmds = plugin_context.cmds
+    name = cmds[0] if cmds else plugin_context.cluster_config.deploy_name
+    obd_home = kwargs.get('obd_home')
+    user_config = kwargs.get('user_config')
+
+    ret = cursor.fetchone('select version() as version', raise_exception=True)
+    if ret is False:
+        return False
+    version = ret.get("version").split("-v")[-1]
+    if Version(version) < Version('4.2.1.4'):
+        return error('The current OceanBase does not support takeover, the version is less than 4.2.1.4.')
+
     available_sql = "show databases"
     available = exec_sql(available_sql, cursor, exec_type='fetchone', raise_exception=False)
     if not available:
@@ -100,7 +108,7 @@ def takeover(plugin_context, user_config={}, name='', obd_home='', *args, **kwar
     check_ocs_sql = "show databases like 'ocs'"
     ocs = exec_sql(check_ocs_sql, cursor, exec_type='fetchone', raise_exception=True)
     if not ocs:
-        stdio.error('The current OceanBase does not support takeover, OCS is not installed.')
+        stdio.error('The current OceanBase does not support takeover, OBShell is not installed.')
         stdio.stop_loading('fail')
         return plugin_context.return_false()
 

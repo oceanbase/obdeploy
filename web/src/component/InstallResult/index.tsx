@@ -568,13 +568,13 @@ const InstallResult: React.FC<InstallResultProps> = ({
             <Space>
               {type === 'update'
                 ? intl.formatMessage({
-                  id: 'OBD.component.InstallResult.UpgradeLogs',
-                  defaultMessage: '升级日志',
-                })
+                    id: 'OBD.component.InstallResult.UpgradeLogs',
+                    defaultMessage: '升级日志',
+                  })
                 : intl.formatMessage({
-                  id: 'OBD.component.InstallResult.DeploymentLogs',
-                  defaultMessage: '部署日志',
-                })}
+                    id: 'OBD.component.InstallResult.DeploymentLogs',
+                    defaultMessage: '部署日志',
+                  })}
               <span
                 style={{
                   cursor: 'pointer',
@@ -713,7 +713,7 @@ const InstallResult: React.FC<InstallResultProps> = ({
                   icon: <ExclamationCircleOutlined />,
                   content: intl.formatMessage({
                     id: 'OBD.component.InstallResult.ReinstallationWillFirstCleanUp',
-                    defaultMessage: '重新安装将先清理失败的 OCP 安装环境',
+                    defaultMessage: '重新安装将会清理失败的 OCP 安装环境',
                   }),
                   okText: intl.formatMessage({
                     id: 'OBD.component.InstallResult.Ok',

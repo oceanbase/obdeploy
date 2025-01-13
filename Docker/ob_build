@@ -1,0 +1,76 @@
+#!/bin/bash
+set -x
+set -e
+
+if [ $# -lt 4 ]; then
+    echo "no enough parameters. Please provide project_name, version and release."
+    exit 1
+fi
+
+# Get system release
+os_release=$(grep -Po '(?<=^ID=")[^"]*' /etc/os-release || true)
+
+if [ -z "$os_release" ]; then
+    os_release=$(grep -Po '^ID=\K[^ ]+' /etc/os-release)
+fi
+
+set +e
+source /etc/profile
+set -e
+
+project_dir=$1
+project_name=$2
+version=$3
+release=$4
+rpm_work_dir=${5:-rpm}
+ob_build_script=${project_name}-build.sh
+ob_build_spec=${project_name}.spec
+ob_build_deps=${project_name}.deps
+cur_dir=`pwd`
+echo "cur dir: $cur_dir"
+# check rpm work dir
+if [ ! -d "${cur_dir}/${rpm_work_dir}" ]; then
+    echo "rpm work dir (${rpm_work_dir}) missing! Please create ${rpm_work_dir} in source code dir and place the packaging related files in the ${rpm_work_dir} dir."
+    exit 1
+fi
+
+# trigger building
+echo "trigger building, current dir: "
+pwd
+cd $rpm_work_dir
+ABS_PATH=`pwd`
+
+if [[ x"$os_release" == x"alios" && x"$AONE_COMPATIBLE_AUTO_DEP_CREATE" == x"on" ]]; then
+    if [ -e "$ob_build_deps" ]; then
+        echo "execute dep_create for alios"
+        dep_create $ob_build_deps
+        echo "execute sw for alios"
+        sw
+    fi
+fi
+
+if [ -e "$ob_build_script" ]; then
+    bash $ob_build_script $project_dir $project_name $version $release
+elif [ -e "$ob_build_spec" ]; then
+    if [[ x"$os_release" == x"alios" ]]; then
+        rpm_create $ob_build_spec -v $version -r $release
+    else
+        TOP_DIR=".rpm_create"
+        RPM_MACROS=$HOME/.rpmmacros
+        if [ -e $RPM_MACROS ]; then
+            mv -f $RPM_MACROS $RPM_MACROS.bak
+        fi
+
+        # prepare rpm build dirs
+        mkdir -p $TOP_DIR/BUILD
+        mkdir -p $TOP_DIR/RPMS
+        mkdir -p $TOP_DIR/SRPMS
+
+        echo "%_topdir $ABS_PATH/$TOP_DIR" > $RPM_MACROS
+        rpmbuild -bb $ob_build_spec
+        find $TOP_DIR/ -name "*.rpm"  -exec mv {} . 2>/dev/null \;
+    fi
+else
+    echo "packaging files missing! Please provide $ob_build_script or $ob_build_spec"
+    exit 1
+fi

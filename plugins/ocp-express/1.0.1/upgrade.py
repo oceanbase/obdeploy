@@ -1,29 +1,27 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
 
+from copy import copy
+
 from tool import ConfigUtil
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, run_workflow, get_workflows, *args, **kwargs):
     namespace = plugin_context.namespace
     namespaces = plugin_context.namespaces
     deploy_name = plugin_context.deploy_name
@@ -45,13 +43,14 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
     repository_dir = dest_repository.repository_dir
     kwargs['repository_dir'] = repository_dir
 
-    stop_plugin = search_py_script_plugin([cur_repository], 'stop')[cur_repository]
-    start_plugin = search_py_script_plugin([dest_repository], 'start')[dest_repository]
+
+    start_workflows = get_workflows("upgrade_start", repositories=[dest_repository])
+    stop_workflows = get_workflows("stop", repositories=[cur_repository])
     connect_plugin = search_py_script_plugin([dest_repository], 'connect')[dest_repository]
     display_plugin = search_py_script_plugin([dest_repository], 'display')[dest_repository]
 
     apply_param_plugin(cur_repository)
-    if not stop_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs):
+    if not run_workflow(stop_workflows, repositories=[cur_repository], **kwargs):
         return
     install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
     apply_param_plugin(dest_repository)
@@ -73,8 +72,9 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
         password = ConfigUtil.get_random_pwd_by_rule()
         cluster_config.update_global_conf(key, password)
 
-
-    if not start_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, need_bootstrap=True, *args, **kwargs):
+    start_kwargs = copy(kwargs)
+    start_kwargs['bootstrap'] = True
+    if not run_workflow(start_workflows, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):
         return 
     
     ret = connect_plugin(namespace, namespaces, deploy_name, deploy_status, repositories, components, clients, cluster_config, cmds, options, stdio, *args, **kwargs)

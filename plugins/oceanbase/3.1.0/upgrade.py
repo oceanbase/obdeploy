@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -64,8 +60,10 @@ class Exector(BaseExector):
 
 class Upgrader(object):
 
-    def __init__(self, plugin_context, search_py_script_plugin, apply_param_plugin, upgrade_ctx, upgrade_repositories, local_home_path, exector_path, install_repository_to_servers, unuse_lib_repository):
+    def __init__(self, plugin_context, search_py_script_plugin, apply_param_plugin, upgrade_ctx, upgrade_repositories, local_home_path, exector_path, install_repository_to_servers, unuse_lib_repository, get_workflows, run_workflow):
         self._search_py_script_plugin = search_py_script_plugin
+        self._run_workflow = run_workflow
+        self.get_workflows = get_workflows
         self.apply_param_plugin = apply_param_plugin
         self.plugin_context = plugin_context
         self.components = plugin_context.components
@@ -73,9 +71,9 @@ class Upgrader(object):
         self.cluster_config = plugin_context.cluster_config
         self.stdio = plugin_context.stdio
         self._connect_plugin = None
-        self._start_plugin = None
-        self._stop_plugin = None
         self._display_plugin = None
+        self._start_workflows = None
+        self._stop_workflows = None
         self.install_repository_to_servers = install_repository_to_servers
         self.unuse_lib_repository = unuse_lib_repository
         self.local_home_path = local_home_path
@@ -112,23 +110,29 @@ class Upgrader(object):
         repository = self.repositories[index]
         return self._search_py_script_plugin([repository], name)[repository]
 
+    def run_workflow(self, workflows, repository, cluster_config, **kwargs):
+        if not kwargs.get(repository.name):
+            kwargs[repository.name] = dict()
+        kwargs[repository.name]["cluster_config"] = cluster_config
+        return self._run_workflow(workflows, repositories=[repository], **kwargs)
+
+    @property
+    def start_workflows(self):
+        if self._start_workflows is None:
+            self._start_workflows = self.get_workflows('upgrade_start', [self.repositories[self.next_stage]])
+        return self._start_workflows
+
+    @property
+    def stop_workflows(self):
+        if self._stop_workflows is None:
+            self._stop_workflows = self.get_workflows('stop', [self.repositories[self.route_index - 1]])
+        return self._stop_workflows
+
     @property
     def connect_plugin(self):
         if self._connect_plugin is None:
             self._connect_plugin = self.search_py_script_plugin(self.route_index - 1, 'connect')
         return self._connect_plugin
-
-    @property
-    def start_plugin(self):
-        if self._start_plugin is None:
-            self._start_plugin = self.search_py_script_plugin(self.next_stage, 'start')
-        return self._start_plugin
-
-    @property
-    def stop_plugin(self):
-        if self._stop_plugin is None:
-            self._stop_plugin = self.search_py_script_plugin(self.route_index - 1, 'stop')
-        return self._stop_plugin
 
     @property
     def display_plugin(self):
@@ -138,8 +142,8 @@ class Upgrader(object):
 
     def _clear_plugin(self):
         self._connect_plugin = None
-        self._start_plugin = None
-        self._stop_plugin = None
+        self._start_workflows = None
+        self._stop_workflows = None
         self._display_plugin = None
 
     def call_plugin(self, plugin, *args, **kwargs):
@@ -153,7 +157,8 @@ class Upgrader(object):
         self.apply_param_plugin(self.repositories[self.route_index - 1])
         while self.route_index < total:
             setattr(self.plugin_context.options, 'without_parameter', True)
-            self.call_plugin(self.start_plugin, local_home_path=None, repository_dir=None)
+            start_workflows = self.get_workflows('upgrade_start', [self.repositories[self.route_index - 1]])
+            self.run_workflow(start_workflows, self.repositories[self.route_index - 1], self.cluster_config, **{self.repositories[self.route_index].name: {"local_home_path": None, "repository_dir": None}})
             self.close()
             if not self.connect():
                 return False
@@ -359,12 +364,12 @@ class Upgrader(object):
         repository_dir = repository.repository_dir
         self.install_repository_to_servers(self.components, self.cluster_config, repository, self.clients,
                                            self.unuse_lib_repository)
-        if not self.call_plugin(self.stop_plugin):
+        if not self.run_workflow(self.stop_workflows, self.repositories[self.route_index - 1], self.cluster_config):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
 
         self.apply_param_plugin(repository)
-        if not self.call_plugin(self.start_plugin, local_home_path=self.local_home_path, repository_dir=repository_dir):
+        if not self.run_workflow(self.start_workflows, repository, self.cluster_config, **{repository.name: {"local_home_path": self.local_home_path, "repository_dir": repository_dir}}):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
         self.close()
@@ -410,12 +415,12 @@ class Upgrader(object):
 
             if pre_zone:
                 self.apply_param_plugin(self.repositories[self.route_index - 1])
-            if not self.call_plugin(self.stop_plugin):
+            if not self.run_workflow(self.stop_workflows, self.repositories[self.route_index - 1], self.cluster_config):
                 self.stdio.stop_loading('stop_loading', 'fail')
                 return False
 
             self.apply_param_plugin(repository)
-            if not self.call_plugin(self.start_plugin, local_home_path=self.local_home_path, repository_dir=repository_dir):
+            if not self.run_workflow(self.start_workflows, repository, self.cluster_config, **{repository.name: {"local_home_path": self.local_home_path, "repository_dir": repository_dir}}):
                 self.stdio.stop_loading('stop_loading', 'fail')
                 return False
             self.close()
@@ -458,7 +463,7 @@ class Upgrader(object):
         return self._exec_script_dest_only('upgrade_post_checker.py')
 
 
-def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, unuse_lib_repository, *args, **kwargs):
+def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install_repository_to_servers, unuse_lib_repository, get_workflows, run_workflow, *args, **kwargs):
 
     upgrade_ctx = kwargs.get('upgrade_ctx')
     local_home_path = kwargs.get('local_home_path')
@@ -474,7 +479,10 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
         local_home_path=local_home_path,
         exector_path=exector_path,
         install_repository_to_servers=install_repository_to_servers,
-        unuse_lib_repository=unuse_lib_repository)
+        unuse_lib_repository=unuse_lib_repository,
+        get_workflows=get_workflows,
+        run_workflow=run_workflow
+        )
     if upgrader.run():
         if upgrader.route_index >= len(upgrader.route):
             upgrader.call_plugin(upgrader.display_plugin, upgrader.cursor, *args, **kwargs)

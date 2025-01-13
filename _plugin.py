@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -76,6 +72,10 @@ class PluginContextNamespace:
         self.spacename = spacename
         self._variables = {}
         self._return = {}
+
+    @property
+    def all_plugin_ret(self):
+        return self._return
 
     @property
     def variables(self):
@@ -198,9 +198,6 @@ class SubIO(object):
         self.stdio = getattr(stdio, 'sub_io', lambda: None)()
         self._func = {}
 
-    def __del__(self):
-        self.before_close()
-
     def _temp_function(self, *arg, **kwargs):
         pass
 
@@ -262,6 +259,9 @@ class ScriptPlugin(Plugin):
 
     def after_do(self, stdio, *arg, **kwargs):
         self._export(stdio)
+        if self.context.stdio.sync_obj:
+            self.context.stdio.warn("%s has animation not been closed" % self)
+        del self.context.stdio
         self.context = None
 
 
@@ -384,6 +384,7 @@ class Null(object):
 
     def __init__(self):
         pass
+
 
 class ParamPlugin(Plugin):
 
@@ -807,13 +808,14 @@ class InstallPlugin(Plugin):
 class ComponentPluginLoader(object):
 
     PLUGIN_TYPE = None
+    MODULE_NAME = __name__
 
     def __init__(self, home_path, plugin_type=PLUGIN_TYPE, dev_mode=False, stdio=None):
         if plugin_type:
             self.PLUGIN_TYPE = plugin_type
         if not self.PLUGIN_TYPE:
             raise NotImplementedError
-        self.plguin_cls = getattr(sys.modules[__name__], self.PLUGIN_TYPE.value, False)
+        self.plguin_cls = getattr(sys.modules[self.MODULE_NAME], self.PLUGIN_TYPE.value, False)
         if not self.plguin_cls:
             raise ImportError(self.PLUGIN_TYPE.value)
         self.dev_mode = dev_mode

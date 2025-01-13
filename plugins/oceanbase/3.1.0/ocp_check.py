@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -24,10 +20,16 @@ from _rpm import Version
 from _deploy import InnerConfigItem
 
 
-def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_clients=None, *args, **kwargs):
+def ocp_check(plugin_context, cursor, *args, **kwargs):
+    cluster_config = plugin_context.cluster_config
+    new_deploy_config = kwargs.get('new_deploy_config')
+    new_cluster_config = new_deploy_config.components.get(cluster_config.name) if new_deploy_config else None
     cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
+    new_clients = kwargs.get('new_clients')
     clients = new_clients if new_clients else plugin_context.clients
     stdio = plugin_context.stdio
+    ocp_version = plugin_context.get_return('takeover_precheck', spacename='ocp-server-ce').get_return('ocp_version') if not kwargs.get('ocp_version', '') else kwargs.get('ocp_version')
+
     
     is_admin = True
     can_sudo = True
@@ -87,4 +89,4 @@ def ocp_check(plugin_context, ocp_version, cursor, new_cluster_config=None, new_
     # if ocp version is greater than 4.2.0, then admin and zone idc check is not needed
     if can_sudo and only_one and pwd_not_empty and is_admin and not zones:
         stdio.print('Configurations of the %s can be taken over by OCP after they take effect.' % cluster_config.name if new_cluster_config else 'Configurations of the %s can be taken over by OCP.' % cluster_config.name)
-        return plugin_context.return_true()
+    return plugin_context.return_true()

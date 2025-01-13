@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import copy
 import os
 import time
@@ -44,9 +40,8 @@ from _repository import Repository
 from _plugin import PluginType
 from ssh import SshClient, SshConfig, LocalClient
 from tool import Cursor
-from const import COMP_JRE, COMPS_OCP
+from const import COMP_JRE, COMPS_OCP, COMP_OCP_SERVER_CE, TELEMETRY_COMPONENT_OCP, COMP_OB_CE
 from tool import COMMAND_ENV
-from const import TELEMETRY_COMPONENT_OCP
 from _environ import ENV_TELEMETRY_REPORTER
 
 
@@ -401,16 +396,14 @@ class OcpHandler(BaseHandler):
         self.obd.search_param_plugin_and_apply(repositories, deploy_config)
         self.obd.set_repositories(repositories)
 
-        start_check_plugins = self.obd.search_py_script_plugin(repositories, 'start_check', no_found_act='warn')
-        log.get_logger().debug('start_check plugins: %s' % start_check_plugins)
-        self._precheck(app_name, repositories, start_check_plugins, init_check_status=True)
+        self._precheck(app_name, repositories, init_check_status=True)
         info = task_manager.get_task_info(app_name, task_type="ocp_precheck")
         if info is not None and info.exception is not None:
             exception = copy.deepcopy(info.exception)
             info.exception = None
             raise exception
         task_manager.del_task_info(app_name, task_type="ocp_precheck")
-        background_tasks.add_task(self._precheck, app_name, repositories, start_check_plugins, init_check_status=False)
+        background_tasks.add_task(self._precheck, app_name, repositories, init_check_status=False)
         self.context['ocp_deployment']['task_id'] = self.context['ocp_deployment']['task_id'] + 1 if self.context['ocp_deployment']['task_id'] else 1
         log.get_logger().info('task id: %d' % self.context['ocp_deployment']['task_id'])
         task_status = TaskStatus.RUNNING.value
@@ -432,23 +425,28 @@ class OcpHandler(BaseHandler):
         return check_status
 
     @auto_register('ocp_precheck')
-    def _precheck(self, name, repositories, start_check_plugins, init_check_status=False):
+    def _precheck(self, name, repositories, init_check_status=False):
         if init_check_status:
-            self._init_precheck(repositories, start_check_plugins)
+            self._init_precheck(repositories)
         else:
-            self._do_precheck(repositories, start_check_plugins)
+            self._do_precheck(repositories)
 
-    def _init_precheck(self, repositories, start_check_plugins):
+    def _init_precheck(self, repositories):
         log.get_logger().info('init precheck')
         param_check_status = {}
         servers_set = set()
+
+        self.obd.ssh_clients = {}
+        kwargs = {repository.name: {'clients': {}} for repository in repositories}
+        init_check_status_workflows = self.obd.get_workflows('init_check_status', no_found_act='ignore', repositories=repositories)
+        workflows_ret = self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore', repositories=repositories, **kwargs)
+
         for repository in repositories:
-            if repository not in start_check_plugins:
+            if not self.obd.namespaces.get(repository.name):
                 continue
+            if not workflows_ret and self.obd.namespaces.get(repository.name).get_return('exception'):
+                raise self.obd.namespaces.get(repository.name).get_return('exception')
             repository_status = {}
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=True, work_dir_check=True, clients={})
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
             servers = self.obd.deploy.deploy_config.components.get(repository.name).servers
             for server in servers:
                 repository_status[server] = {'param': CheckStatus()}
@@ -462,7 +460,8 @@ class OcpHandler(BaseHandler):
         self.context['ocp_deployment']['connect_check_status'] = {'ssh': server_connect_status}
         self.context['ocp_deployment']['servers_set'] = servers_set
 
-    def _do_precheck(self, repositories, start_check_plugins):
+    def _do_precheck(self, repositories):
+        self.context['ocp_deployment_ssh'][self.context['id']] = 'success'
         log.get_logger().info('start precheck')
         log.get_logger().info('ssh check')
         ssh_clients, connect_status = self.obd.get_clients_with_connect_status(self.obd.deploy.deploy_config, repositories, fail_exit=False)
@@ -475,11 +474,8 @@ class OcpHandler(BaseHandler):
                 log.get_logger().info('ssh check failed')
                 return
         log.get_logger().info('ssh check succeed')
-        gen_config_plugins = self.obd.search_py_script_plugin(repositories, 'generate_config')
-        if len(repositories) != len(gen_config_plugins):
-            raise Exception("param_check: config error, check stop!")
 
-        param_check_status, check_pass = self.obd.deploy_param_check_return_check_status(repositories, self.obd.deploy.deploy_config, gen_config_plugins=gen_config_plugins)
+        param_check_status, check_pass = self.obd.deploy_param_check_return_check_status(repositories, self.obd.deploy.deploy_config)
         param_check_status_result = {}
         for comp_name in param_check_status:
             status_res = param_check_status[comp_name]
@@ -492,37 +488,45 @@ class OcpHandler(BaseHandler):
             return
 
         components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
-        for repository in repositories:
-            ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False,
-                                       generate_consistent_config=True, auto_depend=True, components=components)
-            if ret is None:
-                raise Exception("generate config error")
-            elif not ret and ret.get_return("exception"):
-                raise ret.get_return("exception")
-            if not self.obd.deploy.deploy_config.dump():
-                raise Exception('generate config dump error,place check disk space!')
+        workflows = self.obd.get_workflows('generate_config', repositories=repositories)
+        component_kwargs = {repository.name: {"generate_check": False, "generate_consistent_config": True, "auto_depend": True, "components": components} for repository in repositories}
+        workflow_ret = self.obd.run_workflow(workflows, repositories=repositories, error_exit=False, **component_kwargs)
+        if not workflow_ret:
+            for repository in repositories:
+                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                    if plugin_ret.get_return("exception"):
+                        raise plugin_ret.get_return("exception")
+            raise Exception('generate config error!')
+        if not self.obd.deploy.deploy_config.dump():
+            raise Exception('generate config dump error,place check disk space!')
 
         log.get_logger().info('generate config succeed')
         ssh_clients = self.obd.get_clients(self.obd.deploy.deploy_config, repositories)
+
+        component_kwargs = {}
+        log.get_logger().info('start start_check')
         for repository in repositories:
-            log.get_logger().info('begin start_check: %s' % repository.name)
-            java_check = True
-            if repository.name in COMPS_OCP:
+            component_kwargs[repository.name] = {"work_dir_check": True, "precheck": True, "clients": ssh_clients, "cursor": self.context["metadb_cursor"]}
+            if repository.name == COMP_OCP_SERVER_CE:
+                java_check = True
                 jre_name = COMP_JRE
                 install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
                 if install_plugin and jre_name in install_plugin.requirement_map(repository):
                     version = install_plugin.requirement_map(repository)[jre_name].version
                     min_version = install_plugin.requirement_map(repository)[jre_name].min_version
                     max_version = install_plugin.requirement_map(repository)[jre_name].max_version
-                    if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
+                    if len(self.obd.search_images(jre_name, version=version, min_version=min_version,
+                                                  max_version=max_version)) > 0:
                         java_check = False
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False,
-                                       work_dir_check=True, precheck=True, java_check=java_check, clients=ssh_clients, source_option = 'start_check',
-                                       sys_cursor=self.context['metadb_cursor'], components=list(self.obd.deploy.deploy_config.components.keys()))
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
-            log.get_logger().info('end start_check: %s' % repository.name)
-
+                component_kwargs[repository.name]["java_check"] = java_check
+        workflows = self.obd.get_workflows('start_check', no_found_act='ignore', repositories=repositories)
+        if not self.obd.run_workflow(workflows, repositories=repositories, no_found_act='ignore', error_exit=False, **component_kwargs):
+            for repository in repositories:
+                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                    if plugin_ret.get_return("exception"):
+                        raise plugin_ret.get_return("exception")
+        log.get_logger().info('end start_check')
+        
     def get_precheck_result(self, id, task_id):
         log.get_logger().info('get ocp precheck result')
         precheck_result = PrecheckTaskInfo()
@@ -722,12 +726,11 @@ class OcpHandler(BaseHandler):
         self.context['task_info'][self.context['ocp_deployment'][ret.id]] = ret
         return ret
 
-    def _create_tenant(self):
+    def _create_tenant(self, task_id):
         metadb_version = self.context['metadb_cursor'].fetchone("select ob_version() as version")["version"]
         mock_oceanbase_repository = Repository("oceanbase-ce", "/")
         mock_oceanbase_repository.version = metadb_version
         repositories = [mock_oceanbase_repository]
-        create_tenant_plugins = self.obd.search_py_script_plugin(repositories, "create_tenant")
         ocp_config = self.obd.deploy.deploy_config.components["ocp-server-ce"]
         global_conf_with_default = ocp_config.get_global_conf_with_default()
         meta_tenant_config = global_conf_with_default['ocp_meta_tenant']
@@ -749,22 +752,17 @@ class OcpHandler(BaseHandler):
 
         deploy = self.obd.deploy
         self.obd.set_deploy(None)
-        log.get_logger().info("start create meta tenant")
-        create_meta_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(meta_tenant_config)], clients=ssh_clients)
-        if not create_meta_ret:
+        log.get_logger().info("start create tenant")
+        workflow = self.obd.get_workflows('create_tenant_web', repositories=[mock_oceanbase_repository], no_found_act='ignore')
+        if not self.obd.run_workflow(workflow, repositories=[mock_oceanbase_repository], **{'oceanbase-ce': {'cluster_config': ocp_config, 'cursor': self.context['metadb_cursor'], 'create_tenant_options': [Values(meta_tenant_config), Values(monitor_tenant_config)], 'clients': ssh_clients}}):
             self.obd.set_deploy(deploy)
-            raise Exception("Create meta tenant failed")
-        log.get_logger().info("start create monitor tenant")
-        create_monitor_ret = self.obd.call_plugin(create_tenant_plugins[mock_oceanbase_repository], mock_oceanbase_repository, cluster_config=ocp_config, cursor=self.context['metadb_cursor'], create_tenant_options=[Values(monitor_tenant_config)], clients=ssh_clients)
-        if not create_monitor_ret:
-            self.obd.set_deploy(deploy)
-            raise Exception("Create monitor tenant failed")
+            self.context['deploy_status'][task_id] = 'failed'
+            raise Exception("Create tenant failed")
         self.obd.set_deploy(deploy)
-
 
     @auto_register("install")
     def _do_install(self, id, task_id):
-        self.context['deploy_status'] = self.context['process_installed'] = ''
+        self.context['deploy_status'][task_id] = self.context['process_installed'][task_id] = ''
         log.get_logger().info("clean io buffer before start install")
         self.buffer.clear()
         log.get_logger().info("clean namespace for init")
@@ -776,6 +774,7 @@ class OcpHandler(BaseHandler):
         for component in self.obd.deploy.deploy_config.components:
             for plugin in const.START_PLUGINS:
                 if component in self.obd.namespaces:
+                    self.obd.namespaces[component]._variables = {'run_result': self.obd.namespaces[component].variables['run_result']}
                     self.obd.namespaces[component].set_return(plugin, None)
 
         name = self.context['ocp_deployment_id'][id]
@@ -790,14 +789,14 @@ class OcpHandler(BaseHandler):
             # add create tenant operations before deploy ocp if it uses an existing OceanBase as it's metadb cluster
             if 'oceanbase-ce' not in self.obd.deploy.deploy_config.components['ocp-server-ce'].depends:
                 log.get_logger().info("not depends on oceanbase, create tenant first")
-                self._create_tenant()
+                self._create_tenant(task_id)
             deploy_success = self.obd.deploy_cluster(name)
             if not deploy_success:
                 log.get_logger().warn("deploy %s failed", name)
                 raise Exception('deploy failed')
         except:
             self.obd._call_stdio('exception', '')
-            self.context['deploy_status'] = 'failed'
+            self.context['deploy_status'][task_id] = 'failed'
             raise Exception('deploy failed')
         log.get_logger().info("deploy %s succeed", name)
 
@@ -814,25 +813,31 @@ class OcpHandler(BaseHandler):
             self.obd.set_options(opt)
             if repository.name == const.OCEANBASE_CE:
                 oceanbase_repository = repository
-            ret = self.obd._start_cluster(self.obd.deploy, repositories)
+            self.obd.set_repositories([repository])
+            if repository.name == const.OCP_SERVER_CE:
+                self.obd.set_repositories(repositories)
+            ret = self.obd._start_cluster(self.obd.deploy, [repository])
             if not ret:
                 log.get_logger().warn("failed to start component: %s", repository.name)
+                self.context['deploy_status'][task_id] = 'failed'
                 start_success = False
             log.get_logger().info("end start %s", repository.name)
+        self.obd.set_repositories(repositories)
         if not start_success:
             if len(repositories) > 1 and oceanbase_repository:
-                drop_tenant_plugins = self.obd.search_py_script_plugin([repository for repository in repositories if repository.name == const.OCEANBASE_CE], 'drop_tenant', no_found_act='warn')
                 config = self.context['ocp_deployment_info'][id]['config'].components.oceanbase
                 cursor = Cursor(ip=config.topology[0].servers[0].ip, port=config.mysql_port, user='root',
                                 password=config.root_password, stdio=self.obd.stdio)
                 opt = Values()
                 setattr(opt, "tenant_name", self.context['meta_tenant'])
                 self.obd.set_options(opt)
-                self.obd.call_plugin(drop_tenant_plugins[oceanbase_repository], oceanbase_repository, cursor=cursor)
+                workflow = self.obd.get_workflow('drop_tenant_web', repositories=[oceanbase_repository], no_found_act='ignore')
+                self.obd.run_workflow(workflow, repositories=[oceanbase_repository], no_found_act='ignore', **{'oceanbase-ce': {'cursor': cursor}})
                 opt = Values()
                 setattr(opt, "tenant_name", self.context['monitor_tenant'])
                 self.obd.set_options(opt)
-                self.obd.call_plugin(drop_tenant_plugins[oceanbase_repository], oceanbase_repository, cursor=cursor)
+                workflow = self.obd.get_workflow('drop_tenant_web', repositories=[oceanbase_repository], no_found_act='ignore')
+                self.obd.run_workflow(workflow, repositories=[oceanbase_repository], no_found_act='ignore', **{'oceanbase-ce': {'cursor': cursor}})
             raise Exception("task {0} start failed".format(name))
         self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
         log.get_logger().info("finish do start %s", name)
@@ -849,7 +854,7 @@ class OcpHandler(BaseHandler):
             log.get_logger().info("finish take_over metadb")
         deploy = self.obd.deploy_manager.get_deploy_config(name)
         self.obd.set_deploy(deploy)
-        self.context['process_installed'] = 'done'
+        self.context['process_installed'][task_id] = 'done'
 
         ## get obd namespace data and report telemetry
         data = {}
@@ -902,12 +907,12 @@ class OcpHandler(BaseHandler):
                 task_info.info.append(step_info)
                 task_info.finished += f'{component}-{plugin} '
 
-        if self.obd.deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and self.context['process_installed'] == 'done':
+        if self.obd.deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and self.context['process_installed'][task_id] == 'done':
             self.context['ocp_deployment_info'][id]['ocp_start_success_time'] = time.time()
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
 
-        if failed or self.context['deploy_status'] == 'failed':
+        if failed or self.context['deploy_status'][task_id] == 'failed':
             task_info.result = TaskResult.FAILED
             task_info.status = TaskStatus.FINISHED
         return task_info
@@ -920,9 +925,9 @@ class OcpHandler(BaseHandler):
         if task_info is not None and task_info.status != TaskStatus.FINISHED:
             raise Exception("task {0} exists and not finished".format(id))
         task_manager.del_task_info(id, task_type="reinstall")
-        background_tasks.add_task(self._do_reinstall, id)
         self.context['ocp_deployment']['task_id'] = self.context['ocp_deployment']['task_id'] + 1 if self.context['ocp_deployment'][
             'task_id'] else 1
+        background_tasks.add_task(self._do_reinstall, id, self.context['ocp_deployment']['task_id'])
         task_status = TaskStatus.RUNNING.value
         task_res = TaskResult.RUNNING.value
         task_message = 'reinstall'
@@ -932,7 +937,7 @@ class OcpHandler(BaseHandler):
         return ret
 
     @auto_register("reinstall")
-    def _do_reinstall(self, id):
+    def _do_reinstall(self, id, task_id):
         log.get_logger().info("clean io buffer before start reinstall")
         self.buffer.clear()
         log.get_logger().info("clean namespace for init")
@@ -944,6 +949,7 @@ class OcpHandler(BaseHandler):
         for component in self.obd.deploy.deploy_config.components:
             for plugin in const.START_PLUGINS:
                 if component in self.obd.namespaces:
+                    self.obd.namespaces[component]._variables = {'run_result': self.obd.namespaces[component].variables['run_result']}
                     self.obd.namespaces[component].set_return(plugin, None)
 
         name = self.context['ocp_deployment_id'][id]
@@ -977,17 +983,18 @@ class OcpHandler(BaseHandler):
         self.obd.search_param_plugin_and_apply(repositories, deploy_config)
         self.obd.set_repositories(repositories)
 
-        gen_config_plugins = self.obd.search_py_script_plugin(repositories, 'generate_config')
+        kwargs = {}
         components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
         for repository in repositories:
-            ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False,
-                                       generate_consistent_config=True, auto_depend=True, components=components)
-            if ret is None:
-                raise Exception("generate config error")
-            elif not ret and ret.get_return("exception"):
-                raise ret.get_return("exception")
-            if not self.obd.deploy.deploy_config.dump():
-                raise Exception('generate config dump error,place check disk space!')
+            kwargs[repository.name] = {"generate_consistent_config": True, "generate_check": False, "auto_depend": True, "components": components}
+        workflows = self.obd.get_workflows("generate_config")
+        if not self.obd.run_workflow(workflows, **kwargs):
+            for repository in repositories:
+                if self.obd.get_namespace(repository.name).get_return('exception'):
+                    raise self.obd.get_namespace(repository.name).get_return('exception')
+            raise Exception("generate config error")
+        if not self.obd.deploy.deploy_config.dump():
+            raise Exception('generate config dump error,place check disk space!')
 
         log.get_logger().info("start deploy %s", name)
         opt = Values()
@@ -1009,7 +1016,10 @@ class OcpHandler(BaseHandler):
             setattr(opt, "strict_check", False)
             setattr(opt, "metadb_cursor", self.context['metadb_cursor'])
             self.obd.set_options(opt)
-            ret = self.obd._start_cluster(self.obd.deploy, repositories)
+            self.obd.set_repositories([repository])
+            if repository.name == const.OCP_SERVER_CE:
+                self.obd.set_repositories(repositories)
+            ret = self.obd._start_cluster(self.obd.deploy, [repository])
             if not ret:
                 log.get_logger().warn("failed to start component: %s", repository.name)
                 start_success = False
@@ -1017,7 +1027,7 @@ class OcpHandler(BaseHandler):
             raise Exception("task {0} start failed".format(name))
 
         self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
-        self.context['process_installed'] = 'done'
+        self.context['process_installed'][task_id] = 'done'
         log.get_logger().info("finish do start %s", name)
 
     def get_reinstall_task_info(self, id, task_id):
@@ -1078,7 +1088,7 @@ class OcpHandler(BaseHandler):
                 task_info.info.append(step_info)
                 task_info.finished += f'{component}-{plugin} '
 
-        if self.obd.deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and self.context['process_installed'] == 'done':
+        if self.obd.deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and self.context['process_installed'][task_id] == 'done':
             self.context['ocp_deployment_info'][id]['ocp_start_success_time'] = time.time()
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
@@ -1233,15 +1243,12 @@ class OcpHandler(BaseHandler):
         repositories = [repository for repository in repositories if repository.name in ['ocp-server', 'ocp-server-ce']]
         self.obd.set_repositories(repositories)
 
-        start_check_plugins = self.obd.search_py_script_plugin(repositories, 'upgrade_check', no_found_act='warn')
-
-        self._upgrade_precheck(cluster_name, repositories, start_check_plugins, init_check_status=True)
+        self._upgrade_precheck(cluster_name, repositories, init_check_status=True)
         info = task_manager.get_task_info(cluster_name, task_type="upgrade_check")
         if info is not None and info.exception is not None:
             raise info.exception
         task_manager.del_task_info(cluster_name, task_type="upgrade_check")
-        background_tasks.add_task(self._upgrade_precheck, cluster_name, repositories, start_check_plugins,
-                                  init_check_status=False)
+        background_tasks.add_task(self._upgrade_precheck, cluster_name, repositories, init_check_status=False)
         self.context['ocp_deployment']['task_id'] = self.context['ocp_deployment']['task_id'] + 1 if self.context['ocp_deployment'][
             'task_id'] else 1
         task_status = TaskStatus.RUNNING.value
@@ -1253,46 +1260,57 @@ class OcpHandler(BaseHandler):
         return ret
 
     @auto_register('upgrade_precheck')
-    def _upgrade_precheck(self, name, repositories, start_check_plugins, init_check_status=False):
+    def _upgrade_precheck(self, name, repositories, init_check_status=False):
         if init_check_status:
-            self._init_upgrade_precheck(repositories, start_check_plugins)
+            self._init_upgrade_precheck(repositories)
         else:
-            self._do_upgrade_precheck(repositories, start_check_plugins)
+            self._do_upgrade_precheck(repositories)
 
-    def _init_upgrade_precheck(self, repositories, start_check_plugins):
+    def _init_upgrade_precheck(self, repositories):
         param_check_status = {}
         servers_set = set()
+
+        init_check_status_workflows = self.obd.get_workflows('upgrade_check', no_found_act='ignore', repositories=repositories)
+        workflows_ret = self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore', repositories=repositories, **{COMP_OCP_SERVER_CE: {"meta_cursor": self.context['metadb_cursor']}})
+
         for repository in repositories:
-            if repository not in start_check_plugins:
+            if not self.obd.namespaces.get(repository.name):
                 continue
+            if not workflows_ret and self.obd.namespaces.get(repository.name).get_return('exception'):
+                raise self.obd.namespaces.get(repository.name).get_return('exception')
             repository_status = {}
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=True, meta_cursor=self.context['metadb_cursor'])
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
             servers = self.obd.deploy.deploy_config.components.get(repository.name).servers
             for server in servers:
                 repository_status[server] = {'param': CheckStatus()}
                 servers_set.add(server)
             param_check_status[repository.name] = repository_status
 
-    def _do_upgrade_precheck(self, repositories, start_check_plugins):
+    def _do_upgrade_precheck(self, repositories):
         gen_config_plugins = self.obd.search_py_script_plugin(repositories, 'generate_config')
         if len(repositories) != len(gen_config_plugins):
             raise Exception("param_check: config error, check stop!")
 
         components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
-        for repository in repositories:
-            ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False, generate_consistent_config=True, auto_depend=True, components=components)
-            if ret is None:
-                raise Exception("generate config error")
-            elif not ret and ret.get_return("exception"):
-                raise ret.get_return("exception")
-            if not self.obd.deploy.deploy_config.dump():
-                raise Exception('generate config dump error,place check disk space!')
+        workflows = self.obd.get_workflows('generate_config', repositories=repositories)
+        component_kwargs = {repository.name: {"generate_check": False, "generate_consistent_config": True, "auto_depend": True, "components": components} for repository in repositories}
+        workflow_ret = self.obd.run_workflow(workflows, repositories=repositories, **component_kwargs)
+        if not workflow_ret:
+            for repository in repositories:
+                if self.obd.get_namespace(repository.name).get_return('exception'):
+                    raise self.obd.get_namespace(repository.name).get_return('exception')
+            raise Exception('generate config error!')
+        if not self.obd.deploy.deploy_config.dump():
+            raise Exception('generate config dump error,place check disk space!')
+        log.get_logger().info('generate config succeed')
 
+        ssh_clients = self.obd.get_clients(self.obd.deploy.deploy_config, repositories)
+
+        component_kwargs = {}
+        log.get_logger().info('start upgrade_check')
         for repository in repositories:
-            java_check = True
-            if repository.name in COMPS_OCP:
+            component_kwargs[repository.name] = {"database": self.context['meta_database'], "meta_cursor": self.context['metadb_cursor']}
+            if repository.name == COMPS_OCP:
+                java_check = True
                 jre_name = COMP_JRE
                 install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
                 if install_plugin and jre_name in install_plugin.requirement_map(repository):
@@ -1301,10 +1319,13 @@ class OcpHandler(BaseHandler):
                     max_version = install_plugin.requirement_map(repository)[jre_name].max_version
                     if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
                         java_check = False
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, database=self.context['meta_database'],
-                                       meta_cursor=self.context['metadb_cursor'], java_check=java_check)
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
+                component_kwargs[repository.name]["java_check"] = java_check
+        workflows = self.obd.get_workflows('upgrade_check', no_found_act='ignore', repositories=repositories)
+        if not self.obd.run_workflow(workflows, repositories=repositories, no_found_act='ignore', error_exit=False, **component_kwargs):
+            for repository in repositories:
+                if self.obd.get_namespace(repository.name).get_return('exception'):
+                    raise self.obd.get_namespace(repository.name).get_return('exception')
+        log.get_logger().info('end upgrade_check')
 
     def get_upgrade_precheck_result(self, cluster_name, task_id):
         precheck_result = PrecheckTaskInfo()
@@ -1391,7 +1412,7 @@ class OcpHandler(BaseHandler):
         setattr(self.obd.options, 'component', repositories[0].name)
 
         try:
-            if deploy_info.status == DeployStatus.STATUS_RUNNING:
+            if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
                 if not self._ocp_upgrade_use_obd(repositories, deploy, meta_tenant, monitor_tenant):
                     self.context['upgrade']['succeed'] = False
                     return
@@ -1525,19 +1546,20 @@ class OcpHandler(BaseHandler):
 
             repository = upgrade_repositories[upgrade_ctx['index']]
             repositories = [repository]
-            upgrade_plugin = self.obd.search_py_script_plugin(repositories, 'upgrade')[repository]
             self.obd.set_repositories(repositories)
-            ret = self.obd.call_plugin(
-                upgrade_plugin, repository,
-                search_py_script_plugin=self.obd.search_py_script_plugin,
-                local_home_path=self.obd.home_path,
-                current_repository=current_repository,
-                upgrade_repositories=upgrade_repositories,
-                apply_param_plugin=lambda repository: self.obd.search_param_plugin_and_apply([repository],
-                                                                                             deploy_config),
-                metadb_cursor=self.context['metadb_cursor'],
-                sys_cursor=self.context['sys_cursor']
-            )
+            upgrade_workflows = self.obd.get_workflows('upgrade', no_found_act='ignore', repositories=[repository])
+            component_kwargs = {repository.name: {
+                "search_py_script_plugin": self.obd.search_py_script_plugin,
+                "local_home_path": self.obd.home_path,
+                "current_repository": current_repository,
+                "upgrade_repositories": upgrade_repositories,
+                "apply_param_plugin": lambda repository: self.obd.search_param_plugin_and_apply([repository], deploy_config),
+                "metadb_cursor": self.context['metadb_cursor'],
+                "sys_cursor": self.context['sys_cursor'],
+                "run_workflow": self.obd.run_workflow,
+                "get_workflows": self.obd.get_workflows
+            }}
+            ret = self.obd.run_workflow(upgrade_workflows, repositories=[repository], **component_kwargs)
             deploy.update_upgrade_ctx(**upgrade_ctx)
             if not ret:
                 self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)

@@ -56,7 +56,7 @@ export default function UninstallConfig() {
   const componentDepends = componentDependsRes?.data?.items;
 
   const getColumns = (component: API.BestComponentInfo) => {
-    const targetComponent = componentsGroupInfo.find((comp) =>
+    const targetComponent = componentsGroupInfo?.find((comp) =>
       comp.content.some(
         (item) =>
           item.key ===

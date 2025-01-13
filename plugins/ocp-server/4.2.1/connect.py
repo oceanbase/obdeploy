@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -28,7 +24,7 @@ import time
 import _errno as err
 
 
-class OcpServerCursor(object):
+class OcpCursor(object):
 
     class Response(object):
 
@@ -39,31 +35,30 @@ class OcpServerCursor(object):
         def __bool__(self):
             return self.code == 200
 
-    def __init__(self, ip, port, username=None, password=None, component_name=None, base_url=None, stdio=None):
+    def __init__(self, ip=None, port=None, username=None, password=None, component_name=None, stdio=None):
         self.auth = None
         self.ip = ip
         self.port = port
         self.username = username
         self.password = password
-        self.url_prefix = "http://{ip}:{port}".format(ip=self.ip, port=self.port) if not base_url else base_url.strip('/')
+        self.url_prefix = "http://{ip}:{port}".format(ip=self.ip, port=self.port)
         self.component_name = component_name
         if self.username:
             self.auth = HTTPBasicAuth(username=username, password=password)
         self.stdio = stdio
         self.stdio.verbose('connect {} ({}:{} by user {})'.format(component_name, ip, port, username))
 
-
     def status(self, stdio=None):
         ocp_status_ok = False
         now = time.time()
         check_wait_time = 300
         count = 0
-        while time.time() - now < check_wait_time:
+        while time.time() - now < check_wait_time and count < 10:
             stdio.verbose("query ocp to check...")
             count += 1
             resp = self._request('GET', '/api/v2/time', stdio=stdio)
             try:
-                if resp.code == 200 or count >= 10:
+                if resp.code == 200:
                     ocp_status_ok = True
                     break
             except Exception:
@@ -74,10 +69,15 @@ class OcpServerCursor(object):
             return True
         else:
             stdio.verbose("OCP is still not working properly, check failed.")
-            return True
+            return False
 
     def info(self, stdio=None):
         resp = self._request('GET', '/api/v2/info', stdio=stdio)
+        if resp.code == 200:
+            return resp.content
+
+    def upload_packages(self, files, stdio=None):
+        resp = self._request('POST', '/api/v2/software-packages', files=files, stdio=stdio)
         if resp.code == 200:
             return resp.content
 
@@ -131,14 +131,14 @@ class OcpServerCursor(object):
                 msg = resp.content['error']['message']
             raise Exception("failed to do take over: %s" % msg)
 
-    def _request(self, method, api, data=None, retry=5, stdio=None):
+    def _request(self, method, api, data=None, files=None, retry=5, stdio=None):
         url = self.url_prefix + api
-        headers = {"Content-Type": "application/json"}
+        headers = {'Content-Type': 'application/json'} if not files else {}
         try:
             if data is not None:
                 data = json.dumps(data)
-            stdio.verbose('send http request method: {}, url: {}, data: {}'.format(method, url, data))
-            resp = requests.request(method, url, data=data, verify=False, headers=headers, auth=self.auth)
+            stdio.verbose('send http request method: {}, url: {}, data: {}, files: {}'.format(method, url, data, files))
+            resp = requests.request(method, url, data=data, files=files, verify=False, headers=headers, auth=self.auth)
             return_code = resp.status_code
             content = resp.content
         except Exception as e:
@@ -157,6 +157,18 @@ class OcpServerCursor(object):
         return self.Response(code=return_code, content=content)
 
 
+class OcpTakeOverCursor(OcpCursor):
+    def __init__(self, address, user, password, component_name, stdio=None):
+        super(OcpCursor, self).__init__()
+        self.url_prefix = address.rstrip('/')
+        self.username = user
+        self.password = password
+        self.component_name = component_name
+        if self.username:
+            self.auth = HTTPBasicAuth(username=user, password=password)
+        self.stdio = stdio
+
+
 def connect(plugin_context, target_server=None, *args, **kwargs):
     def return_true(**kwargs):
         for key, value in kwargs.items():
@@ -164,30 +176,36 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         return plugin_context.return_true(**kwargs)
     
     cluster_config = plugin_context.cluster_config
-    options = plugin_context.options
+    new_cluster_config = kwargs.get("new_cluster_config")
+    count = kwargs.get("retry_times", 10)
     stdio = plugin_context.stdio
-    address = getattr(options, 'address', '')
-    user = getattr(options, 'user', '')
-    password = getattr(options, 'password', '')
-    servers = cluster_config.servers
-    if address:
-        stdio.start_loading('Connect to {}'.format(address))
-    elif target_server:
+    if target_server:
         servers = [target_server]
         stdio.start_loading('Connect to {} ({})'.format(cluster_config.name, target_server))
     else:
         servers = cluster_config.servers
         stdio.start_loading('Connect to %s' % cluster_config.name)
     cursors = {}
-    for server in servers:
-        config = cluster_config.get_server_conf(server)
-        username = 'admin' if not address else user
-        password = config['admin_password'] if not address else password
-        cursor = OcpServerCursor(ip=server.ip, port=config['port'] if not address else '', username=username, password=password, component_name=cluster_config.name, base_url=address, stdio=stdio)
-        if cursor.status(stdio=stdio):
-            cursors[server] = cursor
+    while count and servers:
+        count -= 1
+        for server in servers:
+            config = cluster_config.get_server_conf(server)
+            username = 'admin'
+            password = config['admin_password']
+
+            new_config = None
+            if new_cluster_config:
+                new_config = new_cluster_config.get_server_conf(server)
+                if new_config:
+                    new_password = new_config['admin_password']
+            password = new_password if new_config and count % 2 else password
+
+            port = config['port']
+            cursor = OcpCursor(ip=server.ip, port=port, username=username, password=password, component_name=cluster_config.name, stdio=stdio)
+            if cursor.status(stdio=stdio):
+                cursors[server] = cursor
     if not cursors:
-        stdio.error(err.EC_FAIL_TO_CONNECT.format(component=cluster_config.name))
+        stdio.error(err.EC_FAIL_TO_CONNECT.format(component='ocp-server-ce'))
         stdio.stop_loading('fail')
         return plugin_context.return_false()
 

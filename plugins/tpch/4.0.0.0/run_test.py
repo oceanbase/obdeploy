@@ -1,27 +1,21 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
 
-
-import re
 import os
 import time
 try:
@@ -46,7 +40,7 @@ def exec_cmd(cmd):
     return process.returncode == 0
 
 
-def run_test(plugin_context, db, cursor, *args, **kwargs):
+def run_test(plugin_context, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if value is None:
@@ -66,7 +60,8 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
     not_test_only = not get_option('test_only')
 
     host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
+    db = plugin_context.get_return("connect").get_return('connect')
+    port = db.port if db else 2881
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test')
@@ -77,12 +72,15 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
     tmp_dir = get_option('tmp_dir')
     obclient_bin = get_option('obclient_bin', 'obclient')
 
+    cursor = plugin_context.get_return('connect').get_return('cursor')
+
     sql_path = sorted(sql_path, key=lambda x: (len(x), x))
 
+    pre_test_ret = plugin_context.get_return("pre_test")
+    max_cpu = pre_test_ret.get_return("max_cpu")
+    tenant_id = pre_test_ret.get_return("tenant_id")
+    unit_count = pre_test_ret.get_return("unit_count")
     cpu_total = 0
-    max_cpu = kwargs.get('max_cpu', 2)
-    tenant_id = kwargs.get('tenant_id')
-    unit_count = kwargs.get('unit_count', 0)
     parallel_num = get_option('parallel', int(max_cpu * unit_count))
 
     if not_test_only:
@@ -116,14 +114,14 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
             return
         ret = ret['value']
         if ret is None:
-            stdio.error('Access denied. Please set `secure_file_priv` to "".')
+            stdio.error('Access denied. Please set `secure_file_priv` to "\\".')
             return
         if ret:
             for path in tbl_path:
                 if not path.startswith(ret):
-                    stdio.error('Access denied. Please set `secure_file_priv` to "".')
+                    stdio.error('Access denied. Please set `secure_file_priv` to "\\".')
                     return
-        
+
         if not_test_only:
             # 替换并发数
             stdio.start_loading('Format DDL')

@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from fastapi import APIRouter, Path, Query, BackgroundTasks, Request
 
@@ -140,8 +136,9 @@ async def get_install_log(name: str = Path(description='deployment name'),
     task_info = handler.get_install_task_info(name)
     if task_info is None:
         return response_utils.new_not_found_exception("task {0} not found".format(name))
-    log_content = handler.buffer.read() if component_name is None else handler.get_install_log_by_component(component_name)
-    log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
+    origin_log = handler.buffer.read() if component_name is None else handler.get_install_log_by_component(component_name)
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    log_info = InstallLog(log=masked_log[offset:], offset=len(masked_log))
     return response_utils.new_ok_response(log_info)
 
 

@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import time
 from collections import defaultdict
 
@@ -79,7 +75,7 @@ def verify_password(cursor, tenant_name, stdio, key, password='', user='root', m
     return False
 
 
-def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cursors={}, primary_info={}, *args, **kwargs):
+def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info={}, *args, **kwargs):
     def error(msg='', *arg, **kwargs):
         msg and stdio.error(msg, *arg, **kwargs)
         stdio.stop_loading('fail') 
@@ -102,6 +98,7 @@ def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cur
 
     stdio = plugin_context.stdio
     options = plugin_context.options
+    repositories = plugin_context.repositories
     standby_tenant = getattr(options, 'tenant_name', '')
     if not cursors:
         error("Connect to OceanBase failed.")
@@ -117,16 +114,19 @@ def switchover_tenant(plugin_context, get_standbys_plugins, cluster_configs, cur
     # find primary and standby tenant`s others relationship
     stdio.start_loading('Find relationship')
     # 1.find primary tenant`s others standby tenant
-    for repository in get_standbys_plugins:
-        ret = call_plugin(get_standbys_plugins[repository], primary_deploy_name=primary_deploy_name, primary_tenant=primary_tenant, exclude_tenant=[standby_deploy_name, standby_tenant])
+    plugin_manager = kwargs.get('plugin_manager')
+    for repository in repositories:
+        get_standbys_plugin = plugin_manager.get_best_py_script_plugin('get_standbys', repository.name, repository.version)
+        ret = call_plugin(get_standbys_plugin, primary_deploy_name=primary_deploy_name, primary_tenant=primary_tenant, exclude_tenant=[standby_deploy_name, standby_tenant])
         if not ret:
             error("Find primary tenant {}:{}'s others standby tenants failed".format(primary_deploy_name, primary_tenant))
             return
     primary_standby_tenants = ret.get_return('standby_tenants')
     stdio.verbose("Primary tenant {}:{}'s others standby tenants:{}".format(primary_deploy_name, primary_tenant, primary_standby_tenants))
     # 2.find standby tenant`s standby tenant
-    for repository in get_standbys_plugins:
-        ret = call_plugin(get_standbys_plugins[repository], primary_deploy_name=standby_deploy_name, primary_tenant=standby_tenant, exclude_tenant=[primary_deploy_name, primary_tenant])
+    for repository in repositories:
+        get_standbys_plugin = plugin_manager.get_best_py_script_plugin('get_standbys', repository.name, repository.version)
+        ret = call_plugin(get_standbys_plugin, primary_deploy_name=standby_deploy_name, primary_tenant=standby_tenant, exclude_tenant=[primary_deploy_name, primary_tenant])
         if not ret:
             error("Find primary tenant {}:{}'s others standby tenants failed".format(primary_deploy_name, primary_tenant))
             return

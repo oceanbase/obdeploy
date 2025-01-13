@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -96,6 +92,8 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         return plugin_context.return_true(**kwargs)
     
     cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get("new_cluster_config")
+    count = kwargs.get("retry_times", 10)
     stdio = plugin_context.stdio
     if target_server:
         servers = [target_server]
@@ -104,18 +102,28 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         servers = cluster_config.servers
         stdio.start_loading('Connect to ocp-express')
     cursors = ConnectCursor()
-    for server in servers:
-        config = cluster_config.get_server_conf(server)
-        username = 'system'
-        password = config['system_password']
-        stdio.verbose('connect ocp-express ({}:{} by user {})'.format(server.ip, config['port'], username))
-        cursor = OcpExpressCursor(ip=server.ip, port=config['port'], username=username, password=password)
-        if cursor.status(stdio=stdio):
-            cursors[server] = cursor
-    if not cursors:
-        stdio.error(err.EC_FAIL_TO_CONNECT.format(component=cluster_config.name))
-        stdio.stop_loading('fail')
-        return plugin_context.return_false()
+    while count and servers:
+        count -= 1
+        for server in servers:
+            config = cluster_config.get_server_conf(server)
+            username = 'system'
+            password = config['system_password']
+
+            new_config = None
+            if new_cluster_config:
+                new_config = new_cluster_config.get_server_conf(server)
+                if new_config:
+                    new_password = new_config['system_password']
+            password = new_password if new_config and count % 2 else password
+
+            stdio.verbose('connect ocp-express ({}:{} by user {})'.format(server.ip, config['port'], username))
+            cursor = OcpExpressCursor(ip=server.ip, port=config['port'], username=username, password=password)
+            if cursor.status(stdio=stdio):
+                cursors[server] = cursor
+        if not cursors:
+            stdio.error(err.EC_FAIL_TO_CONNECT.format(component=cluster_config.name))
+            stdio.stop_loading('fail')
+            return plugin_context.return_false()
 
     stdio.stop_loading('succeed')
     return return_true(connect=cursors, cursor=cursors)

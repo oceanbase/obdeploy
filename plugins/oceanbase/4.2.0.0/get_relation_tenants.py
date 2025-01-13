@@ -1,29 +1,37 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from queue import Queue
 
 
-def get_relation_tenants(plugin_context, repository, get_deploy, deployment_name='', tenant_name='', cluster_configs={}, *args, **kwargs):
-    deploy_name = deployment_name if deployment_name else plugin_context.cluster_config.deploy_name
+def get_relation_tenants(plugin_context, repository, cluster_configs={}, *args, **kwargs):
+    cmds = plugin_context.cmds
     options = plugin_context.options
-    tenant_name = tenant_name if tenant_name else getattr(options, 'tenant_name', '')
+    deploy_manager = kwargs.get('deploy_manager')
+    get_deploy = deploy_manager.get_deploy_config
+    deploy_name = plugin_context.cluster_config.deploy_name
+    tenant_name = getattr(options, 'tenant_name', '')
+    if kwargs.get('option_mode') == 'failover_decouple_tenant':
+        deploy_name = cmds[0]
+        tenant_name = cmds[1]
+    if kwargs.get('option_mode') == 'create_standby_tenant':
+        deploy_name = cmds[1]
+        tenant_name = cmds[2]
+    if kwargs.get('option_mode') == 'switchover_tenant':
+        deploy_name = cmds[0]
+        tenant_name = cmds[1]
     stdio = plugin_context.stdio
     visited_deployname_set = set()
     queue = Queue()

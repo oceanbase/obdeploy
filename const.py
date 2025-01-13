@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # OceanBase official website
 OB_OFFICIAL_WEBSITE = 'https://www.oceanbase.com/'
@@ -36,6 +32,8 @@ REVISION = '<CID>'
 BUILD_BRANCH = '<B_BRANCH>'
 # obdeploy build time
 BUILD_TIME = '<B_TIME>'
+# obdeploy build plugin list
+BUILD_PLUGIN_LIST = '<B_PLUGIN_LIST>'
 
 # obdeploy home path
 CONST_OBD_HOME = "OBD_HOME"
@@ -53,11 +51,26 @@ COMP_OCP_EXPRESS = 'ocp-express'
 COMP_OCP_SERVER = 'ocp-server'
 COMP_OCP_SERVER_CE = 'ocp-server-ce'
 COMPS_OCP = [COMP_OCP_SERVER, COMP_OCP_SERVER_CE]
+COMPS_OCP_CE_AND_EXPRESS = [COMP_OCP_SERVER_CE, COMP_OCP_EXPRESS]
 
 # ob
 COMP_OB = "oceanbase"
 COMP_OB_CE = "oceanbase-ce"
 COMPS_OB = [COMP_OB, COMP_OB_CE]
+
+# obproxy
+COMP_ODP = "obproxy"
+COMP_ODP_CE = "obproxy-ce"
+COMPS_ODP = [COMP_ODP, COMP_ODP_CE]
+
+# ob-configserver
+COMP_OB_CONFIGSERVER = "ob-configserver"
+
+# obagent
+COMP_OBAGENT = 'obagent'
+
+# oblogproxy
+COMP_OBLOGPROXY = 'oblogproxy'
 
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
@@ -79,3 +92,15 @@ TEST_TOOLS = {
     TOOL_SYSBENCH: 'sysbench',
 }
 TOOL_TPCC_BENCHMARKSQL = 'OB-BenchmarkSQL-5.0.jar'
+
+#workflow stages
+STAGE_FIRST = 10
+STAGE_SECOND = 20
+STAGE_THIRD = 30
+STAGE_FOURTH = 40
+STAGE_FIFTH = 50
+STAGE_SIXTH = 60
+STAGE_SEVENTH = 70
+STAGE_EIGHTH = 80
+STAGE_NINTH = 90
+STAGE_TENTH = 100

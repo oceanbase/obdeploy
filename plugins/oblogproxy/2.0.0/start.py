@@ -1,52 +1,26 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
 
 import json
 import os
-import re
-import time
-from copy import deepcopy
 
 from tool import FileUtil
-
-
-def get_port_socket_inode(client, port, stdio):
-    port = hex(port)[2:].zfill(4).upper()
-    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
-    res = client.execute_command(cmd)
-    if not res or not res.stdout.strip():
-        return False
-    stdio.verbose(res.stdout)
-    return res.stdout.strip().split('\n')
-
-
-def confirm_port(client, pid, port, stdio):
-    socket_inodes = get_port_socket_inode(client, port, stdio)
-    if not socket_inodes:
-        return False
-    ret = client.execute_command("ls -l /proc/%s/fd/ |grep -E 'socket:\[(%s)\]'" % (pid, '|'.join(socket_inodes)))
-    if ret and ret.stdout.strip():
-        return True
-    return False
+from tool import confirm_port
 
 
 def is_started(client, port, remote_pid_path, home_path, stdio):
@@ -58,7 +32,7 @@ def is_started(client, port, remote_pid_path, home_path, stdio):
         return False
     pids = pids.split('\n')
     for pid in pids:
-        if confirm_port(client, pid, port, stdio):
+        if confirm_port(client, pid, port):
             client.execute_command('echo "%s" > %s' % (pid, remote_pid_path))
             return True
     else:
@@ -129,6 +103,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
     if not start_env:
         start_env = prepare_conf(plugin_context.repositories, cluster_config, clients, stdio)
         if not start_env:
+            stdio.stop_loading('fail')
             return plugin_context.return_false()
 
     for server in cluster_config.servers:
@@ -142,43 +117,5 @@ def start(plugin_context, start_env=None, *args, **kwargs):
                 continue
 
         client.execute_command("cd {0}; {0}/bin/logproxy -f {0}/conf/conf.json &>{0}/log/out.log & echo $! > {1}".format(home_path, remote_pid_path))
-    servers = cluster_config.servers
-    count = 60
-    failed = []
-    while servers and count:
-        count -= 1
-        tmp_servers = []
-        for server in servers:
-            server_config = cluster_config.get_server_conf(server)
-            client = clients[server]
-            stdio.verbose('%s program health check' % server)
-            remote_pid_path = "%s/run/oblogproxy-%s-%s.pid" % (server_config['home_path'], server.ip, server_config['service_port'])
-            remote_pid = client.execute_command("cat %s" % remote_pid_path).stdout.strip()
-            if remote_pid:
-                for pid in re.findall('\d+', remote_pid):
-                    confirm = confirm_port(client, pid, int(server_config["service_port"]), stdio)
-                    if confirm:
-                        if client.execute_command("ls /proc/%s" % remote_pid):
-                            stdio.verbose('%s oblogproxy[pid: %s] started', server, pid)
-                        else:
-                            tmp_servers.append(server)
-                        break
-                    stdio.verbose('failed to start %s oblogproxy, remaining retries: %d' % (server, count))
-                    if count:
-                        tmp_servers.append(server)
-                    else:
-                        failed.append('failed to start %s oblogproxy' % server)
-            else:
-                failed.append('failed to start %s oblogproxy' % server)
-
-        servers = tmp_servers
-        if servers and count:
-            time.sleep(1)
-    if failed:
-        stdio.stop_loading('fail')
-        for msg in failed:
-            stdio.warn(msg)
-            plugin_context.return_false()
-    else:
-        stdio.stop_loading('succeed')
-        plugin_context.return_true(need_bootstrap=False)
+    stdio.stop_loading('succeed')
+    return plugin_context.return_true()

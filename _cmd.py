@@ -1,22 +1,18 @@
 
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -26,6 +22,8 @@ import sys
 import time
 import textwrap
 import json
+import glob
+import datetime
 from uuid import uuid1 as uuid, UUID
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
@@ -39,8 +37,8 @@ import _environ as ENV
 from ssh import LocalClient
 from const import (
     CONST_OBD_HOME,
-    VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS,
-    COMP_OCEANBASE_DIAGNOSTIC_TOOL, PKG_RPM_FILE,PKG_REPO_FILE
+    VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS, COMP_OB_CE, COMP_ODP_CE, COMP_ODP, COMP_OCP_SERVER_CE,
+    COMP_OCEANBASE_DIAGNOSTIC_TOOL, PKG_RPM_FILE,PKG_REPO_FILE, BUILD_PLUGIN_LIST
 )
 
 
@@ -197,12 +195,50 @@ class ObdCommand(BaseCommand):
         if not COMMAND_ENV.get(ENV.ENV_OBD_ID):
             COMMAND_ENV.set(ENV.ENV_OBD_ID, uuid())
         if VERSION != version:
-            for part in ['plugins', 'config_parser', 'optimize', 'mirror/remote']:
+            for part in ['workflows', 'plugins', 'config_parser', 'optimize', 'mirror/remote']:
                 obd_part_dir = os.path.join(self.OBD_PATH, part)
+                root_part_path = os.path.join(self.OBD_INSTALL_PATH, part)
                 if DirectoryUtil.mkdir(self.OBD_PATH):
-                    root_part_path = os.path.join(self.OBD_INSTALL_PATH, part)
-                    if os.path.exists(root_part_path):
-                        DirectoryUtil.copy(root_part_path, obd_part_dir, ROOT_IO)
+                    if part != 'mirror/remote':
+                        if os.path.exists(obd_part_dir):
+                            backup_path = os.path.join(self.OBD_PATH, '.backup_plugin', VERSION + '_' + REVISION, part)
+                            if DirectoryUtil.mkdir(backup_path):
+                                DirectoryUtil.copy(obd_part_dir, backup_path, ROOT_IO)
+                            os.chdir(obd_part_dir)
+                            if part != 'config_parser':
+                                for file in glob.glob('*/*/*'):
+                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file):
+                                        continue
+                                    if file not in BUILD_PLUGIN_LIST:
+                                        FileUtil.rm(file)
+                            else:
+                                for file in glob.glob('*/*'):
+                                    if file not in BUILD_PLUGIN_LIST:
+                                        FileUtil.rm(file)
+
+                        if os.path.exists(root_part_path):
+                            os.chdir(root_part_path)
+                            if part != 'config_parser':
+                                for file in glob.glob('*/*/*'):
+                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file):
+                                        continue
+                                    if file not in BUILD_PLUGIN_LIST:
+                                        if file.replace(COMP_ODP_CE, COMP_ODP).replace('3.2.1', '3.1.0') in BUILD_PLUGIN_LIST:
+                                            continue
+                                        FileUtil.rm(file)
+                            else:
+                                for file in glob.glob('*/*'):
+                                    if file not in BUILD_PLUGIN_LIST:
+                                        FileUtil.rm(file)
+                if os.path.exists(root_part_path):
+                    DirectoryUtil.copy(root_part_path, obd_part_dir, ROOT_IO)
+
+            backup_path = os.path.join(self.OBD_PATH, '.backup_plugin')
+            if os.path.exists(backup_path):
+                dir_list = [os.path.join(backup_path, f) for f in os.listdir(backup_path)]
+                sorted_dir_list = sorted(dir_list, key=lambda dir: datetime.datetime.fromtimestamp(os.path.getmtime(dir)))
+                for dir in sorted_dir_list[12:]:
+                    DirectoryUtil.rm(dir)
             version_fobj.seek(0)
             version_fobj.truncate()
             version_fobj.write(VERSION)
@@ -1208,7 +1244,8 @@ class ClusterTenantFailoverCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if len(self.cmds) == 2:
-            return obd.failover_decouple_tenant(self.cmds[0], self.cmds[1], 'failover')
+            self.cmds.append('failover')
+            return obd.failover_decouple_tenant(self.cmds[0], self.cmds[1], self.cmds[2])
         else:
             return self._show_help()
 
@@ -1226,7 +1263,8 @@ class ClusterTenantDecoupleCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if len(self.cmds) == 2:
-            return obd.failover_decouple_tenant(self.cmds[0], self.cmds[1], 'decouple')
+            self.cmds.append('decouple')
+            return obd.failover_decouple_tenant(self.cmds[0], self.cmds[1], self.cmds[2])
         else:
             return self._show_help()
 
@@ -1652,7 +1690,7 @@ class UpdateCommand(ObdCommand):
         return super(UpdateCommand, self).do_command()
     
     def _do_command(self, obd):
-        return obd.update_obd(VERSION, self.OBD_INSTALL_PRE)
+        return obd.update_obd(VERSION, self.OBD_INSTALL_PRE, self.OBD_INSTALL_PATH)
 
 
 class DisplayTraceCommand(ObdCommand):
@@ -2265,8 +2303,8 @@ class MainCommand(MajorCommand):
 REVISION: %s
 BUILD_BRANCH: %s
 BUILD_TIME: %s
-Copyright (C) 2021 OceanBase
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+Copyright (c) 2025 OceanBase.
+Apache License, Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0>.
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.''' % (VERSION, REVISION, BUILD_BRANCH, BUILD_TIME)
         self.parser._add_version_option()

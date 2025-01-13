@@ -590,7 +590,7 @@
   "OBD.component.InstallResult.Complete": "完成",
   "OBD.component.InstallResult.PreviousStep": "上一步",
   "OBD.component.InstallResult.PleaseConfirmWhetherTheInstallation": "请确认是否已定位安装失败原因并修复问题？",
-  "OBD.component.InstallResult.ReinstallationWillFirstCleanUp": "重新安装将先清理失败的 OCP 安装环境",
+  "OBD.component.InstallResult.ReinstallationWillFirstCleanUp": "重新安装将会清理失败的 OCP 安装环境",
   "OBD.component.InstallResult.Ok": "确定",
   "OBD.component.InstallResult.Cancel": "取消",
   "OBD.component.InstallResult.Redeploy": "重新部署",
@@ -1070,5 +1070,15 @@
   "OBD.pages.Obdeploy.InstallFinished.ConnectionString": "连接字符串",
   "OBD.component.DeployConfig.UnableToObtainTheAvailable": "无法获取可用安装包",
   "OBD.component.DeployConfig.ByDefaultTheDatabaseVersion": "系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。",
-  "OBD.component.InsstallResult.TheSystemWillUpgradeOcp": "系统将默认升级 OCP Agent，请前往 OCP 任务中心查看升级进度"
+  "OBD.component.InsstallResult.TheSystemWillUpgradeOcp": "系统将默认升级 OCP Agent，请前往 OCP 任务中心查看升级进度",
+  "OBD.src.constant.CannotBeUninstalled": "不可卸载",
+  "OBD.src.constant.Removing": "移除中",
+  "OBD.src.constant.RemovedSuccessfully": "移除成功",
+  "OBD.src.constant.Unmounting": "卸载中",
+  "OBD.src.constant.UninstallFailed": "卸载失败",
+  "OBD.src.constant.Unmounted": "卸载成功",
+  "OBD.src.constant.ToBeUninstalled": "待卸载",
+  "OBD.src.constant.configuration.ComponentConfiguration": "组件配置",
+  "OBD.src.constant.configuration.UninstallConfiguration": "卸载配置",
+  "OBD.src.constant.configuration.Uninstall": "卸载"
 }

@@ -1,22 +1,18 @@
 
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -32,6 +28,7 @@ import signal
 import shutil
 import re
 import json
+import time
 import hashlib
 import socket
 import datetime
@@ -798,6 +795,22 @@ class Cursor(SafeStdio):
                                     cursorclass=mysql.cursors.DictCursor)
             self.cursor = self.db.cursor()
 
+    @property
+    def usable_cursor(self):
+        count = 600
+        self.stdio.start_loading('wait observer usable')
+        while count:
+            if self.execute('show databases', raise_exception=False, exc_level='verbose'):
+                self.stdio.stop_loading('succeed')
+                return self
+            else:
+                count -= 1
+                time.sleep(3)
+                self.close()
+                self._connect()
+        self.stdio.stop_loading('fail')
+        raise Exception('get usable cursor failed')
+
     def new_cursor(self, tenant='sys', user='root', password='', ip='', port='', print_exception=True):
         try:
             ip = ip if ip else self.ip
@@ -937,3 +950,61 @@ class Exector(SafeStdio):
                     return False
         except:
             pass
+
+
+class EnvVariables(object):
+    def __init__(self, environments, client):
+        self.environments = environments
+        self.client = client
+        self.env_done = {}
+
+    def __enter__(self):
+        for env_key, env_value in self.environments.items():
+            self.env_done[env_key] = self.client.get_env(env_key)
+            self.client.add_env(env_key, env_value, True)
+
+    def __exit__(self, *args, **kwargs):
+        for env_key, env_value in self.env_done.items():
+            if env_value is not None:
+                self.client.add_env(env_key, env_value, True)
+            else:
+                self.client.del_env(env_key)
+
+
+class GetStdio(SafeStdio):
+
+    @classmethod
+    def stdio(cls, stdio=None):
+        return stdio
+
+
+def get_option(options, key, default=''):
+    value = getattr(options, key, default)
+    if not value:
+        value = default
+    return value
+
+
+def get_port_socket_inode(client, port, stdio=GetStdio.stdio()):
+    port = hex(port)[2:].zfill(4).upper()
+    cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{if($4==\"0A\") print $2,$4,$10}' | grep ':%s' | awk -F' ' '{print $3}' | uniq" % port
+    res = client.execute_command(cmd)
+    if not res or not res.stdout.strip():
+        return False
+    stdio.verbose(res.stdout)
+    return res.stdout.strip().split('\n')
+
+
+def confirm_port(client, pid, port):
+    socket_inodes = get_port_socket_inode(client, port)
+    if not socket_inodes:
+        return False
+    ret = client.execute_command("ls -l /proc/%s/fd/ |grep -E 'socket:\[(%s)\]'" % (pid, '|'.join(socket_inodes)))
+    if ret and ret.stdout.strip():
+        return True
+    return False
+
+
+def set_plugin_context_variables(plugin_context, variable_dict):
+    for key, value in variable_dict.items():
+        plugin_context.set_variable(key, value)

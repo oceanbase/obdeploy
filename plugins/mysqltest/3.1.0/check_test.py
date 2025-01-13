@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -27,23 +23,6 @@ from glob import glob
 
 import tool
 from mysqltest_lib import succtest
-
-
-def get_variable_from_python_file(file_path, var_name, default_file=None, default_value=None, stdio=None):
-    global_vars = {}
-    try:
-        stdio and stdio.verbose('read variable {} from {}'.format(var_name, file_path))
-        exec(open(file_path).read(), global_vars, global_vars)
-    except Exception as e:
-        stdio and stdio.warn(str(e))
-        if default_file:
-            try:
-                default_path = os.path.join(os.path.dirname(__file__), 'mysqltest_lib', default_file)
-                stdio and stdio.verbose('read variable {} from {}'.format(var_name, file_path))
-                exec(open(default_path).read(), global_vars, global_vars)
-            except Exception as ex:
-                stdio and stdio.warn(str(ex))
-    return global_vars.get(var_name, default_value)
 
 
 def find_tag_test_with_file_pat(file_pattern, flag_pattern, tag, filelist):
@@ -101,6 +80,9 @@ def check_test(plugin_context, env, *args, **kwargs):
     has_test_point = False
     basename = lambda path: os.path.basename(path)
     dirname =lambda path: os.path.dirname(path)
+
+    get_variable_from_python_file = plugin_context.get_variable("get_variable_from_python_file")
+
     if 'all' in opt and opt['all'] and os.path.isdir(os.path.realpath(opt['suite_dir'])):
         opt['suite'] = ','.join(os.listdir(os.path.realpath(opt['suite_dir'])))
     if 'psmall' in opt and opt['psmall']:
@@ -151,8 +133,8 @@ def check_test(plugin_context, env, *args, **kwargs):
             opt["filter"] = 'proxy'
         else:
             test_zone = cluster_config.get_server_conf(opt['test_server'])['zone']
-            query = 'select zone, count(*) as a from oceanbase.__all_virtual_zone_stat group by region order by a desc limit 1'
-            cursor = opt['cursor']
+            query = plugin_context.get_variable('query_sql')
+            cursor = plugin_context.get_return('connect').get_return('cursor')
             ret = cursor.fetchone(query)
             if ret is False:
                 return
@@ -197,11 +179,8 @@ def check_test(plugin_context, env, *args, **kwargs):
         opt['exclude'] = []
     test_set = filter(lambda k: k not in opt['exclude'], test_set)
     if 'filter' in opt and opt['filter']:
-        if opt.get('case_filter'):
-            exclude_list = get_variable_from_python_file(opt['case_filter'], var_name='%s_list' % opt['filter'],
-                                                     default_file='case_filter.py', default_value=[], stdio=stdio)
-        else:
-            exclude_list = []
+        exclude_test = plugin_context.get_variable('exclude_test')
+        exclude_list = exclude_test(opt, stdio)
         test_set = filter(lambda k: k not in exclude_list, test_set)
     ##有all参数时重新排序,保证运行case的顺序
     if 'all' in opt and opt['all'] == 'all':
@@ -240,4 +219,8 @@ def check_test(plugin_context, env, *args, **kwargs):
         opt['reboot_cases'] = list(set(test_set).intersection(set(reboot_cases)))
     else:
         opt['reboot_cases'] = []
+
+    if opt['test_set'] is None:
+        stdio.error('Test set is empty')
+        return plugin_context.return_false()
     return plugin_context.return_true(test_set=test_set)

@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -47,7 +43,7 @@ def exec_cmd(cmd):
     return process.returncode == 0
 
 
-def run_test(plugin_context, db, cursor, *args, **kwargs):
+def run_test(plugin_context, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if value is None:
@@ -67,7 +63,8 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
     not_test_only = not get_option('test_only')
 
     host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
+    db = plugin_context.get_return("connect").get_return('connect')
+    port = db.port if db else 2881
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test')
@@ -80,13 +77,16 @@ def run_test(plugin_context, db, cursor, *args, **kwargs):
     input_parallel = get_option('parallel')
     obclient_bin = get_option('obclient_bin', 'obclient')
 
+    cursor = plugin_context.get_return('connect').get_return('cursor')
+
     sql_path = sorted(sql_path, key=lambda x: (len(x), x))
 
     cpu_total = 0
-    max_cpu = kwargs.get('max_cpu', 2)
-    tenant_id = kwargs.get('tenant_id')
-    unit_count = kwargs.get('unit_count', 0)
-    memory_size = kwargs.get('memory_size', kwargs.get('min_memory'))
+    pre_test_ret = plugin_context.get_return("pre_test")
+    max_cpu = pre_test_ret.get_return("max_cpu")
+    tenant_id = pre_test_ret.get_return("tenant_id")
+    unit_count = pre_test_ret.get_return("unit_count")
+    memory_size = pre_test_ret.get_return("memory_size", pre_test_ret.get_return("min_memory"))
     if not_test_only:
         sql_cmd_prefix = '%s -h%s -P%s -u%s@%s %s -A' % (obclient_bin, host, port, user, tenant_name, ("-p'%s'" % password) if password else '')
         ret = local_execute_command('%s -e "%s"' % (sql_cmd_prefix, 'create database if not exists %s' % mysql_db))

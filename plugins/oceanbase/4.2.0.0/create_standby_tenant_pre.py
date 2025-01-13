@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import time
 from collections import defaultdict
@@ -56,7 +52,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=Non
         return False
 
 
-def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenant, cursors={}, cluster_configs={}, *args, **kwargs):
+def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *args, **kwargs):
     def error(msg='', *arg, **kwargs):
         msg and stdio.error(msg, *arg, **kwargs)
         stdio.stop_loading('fail')
@@ -72,6 +68,9 @@ def create_standby_tenant_pre(plugin_context, primary_deploy_name, primary_tenan
     standby_deploy_name = plugin_context.cluster_config.deploy_name
     current_cluster_config = plugin_context.cluster_config
     plugin_context.cluster_config = current_cluster_config
+    cmds = plugin_context.cmds
+    primary_deploy_name = cmds[1]
+    primary_tenant = cmds[2]
     primary_cursor = cursors.get(primary_deploy_name)
     stdio.start_loading('Check primary tenant')
     if primary_tenant.lower() == 'sys':

@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from fastapi import APIRouter, Path, Query, BackgroundTasks, Body
 
@@ -170,9 +166,9 @@ async def get_ocp_install_task_log(id: int = Path(description="deployment id"),
     task_info = handler.get_install_task_info(id, task_id)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(id))
-    log_content = handler.buffer.read()
-    # log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
-    return response_utils.new_ok_response(TaskLog(log=log_content, offset=offset))
+    origin_log = handler.buffer.read()
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    return response_utils.new_ok_response(TaskLog(log=masked_log, offset=offset))
 
 
 @router.post("/ocp/deployments/{id}/reinstall",
@@ -214,9 +210,9 @@ async def get_ocp_reinstall_task_log(id: int = Path(description="deployment id")
     task_info = handler.get_reinstall_task_info(id, task_id)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(id))
-    log_content = handler.buffer.read()
-    # log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
-    return response_utils.new_ok_response(TaskLog(log=log_content, offset=offset))
+    origin_log = handler.buffer.read()
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    return response_utils.new_ok_response(TaskLog(log=masked_log, offset=offset))
 
 
 @router.delete("/ocp/deployments/{id}",
@@ -349,9 +345,9 @@ async def get_ocp_upgrade_task_log(cluster_name: str = Path(description="ocp clu
     task_info = handler.get_ocp_upgrade_task(cluster_name, task_id)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(cluster_name))
-    log_content = handler.buffer.read()
-    # log_info = InstallLog(log=log_content[offset:], offset=len(log_content))
-    return response_utils.new_ok_response(TaskLog(log=log_content, offset=offset))
+    origin_log = handler.buffer.read()
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    return response_utils.new_ok_response(TaskLog(log=masked_log, offset=offset))
 
 
 @router.get("/ocp/upgraade/agent/hosts",

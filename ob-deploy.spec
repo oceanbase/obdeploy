@@ -5,7 +5,7 @@ Release: 1%{?dist}
 # uncomment below
 Summary: ob-deploy
 Group: Development/Tools
-License: GPL
+License: Apache 2.0
 Url: git@github.com:oceanbase/obdeploy.git
 BuildRoot:  %_topdir/BUILDROOT
 %define debug_package %{nil}

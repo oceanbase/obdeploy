@@ -116,7 +116,7 @@ export default function Uninstall() {
             ...item,
             status: TaskStatus.RUNNING,
             serversCheck:
-              data?.components_server.find(
+              data?.components_server?.find(
                 (checkItem) => checkItem.component_name === item.component,
               )?.failed_servers.length === 0
                 ? ServersCheckType.SUCCESSFUL
@@ -124,7 +124,7 @@ export default function Uninstall() {
           })),
         );
         const checkPassedComp = componentNames.filter((comp) => {
-          const tempComp = data?.components_server.find(
+          const tempComp = data?.components_server?.find(
             (item) => item.component_name === comp,
           );
           return tempComp?.failed_servers.length === 0 ? true : false;
@@ -219,7 +219,7 @@ export default function Uninstall() {
           setDataSource((preState) =>
             preState.map((preItem: any) => ({
               ...preItem,
-              log: data?.items.find(
+              log: data?.items?.find(
                 (item) => item.component_name === preItem.component,
               )?.log,
             })),

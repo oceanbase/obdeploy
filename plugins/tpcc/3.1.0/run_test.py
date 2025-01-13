@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
@@ -32,42 +28,38 @@ except:
 
 from ssh import LocalClient
 from _errno import EC_TPCC_RUN_TEST_FAILED
+from tool import get_option
 
-stdio = None
 
-
-def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
-    def get_option(key, default=''):
-        value = getattr(options, key, default)
-        if value is None:
-            value = default
-        return value
-
-    def local_execute_command(command, env=None, timeout=None):
-        return LocalClient.execute_command(command, env, timeout, stdio)
-
-    global stdio
+def run_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
-    bmsql_jar = get_option('bmsql_jar')
-    bmsql_libs = get_option('bmsql_libs')
-    bmsql_classpath = kwargs.get('bmsql_classpath')
+
+    pre_test_ret = plugin_context.get_return("pre_test")
+
+    bmsql_jar = get_option(options, 'bmsql_jar')
+    bmsql_libs = get_option(options, 'bmsql_libs')
+    bmsql_classpath = pre_test_ret.get_return("bmsql_classpath")
     if not bmsql_classpath:
         jars = [bmsql_jar]
         jars.extend(bmsql_libs.split(','))
         bmsql_classpath = ':'.join(jars)
-    bmsql_prop_path = kwargs.get('bmsql_prop_path')
+    bmsql_prop_path = pre_test_ret.get_return('bmsql_prop_path')
     stdio.verbose('get bmsql_prop_path: {}'.format(bmsql_prop_path))
-    run_path = kwargs.get('run_path')
-    host = get_option('host', '127.0.0.1')
-    port = get_option('port', 2881)
-    db_name = get_option('database', 'test')
-    user = get_option('user', 'root')
-    password = get_option('password', '')
-    tenant_name = get_option('tenant', 'test')
-    obclient_bin = get_option('obclient_bin', 'obclient')
-    run_mins = get_option('run_mins', 10)
-    java_bin = get_option('java_bin', 'java')
+    run_path = pre_test_ret.get_return('run_path')
+    host = get_option(options, 'host', '127.0.0.1')
+    db_name = get_option(options, 'database', 'test')
+    user = get_option(options, 'user', 'root')
+    password = get_option(options, 'password', '')
+    tenant_name = get_option(options, 'tenant', 'test')
+    obclient_bin = get_option(options, 'obclient_bin', 'obclient')
+    run_mins = get_option(options, 'run_mins', 10)
+    java_bin = get_option(options, 'java_bin', 'java')
+
+    sys_namespace = kwargs.get("sys_namespace")
+    get_db_and_cursor = kwargs.get("get_db_and_cursor")
+    db, cursor = get_db_and_cursor(sys_namespace)
+    port = db.port if db else 2881
 
     stdio.verbose('Check connect ready')
     exec_sql_cmd = "%s -h%s -P%s -u%s@%s %s -A %s -e" % (
@@ -75,7 +67,7 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
     stdio.start_loading('Connect to tenant %s' % tenant_name)
     try:
         while True:
-            ret = local_execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'))
+            ret = LocalClient.execute_command('%s "%s" -E' % (exec_sql_cmd, 'select version();'), stdio=stdio)
             if ret:
                 break
             time.sleep(10)
@@ -139,7 +131,7 @@ def run_test(plugin_context, cursor, odp_cursor=None, *args, **kwargs):
             timeout = datetime.timedelta(seconds=int(run_mins * 60 * 1.2))
             while p.poll() is None:
                 time.sleep(1)
-                ret = local_execute_command("tail -c 1000 %s" % log_path)
+                ret = LocalClient.execute_command("tail -c 1000 %s" % log_path, stdio=stdio)
                 if ret:
                     stdio.update_loading_text(ret.stdout.strip('\b\r\n ').split('\n')[-1].split('\b')[-1].strip())
                 if datetime.datetime.now() - start_time > timeout:

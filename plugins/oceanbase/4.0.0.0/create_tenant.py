@@ -1,64 +1,31 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
 
-import os
 import time
 from collections import defaultdict
 
-import const
-from tool import Exector
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 from _types import Capacity
 
 tenant_cursor_cache = defaultdict(dict)
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
-    global tenant_cursor
-    if not user:
-        user = 'SYS' if mode == 'oracle' else 'root'
-    # find tenant ip, port
-    tenant_cursor = None
-    if cursor in tenant_cursor_cache and tenant in tenant_cursor_cache[cursor] and user in tenant_cursor_cache[cursor][tenant]:
-        tenant_cursor = tenant_cursor_cache[cursor][tenant][user]
-    else:
-        query_sql = "select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
-        tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
-        for tenant_server_port in tenant_server_ports:
-            tenant_ip = tenant_server_port['SVR_IP']
-            tenant_port = tenant_server_port['SQL_PORT']
-            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, print_exception=print_exception)
-            if tenant_cursor:
-                if tenant not in tenant_cursor_cache[cursor]:
-                    tenant_cursor_cache[cursor][tenant] = {}
-                tenant_cursor_cache[cursor][tenant][user] = tenant_cursor
-                break
-    if not tenant_cursor and retries:
-        time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
-    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
-
-
-def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, **kwargs):
+def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_out_component='', *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -80,19 +47,20 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
         msg and stdio.error(msg, *arg, **kwargs)
         stdio.stop_loading('fail')
 
-    cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
+    if scale_out_component in ['ocp-server-ce', 'ocp-express']:
+        multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     for options in multi_options:
         create_if_not_exists = get_option('create_if_not_exists', False)
-        cursor = plugin_context.get_return('connect').get_return('cursor') if not cursor else cursor
+        cursor = plugin_context.get_return('connect', spacename='oceanbase-ce').get_return('cursor') if not cursor else cursor
         global tenant_cursor
         tenant_cursor = None
 
         mode = get_option('mode', 'mysql').lower()
         if not mode in ['mysql', 'oracle']:
             error('No such tenant mode: %s.\n--mode must be `mysql` or `oracle`' % mode)
-            return 
+            return plugin_context.return_false()
 
         # options not support
         deserted_options = ('max_session_num', 'max_memory', 'min_memory', 'max_disk_size')
@@ -103,7 +71,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
         name = get_option('tenant_name', 'test')
         unit_name = '%s_unit' % name
         sql = 'select * from oceanbase.DBA_OB_UNIT_CONFIGS order by name'
-        res = cursor.fetchall(sql)
+        res = cursor.fetchall(sql, raise_exception=True)
         if res is False:
             return
         for row in res:
@@ -114,8 +82,10 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
 
         sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
         tenant_exists = False
+        plugin_context.set_variable('tenant_exists', tenant_exists)
         res = cursor.fetchone(sql, [name])
         if res:
+            plugin_context.set_variable('tenant_exists', True)
             if create_if_not_exists:
                 continue
             else:
@@ -148,7 +118,8 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
             min_unit_num = min(zone_obs_num.items(), key=lambda x: x[1])[1]
             unit_num = get_option('unit_num', min_unit_num)
             if unit_num > min_unit_num:
-                return error('resource pool unit num is bigger than zone server count')
+                error('resource pool unit num is bigger than zone server count')
+                return plugin_context.return_false()
 
             sql = "select count(*) num from oceanbase.__all_server where status = 'active' and start_service_time > 0"
             count = 30
@@ -187,19 +158,24 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
             MIN_IOPS = 1024
 
             if cpu_available < MIN_CPU:
-                return error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_available, need=MIN_CPU))
+                error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_available, need=MIN_CPU))
+                return plugin_context.return_false()
             if mem_available < MIN_MEMORY:
-                return error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(MIN_MEMORY)))
+                error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(MIN_MEMORY)))
+                return plugin_context.return_false()
             if log_disk_available < MIN_LOG_DISK_SIZE:
-                return error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(log_disk_available), need=Capacity(MIN_LOG_DISK_SIZE)))
+                error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(log_disk_available), need=Capacity(MIN_LOG_DISK_SIZE)))
+                return plugin_context.return_false()
 
             # cpu options
             max_cpu = get_option('max_cpu', cpu_available)
             min_cpu = get_option('min_cpu', max_cpu)
             if cpu_available < max_cpu:
-                return error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_available, need=max_cpu))
+                error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_available, need=max_cpu))
+                return plugin_context.return_false()
             if max_cpu < min_cpu:
-                return error('min_cpu must less then max_cpu')
+                error('min_cpu must less then max_cpu')
+                return plugin_context.return_false()
 
             # memory options
             memory_size = get_parsed_option('memory_size', None)
@@ -211,20 +187,24 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
                     log_disk_size = log_disk_available
 
             if mem_available < memory_size:
-                return error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(memory_size)))
+                error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(memory_size)))
+                return plugin_context.return_false()
 
             # log disk size options
             if log_disk_size is not None and log_disk_available < log_disk_size:
-                return error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(log_disk_available), need=Capacity(log_disk_size)))
+                error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(log_disk_available), need=Capacity(log_disk_size)))
+                return plugin_context.return_false()
 
             # iops options
             max_iops = get_option('max_iops', None)
             min_iops = get_option('min_iops', None)
             iops_weight = get_option('iops_weight', None)
             if max_iops is not None and max_iops < MIN_IOPS:
-                return error('max_iops must greater than %d' % MIN_IOPS)
+                error('max_iops must greater than %d' % MIN_IOPS)
+                return plugin_context.return_false()
             if max_iops is not None and min_iops is not None and max_iops < min_iops:
-                return error('min_iops must less then max_iops')
+                error('min_iops must less then max_iops')
+                return plugin_context.return_false()
 
             zone_num = len(zones)
             charset = get_option('charset', '')
@@ -239,11 +219,13 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
             if replica_num == 0:
                 replica_num = zone_num
             elif replica_num > zone_num:
-                return error('replica_num cannot be greater than zone num (%s)' % zone_num)
+                error('replica_num cannot be greater than zone num (%s)' % zone_num)
+                return plugin_context.return_false()
             if not primary_zone:
                 primary_zone = 'RANDOM'
             if logonly_replica_num > replica_num:
-                return error('logonly_replica_num cannot be greater than replica_num (%s)' % replica_num)
+                error('logonly_replica_num cannot be greater than replica_num (%s)' % replica_num)
+                return plugin_context.return_false()
 
             # create resource unit
             sql = "create resource unit %s max_cpu %.1f, memory_size %d" % (unit_name, max_cpu, memory_size)
@@ -260,15 +242,15 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
 
             res = cursor.execute(sql, stdio=stdio)
             if res is False:
-                error()
-                return
+                error('create resource unit failed')
+                return plugin_context.return_false()
 
             # create resource pool
             sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
             res = cursor.execute(sql, stdio=stdio)
             if res is False:
-                error()
-                return
+                error('create resource pool failed')
+                return plugin_context.return_false()
 
             # create tenant
             sql = "create tenant %s replica_num=%d,zone_list=%s,primary_zone='%s',resource_pool_list=('%s')"
@@ -291,58 +273,8 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, *args, 
                 sql += "set %s" % set_mode
             res = cursor.execute(sql, stdio=stdio)
             if res is False:
-                error()
-                return
+                error('create tenant failed')
+                return plugin_context.return_false()
         stdio.stop_loading('succeed')
-        root_password = get_option(name+'_root_password', "")
-        if root_password:
-            sql = "alter user root IDENTIFIED BY %s"
-            stdio.verbose(sql)
-            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[root_password]) and not create_if_not_exists:
-                stdio.error('failed to set root@{} password {}'.format(name))
-                return
-        database = get_option('database')
-        if database:
-            sql = 'create database {}'.format(database)
-            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode) and not create_if_not_exists:
-                stdio.error('failed to create database {}'.format(database))
-                return
-
-        db_username = get_option('db_username')
-        db_password = get_option('db_password', '')
-        if db_username:
-            create_sql, grant_sql = "", ""
-            if mode == "mysql":
-                create_sql = "create user if not exists '{username}' IDENTIFIED BY %s;".format(username=db_username)
-                grant_sql = "grant all on *.* to '{username}' WITH GRANT OPTION;".format(username=db_username)
-            else:
-                error("Create user in oracle tenant is not supported")
-            if not exec_sql_in_tenant(sql=create_sql, cursor=cursor, tenant=name, mode=mode, args=[db_password], stdio=stdio):
-                stdio.error('failed to create user {}'.format(db_username))
-                return
-            if not exec_sql_in_tenant(sql=grant_sql, cursor=cursor, tenant=name, mode=mode, stdio=stdio):
-                stdio.error('Failed to grant privileges to user {}'.format(db_username))
-                return
-
-        clients = plugin_context.clients
-        client = clients[plugin_context.cluster_config.servers[0]]
-        repositories = plugin_context.repositories
-        global_config = cluster_config.get_global_conf()
-
-        time_zone = get_option('time_zone', client.execute_command('date +%:z').stdout.strip())
-        exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
-
-        exector_path = get_option('exector_path', '/usr/obd/lib/executer')
-        exector = Exector(tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user, tenant_cursor.password, exector_path, stdio)
-        for repository in repositories:
-            if repository.name in const.COMPS_OB:
-                time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
-                srs_data_param = os.path.join(repository.repository_dir, 'etc', 'default_srs_data_mysql.sql')
-                if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
-                    stdio.warn('execute import_time_zone_info.py failed')
-                if not exector.exec_script('import_srs_data.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), srs_data_param)):
-                    stdio.warn('execute import_srs_data.py failed')
-                    break
-        cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
-        stdio.print(cmd)
+    plugin_context.set_variable('error', error)
     return plugin_context.return_true()

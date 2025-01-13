@@ -1,34 +1,28 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 from __future__ import absolute_import, division, print_function
 
 import os.path
-from glob import glob
 
 import _errno as err
-from _arch import getArchList
-from core import ObdHome
+import const
 from const import CONST_OBD_HOME
-from ssh import LocalClient
 from _mirror import MirrorRepositoryManager
+from _rpm import Version
 
 
 def _clean(server, client, path, stdio=None):
@@ -41,7 +35,7 @@ def _clean(server, client, path, stdio=None):
         return True
 
 
-def _ocp_lib(client, home_path, soft_dir='', stdio=None):
+def _ocp_lib(plugin_context, client, home_path, soft_dir='', stdio=None):
     stdio.verbose('cp rpm & pos')
     if soft_dir:
         client.execute_command('mkdir -p -m 775  %s' % soft_dir, timeout=-1)
@@ -61,11 +55,16 @@ def _ocp_lib(client, home_path, soft_dir='', stdio=None):
         pkg = mirror_manager.get_exact_pkg(name=comp, only_download=True)
         if pkg:
             pkgs.append(pkg)
+    ob_with_opti_pkgs = []
     for pkg in pkgs:
+        if pkg.name in const.COMPS_OB and pkg.version >= Version('4.3.0.0'):
+            ob_with_opti_pkgs.append(pkg)
+            continue
         client.put_file(pkg.path, os.path.join(home_path, 'ocp-server/lib/', pkg.file_name))
         if soft_dir:
             client.put_file(pkg.path, os.path.join(soft_dir, pkg.file_name))
-
+    if ob_with_opti_pkgs:
+        plugin_context.set_variable('ob_with_opti_pkgs', ob_with_opti_pkgs)
 
 
 def init(plugin_context, upgrade=False, *args, **kwargs):
@@ -83,7 +82,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
             server_config = cluster_config.get_server_conf(server)
             home_path = server_config['home_path']
             soft_dir = server_config.get('soft_dir', '')
-            _ocp_lib(client, home_path, soft_dir, stdio)
+            _ocp_lib(plugin_context, client, home_path, soft_dir, stdio)
         plugin_context.return_true()
         return
 
@@ -167,7 +166,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
         link_path = os.path.join(home_path, 'log')
         client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))
         if cp_lib < 1:
-            _ocp_lib(client, home_path, soft_dir, stdio)
+            _ocp_lib(plugin_context, client, home_path, soft_dir, stdio)
         cp_lib += 1
         if launch_user:
             res_home = client.execute_command("sudo chown -R %s %s" % (launch_user, home_path))

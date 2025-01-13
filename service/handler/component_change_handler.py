@@ -1,26 +1,23 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import copy
 import json
 import yaml
 import tempfile
+from copy import deepcopy
 from optparse import Values
 from uuid import uuid1 as uuid
 from singleton_decorator import singleton
@@ -29,7 +26,7 @@ from _rpm import Version
 from _plugin import PluginType
 from _errno import CheckStatus, FixEval
 from collections import defaultdict
-from const import COMP_JRE
+from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMPS_ODP, COMP_OB_CONFIGSERVER
 from ssh import LocalClient
 from _mirror import MirrorRepositoryType
 from _deploy import DeployStatus, DeployConfigStatus
@@ -217,7 +214,10 @@ class ComponentChangeHandler(BaseHandler):
         if config.obproxy:
             if not config.obproxy.cluster_name and self.context['appname'][name]:
                 config.obproxy.cluster_name = self.context['appname'][name]
-            cluster_config[config.obproxy.component] = self.generate_component_config(config, 'obproxy', ['cluster_name', 'prometheus_listen_port', 'listen_port', 'rpc_listen_port', 'obproxy_sys_password'], [self.context['ob_component'][name]])
+            depend_component = [self.context['ob_component'][name]]
+            if config.obconfigserver or 'ob-configserver' in self.obd.deploy.deploy_config.components:
+                depend_component.append('ob-configserver')
+            cluster_config[config.obproxy.component] = self.generate_component_config(config, 'obproxy', ['cluster_name', 'prometheus_listen_port', 'listen_port', 'rpc_listen_port', 'obproxy_sys_password'], depend_component)
         if config.obagent:
             cluster_config[config.obagent.component] = self.generate_component_config(config, config.obagent.component, ['monagent_http_port', 'mgragent_http_port'], [self.context['ob_component'][name]], self.context['ob_servers'][name])
         if config.ocpexpress:
@@ -283,15 +283,14 @@ class ComponentChangeHandler(BaseHandler):
         self.obd.search_param_plugin_and_apply(repositories, deploy_config)
         self.obd._call_stdio('stop_loading', 'succeed')
 
-        start_check_plugins = self.obd.search_py_script_plugin(repositories, 'start_check', no_found_act='warn')
-        self._precheck(name, repositories, start_check_plugins, init_check_status=True)
+        self._precheck(name, repositories, init_check_status=True)
         info = task_manager.get_task_info(name, task_type="component_change_precheck")
         if info is not None and info.exception is not None:
             exception = copy.deepcopy(info.exception)
             info.exception = None
             raise exception
         task_manager.del_task_info(name, task_type="component_change_precheck")
-        background_tasks.add_task(self._precheck, name, repositories, start_check_plugins, init_check_status=False)
+        background_tasks.add_task(self._precheck, name, repositories, init_check_status=False)
         self.obd.set_deploy(self.obd.deploy)
 
     def _init_check_status(self, check_key, servers, check_result={}):
@@ -305,23 +304,27 @@ class ComponentChangeHandler(BaseHandler):
         return check_status
 
     @auto_register('component_change_precheck')
-    def _precheck(self, name, repositories, start_check_plugins, init_check_status=False):
+    def _precheck(self, name, repositories, init_check_status=False):
         if init_check_status:
-            self._init_precheck(repositories, start_check_plugins)
+            self._init_precheck(repositories)
         else:
-            self._do_precheck(repositories, start_check_plugins)
+            self._do_precheck(repositories)
 
-    def _init_precheck(self, repositories, start_check_plugins):
+    def _init_precheck(self, repositories):
         log.get_logger().info('init precheck')
         param_check_status = {}
         servers_set = set()
+
+        component_kwargs = {repository.name: {"clients": {}} for repository in repositories}
+        init_check_status_workflows = self.obd.get_workflows('init_check_status', repositories)
+        workflows_ret = self.obd.run_workflow(init_check_status_workflows, repositories, **component_kwargs)
+
         for repository in repositories:
-            if repository not in start_check_plugins:
+            if not self.obd.namespaces.get(repository.name):
                 continue
+            if not workflows_ret and self.obd.namespaces.get(repository.name).get_return('exception'):
+                raise self.obd.namespaces.get(repository.name).get_return('exception')
             repository_status = {}
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=True, work_dir_check=True, clients={})
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
             servers = self.obd.deploy.deploy_config.components.get(repository.name).servers
             for server in servers:
                 repository_status[server] = {'param': CheckStatus()}
@@ -335,8 +338,9 @@ class ComponentChangeHandler(BaseHandler):
         self.context['component_change_deployment']['connect_check_status'] = {'ssh': server_connect_status}
         self.context['component_change_deployment']['servers_set'] = servers_set
 
-    def _do_precheck(self, repositories, start_check_plugins):
+    def _do_precheck(self, repositories):
         self.context['component_change_deployment']['chcek_pass'] = True
+        self.context['component_change_deployment_ssh']['ssh'] = True
         log.get_logger().info('start precheck')
         log.get_logger().info('ssh check')
         ssh_clients, connect_status = self.obd.get_clients_with_connect_status(self.obd.deploy.deploy_config, repositories, fail_exit=False)
@@ -349,11 +353,7 @@ class ComponentChangeHandler(BaseHandler):
                 log.get_logger().info('ssh check failed')
                 return
         log.get_logger().info('ssh check succeed')
-        gen_config_plugins = self.obd.search_py_script_plugin(repositories, 'generate_config')
-        if len(repositories) != len(gen_config_plugins):
-            raise Exception("param_check: config error, check stop!")
-
-        param_check_status, check_pass = self.obd.deploy_param_check_return_check_status(repositories, self.obd.deploy.deploy_config, gen_config_plugins=gen_config_plugins)
+        param_check_status, check_pass = self.obd.deploy_param_check_return_check_status(repositories, self.obd.deploy.deploy_config)
         param_check_status_result = {}
         for comp_name in param_check_status:
             status_res = param_check_status[comp_name]
@@ -367,19 +367,25 @@ class ComponentChangeHandler(BaseHandler):
             return
 
         components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
-        for repository in repositories:
-            ret = self.obd.call_plugin(gen_config_plugins[repository], repository, generate_check=False, generate_consistent_config=True, auto_depend=True, components=components)
-            if ret is None:
-                raise Exception("generate config error")
-            elif not ret and ret.get_return("exception"):
-                raise ret.get_return("exception")
+        workflows = self.obd.get_workflows('generate_config', repositories=repositories)
+        component_kwargs = {repository.name: {"generate_check": False, "generate_consistent_config": True, "auto_depend": True, "components": components} for repository in repositories}
+        workflow_ret = self.obd.run_workflow(workflows, repositories=repositories, error_exit=False, **component_kwargs)
+        if not workflow_ret:
+            for repository in repositories:
+                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                    if plugin_ret.get_return("exception"):
+                        raise plugin_ret.get_return("exception")
+            raise Exception('generate config error!')
 
         log.get_logger().info('generate config succeed')
         ssh_clients = self.obd.get_clients(self.obd.deploy.deploy_config, repositories)
+
+        component_kwargs = {}
+        log.get_logger().info('begin start_check')
         for repository in repositories:
-            log.get_logger().info('begin start_check: %s' % repository.name)
-            java_check = True
-            if repository.name == const.OCP_EXPRESS:
+            component_kwargs[repository.name] = {"work_dir_check": True, "precheck": True, "clients":ssh_clients}
+            if repository.name == COMP_OCP_EXPRESS:
+                java_check = True
                 jre_name = COMP_JRE
                 install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
                 if install_plugin and jre_name in install_plugin.requirement_map(repository):
@@ -388,10 +394,14 @@ class ComponentChangeHandler(BaseHandler):
                     max_version = install_plugin.requirement_map(repository)[jre_name].max_version
                     if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
                         java_check = False
-            res = self.obd.call_plugin(start_check_plugins[repository], repository, init_check_status=False, work_dir_check=True, precheck=True, java_check=java_check, clients=ssh_clients)
-            if not res and res.get_return("exception"):
-                raise res.get_return("exception")
-            log.get_logger().info('end start_check: %s' % repository.name)
+                component_kwargs[repository.name]["java_check"] = java_check
+        workflows = self.obd.get_workflows('start_check', repositories=repositories)
+        if not self.obd.run_workflow(workflows, repositories=repositories, error_exit=False, **component_kwargs):
+            for repository in repositories:
+                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                    if plugin_ret.get_return("exception"):
+                        raise plugin_ret.get_return("exception")
+        log.get_logger().info('end start_check!')
 
     def get_precheck_result(self, name):
         precheck_result = PreCheckResult()
@@ -404,12 +414,8 @@ class ComponentChangeHandler(BaseHandler):
         total = 0
         finished = 0
         all_passed = True
-        param_check_status = None
-        connect_check_status = None
-        if 'component_change_deployment' in self.context.keys():
-            param_check_status = self.context['component_change_deployment']['param_check_status']
-            connect_check_status = self.context['component_change_deployment']['connect_check_status']
-        connect_check_status_flag = True
+        param_check_status = self.context['component_change_deployment']['param_check_status']
+        connect_check_status = self.context['component_change_deployment']['connect_check_status']
         for component in components:
             namespace_union = {}
             namespace = self.obd.get_namespace(component)
@@ -417,11 +423,10 @@ class ComponentChangeHandler(BaseHandler):
                 variables = namespace.variables
                 if 'start_check_status' in variables.keys():
                     namespace_union = util.recursive_update_dict(namespace_union, variables.get('start_check_status'))
-            if param_check_status is not None:
+            if param_check_status:
                 namespace_union = util.recursive_update_dict(namespace_union, param_check_status[component])
-            if connect_check_status is not None and connect_check_status_flag and 'ssh' in connect_check_status.keys():
+            if connect_check_status and 'ssh' in connect_check_status.keys():
                 namespace_union = util.recursive_update_dict(namespace_union, connect_check_status['ssh'])
-                connect_check_status_flag = False
 
             if namespace_union:
                 for server, result in namespace_union.items():
@@ -586,16 +591,17 @@ class ComponentChangeHandler(BaseHandler):
                 self.obd.namespaces[component].set_return(plugin, None)
         log.get_logger().info("clean namespace for start")
         for component in self.context['new_obd'][name].deploy.deploy_config.components:
+            self.obd.namespaces[component]._variables = {'run_result': self.obd.namespaces[component].variables['run_result']}
             for plugin in const.START_PLUGINS:
                 self.obd.namespaces[component].set_return(plugin, None)
 
+        deploy_config = self.obd.deploy.deploy_config
         repositories, install_plugins = self.obd.search_components_from_mirrors_and_install(self.obd.deploy.deploy_config, components=self.obd.deploy.deploy_config.added_components)
         if not repositories or not install_plugins:
             return False
         self.context['new_obd'][name].set_repositories(repositories)
         repositories = self.context['origin_repository'][name] + repositories
         self.obd.set_repositories(repositories)
-        scale_out_check_plugins = self.obd.search_py_script_plugin(repositories, 'scale_out_check', no_found_act='ignore')
 
         trace_id = str(uuid())
         self.context['component_trace']['deploy'] = trace_id
@@ -603,38 +609,35 @@ class ComponentChangeHandler(BaseHandler):
         if ret is False:
             log.get_logger().warn("component deploy log init error")
 
-        check_pass = True
-        for repository in repositories:
-            if repository not in scale_out_check_plugins:
-                continue
-            ret = self.obd.call_plugin(scale_out_check_plugins[repository], repository)
-            if not ret:
-                self.obd._call_stdio('verbose', '%s scale out check failed.' % repository.name)
-                check_pass = False
-        if not check_pass:
-            log.get_logger().error('component scale out check failed')
+        oceanbase_repo = None
+        current_obproxy_repo = None
+        for repository in self.context['origin_repository'][name]:
+            if repository.name in COMPS_OB:
+                oceanbase_repo = repository
+            elif repository.name in COMPS_ODP:
+                current_obproxy_repo = repository
+
+        add_component_pre_repositories = deepcopy(self.context['new_obd'][name].repositories)
+        if oceanbase_repo:
+            add_component_pre_repositories.append(oceanbase_repo)
+        if COMP_OB_CONFIGSERVER in [repo.name for repo in repositories] and current_obproxy_repo:
+            add_component_pre_repositories.append(current_obproxy_repo)
+
+        workflows = self.obd.get_workflows('add_component_pre', repositories=add_component_pre_repositories, no_found_act='ignore')
+        if not self.obd.run_workflow(workflows, repositories=add_component_pre_repositories):
             return False
 
-        succeed = True
-        # prepare for added components
-        for repository in repositories:
-            if repository in scale_out_check_plugins:
-                plugin_return = self.obd.get_namespace(repository.name).get_return(scale_out_check_plugins[repository].name)
-                plugins_list = plugin_return.get_return('plugins', [])
-                for plugin_name in plugins_list:
-                    plugin = self.obd.search_py_script_plugin([repository], plugin_name)
-                    if repository in plugin:
-                        succeed = succeed and self.obd.call_plugin(plugin[repository], repository)
-        if not succeed:
-            log.get_logger().error('scale out check return plugin failed')
+        # Install repository to servers
+        if not self.obd.install_repositories_to_servers(deploy_config, self.context['new_obd'][name].repositories, install_plugins):
             return False
 
-        self.obd._call_stdio('verbose', 'Start to deploy additional servers')
-        if not self.obd._deploy_cluster(self.obd.deploy, self.context['new_obd'][name].repositories, dump=False):
-            log.get_logger().error('failed to deploy additional servers')
+        # Sync runtime dependencies
+        if not self.obd.sync_runtime_dependencies(self.context['new_obd'][name].repositories):
             return False
 
-        self.obd.deploy.deploy_config.enable_mem_mode()
+        deploy_config.enable_mem_mode()
+
+        self.obd._call_stdio('verbose', 'Start to start additional servers')
         self.obd._call_stdio('verbose', 'Start to start additional servers')
         error_repositories = []
         succeed_repositories = []
@@ -646,7 +649,8 @@ class ComponentChangeHandler(BaseHandler):
             ret = self.obd.stdio.init_trace_logger(self.obd.stdio.log_path, trace_id=trace_id, recreate=True)
             if ret is False:
                 log.get_logger().error("component: {}, start log init error".format(repository.name))
-            if not self.obd._start_cluster(self.obd.deploy, [repository]):
+            workflows = self.obd.get_workflows('add_component', repositories=[repository] + [oceanbase_repo] if oceanbase_repo else [repository], no_found_act='ignore')
+            if not self.obd.run_workflow(workflows, repositories=[repository] + [oceanbase_repo] if oceanbase_repo else [repository]):
                 log.get_logger().error("failed to start component: %s", repository.name)
                 error_repositories.append(repository.name)
                 continue
@@ -851,6 +855,14 @@ class ComponentChangeHandler(BaseHandler):
             log.get_logger().error('Components is required.')
             return False
 
+        oceanbase_repo = None
+        current_obproxy_repo = None
+        for repository in self.obd.repositories:
+            if repository.name in COMPS_OB:
+                oceanbase_repo = repository
+            elif repository.name in COMPS_ODP:
+                current_obproxy_repo = repository
+
         deploy_config.set_undumpable()
         self.obd._call_stdio('start_loading', 'Get local repositories and plugins')
         all_repositories = self.obd.load_local_repositories(deploy_info)
@@ -859,17 +871,8 @@ class ComponentChangeHandler(BaseHandler):
         self.obd.search_param_plugin_and_apply(all_repositories, deploy_config)
         self.obd._call_stdio('stop_loading', 'succeed')
 
-        scale_in_check_plugins = self.obd.search_py_script_plugin(all_repositories, 'scale_in_check', no_found_act='ignore')
-        check_pass = True
-        for repository in all_repositories:
-            if repository not in scale_in_check_plugins:
-                continue
-            ret = self.obd.call_plugin(scale_in_check_plugins[repository], repository)
-            if not ret:
-                self.obd._call_stdio('verbose', '%s scale in check failed.' % repository.name)
-                log.get_logger().error('%s scale in check failed.' % repository.name)
-                check_pass = False
-        if not check_pass:
+        workflows = self.obd.get_workflows('delete_component_pre', repositories=repositories, no_found_act='ignore')
+        if not self.obd.run_workflow(workflows):
             return False
 
         if not deploy_config.del_components(components, dryrun=True):
@@ -890,21 +893,19 @@ class ComponentChangeHandler(BaseHandler):
 
             self.obd._call_stdio('verbose', 'Start to stop target components')
             self.obd.set_repositories([repository])
-            if not self.obd._stop_cluster(deploy, [repository], dump=False):
-                self.obd._call_stdio('warn', f'failed to stop component {repository.name}')
+            workflows = self.obd.get_workflows('delete_component', no_found_act='ignore')
+            if not self.obd.run_workflow(workflows):
+                self.obd._call_stdio('warn', f'failed to delete component {repository.name}')
                 error_component.append(repository.name)
 
-            self.obd._call_stdio('verbose', 'Start to destroy target components')
-            if not self.obd._destroy_cluster(deploy, [repository], dump=False):
-                error_component.append(repository.name)
         if error_component:
-            self.obd._call_stdio('warn', 'failed to stop component {}'.format(','.join([r.name for r in error_component])))
-            log.get_logger().error('failed to stop component {}'.format(','.join([r.name for r in error_component])))
+            self.obd._call_stdio('warn', 'failed to delete component {}'.format(','.join([r.name for r in error_component])))
+            log.get_logger().error('failed to delete component {}'.format(','.join([r.name for r in error_component])))
             return False
 
         if not deploy_config.del_components(components):
-            self.obd._call_stdio('error', 'Failed to delete components for %s' % name)
-            log.get_logger().error('Failed to delete components for %s' % name)
+            self.obd._call_stdio('error', 'Failed to delete components config for %s' % name)
+            log.get_logger().error('Failed to delete components config for %s' % name)
             return False
 
         deploy_config.set_dumpable()

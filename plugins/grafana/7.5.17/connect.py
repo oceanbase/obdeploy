@@ -1,21 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import, division, print_function
 
@@ -84,6 +80,8 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         return plugin_context.return_true(**kwargs)
     
     cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get("new_cluster_config")
+    count = kwargs.get("retry_times", 10)
     stdio = plugin_context.stdio
     clients = plugin_context.clients
 
@@ -97,28 +95,35 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
 
     protocol = 'http'
     user = 'admin'
-    grafana_default_pwd = 'admin'
-    for server in servers:
-        config = cluster_config.get_server_conf(server)
-        client = clients[server]
-        home_path = config['home_path']
-        if config.get('customize_config'):
-            if config['customize_config'].get("server"):
-                if config['customize_config']['server'].get('protocol'):
-                    protocol = config['customize_config']['server']['protocol']
+    while count and servers:
+        count -= 1
+        for server in servers:
+            config = cluster_config.get_server_conf(server)
+            client = clients[server]
+            home_path = config['home_path']
+            if config.get('customize_config'):
+                if config['customize_config'].get("server"):
+                    if config['customize_config']['server'].get('protocol'):
+                        protocol = config['customize_config']['server']['protocol']
 
-        if config.get('security'):
-            if config['security'].get('admin_user'):
-                user = config['security']['admin_user']
-        
-        touch_path = os.path.join(home_path, 'run/.grafana')
-        if client.execute_command("ls %s" % touch_path):
-            grafana_default_pwd = config['login_password']
+            if config.get('security'):
+                if config['security'].get('admin_user'):
+                    user = config['security']['admin_user']
 
-        stdio.verbose('connect grafana ({}:{} by user {})'.format(server.ip, config['port'], user))
-        api_cursor = GrafanaAPICursor(ip=server.ip, port=config['port'], user=user, password=grafana_default_pwd, protocol=protocol)
-        cursors[server] = api_cursor
-    
+            touch_path = os.path.join(home_path, 'run/.grafana')
+            new_config = None
+            if new_cluster_config:
+                new_config = new_cluster_config.get_server_conf(server)
+                if new_config:
+                    new_login_password = new_config['login_password']
+            login_password = config['login_password'] if client.execute_command("ls %s" % touch_path) else 'admin'
+            login_password = new_login_password if new_config and count % 2 else login_password
+
+            stdio.verbose('connect grafana ({}:{} by user {})'.format(server.ip, config['port'], user))
+            api_cursor = GrafanaAPICursor(ip=server.ip, port=config['port'], user=user, password=login_password, protocol=protocol)
+            if api_cursor.connect(stdio=stdio):
+                cursors[server] = api_cursor
+
     if not cursors:
         stdio.error(EC_FAIL_TO_CONNECT.format(component=cluster_config.name))
         stdio.stop_loading('fail')
