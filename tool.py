@@ -1,23 +1,18 @@
 
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
-
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import, division, print_function
 
@@ -1012,3 +1007,36 @@ def confirm_port(client, pid, port):
 def set_plugin_context_variables(plugin_context, variable_dict):
     for key, value in variable_dict.items():
         plugin_context.set_variable(key, value)
+
+
+def get_disk_info(all_paths, client, stdio):
+    overview_ret = True
+    disk_info = get_disk_info_by_path('', client, stdio)
+    if not disk_info:
+        overview_ret = False
+        disk_info = get_disk_info_by_path('/', client, stdio)
+        if not disk_info:
+            disk_info['/'] = {'total': 0, 'avail': 0, 'need': 0, 'threshold': 2}
+    all_path_success = {}
+    for path in all_paths:
+        all_path_success[path] = False
+        cur_path = path
+        while cur_path not in disk_info:
+            disk_info_for_current_path = get_disk_info_by_path(cur_path, client, stdio)
+            if disk_info_for_current_path:
+                disk_info.update(disk_info_for_current_path)
+                all_path_success[path] = True
+                break
+            else:
+                cur_path = os.path.dirname(cur_path)
+    if overview_ret or all(all_path_success.values()):
+        return disk_info
+
+def get_disk_info_by_path(path, client, stdio):
+    disk_info = {}
+    ret = client.execute_command('df --block-size=1024 {}'.format(path))
+    if ret:
+        for total, used, avail, puse, path in re.findall(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
+            disk_info[path] = {'total': int(total) << 10, 'avail': int(avail) << 10, 'need': 0, 'threshold': 2}
+            stdio.verbose('get disk info for path {}, total: {} avail: {}'.format(path, disk_info[path]['total'], disk_info[path]['avail']))
+    return disk_info

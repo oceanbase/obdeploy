@@ -90,6 +90,9 @@ for DIR in workflows plugins config_parser; do
     if [ ! -e ${OBD_HOME}/${DIR}/ocp-server-ce ]; then
         ln -s ${OBD_HOME}/${DIR}/ocp-server ${OBD_HOME}/${DIR}/ocp-server-ce
     fi
+    if [ ! -e ${OBD_HOME}/${DIR}/obproxy-ce ]; then
+        ln -s ${OBD_HOME}/${DIR}/obproxy ${OBD_HOME}/${DIR}/obproxy-ce
+    fi
 done
 
 echo -n '<VERSION>' > ${OBD_HOME}/version

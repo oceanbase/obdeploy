@@ -1,22 +1,17 @@
 # coding: utf-8
-# OceanBase Deploy.
-# Copyright (C) 2021 OceanBase
+# Copyright (c) 2025 OceanBase.
 #
-# This file is part of OceanBase Deploy.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# OceanBase Deploy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# OceanBase Deploy is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with OceanBase Deploy.  If not, see <https://www.gnu.org/licenses/>.
-
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import, division, print_function
 
@@ -26,9 +21,10 @@ import time
 
 import _errno as err
 from _rpm import Version
+from tool import Cursor
 
 
-def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_check_status=False, java_check=True, *args, **kwargs):
+def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', init_check_status=False, java_check=True, *args, **kwargs):
     def check_pass(item):
         status = check_status[server]
         if status[item].status == err.CheckStatus.WAIT:
@@ -63,6 +59,7 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
     plugin_context.set_variable('start_check_status', check_status)
+    start_env = plugin_context.get_variable('start_env')
 
     for server in cluster_config.servers:
         check_status[server] = {
@@ -109,7 +106,20 @@ def upgrade_check(plugin_context, meta_cursor, database='meta_database', init_ch
             stdio.error(e)
             error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='1.8.0'),
                   [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='1.8.0'), ])
-
+        if not meta_cursor:
+            server_config = start_env[server]
+            jdbc_url = server_config.get('jdbc_url', None)
+            if jdbc_url:
+                matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
+                if not matched:
+                    stdio.error('jdbc_url is not valid')
+                    return plugin_context.return_false()
+                host = matched.group(1)
+                port = matched.group(2)[1:]
+                meta_user = server_config['ocp_meta_username']
+                meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
+                meta_password = server_config['ocp_meta_password']
+                meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio)
         sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL', 'ABORTED');" % database
         if meta_cursor.fetchone(sql)['num'] > 0:
             success = False

@@ -1,0 +1,83 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: Path
+  need_redeploy: true
+  description_en: the directory for the work data
+  description_local: log proxy工作目录
+- name: service_port
+  name_local: 端口
+  require: true
+  essential: true
+  type: INT
+  default: 2983
+  need_restart: true
+  description_en: the port of log proxy.
+  description_local: log proxy使用的端口
+- name: prometheus_port
+  name_local: 端口
+  require: true
+  essential: true
+  type: INT
+  default: 2984
+  need_restart: true
+  description_en: the port of prometheus.
+  description_local: prometheus使用的端口
+- name: binlog_mode
+  name_local: 开启binlog模式
+  require: true
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: enable binlog mode
+  description_local: 开启binlog模式
+- name: init_schema
+  require: false
+  essential: false
+  type: BOOL
+  default: true
+  need_restart: true
+  description_en: int meta db
+  description_local: 是否初始化metadb
+- name: meta_host
+  require: false
+  essential: false
+  type: SAFE_STRING
+  default:  ''
+  need_restart: true
+  description_en: meta database host
+  description_local: meta数据库地址
+- name: meta_port
+  require: false
+  essential: false
+  type: INT
+  default:  ''
+  need_restart: true
+  description_en: meta database port
+  description_local: meta数据库端口
+- name: meta_username
+  require: false
+  essential: false
+  type: SAFE_STRING
+  default:  'root'
+  need_restart: true
+  description_en: meta database username
+  description_local: meta数据库用户名
+- name: meta_password
+  require: false
+  essential: false
+  type: SAFE_STRING
+  default:  ''
+  need_restart: true
+  description_en: meta database password
+  description_local: meta数据库密码
+- name: meta_db
+  require: false
+  essential: false
+  type: SAFE_STRING
+  default:  ''
+  need_restart: true
+  description_en: meta database name
+  description_local: meta数据库名

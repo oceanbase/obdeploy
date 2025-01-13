@@ -143,6 +143,15 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Thu Jan 02 2025 obd 3.1.0
+ - new features: add support for OceanBase Binlog maintenance
+ - optimizations: optimize the logic for validating tenant name legality during tenant creation
+ - bug fixes: resolve errors in OBD command line upgrade of OCP package
+ - bug fixes: address unexpected issues when restarting OCP with parameters
+ - bug fixes: resolve unexpected issues when using launch user start in multi-node OCP environments
+* Tue Dec 17 2024 obd 3.0.1
+ - bug fixes: resolve OCP start failures in multi-node environments
+ - bug fixes: address unexpected issues with node duplication checks during white screen deployments
 * Thu Dec 12 2024 obd 3.0.0
  - new features: adapt to Oceanbase-CE 4.2.5.1
  - new features: introduce workflow orchestration mechanism

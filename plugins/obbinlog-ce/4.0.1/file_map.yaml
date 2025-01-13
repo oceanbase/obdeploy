@@ -1,0 +1,30 @@
+- src_path: ./home/ds/oblogproxy/bin/logproxy
+  target_path: bin/logproxy
+  type: file
+  install_method: ln
+- src_path: ./home/ds/oblogproxy/bin/binlog_instance
+  target_path: bin/binlog_instance
+  type: file
+  install_method: ln
+- src_path: ./home/ds/oblogproxy/bin
+  target_path: bin
+  type: dir
+  install_method: ln
+- src_path: ./home/ds/oblogproxy/conf/
+  target_path: conf
+  type: dir
+  install_method: ln
+- src_path: ./home/ds/oblogproxy/obcdc
+  target_path: obcdc
+  type: dir
+  install_method: ln
+- src_path: ./home/ds/oblogproxy/deps/lib
+  target_path: lib
+  type: dir
+  install_method: ln
+- src_path: ./home/ds/oblogproxy/run.sh
+  target_path: run.sh
+  type: file
+  install_method: ln
+
+
