@@ -122,4 +122,4 @@ A：You can use the `obd update` command to update OBD. When you are done with t
 
 ## Protocol
 
-OBD complies with [GPL-3.0](/LICENSE).
+OBD complies with [Apache-2.0](/LICENSE).
