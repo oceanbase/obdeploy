@@ -1844,7 +1844,6 @@ class ObdHome(object):
         repositories, install_plugins = self.search_components_from_mirrors_and_install(deploy_config, components=components)
         if not install_plugins:
             return False
-        self.set_repositories(repositories)
         self.search_param_plugin_and_apply(repositories, deploy_config)
         self._call_stdio('stop_loading', 'succeed')
 
@@ -1882,7 +1881,7 @@ class ObdHome(object):
 
         setattr(self.options, 'force', True)
         deploy_config.enable_mem_mode()
-        workflows = self.get_workflows('scale_out', no_found_act='ignore')
+        workflows = self.get_workflows('scale_out', repositories=repositories, no_found_act='ignore')
         if not self.run_workflow(workflows, no_found_act='ignore'):
             return False
 

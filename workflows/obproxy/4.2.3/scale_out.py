@@ -20,8 +20,8 @@ import const
 
 def scale_out(plugin_context, workflow, *args, **kwargs):
     added_servers = plugin_context.cluster_config.added_servers
-    workflow.add_with_component(const.STAGE_FIRST, {'target_servers': added_servers}, 'start_check_pre', 'status_check', 'password_check', 'proxy_id_check', 'status_check',
+    workflow.add_with_kwargs(const.STAGE_FIRST, {'target_servers': added_servers}, 'start_check_pre', 'status_check', 'password_check', 'proxy_id_check', 'status_check',
                  'work_dir_check', 'port_check')
 
-    workflow.add(const.STAGE_SECOND, {'target_servers': added_servers}, 'parameter_pre', 'start_pre', 'start')
+    workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'parameter_pre', 'start_pre', 'start')
     plugin_context.return_true()
