@@ -165,7 +165,7 @@ class ServiceInfoHandler(BaseHandler):
         if res:
             log.get_logger().info("found ocp docker")
         home_path = "/home/{0}/ocp-server".format(self.context['upgrade_user']) if self.context['upgrade_user'] != 'root' else "/root/ocp-server"
-        auth = Auth(user=username, port=ssh_port, password=password)
+        auth = Auth(user=username, port=ssh_port, password=RSAHandler().encrypt_public_key(password) if password else password)
         jdbc_username = self.context['connection_info'][cluster_name].user
         user_name = jdbc_username.split('@')[0]
         tenant_name = jdbc_username.split('@')[1].split('#')[0] if '#' in jdbc_username else jdbc_username.split('@')[1]
@@ -177,20 +177,17 @@ class ServiceInfoHandler(BaseHandler):
         self.context['monitor']['tenant_name'] = monitor_tenant_name
         monitor_tenant_username = monitor_user.split('@')[0]
         monitor_tenant_user = TenantUser(tenant_name=monitor_tenant_name, user_name=monitor_tenant_username, user_database=monitor_database)
-        monitor_tenant = TenantConfig(name=monitor_tenant_user, password=monitor_password)
-        ocp_server = OcpServer(component='ocp-server-ce', metadb=self.context['connection_info'][cluster_name], meta_tenant=meta_tenant, monitor_tenant=monitor_tenant, admin_password='********',
+        monitor_tenant = TenantConfig(name=monitor_tenant_user, password=RSAHandler().encrypt_public_key(monitor_password))
+        ocp_server = OcpServer(component='ocp-server-ce', metadb=self.context['connection_info'][cluster_name], meta_tenant=meta_tenant, monitor_tenant=monitor_tenant, admin_password=RSAHandler().encrypt_public_key('********'),
                                home_path=home_path, servers=servers, port=server_port, memory_size=memory_xmx)
         components = OcpComponentConfig(ocpserver=ocp_server)
         data = OCPDeploymnetConfig(auth=auth, components=components)
 
         ocp_handler = OcpHandler()
-        try:
-            cluster_config_yaml_path = ocp_handler.create_ocp_config_path(data)
-            log.get_logger().info('upgrade path: %s' % cluster_config_yaml_path)
-            deployment_id = ocp_handler.create_ocp_deployment(cluster_name, cluster_config_yaml_path)
-            log.get_logger().info('upgrade id: %s' % deployment_id)
-        except Exception as ex:
-            log.get_logger().error(ex)
+        cluster_config_yaml_path = ocp_handler.create_ocp_config_path(data)
+        log.get_logger().info('upgrade path: %s' % cluster_config_yaml_path)
+        deployment_id = ocp_handler.create_ocp_deployment(cluster_name, cluster_config_yaml_path)
+        log.get_logger().info('upgrade id: %s' % deployment_id)
 
     def create_ocp_info(self, cluster_name):
         deploy = self.obd.deploy_manager.get_deploy_config(cluster_name)

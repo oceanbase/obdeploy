@@ -16,7 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 import const
-
+import os
 
 def start(plugin_context, workflow, *args, **kwargs):
     repositories = plugin_context.repositories
@@ -27,7 +27,14 @@ def start(plugin_context, workflow, *args, **kwargs):
     workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {'new_clients': clients}, 'chown_dir')
     if not plugin_context.cluster_config.depends:
         workflow.add_with_kwargs(const.STAGE_FIRST, {'need_connect': False}, 'cursor_check')
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, const.COMP_OB_CE if const.COMP_OB_CE in repository_name else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OCP_SERVER_CE}, 'connect', 'create_tenant', 'create_user', 'import_time_zone')
+    cluster_config = plugin_context.cluster_config
+    server_config = cluster_config.get_server_conf(cluster_config.servers[0])
+    client = clients[cluster_config.servers[0]]
+    bootstrap_path = os.path.join(server_config['home_path'], '.bootstrapped')
+    cmd = 'ls %s' % bootstrap_path
+    source_option = getattr(plugin_context.options, 'source_option', None)
+    if not(source_option == 'upgrade' or client.execute_command(cmd)):
+        workflow.add_with_component_version_kwargs(const.STAGE_FIRST, const.COMP_OB_CE if const.COMP_OB_CE in repository_name else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OCP_SERVER_CE}, 'connect', 'create_tenant', 'create_user', 'import_time_zone')
     workflow.add(const.STAGE_FIRST, 'start', 'health_check')
     workflow.add(const.STAGE_FIRST, 'stop_pre')
     workflow.add_with_component(const.STAGE_FIRST, 'general', 'stop')

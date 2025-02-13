@@ -40,5 +40,15 @@ class RSAHandler(BaseHandler):
             decrypt_data = cipher.decrypt(encrypt_data, None)
             return decrypt_data.decode('utf-8')
         except (ValueError, TypeError) as e:
-            self.obd.stdio.error("password  decrypt failed, reason: %s" % e)
+            self.obd.stdio.error("password decrypt failed, reason: %s" % e)
             raise Exception('rsa decryption an exception occurred: %s' % e)
+        
+    def encrypt_public_key(self, text):
+        try:
+            cipher = PKCS1_v1_5.new(self.public_key)
+            encrypt_data = cipher.encrypt(text.encode())
+            encrypt_base64 = base64.b64encode(encrypt_data)
+            return encrypt_base64.decode('utf-8')
+        except ValueError as e:
+            self.obd.stdio.error("password encrypt failed, reason: %s" % e)
+            raise Exception('rsa encryption an exception occurred: %s' % e)
