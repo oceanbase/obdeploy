@@ -4478,6 +4478,26 @@ class ObdHome(object):
         else:
             self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
             return False
+    
+    def obdiag_offline_workflow(self, workflow_name):
+        obdiag_config = Values()
+        setattr(obdiag_config, 'depends', [])
+        deploy_config = DeployConfig('', config_parser_manager=object())
+        deploy_config.components = {'oceanbase-diagnostic-tool': obdiag_config}
+        tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
+        pkg = self.mirror_manager.get_best_pkg(name=tool_name)
+        if not pkg:
+            self._call_stdio('critical', '%s package not found' % tool_name)
+            return False
+        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
+        deployed = self.obdiag_deploy(workflow_name)
+        tool = self.tool_manager.get_tool_config_by_name(tool_name)
+        if deployed and tool:
+            workflows = self.get_workflows(workflow_name, [repository])
+            return self.run_workflow(workflows, deploy_config, [repository])
+        else:
+            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=workflow_name))
+            return False
         
     def obdiag_deploy(self, fuction_type):
         component_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
