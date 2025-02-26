@@ -2154,7 +2154,8 @@ class ObdiagRcaListCommand(ObdCommand):
         return LockMode.NO_LOCK
 
     def _do_command(self, obd):
-        return obd.obdiag_offline_func("rca_list", self.opts)
+        #return obd.obdiag_offline_func("rca_list", self.opts)
+        return obd.obdiag_offline_workflow("rca_list")
 
 
 class ObdiagRcaRunCommand(ObdCommand):
