@@ -1726,7 +1726,16 @@ class DisplayTraceCommand(ObdCommand):
         return True
 
 
-class ObdiagCommand(MajorCommand):
+class ObdiagCommand(ObdCommand):
+
+    def __init__(self):
+        super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
+
+    def _do_command(self, obd):
+        return obd.obdiag_workflow()
+
+
+class ObdiagCommandBak(MajorCommand):
     
     def __init__(self):
         super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
@@ -2154,8 +2163,7 @@ class ObdiagRcaListCommand(ObdCommand):
         return LockMode.NO_LOCK
 
     def _do_command(self, obd):
-        #return obd.obdiag_offline_func("rca_list", self.opts)
-        return obd.obdiag_offline_workflow("rca_list")
+        return obd.obdiag_offline_func("rca_list", self.opts)
 
 
 class ObdiagRcaRunCommand(ObdCommand):

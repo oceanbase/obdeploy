@@ -15,9 +15,9 @@
 
 from __future__ import absolute_import, division, print_function
 
-import const
+from tool import EnvVariables
+from copy import deepcopy
 
 
-def rca_list(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'rca_list')
-    return plugin_context.return_true()
+def obdiag(plugin_context, *args, **kwargs):
+    print("obdiag start..")

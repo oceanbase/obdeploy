@@ -4479,7 +4479,7 @@ class ObdHome(object):
             self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
             return False
     
-    def obdiag_offline_workflow(self, workflow_name):
+    def obdiag_workflow(self, name='obdiag'):
         obdiag_config = Values()
         setattr(obdiag_config, 'depends', [])
         deploy_config = DeployConfig('', config_parser_manager=object())
@@ -4490,13 +4490,13 @@ class ObdHome(object):
             self._call_stdio('critical', '%s package not found' % tool_name)
             return False
         repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
-        deployed = self.obdiag_deploy(workflow_name)
+        deployed = self.obdiag_deploy(name)
         tool = self.tool_manager.get_tool_config_by_name(tool_name)
         if deployed and tool:
-            workflows = self.get_workflows(workflow_name, [repository])
-            return self.run_workflow(workflows, deploy_config, [repository])
+            workflows = self.get_workflows(name, [repository])
+            return self.run_workflow(workflows, deploy_config.components, [repository])
         else:
-            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=workflow_name))
+            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=name))
             return False
         
     def obdiag_deploy(self, fuction_type):
