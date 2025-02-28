@@ -14,10 +14,21 @@
 # limitations under the License.
 
 from __future__ import absolute_import, division, print_function
-
-from tool import EnvVariables
-from copy import deepcopy
+from ssh import LocalClient
+import _errno as err
 
 
 def obdiag(plugin_context, *args, **kwargs):
-    print("obdiag start..")
+    stdio = plugin_context.stdio
+    obdiag_install_dir=kwargs.get("repository").repository_dir
+    obdiag_bin = "obdiag"
+
+    def local_execute_command(command, env=None, timeout=None):
+        exec_command = r"{install_dir}/{cmd}".format(install_dir=obdiag_install_dir, cmd=command)
+        return LocalClient.execute_command(exec_command, env, timeout, stdio)
+
+    ret = local_execute_command(f'{obdiag_bin} {" ".join(plugin_context.cmds)}')
+    if not ret:
+        stdio.error(err.EC_OBDIAG_NOT_FOUND.format())
+        return plugin_context.return_false()
+    print(ret.stdout)

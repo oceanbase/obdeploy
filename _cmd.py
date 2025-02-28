@@ -173,6 +173,8 @@ class BaseCommand(object):
         raise NotImplementedError
 
     def _show_help(self, *args, **kwargs):
+        if self.name == "obdiag":
+            return
         ROOT_IO.print(self._mk_usage())
         self.parser.exit(1)
 
