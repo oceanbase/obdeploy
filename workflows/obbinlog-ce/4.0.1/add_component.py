@@ -18,10 +18,7 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def add_component_pre(plugin_context, workflow, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
-    added_components = cluster_config.get_deploy_added_components()
-    if const.COMP_OB_CONFIGSERVER in added_components:
-        cluster_config.add_depend_component(const.COMP_OB_CONFIGSERVER)
-    workflow.add_with_kwargs(const.STAGE_SECOND, {'only_generate_password': True}, 'generate_config_pre', 'generate_password')
+def add_component(plugin_context, workflow, *args, **kwargs):
+    workflow.add_workflow(const.STAGE_FIRST, 'start')
+    workflow.add_workflow(const.STAGE_SECOND, 'display')
     return plugin_context.return_true()

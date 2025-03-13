@@ -32,4 +32,4 @@ def add_component_pre(plugin_context, workflow, *args, **kwargs):
                                                '4.0.0.0', {'scale_out_component': plugin_context.cluster_config.name}, 'connect')
     workflow.add(const.STAGE_FIRST, 'init', 'start_check_pre', 'status_check', 'password_check', 'status_check', 'work_dir_check', 'port_check')
     workflow.add(const.STAGE_THIRD, 'parameter_pre')
-    plugin_context.return_true()
+    return plugin_context.return_true()
