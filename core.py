@@ -4457,7 +4457,7 @@ class ObdHome(object):
             obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, diagnostic_component_name, tool.config.version)
             return self.call_plugin(obdiag_plugin, target_repository)
         else:
-            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
+            self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=fuction_type))
             return False
 
 
@@ -4476,7 +4476,7 @@ class ObdHome(object):
             obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, tool_name, repository.version)
             return self.call_plugin(obdiag_plugin, repository, clients={})
         else:
-            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
+            self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=fuction_type))
             return False
     
     def obdiag_func(self):
