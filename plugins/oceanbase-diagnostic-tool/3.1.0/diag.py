@@ -18,7 +18,7 @@ from ssh import LocalClient
 import _errno as err
 
 
-def obdiag(plugin_context, *args, **kwargs):
+def diag(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     obdiag_install_dir=kwargs.get("repository").repository_dir
     obdiag_bin = "obdiag"
@@ -31,4 +31,4 @@ def obdiag(plugin_context, *args, **kwargs):
     if not ret:
         stdio.error(err.EC_OBDIAG_NOT_FOUND.format())
         return plugin_context.return_false()
-    print(ret.stdout)
+    stdio.print(ret.stdout)

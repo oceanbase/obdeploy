@@ -1734,7 +1734,7 @@ class ObdiagCommand(ObdCommand):
         super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
 
     def _do_command(self, obd):
-        return obd.obdiag_workflow()
+        return obd.obdiag_func()
 
 
 class ObdiagCommandBak(MajorCommand):
