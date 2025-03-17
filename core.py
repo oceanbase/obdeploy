@@ -4480,7 +4480,7 @@ class ObdHome(object):
             return False
     
     def obdiag_func(self):
-        mock_name='obdiag'
+        mock_name='diag'
         obdiag_config = Values()
         setattr(obdiag_config, 'depends', [])
         deploy_config = DeployConfig('', config_parser_manager=object())
