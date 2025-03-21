@@ -1,0 +1,3 @@
+- src_path: ./opt/oceanbase-diagnostic-tool
+  target_path: ""
+  type: dir
