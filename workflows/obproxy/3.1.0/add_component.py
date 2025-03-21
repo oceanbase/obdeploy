@@ -20,4 +20,4 @@ import const
 
 def add_component(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'display')
-    plugin_context.return_true()
+    return plugin_context.return_true()

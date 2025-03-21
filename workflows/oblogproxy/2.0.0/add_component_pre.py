@@ -28,4 +28,4 @@ def add_component_pre(plugin_context, workflow, *args, **kwargs):
     workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'oceanbase-ce' if 'oceanbase-ce' in repository_names else 'oceanbase',
                                                '4.0.0.0', {'scale_out_component': plugin_context.cluster_config.name}, 'connect')
     workflow.add(const.STAGE_FIRST, 'init')
-    plugin_context.return_true()
+    return plugin_context.return_true()

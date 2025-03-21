@@ -21,4 +21,4 @@ import const
 def add_component(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'start_check')
     workflow.add(const.STAGE_SECOND, 'start')
-    plugin_context.return_true()
+    return plugin_context.return_true()

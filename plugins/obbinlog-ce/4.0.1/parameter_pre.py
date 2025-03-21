@@ -36,8 +36,8 @@ def parameter_pre(plugin_context, *args, **kwargs):
     binlog_tenant = []
     for comp in const.COMPS_OB:
         if comp in cluster_config.depends:
-            ob_config = cluster_config.get_depend_config(comp)
             ob_servers = cluster_config.get_depend_servers(comp)
+            ob_config = cluster_config.get_depend_config(comp, server=ob_servers[0])
             depend_info['database_ip'] = ob_servers[0].ip
             depend_info['database_port'] = ob_config['mysql_port']
             depend_info['database_name'] = ob_config['binlog_meta_tenant']['database']
