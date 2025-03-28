@@ -27,7 +27,7 @@ def diag(plugin_context, *args, **kwargs):
         exec_command = r"{install_dir}/{cmd}".format(install_dir=obdiag_install_dir, cmd=command)
         return LocalClient.execute_command(exec_command, env, timeout, stdio)
 
-    ret = local_execute_command(f'{obdiag_bin} {" ".join(plugin_context.cmds)}')
+    ret = local_execute_command(f'{obdiag_bin} {" ".join(kwargs["full_cmd"])}')
     if not ret:
         stdio.error(err.EC_OBDIAG_NOT_FOUND.format())
         return plugin_context.return_false()

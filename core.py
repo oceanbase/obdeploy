@@ -4479,7 +4479,7 @@ class ObdHome(object):
             self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=fuction_type))
             return False
     
-    def obdiag_func(self):
+    def obdiag_func(self, args):
         mock_name='diag'
         obdiag_config = Values()
         setattr(obdiag_config, 'depends', [])
@@ -4495,7 +4495,7 @@ class ObdHome(object):
         tool = self.tool_manager.get_tool_config_by_name(tool_name)
         if deployed and tool:
             workflows = self.get_workflows(mock_name, [repository])
-            return self.run_workflow(workflows, deploy_config.components, [repository])
+            return self.run_workflow(workflows, deploy_config.components, [repository], **{const.COMP_OCEANBASE_DIAGNOSTIC_TOOL: {"full_cmd": args}})
         else:
             self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=mock_name))
             return False
