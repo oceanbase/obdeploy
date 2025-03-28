@@ -173,6 +173,8 @@ class BaseCommand(object):
         raise NotImplementedError
 
     def _show_help(self, *args, **kwargs):
+        if self.name == "obdiag":
+            return
         ROOT_IO.print(self._mk_usage())
         self.parser.exit(1)
 
@@ -1726,7 +1728,16 @@ class DisplayTraceCommand(ObdCommand):
         return True
 
 
-class ObdiagCommand(MajorCommand):
+class ObdiagCommand(ObdCommand):
+
+    def __init__(self):
+        super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
+
+    def _do_command(self, obd):
+        return obd.obdiag_func(self.args)
+
+
+class ObdiagCommandBak(MajorCommand):
     
     def __init__(self):
         super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
