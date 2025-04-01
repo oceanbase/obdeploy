@@ -293,6 +293,9 @@ def pyScriptPluginExec(func):
             kwargs = namespace_vars
             if method:
                 target_servers = None
+                print("----------------------------------------------")
+                print(cluster_config)
+                print("----------------------------------------------")
                 if cluster_config:
                     servers = cluster_config.servers
                     target_servers = kwargs.get('target_servers')

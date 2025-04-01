@@ -4479,25 +4479,35 @@ class ObdHome(object):
             self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=fuction_type))
             return False
     
-    def obdiag_func(self, args):
-        mock_name='diag'
+    def obdiag_func(self, args, deploy_name):
+        tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
         obdiag_config = Values()
         setattr(obdiag_config, 'depends', [])
         deploy_config = DeployConfig('', config_parser_manager=object())
-        deploy_config.components = {COMP_OCEANBASE_DIAGNOSTIC_TOOL: obdiag_config}
-        tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
+        if deploy_name:
+            self._global_ex_lock()
+            self._call_stdio('verbose', 'Get Deploy by name')
+            deploy = self.deploy_manager.get_deploy_config(deploy_name, read_only=True)
+            if not deploy:
+                self._call_stdio('error', 'No such deploy: %s.' % deploy_name)
+                return False
+            self.set_deploy(deploy)
+            self._call_stdio('verbose', 'Get deploy configuration')
+            deploy_config = deploy.deploy_config
+        deploy_config.components = {tool_name: obdiag_config}
+        workflow_name='diag'
         pkg = self.mirror_manager.get_best_pkg(name=tool_name)
         if not pkg:
             self._call_stdio('critical', '%s package not found' % tool_name)
             return False
         repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
-        deployed = self.obdiag_deploy(mock_name)
+        deployed = self.obdiag_deploy(workflow_name)
         tool = self.tool_manager.get_tool_config_by_name(tool_name)
         if deployed and tool:
-            workflows = self.get_workflows(mock_name, [repository])
-            return self.run_workflow(workflows, deploy_config.components, [repository], **{const.COMP_OCEANBASE_DIAGNOSTIC_TOOL: {"full_cmd": args}})
+            workflows = self.get_workflows(workflow_name, [repository])
+            return self.run_workflow(workflows, deploy_config.components, [repository], **{const.COMP_OCEANBASE_DIAGNOSTIC_TOOL: {"full_cmd": args, "deploy_config": deploy_config}})
         else:
-            self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=mock_name))
+            self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=workflow_name))
             return False
         
     def obdiag_deploy(self, fuction_type):
