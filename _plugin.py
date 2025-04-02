@@ -302,9 +302,10 @@ def pyScriptPluginExec(func):
                         del kwargs['target_servers']
                 try:
                     ret = method(self.context, *arg, **kwargs)
-                    if ret is None and self.context and self.context.get_return() is None:
+                    if ret is None and self.context and self.context.get_return().value == False:
                         run_result[method_name]['result'] = False
-                        self.context.return_false()
+                        if not self.context.get_return().kwargs:
+                            self.context.return_false()
                 except Exception as e:
                     run_result[method_name]['result'] = False
                     self.context.return_false(exception=e)
@@ -676,7 +677,7 @@ class InstallPlugin(Plugin):
             replacement = var.get(varname, m.group())
 
             start, end = m.span()
-            done.append(string[:start])
+            done.append(str(string[:start]))
             done.append(str(replacement))
             string = string[end:]
 
@@ -688,25 +689,8 @@ class InstallPlugin(Plugin):
             self._check_value = os.path.getmtime(self.file_map_path)
         return self._check_value
 
-    @property
-    def file_map_data(self):
-        if self._file_map_data is None:
-            with open(self.file_map_path, 'rb') as f:
-                self._file_map_data = yaml.load(f)
-        return self._file_map_data
-    
-    @property
-    def requirement_data(self):
-        if self._requirement_data is None:
-            if os.path.exists(self.requirement_path):
-                with open(self.requirement_path, 'rb') as f:
-                    self._requirement_data = yaml.load(f)
-            else:
-                self._requirement_data = {}
-        return self._requirement_data
-
-    def file_map(self, package_info):
-        var = {
+    def get_package_var(self, package_info):
+        return {
             'name': package_info.name,
             'version': package_info.version,
             'release': package_info.release,
@@ -714,15 +698,29 @@ class InstallPlugin(Plugin):
             'arch': package_info.arch,
             'md5': package_info.md5,
         }
-        key = str(var)
+    
+    def load_file_map_data(self, pkg_var):
+        with open(self.file_map_path, 'rb') as f:
+            context = f.read().decode('utf-8')
+            return yaml.loads(self.var_replace(context, pkg_var))
+
+    def load_requirement_data(self, pkg_var):
+        if os.path.exists(self.requirement_path):
+            with open(self.requirement_path, 'rb') as f:
+                context = f.read().decode('utf-8')
+                return yaml.loads(self.var_replace(context, pkg_var))
+        return {}
+
+    def file_map(self, package_info):
+        pkg_var = self.get_package_var(package_info)
+        key = str(pkg_var)
         if not self._file_map.get(key):
             try:
                 file_map = {}
-                for data in self.file_map_data:
+                for data in self.load_file_map_data(pkg_var):
                     k = data['src_path']
                     if k[0] != '.':
                         k = '.%s' % os.path.join('/', k)
-                    k = self.var_replace(k, var)
                     file_map[k] = InstallPlugin.FileItem(
                         k,
                         ConfigUtil.get_value_from_dict(data, 'target_path', k),
@@ -759,20 +757,15 @@ class InstallPlugin(Plugin):
         return get_prefix_version(Version(main_componentt_version), m.group(2)), m.group(2)
     
     def requirement_map(self, package_info):
-        var = {
-            'name': package_info.name,
-            'version': package_info.version,
-            'release': package_info.release,
-            'arch': package_info.arch,
-            'md5': package_info.md5,
-        }
-        key = str(var)
+        pkg_var = self.get_package_var(package_info)
+        key = str(pkg_var)
         if not self._requirement.get(key):
             try:
                 requirement_map = {}
-                if self.requirement_data:
-                    for component_name in self.requirement_data:
-                        value = self.requirement_data[component_name]
+                requirement_data = self.load_requirement_data(pkg_var)
+                if requirement_data:
+                    for component_name in requirement_data:
+                        value = requirement_data[component_name]
                         # Once the version is configured and then obd find the package is equal to the version
                         version = ConfigUtil.get_value_from_dict(value, 'version', transform_func=Version)
                         min_version = max_version = None
@@ -780,7 +773,7 @@ class InstallPlugin(Plugin):
                             min_version = ConfigUtil.get_value_from_dict(value, 'min_version', transform_func=Version)
                             max_version = ConfigUtil.get_value_from_dict(value, 'max_version', transform_func=Version)
                         else:
-                            version_replace, offset = self.version_replace(version, var['version'])
+                            version_replace, offset = self.version_replace(version, pkg_var['version'])
                             if version_replace != version:
                                 if offset == 0:
                                     version = version_replace

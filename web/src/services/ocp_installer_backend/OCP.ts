@@ -124,6 +124,34 @@ export async function createOcpDeploymentConfig(
     ...(options || {}),
   });
 }
+
+export async function getTelemetryData(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.createDeploymentConfigParams,
+  body: API.DeploymentConfig,
+  options?: { [key: string]: any },
+) {
+  const { name: param0, ...queryParams } = params;
+  return request<API.OBResponse>(`/api/v1/telemetry/${param0}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
+export async function telemetryReport(params: {}): Promise<any> {
+  return fetch('https://openwebapi.oceanbase.com/api/web/oceanbase/report', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  }).then((response) => response.json());
+}
+
 /** precheck_ocp_deployment precheck for ocp deployment POST /api/v1/ocp/deployments/${param0}/precheck */
 export async function precheckOcpDeployment(
   params: {
@@ -634,11 +662,21 @@ export async function createUpgradePrecheck(
   options?: { [key: string]: any },
 ) {
   const { name } = params;
-  return request<API.createUpgradePrecheck_>(`/api/v1/deployment/upgrade/ocp?name=${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  return request<API.createUpgradePrecheck_>(
+    `/api/v1/deployment/upgrade/ocp?name=${name}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...(options || {}),
     },
+  );
+}
+
+export async function getWebType(options?: { [key: string]: any }) {
+  return request<API.OBResponse>('/api/v1/web/types', {
+    method: 'GET',
     ...(options || {}),
   });
 }

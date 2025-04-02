@@ -23,7 +23,7 @@ def add_component_pre(plugin_context, workflow, *args, **kwargs):
     repository_names = [repository.name for repository in repositories]
     workflow.add(const.STAGE_FIRST, 'scale_out_check', 'parameter_pre')
     workflow.add_with_kwargs(const.STAGE_FIRST, {'auto_depend': True}, 'generate_config')
-    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, const.COMP_OB_CE if const.COMP_OB_CE in repository_names else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OCP_SERVER_CE}, 'connect', 'create_tenant', 'create_user', 'import_time_zone')
+    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, const.COMP_OB_CE if const.COMP_OB_CE in repository_names else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OCP_SERVER_CE if const.COMP_OCP_SERVER_CE in repository_names else const.COMP_OCP_SERVER}, 'connect', 'create_tenant', 'create_user', 'import_time_zone')
 
     workflow.add(const.STAGE_THIRD, 'init')
     plugin_context.return_true()

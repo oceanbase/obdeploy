@@ -28,7 +28,7 @@ def recover(plugin_context, optimize_config, optimize_envs=None, *args, **kwargs
     optimize_envs['optimize_entrances_done'] = optimize_envs.get('optimize_entrances_done', {})
     restart_components = []
     for component, entrances in optimize_envs['optimize_entrances_done'].items():
-        if component in ['oceanbase', 'oceanbase-ce', 'obproxy', 'obproxy-ce']:
+        if component in ['oceanbase', 'oceanbase-ce', 'oceanbase-standalone', 'obproxy', 'obproxy-ce']:
             cursor = plugin_context.get_return('connect', spacename=component).get_return('cursor')
         else:
             raise Exception('Invalid component {}'.format(component))

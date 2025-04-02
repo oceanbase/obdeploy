@@ -15,8 +15,10 @@
 
 from __future__ import absolute_import, division, print_function
 
+import getpass
 import re
 import os
+import sys
 import time
 import signal
 from optparse import Values
@@ -27,6 +29,7 @@ import tempfile
 from subprocess import call as subprocess_call
 
 import const
+import tool
 from ssh import SshClient, SshConfig
 from tool import FileUtil, DirectoryUtil, YamlLoader, timeout, COMMAND_ENV, OrderedDict
 from _stdio import MsgLevel, FormatText
@@ -42,7 +45,7 @@ from _lock import LockManager, LockMode
 from _optimize import OptimizeManager
 from _environ import ENV_REPO_INSTALL_MODE, ENV_BASE_DIR
 from _types import Capacity
-from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH
+from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE
 from ssh import LocalClient
 
 
@@ -63,6 +66,8 @@ class ObdHome(object):
         self._lock_manager = None
         self._optimize_manager = None
         self._tool_manager = None
+        self._enable_encrypt = False
+        self._encrypted_passkey = None
         self.stdio = None
         self._stdio_func = None
         self.ssh_clients = {}
@@ -124,6 +129,19 @@ class ObdHome(object):
         if not self._tool_manager:
             self._tool_manager = ToolManager(self.home_path, self.repository_manager, self.lock_manager, self.stdio)
         return self._tool_manager
+
+    @property
+    def enable_encrypt(self):
+        if not self._enable_encrypt:
+            self._enable_encrypt = COMMAND_ENV.get(const.ENCRYPT_PASSWORD) == '1'
+        return self._enable_encrypt
+
+    @property
+    def encrypted_passkey(self):
+        if not self._encrypted_passkey:
+            self._encrypted_passkey = COMMAND_ENV.get(const.ENCRYPT_PASSKEY)
+        return self._encrypted_passkey
+
 
     def _global_ex_lock(self):
         self.lock_manager.global_ex_lock()
@@ -291,7 +309,8 @@ class ObdHome(object):
             'deploy_manager': self.deploy_manager,
             'lock_manager': self.lock_manager,
             'optimize_manager': self.optimize_manager,
-            'tool_manager': self.tool_manager
+            'tool_manager': self.tool_manager,
+            'config_encrypted': None
         }
         if self.deploy:
             args['deploy_name'] = self.deploy.name
@@ -300,6 +319,8 @@ class ObdHome(object):
             args['cluster_config'] = self.deploy.deploy_config.components[repository.name]
             if "clients" not in kwargs:
                 args['clients'] = self.get_clients(self.deploy.deploy_config, self.repositories)
+            if self.deploy.deploy_config.inner_config:
+                args['config_encrypted'] = self.deploy.deploy_config.inner_config.get_global_config(const.ENCRYPT_PASSWORD) or False
         args['clients'] = args.get('clients', {})
         args.update(kwargs)
         return args
@@ -659,7 +680,7 @@ class ObdHome(object):
             return False
         def is_server_list_change(deploy_config):
             for component_name in deploy_config.components:
-                if deploy_config.components[component_name].servers != deploy.deploy_config.components[component_name].servers:
+                if component_name in deploy.deploy_config.components and deploy_config.components[component_name].servers != deploy.deploy_config.components[component_name].servers:
                     return True
             return False
         if not self.stdio:
@@ -686,18 +707,44 @@ class ObdHome(object):
                 return False
         initial_config = ''
         if deploy:
+            if self.enable_encrypt:
+                try_time = 2
+                while try_time > 0:
+                    epk = self.input_encryption_passkey(double_check=False, print_error=True)
+                    if epk:
+                        if not self.check_encryption_passkey(epk):
+                            self._call_stdio('error', 'Encryption passkey is not correct')
+                            try_time -= 1
+                            if try_time == 0:
+                                return False
+                        else:
+                            break
+                    else:
+                        return False
             try:
                 deploy.deploy_config.allow_include_error()
                 if deploy.deploy_info.config_status == DeployConfigStatus.UNCHNAGE:
+                    need_decrypt_deploy_config = deploy.deploy_config
                     path = deploy.deploy_config.yaml_path
                 else:
                     path = Deploy.get_temp_deploy_yaml_path(deploy.config_dir)
+                    need_decrypt_deploy_config = DeployConfig(path, yaml_loader=YamlLoader(self.stdio),
+                                                              config_parser_manager=self.deploy_manager.config_parser_manager,
+                                                              inner_config=deploy.deploy_config.inner_config if deploy else None,
+                                                              stdio=self.stdio)
                 if user_input:
                     initial_config = user_input
                 else:
                     self._call_stdio('verbose', 'Load %s' % path)
+                    if self.enable_encrypt:
+                        need_decrypt_deploy_config.change_deploy_config_password(False)
+                        need_decrypt_deploy_config.dump()
                     with open(path, 'r') as f:
                         initial_config = f.read()
+                    if self.enable_encrypt:
+                        need_decrypt_deploy_config.change_deploy_config_password(True)
+                        need_decrypt_deploy_config.dump()
+                        need_decrypt_deploy_config.change_deploy_config_password(False, False)
             except:
                 self._call_stdio('exception', '')
             msg = 'Save deploy "%s" configuration' % name
@@ -723,7 +770,7 @@ class ObdHome(object):
                     param_plugins[repository.name] = plugin
             self._call_stdio('stop_loading', 'succeed')
 
-        EDITOR = os.environ.get('EDITOR','vi')
+        EDITOR = os.environ.get('EDITOR', 'vi')
         self._call_stdio('verbose', 'Get environment variable EDITOR=%s' % EDITOR)
         self._call_stdio('verbose', 'Create tmp yaml file')
         tf = tempfile.NamedTemporaryFile(suffix=".yaml")
@@ -732,6 +779,9 @@ class ObdHome(object):
         self.lock_manager.set_try_times(-1)
         config_status = DeployConfigStatus.UNCHNAGE
         diff_need_redeploy_keys = []
+        add_component_names = []
+        del_component_names = []
+        chang_component_names = []
         while True:
             if not user_input:
                 tf.seek(0)
@@ -743,7 +793,7 @@ class ObdHome(object):
                     tf.name, yaml_loader=YamlLoader(self.stdio),
                     config_parser_manager=self.deploy_manager.config_parser_manager,
                     inner_config=deploy.deploy_config.inner_config if deploy else None,
-                    stdio=self.stdio
+                    config_encrypted=False, stdio=self.stdio
                     )
                 deploy_config.allow_include_error()
                 if not deploy_config.get_base_dir():
@@ -762,16 +812,28 @@ class ObdHome(object):
             if not deploy:
                 config_status = DeployConfigStatus.UNCHNAGE
             elif is_deployed:
-                if deploy_config.components.keys() != deploy.deploy_config.components.keys() or is_server_list_change(deploy_config):
+                if is_server_list_change(deploy_config):
                     if not self._call_stdio('confirm', FormatText.warning('Modifications to the deployment architecture take effect after you redeploy the architecture. Are you sure that you want to start a redeployment? ')):
                         if user_input:
                             return False
                         continue
                     config_status = DeployConfigStatus.NEED_REDEPLOY
+                if deploy_config.components.keys() != deploy.deploy_config.components.keys():
+                    add_component_names = list(set(deploy_config.components.keys()) - set(deploy.deploy_config.components.keys()))
+                    del_component_names = list(set(deploy.deploy_config.components.keys()) - set(deploy_config.components.keys()))
+                    chang_component_names = add_component_names + del_component_names
+                    if (add_component_names and del_component_names) or not deploy.deploy_config.del_components(del_component_names, dryrun=True):
+                        if not self._call_stdio('confirm', FormatText.warning('Modifications to the deployment architecture take effect after you redeploy the architecture. Are you sure that you want to start a redeployment? ')):
+                            if user_input:
+                                return False
+                            continue
+                        config_status = DeployConfigStatus.NEED_REDEPLOY
 
                 if config_status != DeployConfigStatus.NEED_REDEPLOY:
                     comp_attr_changed = False
                     for component_name in deploy_config.components:
+                        if component_name in chang_component_names:
+                            continue
                         old_cluster_config = deploy.deploy_config.components[component_name]
                         new_cluster_config = deploy_config.components[component_name]
                         comp_attr_map = {'version': 'config_version', 'package_hash': 'config_package_hash', 'release': 'config_release', 'tag': 'tag'}
@@ -790,6 +852,8 @@ class ObdHome(object):
                 if config_status != DeployConfigStatus.NEED_REDEPLOY:
                     rsync_conf_changed = False
                     for component_name in deploy_config.components:
+                        if component_name in chang_component_names:
+                            continue
                         old_cluster_config = deploy.deploy_config.components[component_name]
                         new_cluster_config = deploy_config.components[component_name]
                         if new_cluster_config.get_rsync_list() != old_cluster_config.get_rsync_list():
@@ -819,12 +883,18 @@ class ObdHome(object):
                         param_plugins[pkg.name] = plugin
 
             for component_name in param_plugins:
+                if component_name in chang_component_names:
+                    continue
                 deploy_config.components[component_name].update_temp_conf(param_plugins[component_name].params)
 
             self._call_stdio('stop_loading', 'succeed')
 
             # Parameter check
             self._call_stdio('start_loading', 'Parameter check')
+            if del_component_names:
+                for repository in repositories:
+                    if repository.name in del_component_names:
+                        repositories.remove(repository)
             errors = self.deploy_param_check(repositories, deploy_config) + self.deploy_param_check(pkgs, deploy_config)
             self._call_stdio('stop_loading', 'fail' if errors else 'succeed')
             if errors:
@@ -844,6 +914,8 @@ class ObdHome(object):
                         config_status = DeployConfigStatus.NEED_RESTART
                     errors = []
                     for component_name in param_plugins:
+                        if component_name in chang_component_names:
+                            continue
                         old_cluster_config = deploy.deploy_config.components[component_name]
                         new_cluster_config = deploy_config.components[component_name]
                         modify_limit_params = param_plugins[component_name].modify_limit_params
@@ -871,6 +943,8 @@ class ObdHome(object):
                 for component_name in deploy_config.components:
                     if config_status == DeployConfigStatus.NEED_REDEPLOY:
                         break
+                    if component_name in chang_component_names:
+                        continue
                     old_cluster_config = deploy.deploy_config.components[component_name]
                     new_cluster_config = deploy_config.components[component_name]
                     if old_cluster_config == new_cluster_config:
@@ -900,20 +974,56 @@ class ObdHome(object):
                     self._call_stdio('error', err.EC_RUNNING_CLUSTER_NO_REDEPLOYED.format(key=', '.join(diff_need_redeploy_keys)))
                     return False
 
+        if chang_component_names and config_status != DeployConfigStatus.UNCHNAGE:
+            self._call_stdio('error', "While component updates are in progress, cluster configuration changes are not permitted.")
+            return False
+
         self._call_stdio('verbose', 'Set deploy configuration status to %s' % config_status)
         self._call_stdio('verbose', 'Save new configuration yaml file')
         if config_status == DeployConfigStatus.UNCHNAGE:
-            ret = self.deploy_manager.create_deploy_config(name, tf.name).update_deploy_config_status(config_status)
+            if not chang_component_names:
+                new_deploy = self.deploy_manager.create_deploy_config(name, tf.name)
+                ret = new_deploy.update_deploy_config_status(config_status)
+                new_deploy.set_config_decrypted()
+                new_deploy.deploy_config.enable_encrypt_dump()
+                new_deploy.deploy_config.dump()
+            else:
+                if del_component_names:
+                    if self._call_stdio('confirm', FormatText.warning('Detected component changes in the configuration file. Do you want to add or remove these components: %s ?' % ', '.join(del_component_names))):
+                        self._call_stdio('print', FormatText.success('Please execute the command `obd cluster component del %s %s` to delete components' % (name, ' '.join(del_component_names))))
+                        return True
+                    else:
+                        return False
+                elif add_component_names:
+                    if self._call_stdio('confirm', FormatText.warning('Detected component changes in the configuration file. Do you want to add or remove these components: %s ?' % ', '.join(add_component_names))):
+                        add_deploy_config = {}
+                        for comp in add_component_names:
+                            add_deploy_config[comp] = deploy_config._src_data[comp]
+                        add_tf = tempfile.NamedTemporaryFile(suffix=".yaml", delete=False)
+                        yaml = YamlLoader()
+                        add_tf.write(yaml.dumps(add_deploy_config).encode())
+                        add_tf.flush()
+                        self._call_stdio('print', FormatText.success('Please execute the command `obd cluster component add %s -c %s` to add components' % (name, add_tf.name)))
+                        return True
+                    else:
+                        return False
         else:
             target_src_path = Deploy.get_temp_deploy_yaml_path(deploy.config_dir)
             old_config_status = deploy.deploy_info.config_status
             try:
                 if deploy.update_deploy_config_status(config_status):
                     FileUtil.copy(tf.name, target_src_path, self.stdio)
+                    if self.enable_encrypt:
+                        need_encrypt_deploy_config = DeployConfig(target_src_path, yaml_loader=YamlLoader(self.stdio),
+                                                                  config_parser_manager=self.deploy_manager.config_parser_manager,
+                                                                  inner_config=deploy.deploy_config.inner_config if deploy else None,
+                                                                  config_encrypted=False, stdio=self.stdio)
+                        need_encrypt_deploy_config.change_deploy_config_password(True, False)
+                        need_encrypt_deploy_config.dump()
                 ret = True
                 if deploy:
                     if is_started or (config_status == DeployConfigStatus.NEED_REDEPLOY and is_deployed):
-                        msg += deploy.effect_tip()
+                        msg += str(FormatText.success(deploy.effect_tip()))
             except Exception as e:
                 deploy.update_deploy_config_status(old_config_status)
                 self._call_stdio('exception', 'Copy %s to %s failed, error: \n%s' % (tf.name, target_src_path, e))
@@ -1232,6 +1342,7 @@ class ObdHome(object):
         self.set_deploy(deploy)
         if not deploy:
             return False
+        deploy.set_config_decrypted()
 
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
@@ -1276,6 +1387,7 @@ class ObdHome(object):
         repositories = self.sort_repository_by_depend(repositories, deploy_config)
         repositories.reverse()
 
+        deploy_config.disable_encrypt_dump()
         kwargs = {}
         for repository in repositories:
             kwargs[repository.name] = {"generate_consistent_config": generate_consistent_config}
@@ -1283,6 +1395,8 @@ class ObdHome(object):
         if not self.run_workflow(workflows, **kwargs):
             return False
 
+        deploy_config.enable_encrypt_dump()
+        deploy_config.set_config_unencrypted()
         if deploy_config.dump():
             return True
 
@@ -1317,24 +1431,33 @@ class ObdHome(object):
             return False
 
         deploy_config = deploy.deploy_config
-        if const.COMP_OB_CE not in deploy_config.components:
+        if const.COMP_OB_CE not in deploy_config.components and const.COMP_OB not in deploy_config.components and const.COMP_OB_STANDALONE not in deploy_config.components:
             self._call_stdio("error", "no oceanbase-ce in deployment %s" % name)
-        cluster_config = deploy_config.components[const.COMP_OB_CE]
+
         repositories = self.load_local_repositories(deploy_info)
         self.set_repositories(repositories)
         ssh_clients = self.get_clients(deploy_config, repositories)
 
-        # search and install oceanbase-ce-utils, just log warning when failed since it can be installed after takeover
-        repositories_utils_map = self.get_repositories_utils(repositories)
-        if not repositories_utils_map:
-            self._call_stdio('warn', 'Failed to get utils package')
-        else:
-            if not self.install_utils_to_servers(repositories, repositories_utils_map):
-                self._call_stdio('warn', 'Failed to install utils to servers')
-
-        self._call_stdio('verbose', 'get plugins by mocking an ocp repository.')
         # search and get all related plugins using a mock ocp repository
-        mock_ocp_repository = Repository(const.COMP_OCP_SERVER_CE, "/")
+        self._call_stdio('verbose', 'get plugins by mocking an ocp repository.')
+        if const.COMP_OCP_SERVER in deploy_config.components:
+            mock_ocp_repository = Repository(const.COMP_OCP_SERVER, "/")
+            if const.COMP_OB in deploy_config.components:
+                cluster_config = deploy_config.components[const.COMP_OB]
+            elif const.COMP_OB_STANDALONE in deploy_config.components:
+                cluster_config = deploy_config.components[const.COMP_OB_STANDALONE]
+
+        else:
+            mock_ocp_repository = Repository(const.COMP_OCP_SERVER_CE, "/")
+            cluster_config = deploy_config.components[const.COMP_OB_CE]
+            # search and install oceanbase-ce-utils, just log warning when failed since it can be installed after takeover
+            repositories_utils_map = self.get_repositories_utils(repositories)
+            if not repositories_utils_map:
+                self._call_stdio('warn', 'Failed to get utils package')
+            else:
+                if not self.install_utils_to_servers(repositories, repositories_utils_map):
+                    self._call_stdio('warn', 'Failed to install utils to servers')
+
         mock_ocp_repository.version = "4.2.1"
         repositories.extend([mock_ocp_repository])
         self.set_deploy(None)
@@ -1449,6 +1572,9 @@ class ObdHome(object):
             self._call_stdio('error', 'Deploy %s %s' % (name, deploy_info.config_status.value))
             return False
         deploy_config = deploy.deploy_config
+        if self.enable_encrypt:
+            deploy_config.change_deploy_config_password(True, False)
+            deploy_config.disable_encrypt_dump()
         if not deploy_config:
             self._call_stdio('error', 'Deploy configuration is empty.\nIt may be caused by a failure to resolve the configuration.\nPlease check your configuration file.\nSee https://github.com/oceanbase/obdeploy/blob/master/docs/zh-CN/4.configuration-file-description.md')
             return False
@@ -1574,6 +1700,7 @@ class ObdHome(object):
     def deploy_cluster(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
+        config_path = getattr(self.options, 'config', '')
         if deploy:
             self._call_stdio('verbose', 'Get deploy info')
             deploy_info = deploy.deploy_info
@@ -1586,8 +1713,10 @@ class ObdHome(object):
                 if not deploy.apply_temp_deploy_config():
                     self._call_stdio('error', 'Failed to apply new deploy configuration')
                     return False
+            if config_path:
+                deploy.set_config_decrypted()
+                deploy.deploy_config.inner_config.update_global_config(const.ENCRYPT_PASSWORD, False)
 
-        config_path = getattr(self.options, 'config', '')
         unuse_lib_repo = getattr(self.options, 'unuselibrepo', False)
         auto_create_tenant = getattr(self.options, 'auto_create_tenant', False)
         self._call_stdio('verbose', 'config path is None or not')
@@ -1597,7 +1726,9 @@ class ObdHome(object):
             if not deploy:
                 self._call_stdio('error', 'Failed to create deploy: %s. please check you configuration file' % name)
                 return False
+            deploy.set_config_decrypted()
 
+        deploy.deploy_config.enable_encrypt_dump()
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s. you can input configuration path to create a new deploy' % name)
             return False
@@ -1679,9 +1810,11 @@ class ObdHome(object):
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
 
+        deploy_config.disable_encrypt_dump()
         workflows = self.get_workflows('init')
         if not self.run_workflow(workflows):
             return False
+        deploy_config.enable_encrypt_dump()
 
         # Parameter check
         self._call_stdio('start_loading', 'Parameter check')
@@ -1893,7 +2026,7 @@ class ObdHome(object):
         self._call_stdio('print', FormatText.success('Execute ` obd cluster display %s ` to view the cluster status' % name))
         return True
 
-    def add_components(self, name):
+    def add_components(self, name, need_confirm=False):
         self._call_stdio('verbose', 'Get Deploy by name')
         config_path = getattr(self.options, 'config', '')
         if not config_path:
@@ -1981,8 +2114,16 @@ class ObdHome(object):
             self._call_stdio('error', 'Failed to dump new deploy config')
             return False
         deploy.dump_deploy_info()
-
-        need_restart_obproxy and self._call_stdio('print', FormatText.success('Use `obd cluster restart %s -c %s` to make changes take effect.' % (name, current_obproxy_repo.name)))
+        restart_components_str = ''
+        if need_restart_obproxy:
+            restart_components_str = current_obproxy_repo.name
+            if oceanbase_repo:
+                restart_components_str += ',' + oceanbase_repo.name
+        if not need_confirm or (need_restart_obproxy and self._call_stdio('read', FormatText.warning('Restart `%s` for %s to take effect. You can do it manually later or enter `restart` now: ' % (restart_components_str, name)), blocked=True).strip() == 'restart'):
+            self._call_stdio('print', '\nRestart %s' % name)
+            setattr(self.options, 'components', '%s' % restart_components_str)
+            if not self.restart_cluster(name):
+                self._call_stdio('warn', '%s restart failed. Please execute `obd cluster restart %s` to retry.' % (name, name))
         self._call_stdio('print', FormatText.success('Execute ` obd cluster display %s ` to view the cluster status' % name))
         return True
 
@@ -2133,19 +2274,39 @@ class ObdHome(object):
 
         start_check_workflows = self.get_workflows('start_check')
         if not self.run_workflow(start_check_workflows, sorted_components=components):
+            ob_repository = None
+            for repository in all_repositories:
+                if repository.name in const.COMPS_OB:
+                    ob_repository = repository
+                    break
+            if ob_repository:
+                finally_check_plugin_name = [value for value in start_check_workflows.workflows.get(ob_repository.name).stage.values()][-1][-1].name
+                if self.get_namespace(ob_repository.name).get_return(finally_check_plugin_name).get_return('system_env_error'):
+                    self._call_stdio('print', FormatText.success('You can use the `obd cluster init4env {name}` command to automatically configure system parameters'.format(name=name)))
             return False
 
+        start_args = {}
+        for repo in repositories:
+            if repo.name in COMPS_OB:
+                start_args[repo.name] = {}
+                start_args[repo.name]["install_utils_to_servers"] = self.install_utils_to_servers
+                start_args[repo.name]["get_repositories_utils"] = self.get_repositories_utils
         start_workflows = self.get_workflows('start', **{'new_clients': ssh_clients})
-        if not self.run_workflow(start_workflows, sorted_components=components):
+        if not self.run_workflow(start_workflows, sorted_components=components, **start_args):
             return False
-
+        display_encrypt_password = None
+        if self.enable_encrypt:
+            display_encrypt_password = '******'
+        components_kwargs = {}
+        for repository in repositories:
+            components_kwargs[repository.name] = {"display_encrypt_password": display_encrypt_password}
         display_workflows = self.get_workflows('display')
-        if not self.run_workflow(display_workflows, sorted_components=components):
+        if not self.run_workflow(display_workflows, sorted_components=components, **components_kwargs):
             return False
 
         if update_deploy_status:
             self._call_stdio('verbose', 'Set %s deploy status to running' % name)
-            if deploy.update_deploy_status(DeployStatus.STATUS_RUNNING):
+            if deploy.update_deploy_status(DeployStatus.STATUS_RUNNING) and deploy.deploy_config.dump():
                 self._call_stdio('print', '%s running' % name)
                 return True
         else:
@@ -2407,7 +2568,6 @@ class ObdHome(object):
                 self._call_stdio('error', 'The deployment architecture is changed and cannot be reloaded.')
                 return False
 
-
         self._call_stdio('stop_loading', 'succeed')
 
         self._call_stdio('start_loading', 'Load cluster param plugin')
@@ -2433,6 +2593,9 @@ class ObdHome(object):
         reload_args = {}
         for repo in repositories:
             reload_args[repo.name] = {"new_cluster_config": new_deploy_config.components[repo.name], "retry_times": 30}
+            if repo.name in COMPS_OB:
+                reload_args[repo.name]["install_utils_to_servers"] = self.install_utils_to_servers
+                reload_args[repo.name]["get_repositories_utils"] = self.get_repositories_utils
         workflows = self.get_workflows('reload')
         if not self.run_workflow(workflows, **reload_args):
             deploy_config.dump()
@@ -2471,10 +2634,23 @@ class ObdHome(object):
             
         self._call_stdio('stop_loading', 'succeed')
 
+        display_encrypt_password = None
+        if self.enable_encrypt:
+            epk = getattr(self.options, 'encryption_passkey')
+            if epk:
+                if not self.check_encryption_passkey(epk):
+                    self._call_stdio('error', 'Encryption passkey is not correct')
+                    return False
+            else:
+                display_encrypt_password = '******'
+
+        components_kwargs = {}
+        for repository in repositories:
+            components_kwargs[repository.name] = {"display_encrypt_password": display_encrypt_password}
         # Get the client
         self.get_clients(deploy_config, repositories)
         workflows = self.get_workflows('display')
-        return self.run_workflow(workflows)
+        return self.run_workflow(workflows, **components_kwargs)
         
     def stop_cluster(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
@@ -2656,6 +2832,7 @@ class ObdHome(object):
                 if self.stdio:
                     self._call_stdio('error', err.EC_SOME_SERVER_STOPED.format())
                 return False
+            deploy_config.change_deploy_config_password(False, False)
 
         need_restart_repositories = []
         component_num = len(target_restart_components)
@@ -2730,6 +2907,7 @@ class ObdHome(object):
 
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
+        deploy_config.disable_encrypt_dump()
         self._call_stdio('start_loading', 'Get local repositories')
         # Get the repository
         repositories = self.load_local_repositories(deploy_info)
@@ -2764,7 +2942,18 @@ class ObdHome(object):
             if not repositories or not install_plugins:
                 return False
             self.set_repositories(repositories)
-        return self._deploy_cluster(deploy, repositories) and self._start_cluster(deploy, repositories)
+        deploy_config.enable_encrypt_dump()
+        if not self._deploy_cluster(deploy, repositories):
+            return False
+        if self.enable_encrypt:
+            deploy_config.change_deploy_config_password(False, False)
+        deploy_config.disable_encrypt_dump()
+        if not self._start_cluster(deploy, repositories):
+            return False
+        deploy_config.enable_encrypt_dump()
+        if not deploy_config.dump():
+            return False
+        return True
 
     def destroy_cluster(self, name, need_confirm=False):
         self._call_stdio('verbose', 'Get Deploy by name')
@@ -3005,10 +3194,6 @@ class ObdHome(object):
                 if not component:
                     self._call_stdio('error', 'Specify the components you want to upgrade.')
                     return False
-
-            if const.COMP_OBBINLOG_CE in component:
-                self._call_stdio('error', 'The component %s is not support upgrade.' % const.COMP_OBBINLOG_CE)
-                return False
 
             for current_repository in repositories:
                 if current_repository.name == component:
@@ -3439,8 +3624,9 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
 
+        allow_components = COMPS_ODP + COMPS_OB
         if opts.component is None:
-            for component_name in ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']:
+            for component_name in allow_components:
                 if component_name in deploy_config.components:
                     opts.component = component_name
                     break
@@ -3488,7 +3674,7 @@ class ObdHome(object):
             self._call_stdio('error', 'Can not find the component for mysqltest, use `--component` to select component')
             return False
         if not ob_repository:
-            self._call_stdio('error', 'Deploy {} must contain the component oceanbase or oceanbase-ce.'.format(deploy.name))
+            self._call_stdio('error', 'Deploy {} must contain the component oceanbase or oceanbase-ce or oceanbase-standalone.'.format(deploy.name))
             return False
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
@@ -3675,7 +3861,7 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
 
-        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
+        allow_components = COMPS_ODP + COMPS_OB
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
@@ -3750,7 +3936,7 @@ class ObdHome(object):
             if tmp_repository.name == opts.component:
                 repository = tmp_repository
         if not ob_repository:
-            self._call_stdio('error', 'Deploy {} must contain the component oceanbase or oceanbase-ce.'.format(deploy.name))
+            self._call_stdio('error', 'Deploy {} must contain the component oceanbase or oceanbase-ce or oceanbase-standalone.'.format(deploy.name))
             return False
         plugin_version = ob_repository.version if ob_repository else repository.version
         setattr(opts, 'host', opts.test_server.ip)
@@ -3950,7 +4136,7 @@ class ObdHome(object):
 
         db_component = None
         db_components = const.COMPS_OB
-        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
+        allow_components = COMPS_ODP + COMPS_OB
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
@@ -4041,7 +4227,7 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Get deploy configuration')
         deploy_config = deploy.deploy_config
 
-        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
+        allow_components = COMPS_ODP + COMPS_OB
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
@@ -4110,7 +4296,7 @@ class ObdHome(object):
             if tmp_repository.name == opts.component:
                 repository = tmp_repository
         if not ob_repository:
-            self._call_stdio('error', 'Deploy {} must contain the component oceanbase or oceanbase-ce.'.format(deploy.name))
+            self._call_stdio('error', 'Deploy {} must contain the component oceanbase or oceanbase-ce or oceanbase-standalone.'.format(deploy.name))
             return False
         plugin_version = ob_repository.version if ob_repository else repository.version
         setattr(opts, 'host', opts.test_server.ip)
@@ -4192,7 +4378,7 @@ class ObdHome(object):
             self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
             return False
 
-        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
+        allow_components = COMPS_ODP + COMPS_OB
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
@@ -4318,7 +4504,7 @@ class ObdHome(object):
             self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
             return False
 
-        allow_components = ['obproxy', 'obproxy-ce', 'oceanbase', 'oceanbase-ce']
+        allow_components = COMPS_ODP + COMPS_OB
         if opts.component is None:
             for component_name in allow_components:
                 if component_name in deploy_config.components:
@@ -4336,7 +4522,7 @@ class ObdHome(object):
             if component in const.COMPS_OB:
                 break
         else:
-            self._call_stdio('error', 'Dooba must contain the component oceanbase or oceanbase-ce.')
+            self._call_stdio('error', 'Dooba must contain the component oceanbase or oceanbase-ce or oceanbase-standalone.')
             return False
 
         cluster_config = deploy_config.components[opts.component]
@@ -4384,6 +4570,9 @@ class ObdHome(object):
         deploy_info = deploy.deploy_info
         if deploy_info.status in (DeployStatus.STATUS_DESTROYED, DeployStatus.STATUS_CONFIGURED):
             self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
+            return False
+
+        if const.COMP_OB in deploy.deploy_config.components:
             return False
 
         repositories = self.load_local_repositories(deploy_info)
@@ -4984,8 +5173,14 @@ class ObdHome(object):
             self.deploy.deploy_info.status = DeployStatus.STATUS_RUNNING
             self.deploy.dump_deploy_info()
             display_plugins = self.search_py_script_plugin([repository], 'display')
+            display_encrypt_password = None
+            if self.enable_encrypt:
+                display_encrypt_password = '******'
+            components_kwargs = {}
+            for repository in repositories:
+                components_kwargs[repository.name] = {"display_encrypt_password": display_encrypt_password}
             workflow = self.get_workflows('display')
-            if not self.run_workflow(workflow):
+            if not self.run_workflow(workflow, **components_kwargs):
                 return False
             return True
         except Exception as e:
@@ -5343,4 +5538,431 @@ class ObdHome(object):
             self._call_stdio('error', 'Deploy "%s" is %s. it needs to be %s.' % (deploy_name, deploy_info.status.value, allowed_deploy_status.value))
             return None
         return deploy
+
+    def set_sys_conf(self, repositories):
+        for repository in repositories:
+            if repository.name in const.COMPS_OB:
+                break
+        else:
+            self._call_stdio('error', 'No such component: oceanbase.')
+            return True
+        workflows = self.get_workflows('set_sys_env', no_found_act='ignore')
+        if not self.run_workflow(workflows):
+            return False
+        return True
+
+    def init_cluster_env(self, name):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        self.set_deploy(deploy)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        self._call_stdio('verbose', 'Deploy status judge')
+        if deploy_info.status not in [DeployStatus.STATUS_DEPLOYED, DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
+            self._call_stdio('error', 'Deploy "%s" is %s. can not support init env.' % (name, deploy_info.status.value))
+            return False
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info, False)
+        self.set_repositories(repositories)
+        self._call_stdio('stop_loading', 'succeed')
+
+        for repository in repositories:
+            if repository.name in const.COMPS_OB:
+                break
+        else:
+            self._call_stdio('error', 'There must be "oceanbase" component in deploy "%s".' % name)
+            return False
+
+        self._call_stdio('verbose', 'Get deploy config')
+
+        if not self.set_sys_conf(repositories):
+            return False
+        return True
+
+    def register_license(self, name):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        self.set_deploy(deploy)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        if deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
+            return False
+
+        license = getattr(self.options, 'file', '')
+        if not license:
+            self._call_stdio('error', 'Use the --file option to specify the required license file。')
+            return False
+
+        self._call_stdio('verbose', 'Get deploy config')
+        deploy_config = deploy.deploy_config
+
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        repositories = self.sort_repository_by_depend(repositories, deploy_config)
+        for repository in repositories:
+            if repository.name == COMP_OB_STANDALONE:
+                break
+        else:
+            self._call_stdio('error', 'The current database version does not support license mechanism.')
+            return
+        self.set_repositories(repositories)
+        self._call_stdio('stop_loading', 'succeed')
+        self.get_clients(deploy_config, repositories)
+        workflows = self.get_workflows('load_license', repositories=[repository])
+        return self.run_workflow(workflows)
+
+    def show_license(self, name):
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        self.set_deploy(deploy)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        if deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('print', 'Deploy "%s" is %s' % (name, deploy_info.status.value))
+            return False
+
+        self._call_stdio('verbose', 'Get deploy config')
+        deploy_config = deploy.deploy_config
+
+        self._call_stdio('start_loading', 'Get local repositories and plugins')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        repositories = self.sort_repository_by_depend(repositories, deploy_config)
+        for repository in repositories:
+            if repository.name == COMP_OB_STANDALONE:
+                break
+        else:
+            self._call_stdio('error', 'The current database version does not support license mechanism.')
+            return
+        self.set_repositories(repositories)
+        self._call_stdio('stop_loading', 'succeed')
+        self.get_clients(deploy_config, repositories)
+        workflows = self.get_workflows('show_license', repositories=[repository])
+        return self.run_workflow(workflows)
+
+    def get_ob_repo_by_normal_check_for_use_obshell(self, name, deploy):
+        self.set_deploy(deploy)
+        self._call_stdio('start_loading', 'Get local repositories')
+        repositories = self.load_local_repositories(deploy.deploy_info, False)
+        self.search_param_plugin_and_apply(repositories, deploy.deploy_config)
+        self._call_stdio('stop_loading', 'succeed')
+
+        for repository in repositories:
+            if repository.name in const.COMPS_OB:
+                if Version('4.2.0.0') <= repository.version <= Version('4.2.5.0'):
+                    self._call_stdio('error', 'Oceanbase must be higher than version 4.2.5.0 .')
+                    return None
+                elif Version('4.3.0.0') <= repository.version <= Version('4.3.3.0'):
+                    self._call_stdio('error', 'Oceanbase must be higher than version 4.3.3.0 .')
+                    return None
+                ob_repository = repository
+                break
+        else:
+            self._call_stdio('error', 'There must be "oceanbase" component in deploy "%s".' % name)
+            return None
+
+        self.set_repositories([ob_repository])
+        component_status = {}
+        cluster_status = self.cluster_status_check([ob_repository], component_status)
+        if cluster_status is False or cluster_status == 0:
+            for repository in component_status:
+                cluster_status = component_status[repository]
+                for server in cluster_status:
+                    if cluster_status[server] == 0:
+                        self._call_stdio('print','%s: "%s" is not running, please execute `obd cluster start %s` to start and try again.' % (server, ob_repository.name, name))
+                        return None
+
+        return ob_repository
+
+    def tenant_set_backup_config(self, name, tenant_name):
+        # check deploy name
+        deploy = self.get_deploy_with_allowed_status(name, DeployStatus.STATUS_RUNNING)
+        if not deploy:
+            return False
+
+        if tenant_name == 'sys':
+            self._call_stdio('error', 'Backup sys tenant is not support.')
+            return False
+
+        ob_repository = self.get_ob_repo_by_normal_check_for_use_obshell(name, deploy)
+        if not ob_repository:
+            return False
+
+        workflows = self.get_workflows('tenant_set_backup_config')
+        if not self.run_workflow(workflows, **{ob_repository.name: {"tenant_name": tenant_name}}):
+            return False
+        return True
+
+    def tenant_backup(self, name, tenant_name):
+        # check deploy name
+        deploy = self.get_deploy_with_allowed_status(name, DeployStatus.STATUS_RUNNING)
+        if not deploy:
+            return False
+
+        if tenant_name == 'sys':
+            self._call_stdio('error', 'Backup sys tenant is not support.')
+            return False
+
+        ob_repository = self.get_ob_repo_by_normal_check_for_use_obshell(name, deploy)
+        if not ob_repository:
+            return False
+
+        workflows = self.get_workflows('tenant_backup')
+        if not self.run_workflow(workflows, **{ob_repository.name: {"tenant_name": tenant_name}}):
+            return False
+        self._call_stdio('print', 'View backup task details,please execute `obd cluster tenant backup-show %s %s`.' % (name, tenant_name))
+        return True
+
+    def tenant_restore(self, name, tenant_name, data_backup_uri, archive_log_uri):
+        # check deploy name
+        deploy = self.get_deploy_with_allowed_status(name, DeployStatus.STATUS_RUNNING)
+        if not deploy:
+            return False
+
+        if tenant_name == 'sys':
+            self._call_stdio('error', 'Restore sys tenant is not support.')
+            return False
+
+        ob_repository = self.get_ob_repo_by_normal_check_for_use_obshell(name, deploy)
+        if not ob_repository:
+            return False
+
+        workflows = self.get_workflows('tenant_restore')
+        if not self.run_workflow(workflows, **{ob_repository.name: {
+            "tenant_name": tenant_name,
+            "data_backup_uri": data_backup_uri,
+            "archive_log_uri": archive_log_uri
+            }
+        }):
+            return False
+        self._call_stdio('print', 'View restore task details,please execute `obd cluster tenant restore-show %s %s`.' % (name, tenant_name))
+        return True
+
+    def query_backup_or_restore_task(self, name, tenant_name, task_type):
+        # check deploy name
+        deploy = self.get_deploy_with_allowed_status(name, DeployStatus.STATUS_RUNNING)
+        if not deploy:
+            return False
+
+        ob_repository = self.get_ob_repo_by_normal_check_for_use_obshell(name, deploy)
+        if not ob_repository:
+            return False
+
+        workflows = self.get_workflows('query_backup_or_restore_task')
+        if not self.run_workflow(workflows, **{ob_repository.name: {"tenant_name": tenant_name, "task_type": task_type}}):
+            return False
+        return True
+
+    def cancel_backup_or_restore_task(self, name, tenant_name, task_type):
+        # check deploy name
+        deploy = self.get_deploy_with_allowed_status(name, DeployStatus.STATUS_RUNNING)
+        if not deploy:
+
+            return False
+
+        ob_repository = self.get_ob_repo_by_normal_check_for_use_obshell(name, deploy)
+        if not ob_repository:
+            return False
+
+        workflows = self.get_workflows('cancel_backup_or_restore_task')
+        if not self.run_workflow(workflows, **{ob_repository.name: {"tenant_name": tenant_name, "task_type": task_type}}):
+            return False
+        return True
+
+    def check_encryption_passkey(self, epk):
+        self._call_stdio('print', 'Check encryption passkey.')
+        if tool.string_to_md5_32bytes(epk) == self.encrypted_passkey:
+            return True
+        return False
+
+    def input_encryption_passkey(self, double_check=True, print_error=True):
+        try_times = 2
+        msg = 'Please enter the encryption passkey: '
+        if double_check:
+            msg = 'First time setting the encryption passkey. please enter the encryption passkey: '
+        while try_times:
+            epk = getpass.getpass(msg).strip()
+            if not epk:
+                msg = 'Encryption passkey cannot be empty, Please enter again: '
+                try_times -= 1
+            elif double_check:
+                double_check_epk = getpass.getpass('Please enter the encryption passkey again: ')
+                if epk != double_check_epk:
+                    self._call_stdio('print', 'The two input encryption passkeys are inconsistent')
+                    try_times -= 1
+                else:
+                    COMMAND_ENV.set(const.ENCRYPT_PASSKEY, tool.string_to_md5_32bytes(epk), save=True)
+                    self._call_stdio('print', FormatText.success('First time setting the encryption passkey successful! '))
+                    break
+            else:
+                break
+        else:
+            if print_error:
+                self._call_stdio('error', 'Encryption passkey input error.')
+                return False
+            return ''
+        return epk
+
+    def encrypt_manager(self, enable):
+        if enable:
+            self._call_stdio('verbose', 'Get encrypt passkey')
+            double_check = True
+            if self.encrypted_passkey:
+                double_check = False
+                encryption_passkey = getattr(self.options, 'encryption_passkey') or self.input_encryption_passkey(double_check=double_check)
+            else:
+                encryption_passkey = self.input_encryption_passkey(double_check=double_check)
+            if not encryption_passkey:
+                return False
+            if not double_check and not self.check_encryption_passkey(encryption_passkey):
+                self._call_stdio('error', 'Encryption passkey error.')
+                return False
+        else:
+            if self.encrypted_passkey:
+                encryption_passkey = getattr(self.options, 'encryption_passkey') or self.input_encryption_passkey(False)
+                if not encryption_passkey:
+                    return False
+                if not self.check_encryption_passkey(encryption_passkey):
+                    self._call_stdio('error', 'Encryption passkey error.')
+                    return False
+        msg = 'Encrypt password'
+        if not enable:
+            msg = 'Decrypt password'
+        self._call_stdio('start_loading', msg)
+        configs = self.deploy_manager.get_deploy_configs(read_only=False)
+        for deploy in configs:
+            if deploy.deploy_info.config_status != DeployConfigStatus.UNCHNAGE:
+                self._call_stdio('error', 'The current is config is modified. Deploy "%s" %s.' % (deploy.name, deploy.deploy_info.config_status.value))
+                return False
+        first_encrypt = False
+        if COMMAND_ENV.get(const.ENCRYPT_PASSWORD) != '1':
+            first_encrypt = True
+            self._call_stdio('verbose', 'Encrypt password')
+        for deploy in configs:
+            if deploy.deploy_config.inner_config.get_global_config(const.ENCRYPT_PASSWORD) != enable:
+                self._call_stdio('verbose', '%s password for deploy %s' % ('encrypt' if enable else 'decrypt', deploy.name))
+                deploy.deploy_config.change_deploy_config_password(enable, first_encrypt=first_encrypt)
+                deploy.deploy_config.dump()
+        self._call_stdio('stop_loading', 'succeed')
+        if not enable:
+            COMMAND_ENV.delete(const.ENCRYPT_PASSKEY, save=True)
+            COMMAND_ENV.delete(const.ENCRYPT_PASSWORD, save=True)
+        else:
+            COMMAND_ENV.set(const.ENCRYPT_PASSWORD, '1', save=True)
+        return True
+
+    def set_encryption_passkey(self, new_epk):
+        current_epk = getattr(self.options, 'current_passkey')
+        force = getattr(self.options, 'force')
+        if force:
+            username = self._call_stdio('read', 'Please input username with sudo privileges. (default: root): ', blocked=True).strip() or 'root'
+            password = getpass.getpass('please input %s password: ' % username)
+            config = SshConfig(host='127.0.0.1', port='22', username=username, password=password)
+            client = SshClient(config, stdio=self.stdio)
+            ret = client.execute_command('echo %s | %s whoami' % (password, 'sudo -S' if username != 'root' else ''))
+            if not ret:
+                self._call_stdio('error', 'Force set must be run with root privileges')
+                return False
+
+        if not force and self.encrypted_passkey:
+            if current_epk is None:
+                self._call_stdio('error', 'Please use `-c` to input current encryption passkey .')
+                return False
+            if not self.check_encryption_passkey(current_epk):
+                self._call_stdio('error', 'Current encryption passkey error.')
+                return False
+
+        if new_epk == '':
+            self._call_stdio('print', ' `` passkey is not supported.')
+            return True
+
+        COMMAND_ENV.set(const.ENCRYPT_PASSKEY, tool.string_to_md5_32bytes(new_epk), save=True)
+        self._call_stdio('print', 'Update encryption passkey successful.')
+        return True
+
+    def precheck_host(self, username, host, dev=False):
+        self._call_stdio('verbose', 'ssh connect')
+        password = getattr(self.options, 'password', None)
+        clients = {}
+
+        client = SshClient(
+            SshConfig(
+                host,
+                username,
+                password,
+            ),
+            self.stdio
+        )
+        if not client.connect():
+            self._call_stdio('error', 'ssh connect failed, please check the password and network.(username: %s ip: %s password: %s)' % (username, host, password))
+            return False
+        clients[host] = client
+
+        host_tool_repository = self.repository_manager.get_repository_allow_shadow('host_tool', '1.0')
+        self.set_repositories([host_tool_repository])
+
+        workflows = self.get_workflows('precheck')
+        if not self.run_workflow(workflows, **{'host_tool': {'host_clients': clients}}):
+            return False
+
+        need_change_servers_vars = self.get_namespace('host_tool').get_return('precheck').get_return('need_change_servers_vars')
+        print_data = []
+        for v in need_change_servers_vars.values():
+            print_data.extend(v)
+        if not print_data:
+            self._call_stdio('print', FormatText.success('No need to change system parameters'))
+            return True
+        self._call_stdio('print_list', print_data, ['ip', 'need_change_var', 'current_value', 'target_value'],
+                         lambda x: [x['server'], x['var'], x['current_value'], x['value']],
+                         title='System Parameter Change List')
+        if dev:
+            return 100
+        return True
+
+    def init_host(self, username, host, dev=False):
+        self._call_stdio('verbose', 'ssh connect')
+        password = getattr(self.options, 'password', None)
+        clients = {}
+
+        client = SshClient(
+            SshConfig(
+                host,
+                username,
+                password,
+            ),
+            self.stdio
+        )
+        if not client.connect():
+            self._call_stdio('error', 'ssh connect failed, please check the password and network.(username: %s ip: %s password: %s)' % (username, host, password))
+            return False
+        clients[host] = client
+
+        host_tool_repository = self.repository_manager.get_repository_allow_shadow('host_tool', '1.0')
+        self.set_repositories([host_tool_repository])
+
+        workflows = self.get_workflows('init')
+        if not self.run_workflow(workflows, **{'host_tool': {'host_clients': clients}}):
+            return False
+
+        need_reboot_ips = self.get_namespace('host_tool').get_return('init').get_return('need_reboot_ips')
+        if need_reboot_ips:
+            if dev:
+                return 101
+            else:
+                self._call_stdio('print', FormatText.warning('You must reboot the following servers to ensure the ulimit parameters take effect: （{servers}）.'.format(servers=','.join(list(need_reboot_ips)))))
+        return True
+
 

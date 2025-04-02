@@ -43,7 +43,7 @@ def collect_log(plugin_context, env, test_name=None, *args, **kwargs):
     ob_component = env["component"]
 
     if is_obproxy:
-        intersection = list({'oceanbase', 'oceanbase-ce'}.intersection(set(cluster_config.depends)))
+        intersection = list({'oceanbase', 'oceanbase-ce', 'oceanbase-standalone'}.intersection(set(cluster_config.depends)))
         if not intersection:
             stdio.warn('observer config not in the depends.')
             return

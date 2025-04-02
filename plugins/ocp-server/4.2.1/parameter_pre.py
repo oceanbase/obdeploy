@@ -45,11 +45,11 @@ def get_ocp_depend_config(cluster_config, stdio):
                 if 'server_ip' not in depend_info:
                     depend_info['server_ip'] = ob_server.ip
                     depend_info['mysql_port'] = ob_server_conf['mysql_port']
-                    depend_info['meta_tenant'] = ob_server_conf['ocp_meta_tenant']['tenant_name']
+                    depend_info['meta_tenant'] = ob_server_conf['ocp_meta_tenant']
                     depend_info['meta_user'] = ob_server_conf['ocp_meta_username']
                     depend_info['meta_password'] = ob_server_conf['ocp_meta_password']
                     depend_info['meta_db'] = ob_server_conf['ocp_meta_db']
-                    depend_info['monitor_tenant'] = ob_server_conf['ocp_monitor_tenant']['tenant_name']
+                    depend_info['monitor_tenant'] = ob_server_conf['ocp_monitor_tenant']
                     depend_info['monitor_user'] = ob_server_conf['ocp_monitor_username']
                     depend_info['monitor_password'] = ob_server_conf['ocp_monitor_password']
                     depend_info['monitor_db'] = ob_server_conf['ocp_monitor_db']
@@ -77,13 +77,14 @@ def get_ocp_depend_config(cluster_config, stdio):
                 default_server_config['jdbc_port'] = depend_info['mysql_port']
                 default_server_config['jdbc_host'] = depend_info['server_ip']
                 default_server_config['ocp_meta_username'] = depend_info['meta_user'] if not original_server_config.get('ocp_meta_username', None) else original_server_config['ocp_meta_username']
-                default_server_config['ocp_meta_tenant']['tenant_name'] = depend_info['meta_tenant'] if not original_server_config.get('ocp_meta_tenant', None) else original_server_config['ocp_meta_tenant']['tenant_name']
+                default_server_config['ocp_meta_tenant'] = depend_info['meta_tenant'] if not original_server_config.get('ocp_meta_tenant', None) else original_server_config['ocp_meta_tenant']
                 default_server_config['ocp_meta_password'] = depend_info['meta_password'] if not original_server_config.get('ocp_meta_password', None) else original_server_config['ocp_meta_password']
                 default_server_config['ocp_meta_db'] = depend_info['meta_db'] if not original_server_config.get('ocp_meta_db', None) else original_server_config['ocp_meta_db']
                 default_server_config['ocp_monitor_username'] = depend_info['monitor_user'] if not original_server_config.get('ocp_monitor_username', None) else original_server_config['ocp_monitor_username']
-                default_server_config['ocp_monitor_tenant']['tenant_name'] = depend_info['monitor_tenant'] if not original_server_config.get('ocp_monitor_tenant', None) else original_server_config['ocp_monitor_tenant']['tenant_name']
+                default_server_config['ocp_monitor_tenant'] = depend_info['monitor_tenant'] if not original_server_config.get('ocp_monitor_tenant', None) else original_server_config['ocp_monitor_tenant']
                 default_server_config['ocp_monitor_password'] = depend_info['monitor_password'] if not original_server_config.get('ocp_monitor_password', None) else original_server_config['ocp_monitor_password']
                 default_server_config['ocp_monitor_db'] = depend_info['monitor_db'] if not original_server_config.get('ocp_monitor_db', None) else original_server_config['ocp_monitor_db']
+
         env[server] = default_server_config
     return env
 
@@ -117,7 +118,7 @@ def parameter_pre(plugin_context, **kwargs):
             tenant_info["database"] = server_config[prefix + "db"]
             tenant_info["db_username"] = server_config[prefix + "username"]
             tenant_info["db_password"] = server_config.get(prefix + "password", "")
-            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "")
+            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "") if not server_config.get('ocp_root_password') else server_config['ocp_root_password']
             ocp_tenants.append(Values(tenant_info))
     plugin_context.set_variable("create_tenant_options", ocp_tenants)
 

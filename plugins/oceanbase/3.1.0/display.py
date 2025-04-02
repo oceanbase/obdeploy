@@ -19,6 +19,8 @@ import re
 import time
 import uuid
 
+from const import ENCRYPT_PASSWORD
+
 
 class Codec(object):
 
@@ -48,7 +50,7 @@ def passwd_format(passwd):
     return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 
-def display(plugin_context, cursor, *args, **kwargs):
+def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     stdio.start_loading('Wait for observer init')
     cluster_config = plugin_context.cluster_config
@@ -61,9 +63,9 @@ def display(plugin_context, cursor, *args, **kwargs):
                 if servers:
                     stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'],
                         lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title=cluster_config.name)
-                    user = 'root'
-                    password = cluster_config.get_global_conf().get('root_password', '')
-                    cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A' % (servers[0]['svr_ip'], servers[0]['inner_port'], user, '-p%s ' % passwd_format(password) if password else '')
+                    user = 'root@%s' % cursor.tenant
+                    password = cluster_config.get_global_conf().get('root_password', '') if not display_encrypt_password else display_encrypt_password
+                    cmd = 'obclient -h%s -P%s -u%ssys %s-Doceanbase -A' % (servers[0]['svr_ip'], servers[0]['inner_port'], user, '-p%s ' % passwd_format(password) if password else '')
                     stdio.print(cmd)
                     stdio.stop_loading('succeed')
                     info_dict = {
@@ -80,9 +82,10 @@ def display(plugin_context, cursor, *args, **kwargs):
                         cid = int(var['gmt_create'] * 1000)
                         unique_id = Codec.encoding(cid, servers[0]['build_version'])
                         stdio.print('cluster unique id: %s\n' % unique_id)
+                    plugin_context.set_variable('server_infos', servers)
                     return plugin_context.return_true(info=info_dict, unique_id=unique_id)
             except Exception as e:
-                code =  e.args[0]
+                code = e.args[0]
                 if code != 1146 and code != 4012:
                     raise e
                 time.sleep(3)

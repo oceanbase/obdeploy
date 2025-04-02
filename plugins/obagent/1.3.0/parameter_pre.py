@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 from copy import deepcopy
+from const import COMPS_OB
 
 
 def parameter_pre(plugin_context, **kwargs):
@@ -30,7 +31,7 @@ def parameter_pre(plugin_context, **kwargs):
         env = {}
         depend_info = {}
         ob_servers_config = {}
-        for comp in ["oceanbase", "oceanbase-ce"]:
+        for comp in COMPS_OB:
             if comp in cluster_config.depends:
                 observer_globals = cluster_config.get_depend_config(comp)
                 for key in depends_keys:

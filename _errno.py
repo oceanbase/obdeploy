@@ -31,6 +31,9 @@ class OBDErrorCode(object):
     def __str__(self):
         return  self.msg
 
+    def __bool__(self):
+        return False
+
 
 class OBDErrorCodeTemplate(object):
 
@@ -142,6 +145,7 @@ WC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) The recommended value of 
 WC_OBSERVER_SAME_DISK = OBDErrorCodeTemplate(1012, '({ip}) clog and data use the same disk ({disk})')
 WC_FAIL_TO_RESTART_OR_RELOAD = OBDErrorCodeTemplate(1021, 'The components has been {action}, but encountered problems when reloading or restarting. Details:\n{detail}')
 WC_FAIL_TO_RESTART_OR_RELOAD_AFTER_SCALE_OUT = OBDErrorCodeTemplate(1022, 'The cluster has been scaled out, but encountered problems when reloading or restarting. Details:\n{detail}')
+WC_CHANGE_SYSTEM_PARAMETER_FAILED = OBDErrorCodeTemplate(1023, '({server}) failed to change system parameter: {key})')
 
 # error code for observer
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
@@ -166,6 +170,8 @@ EC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_m
 EC_OBSERVER_GET_MEMINFO_FAIL = OBDErrorCodeTemplate(2011, "{server}: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
 EC_OBSERVER_FAIL_TO_START_OCS = OBDErrorCodeTemplate(2012, 'Failed to start {server} obshell')
 EC_OBSERVER_UNKONE_SCENARIO = OBDErrorCodeTemplate(2013, 'Unknown scenario: {scenario}')
+EC_CPU_NOT_SUPPORT_AVX = OBDErrorCodeTemplate(2014, "{server}'s cpu not support avx")
+EC_OBSERVER_DISABLE_AUTOSTART = OBDErrorCodeTemplate(2015, "{server}: Failed to modify the configuration of the automatic startup. Please check whether the current user has sudo permissions")
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 
@@ -256,6 +262,9 @@ EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT = OBDErrorCodeTemplate(6001, 'obdiag must
 EC_OBDIAG_OPTIONS_FORMAT_ERROR = OBDErrorCodeTemplate(6002, 'obdiag options {option} format error, please check the value : {value}')
 EC_OBDIAG_FUCYION_FAILED = OBDErrorCodeTemplate(6003, 'Failed to execute obdiag function {fuction}')
 
+# obshell
+EC_OBSHELL_GENERAL_ERROR = OBDErrorCodeTemplate(6100, 'OBSHELL: {msg}')
+
 # Unexpected exceptions code
 EC_UNEXPECTED_EXCEPTION = OBDErrorCodeTemplate(9999, 'Unexpected exception: need to be posted on "https://ask.oceanbase.com", and we will help you resolve them.')
 
@@ -310,6 +319,6 @@ SUG_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "
 SUG_OCP_SERVER_EXIST_METADB_TENANT_NOT_ENOUGH = OBDErrorSuggestionTemplate('Please reduce the ocp meta tenant memory or ocp monitor tenant memory')
 SUG_OCP_SERVER_NOT_EXIST_METADB_TENANT_NOT_ENOUGH = OBDErrorSuggestionTemplate('Please increase the meta db memory_limit and reduce the ocp meta tenant memory or ocp monitor tenant memory')
 SUG_OB_SYS_USERNAME = OBDErrorSuggestionTemplate('Please delete the "ob_sys_username" parameter.')
-SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" component.''')
+SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" or "oceanbase-standalone" component.''')
 SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)
 SUB_OBSERVER_UNKONE_SCENARIO = OBDErrorSuggestionTemplate('Please select a valid scenario from the options: {scenarios}')

@@ -24,7 +24,7 @@ import hashlib
 
 from tool import NetUtil, COMMAND_ENV
 from const import VERSION, REVISION, TELEMETRY_COMPONENT
-from _environ import ENV_TELEMETRY_REPORTER, ENV_OBD_ID
+from _environ import ENV_TELEMETRY_REPORTER, ENV_OBD_ID, ENV_CUSTOM_CLUSTER_ID
 
 shell_command_map = {
     "host_type": 'systemd-detect-virt',
@@ -254,10 +254,9 @@ def telemetry_info_collect(plugin_context, telemetry_post_data={}, *args, **kwar
     repositories = plugin_context.repositories
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-
     if not telemetry_post_data:
         options = plugin_context.options
-        telemetry_post_data = init_telemetry_data(getattr(options, 'data', {}))
+        telemetry_post_data = init_telemetry_data(getattr(options, 'data', '{}'))
 
     for server in cluster_config.servers:
         current_client = clients[server]
@@ -280,6 +279,8 @@ def telemetry_info_collect(plugin_context, telemetry_post_data={}, *args, **kwar
                 data['dataFileSize'] = config.get('datafile_size', '0')
                 data['logDiskSize'] = config.get('log_disk_size', '0')
                 data['cpuCount'] = config.get('cpu_count', '0')
+                cluster_id = COMMAND_ENV.get(ENV_CUSTOM_CLUSTER_ID, default=config.get('cluster_id', '0'))
+                data['clusterId'] = cluster_id
             telemetry_post_data['instances'].append(data)
 
     plugin_context.set_variable('telemetry_post_data', telemetry_post_data)

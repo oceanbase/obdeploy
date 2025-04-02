@@ -76,7 +76,7 @@ def check_opt(plugin_context, env, *args, **kwargs):
 
     is_obproxy = opt["component"].startswith("obproxy")
     if is_obproxy:
-        intersection = list({'oceanbase', 'oceanbase-ce'}.intersection(set(cluster_config.depends)))
+        intersection = list({'oceanbase', 'oceanbase-ce', 'oceanbase-standalone'}.intersection(set(cluster_config.depends)))
         if not intersection:
             stdio.warn('observer config not in the depends.')
             return
@@ -85,7 +85,7 @@ def check_opt(plugin_context, env, *args, **kwargs):
     else:
         ob_component = opt["component"]
         global_config = cluster_config.get_global_conf()
-    opt['is_business'] = 1 if ob_component == 'oceanbase' else 0
+    opt['is_business'] = 1 if ob_component in {'oceanbase', 'oceanbase-standalone'} else 0
     cursor = plugin_context.get_return('connect').get_return('cursor')
     opt['_enable_static_typing_engine'] = None
     if '_enable_static_typing_engine' in global_config:

@@ -20,6 +20,7 @@ import re
 
 from _errno import WC_OBAGENT_SERVER_NAME_ERROR
 from tool import YamlLoader, FileUtil
+from const import COMPS_OB
 
 stdio = None
 
@@ -43,7 +44,7 @@ def start(plugin_context, is_reinstall=False, *args, **kwargs):
         config_mapper = yaml.load(f).get('config_mapper', {})
     stdio.start_loading('Start obagent')
 
-    for comp in ["oceanbase", "oceanbase-ce"]:
+    for comp in COMPS_OB:
         if cluster_config.get_depend_config(comp) and plugin_context.get_return('start', comp).get_return('need_bootstrap'):
             error_servers_list = []
             for server in cluster_config.servers:

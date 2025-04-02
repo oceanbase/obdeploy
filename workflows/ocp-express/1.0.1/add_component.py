@@ -23,7 +23,6 @@ def add_component(plugin_context, workflow, *args, **kwargs):
     repository_names = [repository.name for repository in repositories]
     workflow.add(const.STAGE_FIRST, 'parameter_pre', 'start_check_pre', 'version_check', 'password_check', 'general_check')
 
-    workflow.add(const.STAGE_SECOND, 'parameter_pre')
     workflow.add_with_component_version_kwargs(const.STAGE_SECOND, const.COMP_OB_CE if const.COMP_OB_CE in repository_names else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OCP_EXPRESS}, 'connect', 'create_tenant', 'create_user')
     workflow.add(const.STAGE_SECOND, 'cursor_check', 'start', 'health_check')
 

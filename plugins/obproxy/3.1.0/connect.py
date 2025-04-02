@@ -167,10 +167,11 @@ def connect(plugin_context, target_server=None, connect_proxysys=True, *args, **
                 else:
                     pwd_key = 'observer_root_password'
                 new_config = None
+                new_r_password = None
                 if new_cluster_config:
                     new_config = new_cluster_config.get_server_conf(server)
                     if new_config:
-                        new_r_password = new_config[pwd_key]
+                        new_r_password = new_config.get(pwd_key, '')
                 r_password = password if password else server_config.get(pwd_key)
                 r_password = new_r_password if new_config and count % 2 else r_password
                 if r_password is None:
@@ -188,7 +189,7 @@ def connect(plugin_context, target_server=None, connect_proxysys=True, *args, **
         servers = tmp_servers
         servers and time.sleep(3)
 
-    if servers:
+    if len(servers) == len(cluster_config.servers):
         stdio.stop_loading('fail')
         stdio.error(EC_FAIL_TO_CONNECT.format(component=cluster_config.name))
         return plugin_context.return_false()

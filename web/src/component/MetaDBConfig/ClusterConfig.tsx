@@ -7,6 +7,7 @@ import {
   formatMoreConfig,
   generateRandomPassword as generatePassword,
   getPasswordRules,
+  getTailPath,
 } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
@@ -20,6 +21,8 @@ import InputPort from '../InputPort';
 import styles from './index.less';
 
 export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
+  const isNewDB = getTailPath() === 'install';
+
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
   const { deployUser, useRunningUser } = useModel('ocpInstallData');
   const {
@@ -308,10 +311,12 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
           onChange={handleCluserMoreChange}
         />
       </div>
+
       <ConfigTable
         showVisible={ocpClusterMore}
         dataSource={ocpClusterMoreConfig}
         loading={clusterMoreLoading}
+        isNewDB={isNewDB}
       />
     </div>
   );

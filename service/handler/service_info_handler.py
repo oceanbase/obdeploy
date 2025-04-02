@@ -18,6 +18,7 @@ import copy
 from singleton_decorator import singleton
 
 from _deploy import UserConfig, DeployStatus
+from _rpm import Version
 from tool import Cursor, NetUtil
 from ssh import LocalClient, SshConfig, SshClient
 from service.handler.base_handler import BaseHandler
@@ -160,6 +161,13 @@ class ServiceInfoHandler(BaseHandler):
         memory_xmx = res.stdout.split("Xmx")[1].split(" ")[0]
         home_path = res.stdout.split("/lib/ocp-server")[0].split(' ')[-1]
 
+        ob_version = self.context['metadb_cursor'].fetchone('select version()')['version()']
+        ob_name = ob_version.split('-')[1]
+        if ob_name == 'OceanBase':
+            component_name = 'ocp-server'
+        else:
+            component_name = 'ocp-server-ce'
+
         # check whether ocp docker exists
         res = ssh_client.execute_command("sudo docker ps | grep ocp-all-in-one ")
         if res:
@@ -178,7 +186,7 @@ class ServiceInfoHandler(BaseHandler):
         monitor_tenant_username = monitor_user.split('@')[0]
         monitor_tenant_user = TenantUser(tenant_name=monitor_tenant_name, user_name=monitor_tenant_username, user_database=monitor_database)
         monitor_tenant = TenantConfig(name=monitor_tenant_user, password=RSAHandler().encrypt_public_key(monitor_password))
-        ocp_server = OcpServer(component='ocp-server-ce', metadb=self.context['connection_info'][cluster_name], meta_tenant=meta_tenant, monitor_tenant=monitor_tenant, admin_password=RSAHandler().encrypt_public_key('********'),
+        ocp_server = OcpServer(component=component_name, metadb=self.context['connection_info'][cluster_name], meta_tenant=meta_tenant, monitor_tenant=monitor_tenant, admin_password=RSAHandler().encrypt_public_key('********'),
                                home_path=home_path, servers=servers, port=server_port, memory_size=memory_xmx)
         components = OcpComponentConfig(ocpserver=ocp_server)
         data = OCPDeploymnetConfig(auth=auth, components=components)
@@ -194,7 +202,7 @@ class ServiceInfoHandler(BaseHandler):
         log.get_logger().info('deploy: %s' % deploy)
         if deploy and deploy.deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
             deploy_config = deploy.deploy_config
-            if const.OCP_SERVER in deploy_config.components:
+            if const.OCP_SERVER in deploy_config.components and deploy_config.components[const.OCP_SERVER].config_version <= Version('4.2.1'):
                 cluster_config = deploy_config.components[const.OCP_SERVER]
                 global_config = cluster_config.get_global_conf()
                 if not global_config.get('ocp_meta_username', ''):

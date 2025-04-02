@@ -17,7 +17,7 @@ export default function ComponentUninstall() {
     2: <Uninstall />,
     3: <ExitPage />,
   };
-  console.log('in的v current', current);
+
   return (
     <PageContainer
       style={{

@@ -18,23 +18,23 @@ export default () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [configData, setConfigData] = useState<any>({});
   const [ocpConfigData, setOcpConfigData] = useState<any>({});
-  const [checkOK, setCheckOK] = useState(false);
+  const [checkOK, setCheckOK] = useState<boolean>(false);
   const [installStatus, setInstallStatus] = useState('RUNNING');
-  const [lowVersion, setLowVersion] = useState(false);
-  const [isFirstTime, setIsFirstTime] = useState(true);
-  const [ocpNewFirstTime, setOcpNewFirstTime] = useState(true);
-  const [isDraft, setIsDraft] = useState(false);
-  const [clusterMore, setClusterMore] = useState(false);
-  const [ocpClusterMore, setOcpClusterMore] = useState(false);
-  const [nameIndex, setNameIndex] = useState(4);
-  const [ocpNameIndex, setOcpNameIndex] = useState(4);
+  const [lowVersion, setLowVersion] = useState<boolean>(false);
+  const [isFirstTime, setIsFirstTime] = useState<boolean>(true);
+  const [ocpNewFirstTime, setOcpNewFirstTime] = useState<boolean>(true);
+  const [isDraft, setIsDraft] = useState<boolean>(false);
+  const [clusterMore, setClusterMore] = useState<boolean>(false);
+  const [ocpClusterMore, setOcpClusterMore] = useState<boolean>(false);
+  const [nameIndex, setNameIndex] = useState<number>(4);
+  const [ocpNameIndex, setOcpNameIndex] = useState<number>(4);
   const [errorVisible, setErrorVisible] = useState(false);
   const [errorsList, setErrorsList] = useState<API.ErrorInfo[]>([]);
   const [first, setFirst] = useState<boolean>(true);
   const [loadTypeVisible, setLoadTypeVisible] = useState(false);
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState<string>('');
   const [scenarioParam, setScenarioParam] = useState<any>();
-  const [selectedLoadType, setSelectedLoadType] = useState('htap');
+  const [selectedLoadType, setSelectedLoadType] = useState<string>('htap');
   const [clusterMoreConfig, setClusterMoreConfig] = useState<
     API.NewParameterMeta[]
   >([]);
@@ -127,6 +127,7 @@ export default () => {
     setLoadTypeVisible,
     selectedLoadType,
     setSelectedLoadType,
+
     timerProgress,
     ...docs,
   };

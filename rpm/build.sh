@@ -138,13 +138,12 @@ function build()
     rm -f obd.py obd.spec
     cp -r plugins $BUILD_DIR/plugins
     cp -r config_parser $BUILD_DIR/config_parser
-    rm -fr $BUILD_DIR/plugins/oceanbase-ce
     rm -fr $BUILD_DIR/config_parser/oceanbase-ce
     rm -fr /usr/obd /usr/bin/obd
     cp ./dist/obd /usr/bin/obd 
     cp -fr ./profile/* /etc/profile.d/
     rm -fr dist
-    cd $BUILD_DIR/plugins && ln -s oceanbase oceanbase-ce && cp -rf obproxy/3.1.0 obproxy-ce/ && cp -rf $DIR/plugins/obproxy-ce/* obproxy-ce/
+    cd $BUILD_DIR/plugins && \cp -rf oceanbase/* oceanbase-ce/ && \cp -rf $SRC_DIR/plugins/oceanbase-ce/* oceanbase-ce/ && \cp -rf oceanbase/* oceanbase-standalone/ && \cp -rf $SRC_DIR/plugins/oceanbase-standalone/* oceanbase-standalone/ && \cp -rf ocp-server/* ocp-server-ce/ && \cp -rf $SRC_DIR/plugins/ocp-server-ce/* ocp-server-ce/ && cp -rf obproxy/3.1.0 obproxy-ce/ && cp -rf $DIR/plugins/obproxy-ce/* obproxy-ce/
     cd $BUILD_DIR/config_parser && ln -s oceanbase oceanbase-ce
     mv $BUILD_DIR /usr/obd
     chmod +x /usr/bin/obd

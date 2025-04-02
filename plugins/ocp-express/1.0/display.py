@@ -15,10 +15,11 @@
 
 from __future__ import absolute_import, division, print_function
 
+from const import ENCRYPT_PASSWORD
 from tool import NetUtil
 
 
-def display(plugin_context, cursor, *args, **kwargs):
+def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     servers = cluster_config.servers
@@ -33,7 +34,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             'ip': ip,
             'port': api_cursor.port,
             'user': "admin",
-            'password': cluster_config.get_global_conf_with_default().get('_admin_password_', 'oceanbase'),
+            'password': cluster_config.get_global_conf_with_default().get('_admin_password_', 'oceanbase') if not display_encrypt_password else display_encrypt_password,
             'url': url,
             'status': 'active' if api_cursor and api_cursor.status(stdio) else 'inactive'
         })

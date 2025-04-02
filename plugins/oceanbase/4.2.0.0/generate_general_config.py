@@ -51,10 +51,11 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
     update_global_conf = plugin_context.get_variable('update_global_conf')
     update_server_conf = plugin_context.get_variable('update_server_conf')
     summit_config = plugin_context.get_variable('summit_config')
+    max_syslog_type_file_count = plugin_context.get_variable('max_syslog_type_file_count')
     generate_random_password = plugin_context.get_variable('generate_random_password')
 
     global_config = cluster_config.get_global_conf()
-    max_syslog_file_count_default = 4
+    max_syslog_file_count_default = 16
     if global_config.get('enable_syslog_wf') is None:
         update_global_conf('enable_syslog_wf', False)
     if global_config.get('max_syslog_file_count') is None:
@@ -63,7 +64,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
     MIN_MEMORY = 6 << 30
     PRO_MEMORY_MIN = 16 << 30
     SLOG_SIZE = 4 << 30
-    MIN_CPU_COUNT = 16
+    MIN_CPU_COUNT = 8
     START_NEED_MEMORY = 3 << 30
 
     MINI_MEMORY_SIZE = MIN_MEMORY
@@ -264,7 +265,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
                     auto_set_log_disk_size = True
 
             if int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) != 0:
-                log_size = (256 << 20) * int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) * 4
+                log_size = (256 << 20) * int(user_server_config.get('max_syslog_file_count', max_syslog_file_count_default)) * max_syslog_type_file_count
             else:
                 log_size = 1 << 30  # 默认先给1G普通日志空间
 

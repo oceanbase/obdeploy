@@ -137,11 +137,11 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
     def check_lib():
         lib_check = True
         stdio.start_loading('Remote %s repository lib check' % check_repository)
+        need_libs = set()
         for server in servers:
             stdio.verbose('%s %s repository lib check' % (server, check_repository))
             client = clients[server]
             remote_home_path = home_path_map[server]
-            need_libs = set()
             client.add_env('LD_LIBRARY_PATH', '%s/lib:' % remote_home_path, True)
 
             for file_item in check_file_map.values():
@@ -170,11 +170,11 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
                             if Version(match.group(1)) < Version(requirement_map[file_item.require].min_version) or \
                                 Version(match.group(1)) > Version(requirement_map[file_item.require].max_version):
                                     need_libs.add(requirement_map[file_item.require])
-            if need_libs:
-                for lib in need_libs:
-                    getattr(stdio, msg_lv, '%s %s require: %s' % (server, check_repository, lib.name))
-                lib_check = False
-            client.add_env('LD_LIBRARY_PATH', '', True)
+        if need_libs:
+            for lib in need_libs:
+                getattr(stdio, msg_lv, '%s %s require: %s' % (server, check_repository, lib.name))
+            lib_check = False
+        client.add_env('LD_LIBRARY_PATH', '', True)
 
         if msg_lv == 'error':
             stdio.stop_loading('succeed' if lib_check else 'fail')

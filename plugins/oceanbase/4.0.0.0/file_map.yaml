@@ -2,7 +2,7 @@
   target_path: bin/observer
   type: bin
   mode: 755
-  require: oceanbase-ce-libs
+  require: $name-libs
 - src_path: ./home/admin/oceanbase/bin
   target_path: bin
   type: dir

@@ -1,26 +1,26 @@
-import { intl } from '@/utils/intl';
-import { Button, Space, Alert, Row, Col } from 'antd';
-import { ProCard } from '@ant-design/pro-components';
-import { useModel } from 'umi';
-import useRequest from '@/utils/useRequest';
-import { getErrorInfo } from '@/utils';
+import CustomAlert from '@/component/CustomAlert';
+import ExitBtn from '@/component/ExitBtn';
+import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import { createOcpDeploymentConfig } from '@/services/ocp_installer_backend/OCP';
+import { getErrorInfo } from '@/utils';
+import { encryptPwdForConfig } from '@/utils/encrypt';
+import { intl } from '@/utils/intl';
+import useRequest from '@/utils/useRequest';
+import { ProCard } from '@ant-design/pro-components';
+import { Button, Row, Space } from 'antd';
+import { useModel } from 'umi';
 import CustomFooter from '../../CustomFooter';
+import { formatPreCheckData } from '../helper';
+import styles from '../index.less';
 import BasicInfo from './BasicInfo';
 import ConfigInfo from './ConfigInfo';
 import ConnectInfo from './ConnectInfo';
 import ResourceInfo from './ResourceInfo';
-import ExitBtn from '@/component/ExitBtn';
-import { formatPreCheckData } from '../helper';
-import { encryptPwdForConfig } from '@/utils/encrypt';
-import { getPublicKey } from '@/services/ob-deploy-web/Common';
-import CustomAlert from '@/component/CustomAlert';
-import styles from '../index.less';
 import type {
   BasicInfoProp,
-  ProductInfoType,
-  ConnectInfoType,
   ConnectInfoPropType,
+  ConnectInfoType,
+  ProductInfoType,
   ResourceInfoPropType,
 } from './type';
 
@@ -177,7 +177,7 @@ export default function CheckInfo({
     },
   );
 
-  const nextStep = async() => {
+  const nextStep = async () => {
     const { data: publicKey } = await getPublicKey();
     handleCreateConfig(
       { name: oceanbase?.appname },
@@ -197,7 +197,7 @@ export default function CheckInfo({
         })}
         type="info"
         showIcon
-        style={{ margin: '16px 0', height: '40px' }}
+        style={{ margin: '16px 0' }}
       />
 
       <ProCard className={styles.pageCard} split="horizontal">

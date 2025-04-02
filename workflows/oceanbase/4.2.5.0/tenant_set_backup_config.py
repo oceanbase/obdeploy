@@ -16,8 +16,11 @@
 from __future__ import absolute_import, division, print_function
 
 import const
+from _rpm import Version
 
 
-def create_tenant(plugin_context, workflow, *args, **kwargs):
-    workflow.add_with_component(const.STAGE_FIRST, 'oceanbase-ce', 'connect', 'create_tenant', 'create_user', 'import_time_zone')
-    plugin_context.return_true()
+def tenant_set_backup_config(plugin_context, workflow, *args, **kwargs):
+    workflow.add(const.STAGE_FIRST, 'obshell_client', 'obshell_health_check')
+    workflow.add_with_kwargs(const.STAGE_FIRST, {"version": Version("4.2.4.0"), "comparison_operators": ">="}, 'obshell_version_check')
+    workflow.add(const.STAGE_FIRST, 'connect', 'set_backup_config')
+    return plugin_context.return_true()

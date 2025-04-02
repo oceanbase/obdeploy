@@ -22,8 +22,8 @@ from _lock import LockManager
 
 def reload(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'connect')
-    workflow.add(const.STAGE_SECOND, 'reload')
+    workflow.add(const.STAGE_SECOND, 'reload', 'enable_auto_start')
     component_name = plugin_context.cluster_config.name
-    if const.COMP_OB_CE == component_name:
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
         workflow.add(const.STAGE_SECOND, 'obshell_password_reload')
     plugin_context.return_true()

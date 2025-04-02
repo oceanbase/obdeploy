@@ -58,3 +58,13 @@ ENV_OBD_INSTALL_PRE = "OBD_INSTALL_PRE"
 
 # obdeploy install path. default /usr/obd/
 ENV_OBD_INSTALL_PATH = "OBD_INSTALL_PATH"
+
+# obd web idle minite time before shutdown. default 30
+# if you do not want to set idle time, you can set it to "infinity"
+ENV_IDLE_TIME_BEFORE_SHUTDOWN_MINITES = "IDLE_TIME_BEFORE_SHUTDOWN_MINITES"
+
+# obdesktop/docker mock cluster id
+ENV_CUSTOM_CLUSTER_ID = "CUSTOM_CLUSTER_ID"
+
+# obdeploy web type
+ENV_OBD_WEB_TYPE = "OBD_WEB_TYPE"

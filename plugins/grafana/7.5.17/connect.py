@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function
 
 import json
 import os
+import time
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -98,8 +99,6 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
         count -= 1
         for server in servers:
             config = cluster_config.get_server_conf(server)
-            client = clients[server]
-            home_path = config['home_path']
             if config.get('customize_config'):
                 if config['customize_config'].get("server"):
                     if config['customize_config']['server'].get('protocol'):
@@ -109,19 +108,14 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
                 if config['security'].get('admin_user'):
                     user = config['security']['admin_user']
 
-            touch_path = os.path.join(home_path, 'run/.grafana')
-            new_config = None
-            if new_cluster_config:
-                new_config = new_cluster_config.get_server_conf(server)
-                if new_config:
-                    new_login_password = new_config['login_password']
-            login_password = config['login_password'] if client.execute_command("ls %s" % touch_path) else 'admin'
-            login_password = new_login_password if new_config and count % 2 else login_password
-
+            login_password = config['login_password'] if count % 2 else 'admin'
             stdio.verbose('connect grafana ({}:{} by user {})'.format(server.ip, config['port'], user))
             api_cursor = GrafanaAPICursor(ip=server.ip, port=config['port'], user=user, password=login_password, protocol=protocol)
             if api_cursor.connect(stdio=stdio):
                 cursors[server] = api_cursor
+        if cursors:
+            break
+        time.sleep(3)
 
     if not cursors:
         stdio.error(EC_FAIL_TO_CONNECT.format(component=cluster_config.name))

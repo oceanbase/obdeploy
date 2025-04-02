@@ -109,6 +109,34 @@ async def get_install_status(name: str = Path(description='deployment name')):
     return response_utils.new_ok_response(task_info)
 
 
+@router.post("/deployments/{name}/start",
+             response_model=OBResponse,
+             description='start a deployment',
+             operation_id='startADeployment',
+             tags=['Deployments'])
+async def start(name: str, background_tasks: BackgroundTasks):
+    handler = handler_utils.new_deployment_handler()
+    try:
+        handler.start(name, background_tasks)
+    except Exception as ex:
+        return response_utils.new_internal_server_error_exception(ex)
+    return response_utils.new_ok_response("")
+
+
+@router.post("/deployments/{name}/stop",
+             response_model=OBResponse,
+             description='stop a deployment',
+             operation_id='stopADeployment',
+             tags=['Deployments'])
+async def stop(name: str, background_tasks: BackgroundTasks):
+    handler = handler_utils.new_deployment_handler()
+    try:
+        handler.stop(name, background_tasks)
+    except Exception as ex:
+        return response_utils.new_internal_server_error_exception(ex)
+    return response_utils.new_ok_response("")
+
+
 @router.get("/deployments/{name}/connection",
             response_model=OBResponse[DataList[ConnectionInfo]],
             description='query connect info',
@@ -150,6 +178,19 @@ async def get_deployments(task_status: DeploymentStatus = Query(..., description
     handler = handler_utils.new_deployment_handler()
     deployments = handler.list_deployments_by_status(task_status)
     return response_utils.new_ok_response(deployments)
+
+
+@router.get("/deployments/{name}/detail",
+             response_model=OBResponse,
+             description='get one deployment detail',
+             operation_id='queryDeploymentDetail',
+             tags=['Deployments'])
+async def get_detail(name: str, background_tasks: BackgroundTasks):
+    handler = handler_utils.new_deployment_handler()
+    deployment = handler.get_deployment_detail_by_name(name)
+    if deployment is None:
+        return response_utils.new_not_found_exception(Exception('deployment {} not found'.format(name)))
+    return response_utils.new_ok_response(deployment)
 
 
 @router.get("/deployments/{name}",

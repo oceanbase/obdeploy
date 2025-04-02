@@ -47,7 +47,12 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
     jdbc_host = plugin_context.get_variable('jdbc_host', default=server_config.get('jdbc_host', ''))
     jdbc_port = plugin_context.get_variable('jdbc_port', default=server_config.get('jdbc_port', ''))
     jdbc_url = server_config['jdbc_url']
-    jdbc_username = "{0}@{1}".format(server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'])
+    cluster_name = ''
+    if server_config.get('jdbc_username', ''):
+        jdbc_username = server_config['jdbc_username']
+        if '#' in jdbc_username:
+            cluster_name = '#' + jdbc_username.split('#')[1]
+    jdbc_username = "{0}@{1}{2}".format(server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'], cluster_name)
     jdbc_password = server_config['ocp_meta_password']
     jdbc_public_key = ''
     monitor_user = server_config['ocp_monitor_username']

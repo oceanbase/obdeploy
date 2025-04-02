@@ -22,7 +22,7 @@ def reinstall(plugin_context, workflow, *args, **kwargs):
     component_name = plugin_context.cluster_config.name
 
     workflow.add_with_kwargs(const.STAGE_FIRST, {'is_reinstall': True}, 'configserver_pre', 'start_pre', 'start', 'health_check')
-    if const.COMP_OB_CE == component_name:
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
         workflow.add_with_kwargs(const.STAGE_FIRST, {'is_reinstall': True}, 'obshell_start')
     plugin_context.return_true()
 

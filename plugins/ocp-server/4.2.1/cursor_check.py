@@ -70,7 +70,7 @@ def cursor_check(plugin_context, need_connect=True, *args, **kwargs):
                 time.sleep(1)
             if not connected:
                 success = False
-                error('metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR])
+                error(cluster_config.servers[0], 'metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR])
 
         if need_connect:
             if meta_cursor and meta_user != 'root':

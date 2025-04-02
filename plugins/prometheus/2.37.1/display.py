@@ -15,12 +15,13 @@
 
 from __future__ import absolute_import, division, print_function
 
+from const import ENCRYPT_PASSWORD
 from tool import YamlLoader, NetUtil
 
 yaml = YamlLoader()
 
 
-def display(plugin_context, cursor, *args, **kwargs):
+def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
@@ -40,7 +41,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             'port': api_cursor.port,
             'url': url,
             'user': user if user else '',
-            'password': password if password else '',
+            'password': (password if password else '') if not display_encrypt_password else display_encrypt_password,
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })
     stdio.print_list(results, ['url', 'user', 'password', 'status'], lambda x: [x['url'], x['user'], x['password'], x['status']], title=cluster_config.name)

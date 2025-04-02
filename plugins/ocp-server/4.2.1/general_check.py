@@ -77,6 +77,7 @@ def general_check(plugin_context, work_dir_check=False, work_dir_empty_check=Tru
     check_pass = plugin_context.get_variable('check_pass')
     critical = plugin_context.get_variable('critical')
     wait_2_pass = plugin_context.get_variable('wait_2_pass')
+    change_fail = plugin_context.get_variable('change_fail')
     alert = plugin_context.get_variable('alert')
     error = plugin_context.get_variable('error')
     cursor = plugin_context.get_variable('cursor')
@@ -125,7 +126,8 @@ def general_check(plugin_context, work_dir_check=False, work_dir_empty_check=Tru
         ocp_user = server_config.get('launch_user', '')
         missed_keys = get_missing_required_parameters(server_config)
         if missed_keys:
-            error(server, err.EC_NEED_CONFIG.format(server=server, component=cluster_config.name, miss_keys=missed_keys))
+            stdio.error(err.EC_NEED_CONFIG.format(server=server, component=cluster_config.name, miss_keys=missed_keys))
+            change_fail()
         home_path = server_config['home_path']
         if not precheck:
             remote_pid_path = '%s/run/ocp-server.pid' % home_path

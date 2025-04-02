@@ -141,24 +141,24 @@ export const componentsConfig = {
       defaultMessage: 'OB ConfigServer 参数名称',
     }),
   },
-  [prometheusComponent]:{
-    name:'Prometheus',
-    showComponentName:'Prometheus',
+  [prometheusComponent]: {
+    name: 'Prometheus',
+    showComponentName: 'Prometheus',
     type: intl.formatMessage({
       id: 'OBD.pages.constants.Tools',
       defaultMessage: '工具',
     }),
     componentKey: prometheusComponent,
   },
-  [graphnaComponent]:{
-    name:'Grafana',
-    showComponentName:'Grafana',
+  [graphnaComponent]: {
+    name: 'Grafana',
+    showComponentName: 'Grafana',
     type: intl.formatMessage({
       id: 'OBD.pages.constants.Tools',
       defaultMessage: '工具',
     }),
     componentKey: graphnaComponent,
-  }
+  },
 };
 
 export const modeConfig = {

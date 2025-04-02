@@ -15,6 +15,8 @@
 import json
 import tempfile
 import re
+import time
+import os
 from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid1 as uuid
@@ -32,7 +34,7 @@ from service.handler.rsa_handler import RSAHandler
 from service.model.deployments import DeploymentConfig, PreCheckResult, RecoverChangeParameter, TaskInfo, \
     ComponentInfo, PrecheckTaskResult, \
     DeployMode, ConnectionInfo, PreCheckInfo, RecoverAdvisement, DeploymentReport, Deployment, Auth, DeployConfig, \
-    DeploymentStatus, Parameter, ScenarioType
+    DeploymentStatus, Parameter, ScenarioType, DeploymentDetial, ZoneInfo, ServerInfo, TenantInfo, DetialStats
 
 from service.common import log, task, util, const
 from service.common.task import TaskStatus, TaskResult
@@ -61,7 +63,158 @@ class DeploymentHandler(BaseHandler):
             deployment_info_copy.config.auth.password = ''
         if deployment_info_copy.config and deployment_info_copy.config.components and deployment_info_copy.config.components.oceanbase and deployment_info_copy.config.components.oceanbase.root_password:
             deployment_info_copy.config.components.oceanbase.root_password = ''
+        if deployment_info_copy.config and deployment_info_copy.config.components and deployment_info_copy.config.components.ocpexpress and deployment_info_copy.config.components.ocpexpress.admin_passwd:
+            deployment_info_copy.config.components.ocpexpress.admin_passwd = ''
+        if deployment_info_copy.config and deployment_info_copy.config.components and deployment_info_copy.config.components.obproxy and deployment_info_copy.config.components.obproxy.parameters:
+            for parameter in deployment_info_copy.config.components.obproxy.parameters:
+                if parameter.key == 'obproxy_sys_password':
+                    parameter.value = ''
+        if deployment_info_copy.config and deployment_info_copy.config.components and deployment_info_copy.config.components.obagent and deployment_info_copy.config.components.obagent.parameters:
+            for parameter in deployment_info_copy.config.components.obagent.parameters:
+                if parameter.key == 'http_basic_auth_password':
+                    parameter.value = ''
         return deployment_info_copy
+        
+    def get_deployment_detail_by_name(self, name):
+        deployment = self.obd.deploy_manager.get_deploy_config(name)
+        if deployment is None:
+            return None
+        deployment_detail = DeploymentDetial()
+        deployment_detail.name = deployment.name
+        deployment_detail.status = deployment.deploy_info.status.value.upper()
+        deployment_detail.zone_info = []
+        deployment_detail.server_info = []
+        deployment_detail.tenant_info = []
+        deployment_detail_copy = deepcopy(deployment_detail)
+        deployment_detail_copy.arch = os.uname().machine
+        
+        self.obd.set_deploy(deployment)
+        deploy = self.obd.deploy
+        if not deploy:
+            raise Exception("no such deploy {0}".format(name))
+        deploy_config = deploy.deploy_config
+        # Get the repository
+        pkgs, repositories, errors = self.obd.search_components_from_mirrors(deploy_config, only_info=True)
+        
+        if deployment.deploy_info.status == DeployStatus.STATUS_RUNNING:
+            # get observer info
+            self.obd.display_cluster(name)
+            # get tenant info
+            self.obd.list_tenant(name)
+            
+            for repository in repositories:
+                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                    if plugin_ret.get_return("exception"):
+                        raise plugin_ret.get_return("exception")
+                    
+            for repository in repositories:
+                server_info = self.obd.get_namespace(repository.name).get_variable('server_infos')
+                if server_info:
+                    deployment_detail_copy.version = server_info[0]['build_version'].split('_')[0]
+                    # Initialize stats
+                    server_stats = {
+                        'active': 0,
+                        'inactive': 0,
+                        'other': 0,
+                        'total': len(server_info)
+                    }
+
+                    # Group servers by zone
+                    zone_stats = {}
+                    for item in server_info:
+                        # Update server status statistics
+                        status = item['status'].lower()
+                        if status == 'active':
+                            server_stats['active'] += 1
+                        elif status == 'inactive':
+                            server_stats['inactive'] += 1
+                        else:
+                            server_stats['other'] += 1
+
+                        # Existing zone statistics code...
+                        zone = item['zone']
+                        if zone not in zone_stats:
+                            zone_stats[zone] = {
+                                'total': 0,
+                                'active': 0,
+                                'servers': set()
+                            }
+                        zone_stats[zone]['total'] += 1
+                        zone_stats[zone]['servers'].add(item['svr_ip'])
+                        if status == 'active':
+                            zone_stats[zone]['active'] += 1
+
+                    # Set the statistics
+                    deployment_detail_copy.server_stats = DetialStats(
+                        active=server_stats['active'],
+                        inactive=server_stats['inactive'],
+                        other=server_stats['other'],
+                        total=server_stats['total']
+                    )
+
+                    # Add zone info
+                    for zone, stats in zone_stats.items():
+                        deployment_detail_copy.zone_info.append(
+                            ZoneInfo(
+                                name=zone,
+                                ip=', '.join(stats['servers']),
+                                status='ACTIVE' if stats['active'] > 0 else 'INACTIVE'
+                            )
+                        )
+
+                    # Add server info
+                    for item in server_info:
+                        deployment_detail_copy.server_info.append(
+                            ServerInfo(
+                                ip=item['svr_ip'],
+                                sql_port=item['inner_port'],
+                                rpc_port=item['svr_port'],
+                                zone=item['zone'],
+                                status=item['status']
+                            )
+                        )
+
+                # Add tenant info
+                tenant_info = self.obd.get_namespace(repository.name).get_variable('tenant_infos')
+                if tenant_info:
+                    # Initialize tenant stats
+                    tenant_stats = {
+                        'active': 0,
+                        'inactive': 0,
+                        'other': 0,
+                        'total': len(tenant_info)
+                    }
+
+                    for item in tenant_info:
+                        # Update tenant status statistics
+                        status = item.get('STATUS', '').lower()
+                        if status == 'normal':  # assuming 'NORMAL' means active
+                            tenant_stats['active'] += 1
+                        elif status == 'inactive':
+                            tenant_stats['inactive'] += 1
+                        else:
+                            tenant_stats['other'] += 1
+
+                        deployment_detail_copy.tenant_info.append(
+                            TenantInfo(
+                                id=item.get('TENANT_ID'),
+                                name=item.get('TENANT_NAME', ''),
+                                type=item.get('TENANT_TYPE', ''),
+                                role=item.get('TENANT_ROLE', ''),
+                                mode=item.get('COMPATIBILITY_MODE', ''),
+                                status='ACTIVE' if item.get('STATUS', '') == 'NORMAL' else 'INACTIVE'
+                            )
+                        )
+
+                    # Set tenant statistics
+                    deployment_detail_copy.tenant_stats = DetialStats(
+                        active=tenant_stats['active'],
+                        inactive=tenant_stats['inactive'],
+                        other=tenant_stats['other'],
+                        total=tenant_stats['total']
+                    )
+                
+        return deployment_detail_copy
 
     def generate_deployment_config(self, name: str, config: DeploymentConfig):
         log.get_logger().debug('generate cluster config')
@@ -165,6 +318,10 @@ class DeploymentHandler(BaseHandler):
         if oceanbase.parameters:
             for parameter in oceanbase.parameters:
                 if not parameter.adaptive:
+                    if parameter.key.endswith('_password'):
+                        passwd = RSAHandler().decrypt_private_key(parameter.value)
+                        oceanbase_config['global'][parameter.key] = passwd
+                        continue
                     oceanbase_config['global'][parameter.key] = parameter.value
         if oceanbase.component == const.OCEANBASE_CE:
             cluster_config[const.OCEANBASE_CE] = oceanbase_config
@@ -369,6 +526,44 @@ class DeploymentHandler(BaseHandler):
         COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT_OB, save=True)
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
         self.obd.set_deploy(None)
+        
+    @serial("start")
+    def start(self, name, background_tasks):
+        task_manager = task.get_task_manager()
+        task_info = task_manager.get_task_info(name, task_type="install")
+        if task_info is not None and task_info.status != TaskStatus.FINISHED:
+            raise Exception("task {0} exists and not finished".format(name))
+        task_manager.del_task_info(name, task_type="start")
+        return self._do_start(name)
+        
+    @auto_register("start")
+    def _do_start(self, name):
+        log.get_logger().info("clean io buffer before start")
+        self.buffer.clear()
+        log.get_logger().info("start the cluster %s", name)
+        start_success = self.obd.start_cluster(name)
+        if not start_success:
+            log.get_logger().warn("start %s failed", name)
+        log.get_logger().info("finish do start %s", name)
+        
+    @serial("stop")
+    def stop(self, name, background_tasks):
+        task_manager = task.get_task_manager()
+        task_info = task_manager.get_task_info(name, task_type="install")
+        if task_info is not None and task_info.status != TaskStatus.FINISHED:
+            raise Exception("task {0} exists and not finished".format(name))
+        task_manager.del_task_info(name, task_type="stop")
+        return self._do_stop(name)
+        
+    @auto_register("stop")
+    def _do_stop(self, name):
+        log.get_logger().info("clean io buffer before stop")
+        self.buffer.clear()
+        log.get_logger().info("stop the cluster %s", name)
+        stop_success = self.obd.stop_cluster(name)
+        if not stop_success:
+            log.get_logger().warn("stop %s failed", name)
+        log.get_logger().info("finish do stop %s", name)
 
     def get_install_task_info(self, name):
         task_info = task.get_task_manager().get_task_info(name, task_type="install")
@@ -635,7 +830,7 @@ class DeploymentHandler(BaseHandler):
         elif deployment_status == DeploymentStatus.DRAFT:
             # query draft task
             obd_deploy_status = ['configured', 'deployed', 'destroyed']
-            for deployment in deployments:
+            for deployment in deployments:                               
                 if deployment.deploy_info.status.value in obd_deploy_status:
                     config = self.context['deployment'][deployment.name] if self.context['deployment'] is not None else None
                     if config is not None:
@@ -855,3 +1050,4 @@ class DeploymentHandler(BaseHandler):
             for scenario in scenario_4_3_0_0:
                 data.append(ScenarioType(type=scenario['type'], desc=scenario['desc'], value=scenario['value']))
         return data
+

@@ -15,8 +15,10 @@ export const encryptPwdForConfig = (
   publicKey: string,
 ) => {
   const newConfigData = cloneDeep(configData);
+
   const { obagent, obproxy, oceanbase, ocpserver, ocpexpress } =
     newConfigData.components || newConfigData;
+
   if (newConfigData.auth?.password)
     newConfigData.auth.password =
       encrypt(newConfigData.auth.password, publicKey) ||
@@ -39,6 +41,13 @@ export const encryptPwdForConfig = (
     oceanbase.root_password =
       encrypt(oceanbase.root_password, publicKey) || oceanbase.root_password;
   }
+  if (oceanbase?.parameters) {
+    oceanbase.parameters.forEach((param) => {
+      if (param.key === 'ocp_meta_password' && param.value) {
+        param.value = encrypt(param.value, publicKey) || param.value;
+      }
+    });
+  }
   if (ocpserver?.admin_password) {
     ocpserver.admin_password =
       encrypt(ocpserver.admin_password, publicKey) || ocpserver.admin_password;
@@ -53,9 +62,10 @@ export const encryptPwdForConfig = (
       encrypt(ocpserver.monitor_tenant.password, publicKey) ||
       ocpserver.monitor_tenant.password;
   }
-  if(ocpserver?.metadb?.password){
-    ocpserver.metadb.password =  encrypt(ocpserver.metadb.password, publicKey) ||
-    ocpserver.metadb.password;
+  if (ocpserver?.metadb?.password) {
+    ocpserver.metadb.password =
+      encrypt(ocpserver.metadb.password, publicKey) ||
+      ocpserver.metadb.password;
   }
   if (ocpexpress?.admin_passwd) {
     ocpexpress.admin_passwd =

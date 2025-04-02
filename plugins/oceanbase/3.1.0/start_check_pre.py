@@ -55,7 +55,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
         global success
         success = False
         check_fail(server, item, error, suggests)
-        stdio.error(error)
+        print_with_suggests(error, suggests)
 
     def alert_strict(server, item, error, suggests=[]):
         global success, production_mode
@@ -82,6 +82,12 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
     def change_success():
         global success
         success = True
+
+    def check_item_status_pass(item):
+        for server in cluster_config.servers:
+            if check_status[server][item] == err.CheckStatus.FAIL:
+                return False
+        return True
 
     def print_with_suggests(error, suggests=[]):
         stdio.error('{}, {}'.format(error, suggests[0].msg if suggests else ''))
@@ -125,16 +131,38 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
 
     clog_sub_dir = 'ilog'
 
-    max_user_processes = {
-        'need': lambda x: 4096,
-        'recd': lambda x: 4096 * x,
-        'name': 'nproc'
+    INF = float('inf')
+    ulimits_min = {
+        'open files': {
+            'need': lambda x: 20000 * x,
+            'recd': lambda x: 655350,
+            'name': 'nofile'
+        },
+        'max user processes': {
+            'need': lambda x: 4096,
+            'recd': lambda x: 4096 * x,
+            'name': 'nproc'
+        },
+        'core file size': {
+            'need': lambda x: 0,
+            'recd': lambda x: INF,
+            'below_need_error': False,
+            'below_recd_error_strict': False,
+            'name': 'core'
+        },
+        'stack size': {
+            'need': lambda x: 1024,
+            'recd': lambda x: INF,
+            'below_recd_error_strict': False,
+            'name': 'stack'
+        },
     }
+
 
     variable_dict = {
         'start_check_status': check_status,
         'kernel_check_items': kernel_check_items,
-        'max_user_processes': max_user_processes,
+        'ulimits_min': ulimits_min,
         'clog_sub_dir': clog_sub_dir,
         'check_pass': check_pass,
         'check_fail': check_fail,
@@ -145,7 +173,8 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
         'critical': critical,
         'get_success': get_success,
         'print_with_suggests': print_with_suggests,
-        'production_mode': production_mode
+        'production_mode': production_mode,
+        'check_item_status_pass': check_item_status_pass
     }
     change_success()
     set_plugin_context_variables(plugin_context, variable_dict)

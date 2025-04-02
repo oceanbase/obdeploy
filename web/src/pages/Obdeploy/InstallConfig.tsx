@@ -41,6 +41,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import copy from 'copy-to-clipboard';
+import { isNull } from 'lodash';
 import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
 import { getLocale, history, useModel } from 'umi';
@@ -346,6 +347,7 @@ export default function InstallConfig() {
       aliveTokenTimer.current = null;
     }
     history.push('/guide');
+    sessionStorage.removeItem('componentSelect');
   };
 
   const nextStep = () => {
@@ -429,6 +431,8 @@ export default function InstallConfig() {
       setErrorsList([]);
       window.scrollTo(0, 0);
     });
+    // 是否为初次点击部署组件
+    sessionStorage.setItem('componentSelect', 'true');
   };
 
   const onVersionChange = (
@@ -665,12 +669,6 @@ export default function InstallConfig() {
     }
   };
 
-  useEffect(() => {
-    // 默认勾选项，只取 obproxy
-    // https://project.alipay.com/project/W24001004950/P24001006922/requirement?openWorkItemId=2024100800104636325&status=status&workItemView=72fcab42129ae1bd489e077d
-    setSelectedConfig(['obproxy']);
-  }, []);
-
   const rowSelection = {
     hideSelectAll: true,
     onSelect: handleSelect,
@@ -703,6 +701,7 @@ export default function InstallConfig() {
       return newClusterMoreConfig;
     }
   };
+  const componentSelect = sessionStorage.getItem('componentSelect');
 
   useEffect(() => {
     setComponentLoading(true);
@@ -851,6 +850,14 @@ export default function InstallConfig() {
       setLoadTypeVisible(true);
     }
   }, [scenarioTypeList]);
+
+  useEffect(() => {
+    // 默认勾选项，只取 obproxy
+    const componentSelect = sessionStorage.getItem('componentSelect');
+    if (isNull(componentSelect)) {
+      setSelectedConfig(['obproxy']);
+    }
+  }, []);
 
   return (
     <Spin spinning={loading || componentLoading}>

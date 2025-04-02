@@ -121,12 +121,12 @@ export default function ResourcePlan({
           defaultMessage:
             'OCP 服务在运行过程中会有计算和存储资源开销，您需要根据待管理的对象规模进行资源规划，包括 OCP 服务、MetaDB 和 MonitorDB。',
         })}
-        style={{ height: 40 }}
       />
 
       <Row style={{ alignItems: 'center', marginTop: 16 }}>
         <ProFormDigit
           name={['ocpserver', 'manage_info', 'machine']}
+          min={1}
           label={
             <span style={lableStyle}>
               {intl.formatMessage({
@@ -174,6 +174,7 @@ export default function ResourcePlan({
               }),
             },
           ]}
+          min={1}
           label={
             <span style={lableStyle}>
               {intl.formatMessage({
@@ -236,6 +237,7 @@ export default function ResourcePlan({
         <ProFormDigit
           name={['ocpserver', 'meta_tenant', 'resource', 'cpu']}
           fieldProps={{ style: commonPortStyle }}
+          min={1}
           rules={[
             {
               required: true,
@@ -260,6 +262,7 @@ export default function ResourcePlan({
               }),
             },
           ]}
+          min={1}
           label={
             <span style={lableStyle}>
               {intl.formatMessage({
@@ -330,6 +333,7 @@ export default function ResourcePlan({
               }),
             },
           ]}
+          min={1}
           fieldProps={{ style: commonPortStyle }}
           label={<span style={lableStyle}>CPU（VCPUS）</span>}
         />
@@ -346,6 +350,7 @@ export default function ResourcePlan({
             },
           ]}
           fieldProps={{ style: commonPortStyle }}
+          min={1}
           label={
             <span style={lableStyle}>
               {intl.formatMessage({

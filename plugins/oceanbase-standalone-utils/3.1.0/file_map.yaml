@@ -1,0 +1,4 @@
+- src_path: ./usr/bin
+  target_path: bin
+  type: dir
+  install_method: cp

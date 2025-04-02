@@ -36,14 +36,17 @@ from service.api.v1 import ocp_deployments
 from service.api.v1 import metadb
 from service.api.v1 import installer
 from service.api.v1 import component_change
-from const import DISABLE_SWAGGER
+from tool import COMMAND_ENV
+from const import DISABLE_SWAGGER, IDLE_TIME_BEFORE_SHUTDOWN_MINITES
+from _environ import ENV_IDLE_TIME_BEFORE_SHUTDOWN_MINITES
 
 
 if DISABLE_SWAGGER == '<DISABLE_SWAGGER>':
     app = FastAPI()
 else:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, swagger_ui_oauth2_redirect_url=None)
-IDLE_TIME_BEFORE_SHUTDOWN = timedelta(minutes=30)
+idle_minutes = COMMAND_ENV.get(ENV_IDLE_TIME_BEFORE_SHUTDOWN_MINITES, IDLE_TIME_BEFORE_SHUTDOWN_MINITES)
+IDLE_TIME_BEFORE_SHUTDOWN = timedelta(minutes=idle_minutes) if isinstance(idle_minutes, int) else float('inf')
 
 
 class OBDWeb(object):

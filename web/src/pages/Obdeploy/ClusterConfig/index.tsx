@@ -12,6 +12,10 @@ import { ProCard, ProForm, ProFormRadio } from '@ant-design/pro-components';
 import { Form, message, Row, Space, Switch } from 'antd';
 import { useEffect, useState } from 'react';
 import { getLocale, useModel } from 'umi';
+
+import { getPasswordRules } from '@/utils/helper';
+import { useUpdateEffect } from 'ahooks';
+import { isEmpty } from 'lodash';
 import {
   commonInputStyle,
   commonPortStyle,
@@ -25,7 +29,7 @@ import {
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 import TooltipInput from '../TooltipInput';
-import ConfigTable from './ConfigTable';
+import ConfigTable, { parameterValidator } from './ConfigTable';
 import Footer from './Footer';
 import { getParamstersHandler } from './helper';
 import Parameter from './Parameter';
@@ -88,7 +92,10 @@ export default function ClusterConfig() {
   const [currentMode, setCurrentMode] = useState(
     oceanbase?.mode || 'PRODUCTION',
   );
-
+  const oceanbasePasswordFormValue = ProForm.useWatch(
+    ['oceanbase', 'parameters', 'ocp_meta_password', 'params'],
+    form,
+  );
   const [passwordVisible, setPasswordVisible] = useState(true);
   // const [adminPasswdVisible, setAdminPasswdVisible] = useState(true);
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
@@ -102,6 +109,30 @@ export default function ClusterConfig() {
   const [obPwdMsgInfo, setObPwdMsgInfo] = useState<MsgInfoType>();
   const [ocpPwdMsgInfo, setOcpPwdMsgInfo] = useState<MsgInfoType>();
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
+
+  const [metadbParameterRules, setMetadbParameterRules] = useState<RulesDetail>(
+    {
+      rules: [() => ({ validator: parameterValidator })],
+      targetTable: 'oceanbase-ce',
+      targetColumn: 'ocp_meta_password',
+    },
+  );
+
+  useUpdateEffect(() => {
+    if (!oceanbasePasswordFormValue?.adaptive) {
+      setMetadbParameterRules({
+        rules: getPasswordRules('ob'),
+        targetTable: 'oceanbase-ce',
+        targetColumn: 'ocp_meta_password',
+      });
+    } else {
+      setMetadbParameterRules({
+        rules: [() => ({ validator: parameterValidator })],
+        targetTable: 'oceanbase-ce',
+        targetColumn: 'ocp_meta_password',
+      });
+    }
+  }, [oceanbasePasswordFormValue]);
 
   const formatParameters = (dataSource: any) => {
     if (dataSource) {
@@ -541,18 +572,20 @@ export default function ClusterConfig() {
                 id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
                 defaultMessage: '更多配置',
               })}
-
               <Switch
                 className="ml-20"
                 checked={clusterMore}
                 onChange={handleCluserMoreChange}
               />
             </div>
+
             <ConfigTable
               showVisible={clusterMore}
               dataSource={clusterMoreConfig}
               loading={clusterMoreLoading}
               customParameter={<Parameter />}
+              parameterRules={[metadbParameterRules]}
+              showMetaPassword={isEmpty(ocpexpress)}
             />
           </ProCard>
         </ProCard>

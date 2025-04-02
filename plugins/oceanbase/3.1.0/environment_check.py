@@ -34,6 +34,7 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
     port_check = plugin_context.get_variable('port_check')
     servers_memory = plugin_context.get_variable('servers_memory')
     slog_dir_key = plugin_context.get_variable('slog_dir_key')
+    check_item_status_pass = plugin_context.get_variable('check_item_status_pass')
     success = plugin_context.get_variable('get_success')()
 
     servers_dirs = {}
@@ -161,12 +162,15 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
             is_check_ping_permission = False
             for devname in servers_net_interface[ip]:
                 if not is_check_ping_permission:
+                    for server in cluster_config.servers:
+                        if server.ip == ip:
+                            break
                     ret = client.execute_command('ping -W 1 -c 1 127.0.0.1')
                     if ret.code == 127:
-                        critical(ip, 'net', err.EC_OBSERVER_PING_NOT_FOUND.format())
+                        critical(server, 'net', err.EC_OBSERVER_PING_NOT_FOUND.format())
                         break
                     if not ret:
-                        critical(ip, 'net', err.EC_OBSERVER_PING_FAILED_SUID.format())
+                        critical(server, 'net', err.EC_OBSERVER_PING_FAILED_SUID.format())
                         break
                     is_check_ping_permission = True
                 if client.is_localhost() and (devname != 'lo' and devname is not None) or (not client.is_localhost() and devname == 'lo'):
@@ -190,7 +194,17 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
                         break
     plugin_context.set_variable('servers_net_interface', servers_net_interface)
     plugin_context.set_variable('servers_port', servers_port)
+
     if not success:
-        return plugin_context.return_false()
+        system_env_error = False
+        kernel_check_items = plugin_context.get_variable('kernel_check_items')
+        for check_item in kernel_check_items:
+            if check_item_status_pass(check_item['check_item']):
+                system_env_error = True
+                break
+        else:
+            if not check_item_status_pass('aio') or not check_item_status_pass('ulimit'):
+                system_env_error = True
+        return plugin_context.return_false(system_env_error=system_env_error)
     return plugin_context.return_true()
 

@@ -25,11 +25,11 @@ def generate_random_password(cluster_config, auto_depend):
     be_depend = cluster_config.be_depends
     added_components = {
         component: component in add_components
-        for component in const.COMPS_OB + const.COMPS_ODP + [const.COMP_OBAGENT, const.COMP_OBLOGPROXY]
+        for component in const.COMPS_OB + const.COMPS_ODP + const.COMPS_OCP + [const.COMP_OCP_EXPRESS, const.COMP_OBAGENT]
     }
     be_depends = {
         component: (auto_depend or component in be_depend)
-        for component in const.COMPS_ODP + [const.COMP_OBAGENT, const.COMP_OBLOGPROXY]
+        for component in const.COMPS_ODP + const.COMPS_OCP + [const.COMP_OCP_EXPRESS, const.COMP_OBAGENT, const.COMP_OBLOGPROXY, const.COMP_OBBINLOG_CE]
     }
 
     if added_components[cluster_config.name] and 'root_password' not in global_config:
@@ -42,6 +42,33 @@ def generate_random_password(cluster_config, auto_depend):
         for component_name in const.COMPS_ODP:
             if added_components[component_name] and be_depends[component_name]:
                 cluster_config.update_global_conf('proxyro_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+
+    if (added_components[const.COMP_OCP_EXPRESS] and be_depends[const.COMP_OCP_EXPRESS] and 'ocp_meta_password' not in global_config) or \
+          any([key in global_config for key in ["ocp_meta_tenant", "ocp_meta_db", "ocp_meta_username", "ocp_meta_password"]]):
+            if 'ocp_root_password' not in global_config:
+                cluster_config.update_global_conf('ocp_root_password', ConfigUtil.get_random_pwd_by_total_length(), False) # Does not support configuration in the configuration file
+            if 'ocp_meta_password' not in global_config :
+                cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+
+    if (added_components[const.COMP_OCP_SERVER_CE] and be_depends[const.COMP_OCP_SERVER_CE] and ('ocp_meta_password' not in global_config)) or \
+          any([key in global_config for key in ["ocp_meta_tenant", "ocp_meta_db", "ocp_meta_username", "ocp_meta_password"]]):
+            if 'ocp_meta_password' not in global_config :
+                cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+
+    if (added_components[const.COMP_OCP_SERVER_CE] and be_depends[const.COMP_OCP_SERVER_CE] and ('ocp_monitor_password' not in global_config)) or \
+          any([key in global_config for key in ["ocp_monitor_tenant", "ocp_monitor_db", "ocp_monitor_username", "ocp_monitor_password"]]):
+            if 'ocp_meta_password' not in global_config :
+                cluster_config.update_global_conf('ocp_monitor_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+
+    if (added_components[const.COMP_OCP_SERVER] and be_depends[const.COMP_OCP_SERVER] and ('ocp_meta_password' not in global_config)) or \
+          any([key in global_config for key in ["ocp_meta_tenant", "ocp_meta_db", "ocp_meta_username", "ocp_meta_password"]]):
+            if 'ocp_meta_password' not in global_config :
+                cluster_config.update_global_conf('ocp_meta_password', ConfigUtil.get_random_pwd_by_total_length(), False)
+
+    if (added_components[const.COMP_OCP_SERVER] and be_depends[const.COMP_OCP_SERVER] and ('ocp_monitor_password' not in global_config)) or \
+          any([key in global_config for key in ["ocp_monitor_tenant", "ocp_monitor_db", "ocp_monitor_username", "ocp_monitor_password"]]):
+            if 'ocp_meta_password' not in global_config :
+                cluster_config.update_global_conf('ocp_monitor_password', ConfigUtil.get_random_pwd_by_total_length(), False)
 
 
 def generate_config_pre(plugin_context, auto_depend=False, *args, **kwargs):
