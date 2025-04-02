@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from __future__ import absolute_import, division, print_function
 import os
 from tool import YamlLoader
 
-def generate_config(plugin_context, deploy_config, *args, **kwargs):
+
+def generate_config(plugin_context, *args, **kwargs):
+    deploy_config = kwargs["deploy_config"]
     def get_option(key, default=''):
         value = getattr(options, key)
         if value is None:
@@ -33,6 +36,9 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
     options = plugin_context.options
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
+    print("---------------------------------------------------")
+    print(cluster_config)
+    print("---------------------------------------------------")
     global_conf = cluster_config.get_global_conf()
     deploy_name = plugin_context.deploy_name
     user_config = deploy_config.user
@@ -117,4 +123,3 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
     except KeyboardInterrupt:
         stdio.exception("obdiag config failed")
         return plugin_context.return_false()
-    

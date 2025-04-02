@@ -14,7 +14,6 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function
 import os
-import json
 from tool import YamlLoader, FileUtil
 from subprocess import call, Popen, PIPE
 
@@ -157,3 +156,4 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
     except KeyboardInterrupt:
         stdio.exception("obdiag gather log failded")
         return plugin_context.return_false()
+    
