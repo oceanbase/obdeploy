@@ -78,7 +78,7 @@ def rsa_private_sign(passwd, private_key):
 def get_missing_required_parameters(parameters):
     results = []
     for key in ["jdbc_url", "jdbc_password", "jdbc_username", "cluster_name", "ob_cluster_id", "root_sys_password",
-                "server_addresses", "agent_username", "agent_password", "ocp_root_password", "ocp_meta_tenant"]:
+                "server_addresses", "agent_username", "agent_password", "ocp_meta_tenant"]:
         if parameters.get(key) is None:
             results.append(key)
     return results
@@ -179,7 +179,7 @@ def prepare_parameters(cluster_config, stdio):
                 server_config['ocp_meta_username'] = depend_info['ocp_meta_username']
                 server_config['ocp_meta_tenant'] = depend_info['ocp_meta_tenant']
                 server_config['ocp_meta_password'] = depend_info['ocp_meta_password']
-                server_config['ocp_root_password'] = server_config.get('ocp_root_password')
+                server_config['ocp_root_password'] = depend_info.get('ocp_root_password')
                 server_config['jdbc_username'] = "{}@{}".format(depend_info['ocp_meta_username'], depend_info.get('ocp_meta_tenant', {}).get("tenant_name"))
             depends_key_maps = {
                 "jdbc_password": "ocp_meta_password",
@@ -233,7 +233,7 @@ def parameter_pre(plugin_context, **kwargs):
             tenant_info["database"] = server_config.get(prefix + "db")
             tenant_info["db_username"] = server_config.get(prefix + "username")
             tenant_info["db_password"] = server_config.get(prefix + "password", "")
-            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "")
+            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "") if not server_config.get('ocp_root_password') else server_config['ocp_root_password']
             ocp_tenants.append(Values(tenant_info))
 
     clean_data = (not cluster_config.depends or len(removed_components) > 0 and len(removed_components.intersection({const.COMP_OB, const.COMP_OB_CE})) == 0) and stdio.confirm("Would you like to clean meta data ？")

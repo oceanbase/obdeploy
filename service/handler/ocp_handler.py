@@ -41,7 +41,7 @@ from _repository import Repository
 from _plugin import PluginType
 from ssh import SshClient, SshConfig, LocalClient
 from tool import Cursor
-from const import COMP_JRE, COMPS_OCP, COMP_OCP_SERVER_CE, TELEMETRY_COMPONENT_OCP, COMP_OB_CE
+from const import COMP_JRE, COMPS_OCP, COMP_OCP_SERVER_CE, COMP_OCP_SERVER, TELEMETRY_COMPONENT_OCP, COMPS_OB, COMP_OB_CE, COMP_OB
 from tool import COMMAND_ENV
 from _environ import ENV_TELEMETRY_REPORTER
 
@@ -508,7 +508,7 @@ class OcpHandler(BaseHandler):
         log.get_logger().info('start start_check')
         for repository in repositories:
             component_kwargs[repository.name] = {"work_dir_check": True, "precheck": True, "clients": ssh_clients, "cursor": self.context["metadb_cursor"]}
-            if repository.name == COMP_OCP_SERVER_CE:
+            if repository.name in COMPS_OCP:
                 java_check = True
                 jre_name = COMP_JRE
                 install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
@@ -732,7 +732,10 @@ class OcpHandler(BaseHandler):
         mock_oceanbase_repository = Repository("oceanbase-ce", "/")
         mock_oceanbase_repository.version = metadb_version
         repositories = [mock_oceanbase_repository]
-        ocp_config = self.obd.deploy.deploy_config.components["ocp-server-ce"]
+        if COMP_OCP_SERVER in self.obd.deploy.deploy_config.components:
+            ocp_config = self.obd.deploy.deploy_config.components[COMP_OCP_SERVER]
+        else:
+            ocp_config = self.obd.deploy.deploy_config.components[COMP_OCP_SERVER_CE]
         global_conf_with_default = ocp_config.get_global_conf_with_default()
         meta_tenant_config = global_conf_with_default['ocp_meta_tenant']
         meta_tenant_config["variables"] = "ob_tcp_invited_nodes='%'"
@@ -788,7 +791,11 @@ class OcpHandler(BaseHandler):
 
         try:
             # add create tenant operations before deploy ocp if it uses an existing OceanBase as it's metadb cluster
-            if 'oceanbase-ce' not in self.obd.deploy.deploy_config.components['ocp-server-ce'].depends:
+            if COMP_OCP_SERVER_CE in self.obd.deploy.deploy_config.components:
+                depends = self.obd.deploy.deploy_config.components[COMP_OCP_SERVER_CE].depends
+            else:
+                depends = self.obd.deploy.deploy_config.components[COMP_OCP_SERVER].depends
+            if COMP_OB not in depends and COMP_OB_CE not in depends:
                 log.get_logger().info("not depends on oceanbase, create tenant first")
                 self._create_tenant(task_id)
             deploy_success = self.obd.deploy_cluster(name)
@@ -812,10 +819,10 @@ class OcpHandler(BaseHandler):
             setattr(opt, "strict_check", False)
             setattr(opt, "metadb_cursor", self.context['metadb_cursor'])
             self.obd.set_options(opt)
-            if repository.name == const.OCEANBASE_CE:
+            if repository.name in COMPS_OB:
                 oceanbase_repository = repository
             self.obd.set_repositories([repository])
-            if repository.name == const.OCP_SERVER_CE:
+            if repository.name in COMPS_OCP:
                 self.obd.set_repositories(repositories)
             ret = self.obd._start_cluster(self.obd.deploy, [repository])
             if not ret:
@@ -833,12 +840,12 @@ class OcpHandler(BaseHandler):
                 setattr(opt, "tenant_name", self.context['meta_tenant'])
                 self.obd.set_options(opt)
                 workflow = self.obd.get_workflow('drop_tenant_web', repositories=[oceanbase_repository], no_found_act='ignore')
-                self.obd.run_workflow(workflow, repositories=[oceanbase_repository], no_found_act='ignore', **{'oceanbase-ce': {'cursor': cursor}})
+                self.obd.run_workflow(workflow, repositories=[oceanbase_repository], no_found_act='ignore', **{oceanbase_repository.name: {'cursor': cursor}})
                 opt = Values()
                 setattr(opt, "tenant_name", self.context['monitor_tenant'])
                 self.obd.set_options(opt)
                 workflow = self.obd.get_workflow('drop_tenant_web', repositories=[oceanbase_repository], no_found_act='ignore')
-                self.obd.run_workflow(workflow, repositories=[oceanbase_repository], no_found_act='ignore', **{'oceanbase-ce': {'cursor': cursor}})
+                self.obd.run_workflow(workflow, repositories=[oceanbase_repository], no_found_act='ignore', **{oceanbase_repository.name: {'cursor': cursor}})
             raise Exception("task {0} start failed".format(name))
         self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
         log.get_logger().info("finish do start %s", name)
@@ -1018,7 +1025,7 @@ class OcpHandler(BaseHandler):
             setattr(opt, "metadb_cursor", self.context['metadb_cursor'])
             self.obd.set_options(opt)
             self.obd.set_repositories([repository])
-            if repository.name == const.OCP_SERVER_CE:
+            if repository.name in COMPS_OCP:
                 self.obd.set_repositories(repositories)
             ret = self.obd._start_cluster(self.obd.deploy, [repository])
             if not ret:
@@ -1030,6 +1037,28 @@ class OcpHandler(BaseHandler):
         self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
         self.context['process_installed'][task_id] = 'done'
         log.get_logger().info("finish do start %s", name)
+
+        if not self.context['ocp_deployment_info'][id]['config'].components.ocpserver.metadb:
+            log.get_logger().info("begin take_over metadb")
+            config = self.context['ocp_deployment_info'][id]['config']
+            servers = config.components.ocpserver.servers
+            port = config.components.ocpserver.port
+            password = config.components.ocpserver.admin_password
+            password = RSAHandler().decrypt_private_key(password)
+            address = ['http://' + str(server) + ':' + str(port) for server in servers]
+            self.obd.options._update_loose({"address": address[0], "user": 'admin', "password": password})
+            self.obd.export_to_ocp(name)
+            log.get_logger().info("finish take_over metadb")
+        deploy = self.obd.deploy_manager.get_deploy_config(name)
+        self.obd.set_deploy(deploy)
+        self.context['process_installed'][task_id] = 'done'
+
+        ## get obd namespace data and report telemetry
+        data = {}
+        for component, _ in self.obd.namespaces.items():
+            data[component] = _.get_variable('run_result')
+        COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT_OCP, save=True)
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
     def get_reinstall_task_info(self, id, task_id):
         name = self.context['ocp_deployment_id'][id]
@@ -1241,7 +1270,7 @@ class OcpHandler(BaseHandler):
                     return False
                 real_servers.add(server.ip)
         self.obd.search_param_plugin_and_apply(repositories, deploy_config)
-        repositories = [repository for repository in repositories if repository.name in ['ocp-server', 'ocp-server-ce']]
+        repositories = [repository for repository in repositories if repository.name in COMPS_OCP]
         self.obd.set_repositories(repositories)
 
         self._upgrade_precheck(cluster_name, repositories, init_check_status=True)
@@ -1268,11 +1297,17 @@ class OcpHandler(BaseHandler):
             self._do_upgrade_precheck(repositories)
 
     def _init_upgrade_precheck(self, repositories):
+        for repository in repositories:
+            if COMP_OCP_SERVER_CE == repository.name:
+                repo_name = repository.name
+                break
+            if COMP_OCP_SERVER == repository.name:
+                repo_name = repository.name
+                break
         param_check_status = {}
         servers_set = set()
-
         init_check_status_workflows = self.obd.get_workflows('upgrade_check', no_found_act='ignore', repositories=repositories)
-        workflows_ret = self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore', repositories=repositories, **{COMP_OCP_SERVER_CE: {"meta_cursor": self.context['metadb_cursor']}})
+        workflows_ret = self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore', repositories=repositories, **{repo_name: {"meta_cursor": self.context['metadb_cursor']}})
 
         for repository in repositories:
             if not self.obd.namespaces.get(repository.name):
@@ -1310,7 +1345,7 @@ class OcpHandler(BaseHandler):
         log.get_logger().info('start upgrade_check')
         for repository in repositories:
             component_kwargs[repository.name] = {"database": self.context['meta_database'], "meta_cursor": self.context['metadb_cursor']}
-            if repository.name == COMPS_OCP:
+            if repository.name in COMPS_OCP:
                 java_check = True
                 jre_name = COMP_JRE
                 install_plugin = self.obd.search_plugin(repository, PluginType.INSTALL)
@@ -1408,7 +1443,7 @@ class OcpHandler(BaseHandler):
         repositories.extend(pkgs)
         repositories = self.obd.sort_repository_by_depend(repositories, deploy_config)
         self.obd.search_param_plugin_and_apply(repositories, deploy_config)
-        repositories = [repository for repository in repositories if repository.name in ['ocp-server', 'ocp-server-ce']]
+        repositories = [repository for repository in repositories if repository.name in COMPS_OCP]
         self.obd.set_repositories(repositories)
         setattr(self.obd.options, 'component', repositories[0].name)
 
@@ -1433,6 +1468,14 @@ class OcpHandler(BaseHandler):
     def _ocp_upgrade_use_obd(self, repositories, deploy, meta_tenant, monitor_tenant):
         try:
             log.get_logger().info('use obd upgrade ocp')
+            for repository in repositories:
+                if COMP_OCP_SERVER_CE == repository.name:
+                    repo_name = repository.name
+                    break
+                if COMP_OCP_SERVER == repository.name:
+                    repo_name = repository.name
+                    break
+
             deploy_config = deploy.deploy_config
             deploy_info = deploy.deploy_info
             component = getattr(self.obd.options, 'component')
@@ -1443,7 +1486,7 @@ class OcpHandler(BaseHandler):
                 deploy_config._src_data[const.OCP_SERVER_CE] = deploy_config._src_data[const.OCP_SERVER]
             usable = getattr(self.obd.options, 'usable', '')
             disable = getattr(self.obd.options, 'disable', '')
-            cluster_config = deploy_config.components[const.OCP_SERVER_CE]
+            cluster_config = deploy_config.components[repo_name]
             cluster_config.update_component_attr("meta_tenant", meta_tenant, save=True)
             cluster_config.update_component_attr("monitor_tenant", monitor_tenant, save=True)
 
@@ -1590,7 +1633,13 @@ class OcpHandler(BaseHandler):
     def _ocp_upgrade_from_new_deployment(self, repositories, deploy, pkgs, name, meta_tenant, monitor_tenant):
         deploy_config = deploy.deploy_config
         try:
-
+            for repository in repositories:
+                if COMP_OCP_SERVER_CE == repository.name:
+                    repo_name = repository.name
+                    break
+                if COMP_OCP_SERVER == repository.name:
+                    repo_name = repository.name
+                    break
             component = getattr(self.obd.options, 'component')
             version = getattr(self.obd.options, 'version')
             usable = getattr(self.obd.options, 'usable', '')
@@ -1599,11 +1648,11 @@ class OcpHandler(BaseHandler):
                 self.obd._call_stdio('error', 'Specify the target version.')
                 raise Exception('Specify the upgrade version.')
 
-            cluster_config = deploy_config.components[const.OCP_SERVER_CE]
+            cluster_config = deploy_config.components[repo_name]
             cluster_config.update_component_attr("meta_tenant", meta_tenant, save=True)
             cluster_config.update_component_attr("monitor_tenant", monitor_tenant, save=True)
-            deploy_config._src_data[const.OCP_SERVER_CE]['version'] = version
-            deploy_config._src_data[const.OCP_SERVER_CE]['package_hash'] = usable
+            deploy_config._src_data[repo_name]['version'] = version
+            deploy_config._src_data[repo_name]['package_hash'] = usable
             deploy_config.dump()
             self.obd.set_deploy(deploy)
 
@@ -1649,7 +1698,7 @@ class OcpHandler(BaseHandler):
                 ssh_config = SshConfig(server, username=self.context['upgrade_user'], password=self.context['upgrade_user_password'], port=self.context['upgrade_ssh_port'])
                 ssh_client = SshClient(ssh_config)
                 log.get_logger().info("kill ocp process on host: {}".format(server))
-                kill_docker_res = ssh_client.execute_command("sudo docker ps | grep ocp-all-in-one | awk '{print $1}' | xargs sudo docker stop")
+                kill_docker_res = ssh_client.execute_command("sudo docker ps | grep ocp | awk '{print $1}' | xargs sudo docker stop")
                 log.get_logger().info("stop container get result {0} {1} {2}".format(kill_docker_res.code, kill_docker_res.stdout, kill_docker_res.stderr))
                 kill_process_res = ssh_client.execute_command("ps -ef | grep java | grep 'ocp-server.jar' | grep -v grep | awk '{print $2}' | xargs kill -9 ")
                 log.get_logger().info("stop ocp process get result {0} {1} {2}".format(kill_process_res.code, kill_process_res.stdout, kill_process_res.stderr))

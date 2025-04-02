@@ -3,7 +3,7 @@ import ConfigTable, {
   parameterValidator,
 } from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import Parameter from '@/pages/Obdeploy/ClusterConfig/Parameter';
-import { serverReg } from '@/utils';
+import { serversValidator } from '@/utils';
 import { getPasswordRules } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import { ProForm } from '@ant-design/pro-components';
@@ -117,15 +117,7 @@ export default function MoreConfigTable({
             },
             () => ({
               validator: (_: any, param?: API.ParameterValue) => {
-                if (serverReg.test(param?.value || '')) {
-                  return Promise.resolve();
-                }
-                return Promise.reject(
-                  intl.formatMessage({
-                    id: 'OBD.Obdeploy.ClusterConfig.TheIpAddressFormatIs',
-                    defaultMessage: 'ip格式错误',
-                  }),
-                );
+                return serversValidator(_, param?.value, 'OBServer');
               },
             }),
           ],

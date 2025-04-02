@@ -135,6 +135,9 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
                         [err.SUG_USE_OTHER_PORT.format()]
                     )
 
+        if not client.execute_command('lscpu | grep Flags | grep avx'):
+            critical(server, 'cpu', err.EC_CPU_NOT_SUPPORT_AVX.format(server=server), [])
+
     if success:
         for ip in servers_net_interface:
             client = servers_clients[ip]
@@ -160,12 +163,15 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
             is_check_ping_permission = False
             for devname in servers_net_interface[ip]:
                 if not is_check_ping_permission:
+                    for server in cluster_config.servers:
+                        if server.ip == ip:
+                            break
                     ret = client.execute_command('ping -W 1 -c 1 127.0.0.1')
                     if ret.code == 127:
-                        critical(ip, 'net', err.EC_OBSERVER_PING_NOT_FOUND.format())
+                        critical(server, 'net', err.EC_OBSERVER_PING_NOT_FOUND.format())
                         break
                     if not ret:
-                        critical(ip, 'net', err.EC_OBSERVER_PING_FAILED_SUID.format())
+                        critical(server, 'net', err.EC_OBSERVER_PING_FAILED_SUID.format())
                         break
                     is_check_ping_permission = True
                 if client.is_localhost() and devname != 'lo' or (not client.is_localhost() and devname == 'lo'):

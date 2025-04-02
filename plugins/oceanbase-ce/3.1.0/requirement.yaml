@@ -1,0 +1,2 @@
+oceanbase-ce-libs:
+  version: $version

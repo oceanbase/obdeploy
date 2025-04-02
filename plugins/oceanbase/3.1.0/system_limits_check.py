@@ -19,7 +19,7 @@ import re
 import _errno as err
 
 
-def system_limits_check(plugin_context, generate_configs={}, strict_check=False, *args, **kwargs):
+def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict_check=False,  *args, **kwargs):
     stdio = plugin_context.stdio
 
     servers_clients = plugin_context.get_variable('servers_clients')
@@ -31,7 +31,6 @@ def system_limits_check(plugin_context, generate_configs={}, strict_check=False,
     production_mode = plugin_context.get_variable('production_mode')
     kernel_check = plugin_context.get_variable('kernel_check')
     kernel_check_items = plugin_context.get_variable('kernel_check_items')
-    max_user_processes = plugin_context.get_variable('max_user_processes')
 
     INF = float('inf')
 
@@ -62,28 +61,7 @@ def system_limits_check(plugin_context, generate_configs={}, strict_check=False,
                     alert(server, 'aio', err.EC_FAILED_TO_GET_AIO_NR.format(ip=ip), [err.SUG_UNSUPPORT_OS.format()])
                 stdio.exception('')
 
-        ret = client.execute_command('ulimit -a')
-        ulimits_min = {
-            'open files': {
-                'need': lambda x: 20000 * x,
-                'recd': lambda x: 655350,
-                'name': 'nofile'
-            },
-            'max user processes': max_user_processes,
-            'core file size': {
-                'need': lambda x: 0,
-                'recd': lambda x: INF,
-                'below_need_error': False,
-                'below_recd_error_strict': False,
-                'name': 'core'
-            },
-            'stack size': {
-                'need': lambda x: 1024,
-                'recd': lambda x: INF,
-                'below_recd_error_strict': False,
-                'name': 'stack'
-            },
-        }
+        ret = client.execute_command('bash -c "ulimit -a"')
         ulimits = {}
         src_data = re.findall('\s?([a-zA-Z\s]+[a-zA-Z])\s+\([a-zA-Z\-,\s]+\)\s+([\d[a-zA-Z]+)', ret.stdout) if ret else []
         for key, value in src_data:

@@ -377,7 +377,7 @@ export const PORT_MAX = 65535;
 
 export const DEFAULT_PROXY_PWD = {
   key: 'obproxy_sys_password',
-  description: 'password pf obproxy sys user',
+  description: 'password of obproxy sys user',
   value: '',
   adaptive: false,
   auto: true,

@@ -451,6 +451,7 @@ export default function ComponentConfig() {
               className="card-padding-bottom-24"
             >
               <ComponentsPort
+                form={form}
                 lowVersion={lowVersion}
                 selectedConfig={selectedConfig}
               />

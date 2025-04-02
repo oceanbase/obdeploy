@@ -8,17 +8,30 @@ import {
 } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { QuestionCircleOutlined } from '@ant-design/icons';
+import { ProForm } from '@ant-design/pro-components';
 import { Row, Space, Tooltip } from 'antd';
+import type { FormInstance } from 'antd/lib/form';
 
 interface ComponentsPortProps {
   lowVersion?: boolean;
   selectedConfig: string[];
+  form: FormInstance;
 }
 
 export default function ComponentsPort({
   selectedConfig,
   lowVersion = false,
+  form,
 }: ComponentsPortProps) {
+  const PortOcpExpressFormValue = ProForm.useWatch(
+    ['ocpexpress', 'port'],
+    form,
+  );
+  const PortListentFormValue = ProForm.useWatch(
+    ['obconfigserver', 'listen_port'],
+    form,
+  );
+
   return (
     <>
       {(selectedConfig.includes(obproxyComponent) ||
@@ -103,6 +116,17 @@ export default function ComponentsPort({
                     defaultMessage: 'OCP Express 端口',
                   })}
                   fieldProps={{ style: commonStyle }}
+                  portError={
+                    PortOcpExpressFormValue === PortListentFormValue &&
+                    intl.formatMessage(
+                      {
+                        id: 'OBD.pages.components.InstallConfig.PortOccupied',
+                        defaultMessage:
+                          '端口${PortOcpExpressFormValue}已被占用，请修改',
+                      },
+                      { PortOcpExpressFormValue: PortOcpExpressFormValue },
+                    )
+                  }
                 />
               )}
 
@@ -114,6 +138,17 @@ export default function ComponentsPort({
                     defaultMessage: 'OBConfigserver 服务端口',
                   })}
                   fieldProps={{ style: commonStyle }}
+                  portError={
+                    PortOcpExpressFormValue === PortListentFormValue &&
+                    intl.formatMessage(
+                      {
+                        id: 'OBD.pages.components.InstallConfig.PortOccupied',
+                        defaultMessage:
+                          '端口${PortListentFormValue}已被占用，请修改',
+                      },
+                      { PortListentFormValue: PortListentFormValue },
+                    )
+                  }
                 />
               )}
             </Space>

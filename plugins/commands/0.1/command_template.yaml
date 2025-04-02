@@ -2,21 +2,21 @@ variables:
   ssh:
     - name: host
       config_key: host
-      components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+      components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     - name: user
       config_key: username
-      components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+      components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
   server:
     - name: home_path
       config_key: home_path
-      components:  ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+      components:  ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     - name: mysql_port
       config_key: mysql_port
-      components: ['oceanbase', 'oceanbase-ce']
+      components: ['oceanbase',  'oceanbase-standalone','oceanbase-ce']
   global:
     - name: password
       config_key: root_password
-      components: ['oceanbase', 'oceanbase-ce']
+      components: ['oceanbase',  'oceanbase-standalone','oceanbase-ce']
     - name: password
       config_key: observer_root_password
       components: ['obproxy', 'obproxy-ce']
@@ -31,18 +31,18 @@ wrappers:
 
 commands:
   - name: ssh
-    components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+    components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     command: "cd {home_path}/log; echo 'ssh {user}@{host}'; bash --login"
     wrapper: "ssh"
     interactive: true
   - name: log
-    components: ['oceanbase', 'obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+    components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
     command: "cd {home_path}/log; echo 'ssh {user}@{host}'; ls -l; bash --login"
     wrapper: "ssh"
     interactive: true
   - name: less
     command: "less {home_path}/log/observer.log"
-    components: ['oceanbase', 'oceanbase-ce']
+    components: ['oceanbase',  'oceanbase-standalone','oceanbase-ce']
     wrapper: "ssh"
     interactive: true
     no_interruption: true
@@ -55,7 +55,7 @@ commands:
   - name: pid
     wrapper: ssh_client
     command: "pgrep -u {user} -f ^{home_path}/bin/observer"
-    components: ['oceanbase', 'oceanbase-ce']
+    components: ['oceanbase',  'oceanbase-standalone','oceanbase-ce']
     no_excption: true
   - name: pid
     wrapper: ssh_client
@@ -65,6 +65,6 @@ commands:
   - name: gdb
     wrapper: "ssh"
     command: "cd {home_path}; LD_LIBRARY_PATH=./lib:$LD_LIBRARY_PATH gdb --pid=`$pid`"
-    components: ['oceanbase', 'oceanbase-ce']
+    components: ['oceanbase',  'oceanbase-standalone','oceanbase-ce']
     interactive: true
     no_interruption: true

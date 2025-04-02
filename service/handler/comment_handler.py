@@ -19,6 +19,9 @@ from singleton_decorator import singleton
 
 from service.common import log, const
 from service.handler.base_handler import BaseHandler
+from tool import COMMAND_ENV
+from _environ import ENV_OBD_WEB_TYPE
+
 
 @singleton
 class CommonHandler(BaseHandler):
@@ -45,3 +48,6 @@ class CommonHandler(BaseHandler):
         else:
             self.context['alive_token'] = {'token': token, 'update_time': time.time()}
         return True
+
+    def get_web_type(self):
+        return COMMAND_ENV.get(ENV_OBD_WEB_TYPE, '')

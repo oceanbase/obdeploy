@@ -39,7 +39,12 @@ class IdleShutdownMiddleware(BaseHTTPMiddleware):
     async def check_for_idle(self):
         while True:
             await asyncio.sleep(1)  # Sleep for 60 seconds before the next check
-            if datetime.utcnow() - self.last_request_time > self.idle_time_before_shutdown:
+            time_delta = 0
+            if isinstance(self.idle_time_before_shutdown, float):
+                time_delta = (datetime.utcnow() - self.last_request_time).total_seconds() / 60
+            else:
+                time_delta = datetime.utcnow() - self.last_request_time
+            if time_delta > self.idle_time_before_shutdown:
                 self.logger.info("Shutting down due to inactivity.")
                 pid = os.getpid()
                 self.logger.info("shutdown pid %d", pid)

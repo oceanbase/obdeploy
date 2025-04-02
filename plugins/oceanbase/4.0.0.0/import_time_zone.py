@@ -21,6 +21,7 @@ import time
 import const
 from tool import Exector
 from collections import defaultdict
+from _stdio import FormatText
 
 
 tenant_cursor_cache = defaultdict(dict)
@@ -67,7 +68,7 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
 
     cursor = plugin_context.get_return('connect', spacename=cluster_config.name).get_return('cursor') if not cursor else cursor
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
-    if scale_out_component in const.COMPS_OCP_CE_AND_EXPRESS:
+    if scale_out_component in const.COMPS_OCP + ['ocp-express']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     if scale_out_component in ['obbinlog-ce']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
@@ -80,6 +81,10 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
         name = getattr(options, 'tenant_name', 'test')
         mode = getattr(options, 'mode', 'mysql')
         root_password = getattr(options, name+'_root_password', "")
+
+        if mode == 'oracle':
+            stdio.verbose('Import time zone in oracle tenant is not supported')
+            return plugin_context.return_true()
 
         time_zone = getattr(options, 'time_zone', '')
         if not time_zone:
@@ -100,5 +105,7 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
                     break
             cursors.append(tenant_cursor)
             cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+            if cluster_config.name == const.COMP_OB_STANDALONE:
+                cmd = FormatText.success(cmd)
             stdio.print(cmd)
     return plugin_context.return_true(tenant_cursor=cursors)

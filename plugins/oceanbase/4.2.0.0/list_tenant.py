@@ -16,10 +16,12 @@
 from __future__ import absolute_import, division, print_function
 
 import datetime
+
+from _stdio import IO
 from _types import Capacity
 
 
-def list_tenant(plugin_context, cursor, relation_tenants={}, *args, **kwargs):
+def list_tenant(plugin_context, cursor, config_encrypted, relation_tenants={}, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(plugin_context.options, key, default)
         if not value:
@@ -76,7 +78,8 @@ def list_tenant(plugin_context, cursor, relation_tenants={}, *args, **kwargs):
             lambda x: [x['TENANT_NAME'], x['TENANT_TYPE'], x['COMPATIBILITY_MODE'], x['PRIMARY_ZONE'],
                        x['MAX_CPU'], x['MIN_CPU'], str(Capacity(x['MEMORY_SIZE'])), x['MAX_IOPS'], x['MIN_IOPS'],
                        str(Capacity(x['LOG_DISK_SIZE'])), x['IOPS_WEIGHT'], x['TENANT_ROLE']],
-            title='tenant base info')
+            title='tenant basic info')
+        plugin_context.set_variable('tenant_infos', tenant_infos)
     else:
         stdio.stop_loading('fail')
         plugin_context.return_false()
@@ -86,7 +89,7 @@ def list_tenant(plugin_context, cursor, relation_tenants={}, *args, **kwargs):
             lambda x: [x.get('TENANT_NAME', ''), x.get('STATUS', ''), x.get('SYNC_STATUS', ''), datetime.datetime.fromtimestamp(x.get('SYNC_SCN') / 1000000000) if x.get('SYNC_SCN', '') else '', x.get('ERR_CODE', ''), x.get('ERROR_COMMENT', ''), x.get('SWITCHOVER_STATUS', ''), x.get('SWITCHOVER_EPOCH', ''), x.get('LOG_MODE', '')],
             title='standby tenant standby info')
         stdio.print_list(standby_tenants, ['standby_tenant_name', 'primary_tenant_info'],
-            lambda x: [x.get('TENANT_NAME', ''), x.get('PRIMARY_TENANT_INFO', '')],
+            lambda x: [x.get('TENANT_NAME', ''), IO.log_masking_static(x.get('PRIMARY_TENANT_INFO', '')) if config_encrypted else x.get('PRIMARY_TENANT_INFO', '')],
             title='standby tenant`s primary info')
 
     plugin_context.set_variable('need_list_standby', need_list_standby)

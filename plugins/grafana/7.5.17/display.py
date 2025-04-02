@@ -20,7 +20,7 @@ from tool import NetUtil
 stdio = None
 
 
-def display(plugin_context, cursor, *args, **kwargs):
+def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
@@ -45,7 +45,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             'ip': ip,
             'port': server_config['port'],
             'user': user,
-            'password': api_cursor.password,
+            'password': api_cursor.password if not display_encrypt_password else display_encrypt_password,
             'url': url,
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })

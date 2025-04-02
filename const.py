@@ -21,6 +21,7 @@ TELEMETRY_URL = '{}/api/web/oceanbase/report'.format(TELEMETRY_WEBSITE if TELEME
 TELEMETRY_COMPONENT = 'obd'
 TELEMETRY_COMPONENT_OB = "obd_web_ob"
 TELEMETRY_COMPONENT_OCP = "obd_web_ocp"
+TELEMETRY_COMPONENT_FRONTEND = "obd_web_frontend"
 TELEMETRY_SIG = 'dbe97393a695335d67de91dd4049ba'
 
 # obdeploy version
@@ -34,10 +35,16 @@ BUILD_TIME = '<B_TIME>'
 # obdeploy build plugin list
 BUILD_PLUGIN_LIST = '<B_PLUGIN_LIST>'
 
+#encrypt password
+ENCRYPT_PASSWORD = 'ENCRYPT_PASSWORD'
+
+#encrypt passkey
+ENCRYPT_PASSKEY = 'ENCRYPT_PASSKEY'
+
 # obdeploy home path
 CONST_OBD_HOME = "OBD_HOME"
 # obdeploy forbidden variable
-FORBIDDEN_VARS = (CONST_OBD_HOME)
+FORBIDDEN_VARS = (CONST_OBD_HOME, ENCRYPT_PASSWORD, ENCRYPT_PASSKEY)
 
 # tool variable
 COMP_OBCLIENT = "obclient"
@@ -55,7 +62,8 @@ COMPS_OCP_CE_AND_EXPRESS = [COMP_OCP_SERVER_CE, COMP_OCP_EXPRESS]
 # ob
 COMP_OB = "oceanbase"
 COMP_OB_CE = "oceanbase-ce"
-COMPS_OB = [COMP_OB, COMP_OB_CE]
+COMP_OB_STANDALONE = "oceanbase-standalone"
+COMPS_OB = [COMP_OB, COMP_OB_CE, COMP_OB_STANDALONE]
 
 # obproxy
 COMP_ODP = "obproxy"
@@ -79,6 +87,9 @@ BINLOG_INSTANCE_STATUS_OPERATORS_MAP = {
     'stop': 'Stop',
 }
 
+#prometheus
+COMP_PROMETHEUS = 'prometheus'
+
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
 
@@ -87,7 +98,6 @@ PKG_RPM_FILE = 'rpm'
 PKG_REPO_FILE = 'repository'
 
 RSA_KEY_SIZE = 512
-
 
 # test tool
 TOOL_TPCH = 'obtpch'
@@ -111,3 +121,10 @@ STAGE_SEVENTH = 70
 STAGE_EIGHTH = 80
 STAGE_NINTH = 90
 STAGE_TENTH = 100
+
+IDLE_TIME_BEFORE_SHUTDOWN_MINITES = 30
+
+#obshell task type
+TENANT_BACKUP = 'backup'
+TENANT_RESTORE = 'restore'
+

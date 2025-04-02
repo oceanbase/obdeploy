@@ -63,6 +63,11 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
         name = getattr(options, 'tenant_name', 'test')
         mode = getattr(options, 'mode', 'mysql')
         time_zone = getattr(options, 'time_zone', '')
+
+        if mode == 'oracle':
+            stdio.verbose('Import time zone in oracle tenant is not supported')
+            return plugin_context.return_true()
+
         if not time_zone:
             time_zone = client.execute_command('date +%:z').stdout.strip()
         exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, stdio=stdio)

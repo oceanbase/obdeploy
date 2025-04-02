@@ -23,6 +23,7 @@ from copy import deepcopy
 
 from tool import YamlLoader
 from _errno import *
+from const import COMPS_OB
 
 
 stdio = None
@@ -82,7 +83,7 @@ def start(plugin_context, *args, **kwargs):
                         key = list(key.keys())[0]
                         need_encrypted.append(key)
 
-    for comp in ["oceanbase", "oceanbase-ce"]:
+    for comp in COMPS_OB:
         if cluster_config.get_depend_config(comp) and plugin_context.get_return('start', comp).get_return('need_bootstrap'):
             error_servers_list = []
             for server in cluster_config.servers:
@@ -113,7 +114,7 @@ def start(plugin_context, *args, **kwargs):
             use_parameter = True
 
         if use_parameter:
-            for comp in ['oceanbase', 'oceanbase-ce']:
+            for comp in COMPS_OB:
                 obs_config = cluster_config.get_depend_config(comp, server)
                 if obs_config is not None:
                     break

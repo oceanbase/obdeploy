@@ -19,5 +19,5 @@ from __future__ import absolute_import, division, print_function
 import const
 
 def start(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'start', 'health_check')
+    workflow.add(const.STAGE_FIRST, 'start', 'health_check', 'connect', 'modify_password')
     plugin_context.return_true()

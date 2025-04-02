@@ -347,18 +347,18 @@ class OBUser(ConfigItemType):
 # this type is used to ensure the parameter not containing special characters to inject command
 class SafeString(ConfigItemType):
 
-    SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:=@/\.]*$")
 
     def _format(self):
         if not self.SAFE_STRING_PATTERN.match(str(self._origin)):
-            raise Exception("%s is not a valid string(Support: a-z、A-Z、0-9、chinese characters、- _ : @ / .)" % self._origin)
+            raise Exception("%s is not a valid string(Support: a-z、A-Z、0-9、chinese characters、- _ = : @ / .)" % self._origin)
         self.value = self._value = str(self._origin) if self._origin else ''
 
 
 # this type is used to ensure the parameter not containing special characters to inject command
 class SafeStringList(ConfigItemType):
 
-    SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:@/\.]*$")
+    SAFE_STRING_PATTERN = re.compile("^[a-zA-Z0-9\u4e00-\u9fa5\-_:=@/\.]*$")
 
     def _format(self):
         if self._origin:
@@ -366,7 +366,7 @@ class SafeStringList(ConfigItemType):
             self._value = self._origin.split(';')
             for v in self._value:
                 if not self.SAFE_STRING_PATTERN.match(v):
-                    raise Exception("%s is not a valid string(Support: a-z、A-Z、0-9、chinese characters、- _ : @ / .)" % v)
+                    raise Exception("%s is not a valid string(Support: a-z、A-Z、0-9、chinese characters、- _ = : @ / .)" % v)
         else:
             self._value = []
 

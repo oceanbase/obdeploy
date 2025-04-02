@@ -28,7 +28,9 @@ from datetime import datetime
 from ruamel.yaml.comments import CommentedMap
 
 import _errno as err
-from tool import ConfigUtil, FileUtil, YamlLoader, OrderedDict, COMMAND_ENV
+import const
+from tool import ConfigUtil, FileUtil, YamlLoader, OrderedDict, COMMAND_ENV, aes_encrypt, aes_decrypt, \
+    string_to_md5_32bytes
 from _manager import Manager
 from _stdio import SafeStdio
 from _environ import ENV_BASE_DIR
@@ -1051,13 +1053,15 @@ class DeployInfo(object):
 
 class DeployConfig(SafeStdio):
 
-    def __init__(self, yaml_path, yaml_loader=yaml, inner_config=None, config_parser_manager=None, stdio=None):
+    def __init__(self, yaml_path, yaml_loader=yaml, inner_config=None, config_parser_manager=None, config_encrypted=None, stdio=None):
         self._user = None
         self.unuse_lib_repository = False
         self.auto_create_tenant = False
         self._inner_config = inner_config
         self.components = OrderedDict()
         self._src_data = None
+        self._need_encrypt_dump = False
+        self._config_encrypted = config_encrypted
         self.name = os.path.split(os.path.split(yaml_path)[0])[-1]
         self.yaml_path = yaml_path
         self.yaml_loader = yaml_loader
@@ -1072,6 +1076,8 @@ class DeployConfig(SafeStdio):
         self._removed_components = set()
         self._do_not_dump = False
         self._mem_mode = False
+        self._tmp_user_password = None
+        self._auto_decrypt_password()
 
     def __deepcopy__(self, memo):
         deploy_config = self.__class__(self.yaml_path, self.yaml_loader, self._inner_config, self.config_parser_manager, self.stdio)
@@ -1090,6 +1096,15 @@ class DeployConfig(SafeStdio):
 
     def disable_mem_mode(self):
         self._mem_mode = False
+
+    def set_config_unencrypted(self):
+        self._config_encrypted = False
+
+    def disable_encrypt_dump(self):
+        self._need_encrypt_dump = False
+
+    def enable_encrypt_dump(self):
+        self._need_encrypt_dump = True
 
     @property
     def sorted_components(self):
@@ -1201,6 +1216,14 @@ class DeployConfig(SafeStdio):
         self._src_data[component] = ori_data
         return False
 
+    def _update_user_password(self):
+        try:
+            for key in self._src_data:
+                if key == 'user':
+                    self._src_data[key]['password'] = self.user.password
+        except:
+            self.stdio.exception()
+
     def _load(self):
         try:
             with open(self.yaml_path, 'rb') as f:
@@ -1225,6 +1248,8 @@ class DeployConfig(SafeStdio):
                 for comp in depends:
                     conf = self.components[comp]
                     for name in depends[comp]:
+                        if depends[comp] is None:
+                            continue
                         if name == comp:
                             continue
                         if name in self.components:
@@ -1233,6 +1258,39 @@ class DeployConfig(SafeStdio):
             self.stdio.exception()
         if not self.user:
             self.set_user_conf(UserConfig())
+
+    def _auto_decrypt_password(self):
+        if not self._inner_config:
+            return True
+        if self._config_encrypted is None:
+            if COMMAND_ENV.get(const.ENCRYPT_PASSWORD) == '1':
+                self._config_encrypted = True
+            if not bool(self._inner_config.get_global_config(const.ENCRYPT_PASSWORD)):
+                self.stdio.verbose("auto_decrypt_password: deploy is not encrypted")
+                self._config_encrypted = False
+        if self._config_encrypted and bool(self._inner_config.get_global_config(const.ENCRYPT_PASSWORD)):
+            self.change_deploy_config_password(False, False)
+            self._need_encrypt_dump = True
+        elif not self._config_encrypted and COMMAND_ENV.get(const.ENCRYPT_PASSWORD) == '1':
+            self._need_encrypt_dump = True
+
+    def _encrypt_password_before_dump(self):
+        if not self._inner_config:
+            return True
+        if self._need_encrypt_dump and COMMAND_ENV.get(const.ENCRYPT_PASSWORD) == '1' and not self._config_encrypted:
+            if bool(self._inner_config.get_global_config(const.ENCRYPT_PASSWORD)):
+                change_deploy_encrypt = False
+            else:
+                change_deploy_encrypt = True
+            enable_mem_mode = False
+            if self._mem_mode:
+                enable_mem_mode = True
+                self._mem_mode = False
+            self.change_deploy_config_password(True, change_deploy_encrypt)
+            if enable_mem_mode:
+                self._mem_mode = True
+            self._config_encrypted = True
+        self._update_user_password()
 
     def scale_out(self, config_path):
         ret = True
@@ -1361,6 +1419,7 @@ class DeployConfig(SafeStdio):
     def _dump(self):
         if self._do_not_dump:
             raise Exception("Cannot dump because flag DO NOT DUMP exists.")
+        self._encrypt_password_before_dump()
         try:
             with open(self.yaml_path, 'w') as f:
                 self._dump_inner_config()
@@ -1548,6 +1607,76 @@ class DeployConfig(SafeStdio):
             self._src_data[component_name] = new_config['config']
         return True
 
+    def get_all_password_path(self, global_config, password_paths=[], component=None, parent_key=None):
+        pattern = r'password'
+        pattern1 = r'passwd'
+        for key, value in global_config.items():
+            if parent_key:
+                current_key = f"{parent_key}.{key}"
+            else:
+                current_key = key
+
+            if isinstance(value, dict):
+                self.get_all_password_path(value, password_paths, component, current_key)
+            else:
+                value = str(value)
+                if isinstance(key, str) and isinstance(value, str) and (re.findall(pattern, key, re.IGNORECASE) or re.findall(pattern1, key, re.IGNORECASE)):
+                    self.stdio.verbose(f"find pwd key: {current_key}")
+                    password_paths.append(current_key)
+                if component == const.COMP_PROMETHEUS and parent_key == 'basic_auth_users':
+                    self.stdio.verbose(f"find pwd key: {key}")
+                    password_paths.append(current_key)
+        return password_paths
+
+    def update_password_in_global_config(self, global_config, path, key, enable_encrypt):
+        current_key = path[0]
+        if len(path) == 1:
+            if enable_encrypt:
+                self.stdio.verbose(f"encrypt pwd-key: {current_key}")
+                global_config[current_key] = aes_encrypt(str(global_config[current_key]), key)
+            else:
+                self.stdio.verbose(f"decrypt pwd-key: {current_key}")
+                global_config[current_key] = aes_decrypt(global_config[current_key], key)
+        else:
+            if current_key in global_config and isinstance(global_config[current_key], dict):
+                self.update_password_in_global_config(global_config[current_key], path[1:], key, enable_encrypt)
+
+    def change_deploy_config_password(self, enable_encrypt, change_deploy_encrypt=True, first_encrypt=False):
+        if COMMAND_ENV.get(const.ENCRYPT_PASSWORD) != '1' and not first_encrypt:
+            return True
+        deploy_encrypt_enable = self.inner_config.get_global_config(const.ENCRYPT_PASSWORD) or False
+        if enable_encrypt == deploy_encrypt_enable == self._config_encrypted:
+            return True
+        if not enable_encrypt and not self._config_encrypted:
+            self._need_encrypt_dump = False
+        else:
+
+            cluster_id = ''
+            for component in const.COMPS_OB:
+                if component in self.components.keys():
+                    cluster_config = self.components[component]
+                    global_config = cluster_config.get_global_conf()
+                    cluster_id = str(global_config['cluster_id']) if 'cluster_id' in global_config else ''
+            key = string_to_md5_32bytes(self.name + cluster_id).encode('utf-8')
+            self.stdio.verbose(f"encrypt key: {key}")
+            if self.user.password:
+                if enable_encrypt:
+                    self.user.password = aes_encrypt(str(self.user.password), key)
+                else:
+                    self.user.password = aes_decrypt(self.user.password, key)
+            for component, cluster_config in self.components.items():
+                self.stdio.verbose(f"change {component} pwd encrypt.")
+                password_paths = []
+                global_config = cluster_config.get_global_conf()
+                self.get_all_password_path(global_config, password_paths, component)
+                change_global_config = deepcopy(global_config)
+                for password_path in password_paths:
+                    password_path_keys = password_path.split('.')
+                    self.update_password_in_global_config(change_global_config, password_path_keys, key, enable_encrypt)
+                    cluster_config.update_global_conf(password_path_keys[0], change_global_config[password_path_keys[0]], save=False)
+            self._config_encrypted = enable_encrypt
+        change_deploy_encrypt and self.inner_config.update_global_config(const.ENCRYPT_PASSWORD, enable_encrypt)
+
 
 class Deploy(object):
 
@@ -1564,6 +1693,10 @@ class Deploy(object):
         self.stdio = stdio
         self.config_parser_manager = config_parser_manager
         self._uprade_meta = None
+        self._config_encrypted = True
+
+    def set_config_decrypted(self):
+        self._config_encrypted = False
 
     def use_model(self, name, repository, dump=True):
         self.deploy_info.components[name] = {
@@ -1616,7 +1749,8 @@ class Deploy(object):
 
     def _load_deploy_config(self, path):
         yaml_loader = YamlLoader(stdio=self.stdio)
-        deploy_config = DeployConfig(path, yaml_loader=yaml_loader, config_parser_manager=self.config_parser_manager, stdio=self.stdio)
+        inner_config = InnerConfig(self.get_inner_config_path(self.config_dir), yaml_loader=yaml_loader)
+        deploy_config = DeployConfig(path, yaml_loader=yaml_loader, inner_config=inner_config, config_parser_manager=self.config_parser_manager, config_encrypted=self._config_encrypted,stdio=self.stdio)
         deploy_info = self.deploy_info
         for component_name in deploy_info.components:
             if component_name not in deploy_config.components:
@@ -1627,7 +1761,6 @@ class Deploy(object):
                 cluster_config.version = config['version']
             if 'hash' in config and config['hash']:
                 cluster_config.package_hash = config['hash']
-        deploy_config.inner_config = InnerConfig(self.get_inner_config_path(self.config_dir), yaml_loader=yaml_loader)
         return deploy_config
 
     @property

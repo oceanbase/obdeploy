@@ -23,6 +23,7 @@ export type RulesDetail = {
 };
 interface ConfigTableProps {
   showVisible: boolean;
+  showMetaPassword: boolean;
   dataSource: API.NewParameterMeta[];
   loading: boolean;
   customParameter?: JSX.Element;
@@ -145,6 +146,8 @@ export default function ConfigTable({
   dataSource,
   loading,
   parameterRules,
+  isNewDB,
+  showMetaPassword,
 }: ConfigTableProps) {
   return (
     <>
@@ -169,6 +172,14 @@ export default function ConfigTable({
                   rulesList.push(parameterRules);
                 }
               }
+
+              const realDataSource =
+                isNewDB || showMetaPassword
+                  ? (moreItem.configParameter || [])?.filter(
+                      (item) => item.name !== 'ocp_meta_password',
+                    )
+                  : moreItem.configParameter;
+
               return (
                 <ProCard
                   className={styles.infoSubCard}
@@ -184,7 +195,7 @@ export default function ConfigTable({
                       rulesList,
                     )}
                     rowKey="name"
-                    dataSource={moreItem.configParameter}
+                    dataSource={realDataSource}
                     scroll={{ y: 300 }}
                     pagination={false}
                   />

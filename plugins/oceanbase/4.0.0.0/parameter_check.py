@@ -37,12 +37,11 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
     servers_disk = plugin_context.get_variable('servers_disk')
     servers_clog_mount = plugin_context.get_variable('servers_clog_mount')
     servers_net_interface = plugin_context.get_variable('servers_net_interface')
-    success = plugin_context.get_variable('success')
     parameter_check = plugin_context.get_variable('parameter_check')
 
     global_generate_config = generate_configs.get('global', {})
     servers_min_pool_memory = {}
-    PRO_POOL_MEM_MIN = 2147483648
+    PRO_POOL_MEM_MIN = 1073741824 if cluster_config.name == 'oceanbase-standalone' else 2147483648
     PRO_MEMORY_MIN = 16 << 30
 
     for server in cluster_config.servers:
@@ -61,10 +60,12 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
         if parameter_check:
             servers_min_pool_memory[server] = __min_full_resource_pool_memory = server_config.get('__min_full_resource_pool_memory')
             if production_mode and __min_full_resource_pool_memory < PRO_POOL_MEM_MIN:
-                error('mem',err.EC_OBSERVER_PRODUCTION_MODE_LIMIT.format(server=server, key="__min_full_resource_pool_memory",limit=PRO_POOL_MEM_MIN), [err.SUB_SET_NO_PRODUCTION_MODE.format()])
+                error(server, 'mem',err.EC_OBSERVER_PRODUCTION_MODE_LIMIT.format(server=server, key="__min_full_resource_pool_memory",limit=PRO_POOL_MEM_MIN), [err.SUB_SET_NO_PRODUCTION_MODE.format()])
             memory_limit = 0
             percentage = 0
             if server_config.get('memory_limit'):
+                if memory_limit < PRO_MEMORY_MIN:
+                    production_mode = False
                 memory_limit = Capacity(server_config['memory_limit']).bytes
                 if production_mode and memory_limit < PRO_MEMORY_MIN:
                     error(server, 'mem', err.EC_OBSERVER_PRODUCTION_MODE_LIMIT.format(server=server, key='memory_limit',
@@ -111,11 +112,10 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
                     if not client.execute_command("grep -e '^ *%s:' /proc/net/dev" % devname):
                         suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                         suggest.auto_fix = 'devname' not in global_generate_config and 'devname' not in server_generate_config
-                        success += critical(server, 'net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])
+                        critical(server, 'net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])
                 if devname not in interfaces:
                     interfaces[devname] = []
                 interfaces[devname].append(ip)
-    plugin_context.set_variable('success', success)
     plugin_context.set_variable('servers_memory', servers_memory)
     plugin_context.set_variable('servers_disk', servers_disk)
     plugin_context.set_variable('servers_clog_mount', servers_clog_mount)

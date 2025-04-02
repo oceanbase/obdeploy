@@ -165,6 +165,43 @@ class DeploymentInfo(BaseModel):
     status: str = Body('',
                        description='ex:CONFIGURING,CONFIGURED,DEPLOYING,DEPLOYED,RUNNING,STOPPING,STOPPED,DESTROYING,DESTROYED,UPGRADING')
     config: DeploymentConfig = None
+    
+class ZoneInfo(BaseModel):
+    name: str = Body('', description='zone name')
+    ip: str = Body('', description='zone ip')
+    status: str = Body('', description='zone status')
+
+class ServerInfo(BaseModel):
+    ip: str = Body('', description='server ip')
+    sql_port: str = Body('', description='sql ip')
+    rpc_port: str = Body('', description='rpc ip')
+    zone: str = Body('', description='zone')
+    status: str = Body('', description='server status')
+
+class TenantInfo(BaseModel):
+    id: str = Body('', description='tenant id')
+    name: str = Body('', description='tenant name')
+    type: str = Body('', description='tenant type')
+    role: str = Body('', description='tenant role')
+    mode: str = Body('', description='tenant mode')
+    status: str = Body('', description='tenant status')
+
+class DetialStats(BaseModel):
+    active: int = Body(0, description='count of active instance')
+    inactive: int = Body(0, description='count of inactive instance')
+    other: int = Body(0, description='count of other status instance')
+    total: int = Body(0, description='total count of instance')
+
+class DeploymentDetial(BaseModel):
+    name: str = Body('', description='deployment name')
+    status: str = Body('', description='status, ex:CONFIGURED,DEPLOYED,STARTING,RUNNING,DESTROYED,UPGRADING')
+    arch: str = Body('', description='deployment arch')
+    version: str = Body('', description='deployment version')
+    server_stats: DetialStats = Body(None, description='server statistics')
+    tenant_stats: DetialStats = Body(None, description='tenant statistics')
+    zone_info: List[ZoneInfo] = Body(None, description='zone info list')
+    server_info: List[ServerInfo] = Body(None, description='server info list')
+    tenant_info: List[TenantInfo] = Body(None, description='tenant info list')
 
 
 class RecoverAdvisement(BaseModel):
@@ -294,3 +331,7 @@ class ScenarioType(BaseModel):
     desc: str = Body(..., description='scenario description')
     value: str = Body(..., description='scenario value')
 
+
+class TelemetryData(BaseModel):
+    data: dict = Body(..., description='telemetry data')
+    msg: str = Body('', description='telemetry message')

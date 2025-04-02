@@ -48,6 +48,11 @@ def scale_out_check(plugin_context, *args, **kwargs):
         add_plugin('connect', plugins)
         add_plugin('bootstrap', plugins)
         add_plugin('create_tenant', plugins)
+    if 'ocp-server' in added_components and 'ocp-server' in be_depend:
+        add_plugin('generate_config', plugins)
+        add_plugin('connect', plugins)
+        add_plugin('bootstrap', plugins)
+        add_plugin('create_tenant', plugins)
     if 'oblogproxy' in added_components and 'oblogproxy' in be_depend:
         add_plugin('generate_config', plugins)
         add_plugin('connect', plugins)

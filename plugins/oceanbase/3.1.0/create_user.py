@@ -72,6 +72,11 @@ def create_user(plugin_context, create_tenant_options=[], cursor=None, scale_out
         db_username = getattr(options, 'db_username', '')
         db_password = getattr(options, 'db_password', '')
         create_if_not_exists = getattr(options, 'create_if_not_exists', False)
+
+        if mode == 'oracle':
+            stdio.print('Create user in oracle tenant is not supported and --password is not supported')
+            return plugin_context.return_true()
+
         if database:
             sql = 'create database {}'.format(database)
             if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, password=password, stdio=stdio) and not create_if_not_exists:
@@ -83,8 +88,6 @@ def create_user(plugin_context, create_tenant_options=[], cursor=None, scale_out
             if mode == "mysql":
                 create_sql = "create user if not exists '{username}' IDENTIFIED BY %s;".format(username=db_username)
                 grant_sql = "grant all on *.* to '{username}' WITH GRANT OPTION;".format(username=db_username)
-            else:
-                error("Create user in oracle tenant is not supported")
             if not exec_sql_in_tenant(sql=create_sql, cursor=cursor, tenant=name, mode=mode, password=password, args=[db_password], stdio=stdio):
                 stdio.error('failed to create user {}'.format(db_username))
                 return plugin_context.return_false()

@@ -36,8 +36,8 @@ def connect(plugin_context, target_server=None, retry_times=101, connect_all=Fal
             plugin_context.set_variable(key, value)
         return plugin_context.return_true(**kwargs)
 
-    if kwargs.get('scale_out_component') == const.COMP_OCP_SERVER_CE:
-        cursor = plugin_context.get_return('cursor_check', spacename=const.COMP_OCP_SERVER_CE).get_return('cursor')
+    if kwargs.get('scale_out_component') in const.COMPS_OCP:
+        cursor = plugin_context.get_return('cursor_check', spacename=kwargs.get('scale_out_component')).get_return('cursor')
         if cursor:
             return return_true(connect=cursor.db, cursor=cursor, server=None)
     

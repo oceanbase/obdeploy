@@ -87,6 +87,9 @@ for DIR in workflows plugins config_parser; do
     if [ ! -e ${OBD_HOME}/${DIR}/oceanbase-ce ]; then
         ln -s ${OBD_HOME}/${DIR}/oceanbase ${OBD_HOME}/${DIR}/oceanbase-ce
     fi
+    if [ ! -e ${OBD_HOME}/${DIR}/oceanbase-standalone ]; then
+        ln -s ${OBD_HOME}/${DIR}/oceanbase ${OBD_HOME}/${DIR}/oceanbase-standalone
+    fi
     if [ ! -e ${OBD_HOME}/${DIR}/ocp-server-ce ]; then
         ln -s ${OBD_HOME}/${DIR}/ocp-server ${OBD_HOME}/${DIR}/ocp-server-ce
     fi

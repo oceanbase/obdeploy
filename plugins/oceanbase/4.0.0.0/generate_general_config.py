@@ -56,7 +56,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
     stdio.start_loading('Generate observer configuration')
 
     global_config = cluster_config.get_global_conf()
-    max_syslog_file_count_default = 4
+    max_syslog_file_count_default = 16
     if global_config.get('enable_syslog_wf') is None:
         update_global_conf('enable_syslog_wf', False)
     if global_config.get('max_syslog_file_count') is None:
@@ -65,7 +65,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
     MIN_MEMORY = 6 << 30
     PRO_MEMORY_MIN = 16 << 30
     SLOG_SIZE = 10 << 30
-    MIN_CPU_COUNT = 16
+    MIN_CPU_COUNT = 8
     START_NEED_MEMORY = 3 << 30
 
     MINI_MEMORY_SIZE = MIN_MEMORY

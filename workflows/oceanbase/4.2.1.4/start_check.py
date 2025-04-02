@@ -22,7 +22,7 @@ def start_check(plugin_context, workflow, *args, **kwargs):
     component_name = plugin_context.cluster_config.name
 
     workflow.add(const.STAGE_FIRST, 'start_check_pre', 'status_check', 'parameter_check', 'system_limits_check', 'resource_check', 'environment_check')
-    if const.COMP_OB_CE == component_name:
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
         workflow.add(const.STAGE_FIRST, 'obshell_port_check')
     workflow.add(const.STAGE_FIRST, 'ocp_tenant_check')
 

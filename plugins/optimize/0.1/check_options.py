@@ -30,7 +30,7 @@ def check_options(plugin_context, *args, **kwargs):
     options = plugin_context.options
     optimize_config = kwargs.get('optimize_config')
 
-    sql_file_pattern = r'^optimize_(oceanbase|oceanbase_ce|obproxy|obproxy_ce)_stage_(\w+)_sql_file(_by_sys)?$'
+    sql_file_pattern = r'^optimize_(oceanbase|oceanbase_ce|oceanbase-standalone|obproxy|obproxy_ce)_stage_(\w+)_sql_file(_by_sys)?$'
     for key in vars(options):
         matched = re.match(sql_file_pattern, key)
         if matched:

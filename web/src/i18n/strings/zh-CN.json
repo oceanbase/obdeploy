@@ -1080,5 +1080,10 @@
   "OBD.src.constant.ToBeUninstalled": "待卸载",
   "OBD.src.constant.configuration.ComponentConfiguration": "组件配置",
   "OBD.src.constant.configuration.UninstallConfiguration": "卸载配置",
-  "OBD.src.constant.configuration.Uninstall": "卸载"
+  "OBD.src.constant.configuration.Uninstall": "卸载",
+ "OBD.component.NodeConfig.TheValidatorNode":"请输入正确的 OBProxy 节点",
+ "OBD.component.NodeConfig.TheValidatorNode2":"禁止输入重复节点",
+ "OBD.component.MetaDBConfig.DataBaseNodeConfig.TheValidatorNode":"请输入正确的 IP 地址",
+"OBD.component.MetaDBConfig.DataBaseNodeConfig.TheValidatorNode2":"禁止输入重复节点",
+ "OBD.component.MetaDBConfig.DataBaseNodeConfig.Description":"采用 127.0.0.1 地址的数据库不支持扩展为分布式集群和配置主备租户"
 }

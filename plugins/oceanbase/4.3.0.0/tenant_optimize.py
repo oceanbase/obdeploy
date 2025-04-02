@@ -80,7 +80,10 @@ def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, *args, **
         if not tenant:
             stdio.error('No such Tenant %s' % tenant_name)
             return plugin_context.return_false()
-        tenant_cursor = exec_sql_in_tenant(cursor, tenant_name)
+        name = getattr(options, 'tenant_name', 'test')
+        mode = getattr(options, 'mode', 'mysql')
+        root_password = getattr(options, name+'_root_password', "")
+        tenant_cursor = exec_sql_in_tenant(cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
 
     def _optimize(json_files):
         for file in json_files:

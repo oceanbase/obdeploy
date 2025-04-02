@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 from tool import ConfigUtil
+from const import COMPS_OB
 
 
 def generate_config(plugin_context, auto_depend=False, return_generate_keys=False, only_generate_password=False, generate_password=True, *args, **kwargs):
@@ -35,7 +36,7 @@ def generate_config(plugin_context, auto_depend=False, return_generate_keys=Fals
 
     stdio = plugin_context.stdio
     have_depend = False
-    depends = ['oceanbase', 'oceanbase-ce']
+    depends = COMPS_OB
     server_depends = {}
     generate_configs = {'global': {}}
     plugin_context.set_variable('generate_configs', generate_configs)

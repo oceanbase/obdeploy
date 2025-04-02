@@ -27,7 +27,9 @@ def scale_out(plugin_context, workflow, *args, **kwargs):
     workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'start_check_pre', 'parameter_pre', 'sudo_check', 'password_check', 'java_check', 'clockdiff_check', 'general_check')
 
     workflow.add(const.STAGE_THIRD, 'parameter_pre', 'ocp_const')
-    workflow.add_with_kwargs(const.STAGE_THIRD, {'target_servers': added_servers}, 'cursor_check', 'start', 'health_check')
+    if not plugin_context.cluster_config.depends:
+        workflow.add_with_kwargs(const.STAGE_FIRST, {'need_connect': False, 'target_servers': added_servers}, 'cursor_check')
+    workflow.add_with_kwargs(const.STAGE_THIRD, {'target_servers': added_servers}, 'start', 'health_check')
     workflow.add_with_component_version_kwargs(const.STAGE_THIRD, 'general', '0.1', {'target_servers': added_servers}, 'stop')
     workflow.add_with_kwargs(const.STAGE_THIRD, {'target_servers': added_servers, 'multi_process_flag': True}, 'start', 'health_check', 'bootstrap')
 

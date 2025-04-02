@@ -1080,5 +1080,10 @@
   "OBD.src.constant.ToBeUninstalled": "To be uninstalled",
   "OBD.src.constant.configuration.ComponentConfiguration": "Component configuration",
   "OBD.src.constant.configuration.UninstallConfiguration": "Uninstall configuration",
-  "OBD.src.constant.configuration.Uninstall": "Uninstall"
+  "OBD.src.constant.configuration.Uninstall": "Uninstall",
+  "OBD.component.NodeConfig.TheValidatorNode":"Please enter the correct IP address",
+  "OBD.component.NodeConfig.TheValidatorNode2":"Not allowed to enter duplicate nodes",
+  "OBD.component.MetaDBConfig.DataBaseNodeConfig.TheValidatorNode":"Please enter the correct IP address",
+ "OBD.component.MetaDBConfig.DataBaseNodeConfig.TheValidatorNode2":"Not allowed to enter duplicate nodes",
+ "OBD.component.MetaDBConfig.DataBaseNodeConfig.Description":"The database using the 127.0.0.1 address does not support expansion into a distributed cluster and configuration of primary and secondary tenants."
 }

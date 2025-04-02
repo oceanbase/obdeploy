@@ -1,28 +1,28 @@
 import { intl } from '@/utils/intl';
 import React, { useEffect } from 'react';
 // import { useSelector } from 'umi';
-import {
-  Result,
-  Descriptions,
-  Card,
-  Space,
-  Table,
-  Typography,
-  Button,
-  Row,
-  Col,
-  Tag,
-} from '@oceanbase/design';
-import { ProCard } from '@ant-design/pro-components';
-import { useRequest } from 'ahooks';
-import { useModel } from 'umi';
-import { Alert } from 'antd';
-import { errorHandler } from '@/utils';
-import * as OCP from '@/services/ocp_installer_backend/OCP';
-import type { ResultProps } from 'antd/es/result';
 import ArrowIcon from '@/component/Icon/ArrowIcon';
 import NewIcon from '@/component/Icon/NewIcon';
-import { copyText } from '@/utils';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
+import { copyText, errorHandler } from '@/utils';
+import { ProCard } from '@ant-design/pro-components';
+import {
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Result,
+  Row,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from '@oceanbase/design';
+import { useRequest } from 'ahooks';
+import { Alert } from 'antd';
+import type { ResultProps } from 'antd/es/result';
+import { isEmpty } from 'lodash';
+import { useModel } from 'umi';
 import styles from './index.less';
 
 const { Text } = Typography;
@@ -48,6 +48,10 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
 }) => {
   let isHaveMetadb;
   const { ocpConfigData, RELEASE_RECORD, OCP_DOCS } = useModel('global');
+
+  const { components = {} } = ocpConfigData;
+  const { oceanbase = {} } = components;
+
   const version: string = ocpConfigData?.components?.ocpserver?.version;
   // 获取 升级主机列表
   const { data: upgraadeAgentHosts, run: getOcpNotUpgradingHost } = useRequest(
@@ -59,6 +63,27 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
       },
     },
   );
+
+  // 上报遥测数据
+  const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
+    manual: true,
+  });
+
+  useRequest(OCP.getTelemetryData, {
+    ready: !!oceanbase?.appname,
+    defaultParams: [
+      {
+        name: oceanbase?.appname,
+      },
+    ],
+    onSuccess: (res) => {
+      const data = res?.data;
+
+      if (!isEmpty(res?.data)) {
+        telemetryReport({ component: 'obd', content: data });
+      }
+    },
+  });
 
   const upgraadeHosts = upgraadeAgentHosts?.data || {};
 
@@ -116,8 +141,8 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                   ? '/assets/install/successful.png'
                   : '/assets/install/metadbSuccessful.png'
                 : installType === 'OCP'
-                  ? '/assets/install/failed.png'
-                  : '/assets/install/metadbFailed.png'
+                ? '/assets/install/failed.png'
+                : '/assets/install/metadbFailed.png'
             }
             alt="resultLogo"
             style={{
@@ -357,7 +382,7 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                     type="inner"
                     className={`${styles.componentCard}`}
                     style={{ border: '1px solid #e2e8f3' }}
-                  //   key={oceanBaseInfo.group}
+                    //   key={oceanBaseInfo.group}
                   >
                     <Table
                       className={`${styles.componentTable} ob-table`}
@@ -417,7 +442,6 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                         type="info"
                         showIcon={true}
                         style={{
-                          height: 54,
                           marginBottom: 24,
                         }}
                         message={

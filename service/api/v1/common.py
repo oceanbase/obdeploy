@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Path
 
 from fastapi import BackgroundTasks
 from service.api.response import OBResponse
@@ -56,3 +56,25 @@ async def public_key():
     if err:
         return response_utils.new_internal_server_error_exception(Exception('get rea public key is failed'))
     return response_utils.new_ok_response(key)
+
+
+@router.get("/telemetry/{name}",
+            response_model=OBResponse,
+            description='get telemetry data',
+            operation_id='getTelemetryData',
+            tags=['Common'])
+async def get_telemetry_data(name: str = Path(description='deploy_name')):
+    handler = handler_utils.new_telemetry_handler()
+    data = handler.get_telemetry_data(name)
+    return response_utils.new_ok_response(data)
+
+
+@router.get("/web/types",
+            response_model=OBResponse,
+            description='get web type',
+            operation_id='getWebType',
+            tags=['Common'])
+async def get_web_type():
+    handler = handler_utils.new_common_handler()
+    data = handler.get_web_type()
+    return response_utils.new_ok_response(data)

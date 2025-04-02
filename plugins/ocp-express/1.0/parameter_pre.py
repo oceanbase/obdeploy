@@ -231,7 +231,7 @@ def parameter_pre(plugin_context, **kwargs):
             tenant_info["database"] = server_config.get(prefix + "db")
             tenant_info["db_username"] = server_config.get(prefix + "username")
             tenant_info["db_password"] = server_config.get(prefix + "password", "")
-            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "")
+            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "") if not server_config.get('ocp_root_password') else server_config['ocp_root_password']
             ocp_tenants.append(Values(tenant_info))
 
 

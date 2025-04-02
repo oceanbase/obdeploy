@@ -991,7 +991,7 @@ export default function DeployConfig({
                         showIcon
                         style={{ marginTop: '16px' }}
                       />
-                      {isNewDB && metaDbAlert}
+                      {tableData.length !== 0 && isNewDB && metaDbAlert}
                     </>
                   ) : (
                     <Alert

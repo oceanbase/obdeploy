@@ -2,6 +2,7 @@ import {
   connectColumns,
   getReportColumns,
 } from '@/pages/Obdeploy/InstallFinished';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
 import { handleCopy } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
 import { getLocale, useModel } from '@umijs/max';
+import { useRequest } from 'ahooks';
 import {
   Alert,
   Button,
@@ -24,6 +26,7 @@ import {
   Table,
   Typography,
 } from 'antd';
+import { isEmpty } from 'lodash';
 import { useState } from 'react';
 import CustomFooter from '../CustomFooter';
 import EnStyles from './indexEn.less';
@@ -76,6 +79,7 @@ export default function InstallResultComp({
   const [currentExpeandedName, setCurrentExpeandedName] = useState('');
   const { deployUser = '', componentConfig = {} } = useModel('componentDeploy');
   const { home_path = '' } = componentConfig;
+
   const onExpand = (expeanded: boolean, record: API.DeploymentReport) => {
     if (expeanded && !logs?.[record.name]) {
       setCurrentExpeandedName(record.name);
@@ -151,6 +155,32 @@ export default function InstallResultComp({
       onOk: exitOnOk,
     });
   };
+
+  const { ocpConfigData } = useModel('global');
+  const { components = {} } = ocpConfigData;
+  const { oceanbase = {} } = components;
+
+   // 上报遥测数据
+  const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
+    manual: true,
+  });
+
+  useRequest(OCP.getTelemetryData, {
+    ready: !!name,
+    defaultParams: [
+      {
+        name,
+      },
+    ],
+    onSuccess: (res) => {
+      const data = res?.data;
+
+      if (!isEmpty(res?.data)) {
+        telemetryReport({ component: 'obd', content: data });
+      }
+    },
+  });
+
   return (
     <Space className={styles.spaceWidth} direction="vertical" size="middle">
       {ConfigserverAlert}
@@ -276,7 +306,7 @@ export default function InstallResultComp({
           columns={getReportColumns(
             name,
             type === ResultType.CompInstall,
-            configPath
+            configPath,
           )}
           dataSource={reportInfo || []}
           rowKey="name"

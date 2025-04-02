@@ -14,12 +14,14 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function
 
+from const import ENCRYPT_PASSWORD
+
 
 def passwd_format(passwd):
     return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 
-def display(plugin_context, cursor, *args, **kwargs):
+def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
@@ -61,7 +63,7 @@ def display(plugin_context, cursor, *args, **kwargs):
             with_observer = True
             info_dict['user'] = user
             info_dict['password'] = password
-            cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % passwd_format(password) if password else '')
+            cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % ((passwd_format(password) if password else '') if not display_encrypt_password else display_encrypt_password))
             break
 
     if (with_observer and server_config.get('obproxy_sys_password', '')) or not with_observer:
@@ -69,7 +71,7 @@ def display(plugin_context, cursor, *args, **kwargs):
         password = server_config.get('obproxy_sys_password', '')
         info_dict['user'] = user
         info_dict['password'] = password
-        cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % passwd_format(password) if password else '')
+        cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % ((passwd_format(password) if password else '') if not display_encrypt_password else display_encrypt_password))
 
     stdio.print(cmd)
     info_dict['cmd'] = cmd

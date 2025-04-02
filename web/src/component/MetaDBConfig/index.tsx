@@ -125,7 +125,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
       components: newComponents,
       auth: newAuth,
     };
-    if (dataSource.launch_user) {
+    if (dataSource.launch_user !== '') {
       newConfigData.launch_user = dataSource.launch_user;
     }
     setOcpConfigData(newConfigData);

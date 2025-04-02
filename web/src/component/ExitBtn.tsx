@@ -101,6 +101,7 @@ export default function ExitBtn() {
           },
           onOk: () => {
             suicide();
+            sessionStorage.removeItem('componentSelect');
           },
         });
       }}

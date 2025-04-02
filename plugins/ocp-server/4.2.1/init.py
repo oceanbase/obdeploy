@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 import os.path
+import time
 
 import _errno as err
 import const
@@ -34,7 +35,12 @@ def _clean(server, client, path, stdio=None):
         return True
 
 
-def _ocp_lib(plugin_context, client, home_path, soft_dir='', stdio=None):
+def _ocp_lib(plugin_context, client, home_path, soft_dir='', stdio=None, **kwargs):
+    def add_pkg(name, version=None, release=None, arch=None):
+        pkg = mirror_manager.get_exact_pkg(name=name, arch=arch, version=version, release=release, only_download=True)
+        if pkg:
+            pkgs.append(pkg)
+
     stdio.verbose('cp rpm & pos')
     if soft_dir:
         client.execute_command('mkdir -p -m 775  %s' % soft_dir, timeout=-1)
@@ -43,17 +49,37 @@ def _ocp_lib(plugin_context, client, home_path, soft_dir='', stdio=None):
     client.execute_command('mkdir -p -m 775  %s/ocp-server/lib/' % home_path, timeout=-1)
     client.execute_command('mkdir -p -m 775  %s/logs/ocp/' % home_path, timeout=-1)
 
-    OBD_HOME = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), '.obd')
-    mirror_manager = MirrorRepositoryManager(OBD_HOME)
+    cluster_config = plugin_context.cluster_config
+    mirror_manager = kwargs.get('mirror_manager')
+    deploy_manager = kwargs.get('deploy_manager')
+    deploy_name = plugin_context.deploy_name
+    deploy = deploy_manager.get_deploy_config(deploy_name)
+    deploy.set_config_decrypted()
     pkgs = []
+    if cluster_config.name == 'ocp-server':
+        agent_name = 'ocp-agent'
+        ob_pkgs = ['oceanbase', 'oceanbase-standalone', 'oceanbase-standalone-libs', 'oceanbase-standalone-utils', 'oceanbase-libs', 'oceanbase-utils', 'obproxy']
+    else:
+        agent_name = 'ocp-agent-ce'
+        ob_pkgs = ['oceanbase-ce', 'oceanbase-ce-libs', 'oceanbase-ce-utils', 'obproxy-ce']
     for arch in ['x86_64', 'aarch64']:
-        pkg = mirror_manager.get_exact_pkg(name="ocp-agent-ce", arch=arch, only_download=True)
-        if pkg:
-            pkgs.append(pkg)
-    for comp in ['oceanbase-ce', 'oceanbase-ce-libs', 'oceanbase-ce-utils', 'obproxy-ce']:
-        pkg = mirror_manager.get_exact_pkg(name=comp, only_download=True)
-        if pkg:
-            pkgs.append(pkg)
+        add_pkg(name=agent_name, arch=arch)
+    for comp in ob_pkgs:
+        add_pkg(name=comp)
+    if const.COMP_OB_CE in deploy.deploy_config.components:
+        ob_version = deploy.deploy_config.components[const.COMP_OB_CE].config_version
+        ob_release = deploy.deploy_config.components[const.COMP_OB_CE].config_release
+        add_pkg(name=const.COMP_OB_CE, version=ob_version, release=ob_release)
+        add_pkg(name='oceanbase-ce-libs', version=ob_version, release=ob_release)
+        add_pkg(name='oceanbase-ce-utils', version=ob_version, release=ob_release)
+    if const.COMP_OB in deploy.deploy_config.components:
+        ob_version = deploy.deploy_config.components[const.COMP_OB].config_version
+        ob_release = deploy.deploy_config.components[const.COMP_OB].config_release
+        add_pkg(name=const.COMP_OB, version=ob_version, release=ob_release)
+        add_pkg(name='oceanbase-libs', version=ob_version, release=ob_release)
+        add_pkg(name='oceanbase-utils', version=ob_version, release=ob_release)
+        add_pkg(name='oceanbase-standalone-libs', version=ob_version, release=ob_release)
+        add_pkg(name='oceanbase-standalone-utils', version=ob_version, release=ob_release)
     ob_with_opti_pkgs = []
     for pkg in pkgs:
         if pkg.name in const.COMPS_OB and pkg.version >= Version('4.3.0.0'):
@@ -81,7 +107,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
             server_config = cluster_config.get_server_conf(server)
             home_path = server_config['home_path']
             soft_dir = server_config.get('soft_dir', '')
-            _ocp_lib(plugin_context, client, home_path, soft_dir, stdio)
+            _ocp_lib(plugin_context, client, home_path, soft_dir, stdio, **kwargs)
         plugin_context.return_true()
         return
 
@@ -165,7 +191,7 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
         link_path = os.path.join(home_path, 'log')
         client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))
         if cp_lib < 1:
-            _ocp_lib(plugin_context, client, home_path, soft_dir, stdio)
+            _ocp_lib(plugin_context, client, home_path, soft_dir, stdio, **kwargs)
         cp_lib += 1
         if launch_user:
             res_home = client.execute_command("sudo chown -R %s %s" % (launch_user, home_path))
@@ -180,4 +206,3 @@ def init(plugin_context, upgrade=False, *args, **kwargs):
     else:
         stdio.stop_loading('fail')
         plugin_context.return_false()
-

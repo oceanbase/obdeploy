@@ -1,14 +1,17 @@
+import Banner from '@/component/Banner';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
 import { intl } from '@/utils/intl';
 import { DownOutlined } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
+import { useRequest } from 'ahooks';
 import { Button, Card, Col, Dropdown, Row, Space, Tag, Tooltip } from 'antd';
-import { useRef } from 'react';
+import React from 'react';
 import { getLocale, history, useModel } from 'umi';
-
-import Banner from '@/component/Banner';
 import compManageGuideIcon from '../../../public/assets/welcome/component-manage.svg';
 import obGuideIcon from '../../../public/assets/welcome/ob-guide.png';
+import obUnselectedIcon from '../../../public/assets/welcome/ob-unselected.png';
 import ocpGuideIcon from '../../../public/assets/welcome/ocp-guide.png';
+import odcDisableIcon from '../../../public/assets/welcome/odc-unselected.png';
 import omsGuideDisableIcon from '../../../public/assets/welcome/oms-guide-disable.png';
 
 import styles from './index.less';
@@ -16,6 +19,7 @@ import styles from './index.less';
 const locale = getLocale();
 
 interface CustomCardProps {
+  noTooltip: boolean;
   disable: boolean;
   icon: string;
   title: string;
@@ -30,11 +34,20 @@ interface CustomCardProps {
 export default function Guide() {
   const isCN = locale === 'zh-CN';
   const buttonStyle = isCN ? styles.guideBtn : styles.guideBtnUS;
-  const guideConfigListRef = useRef<CustomCardProps[]>([
+
+  const { data: suicide } = useRequest(OCP.getWebType, {
+    defaultParams: [{}],
+  });
+
+  // 当前环境是否为单机版
+  const standAlone = suicide?.data === 'oceanbase-standalone';
+
+  const guideConfigListRef = [
     {
-      disable: false,
+      disable: standAlone,
       id: 'ob',
-      icon: obGuideIcon,
+      noTooltip: true,
+      icon: standAlone ? obUnselectedIcon : obGuideIcon,
       title: intl.formatMessage({
         id: 'OBD.pages.Guide.OceanbaseAndSupportingTools',
         defaultMessage: 'OceanBase 及配套工具',
@@ -49,6 +62,7 @@ export default function Guide() {
             setOBCurrentStep(1);
             history.push('/obdeploy');
           }}
+          disabled={standAlone}
           className={buttonStyle}
           style={locale === 'zh-CN' ? { width: 63 } : { width: 100 }}
         >
@@ -62,6 +76,7 @@ export default function Guide() {
     {
       disable: false,
       icon: ocpGuideIcon,
+      noTooltip: true,
       title: intl.formatMessage({
         id: 'OBD.pages.Guide.OceanbaseCloudPlatform',
         defaultMessage: 'OceanBase 云平台',
@@ -147,9 +162,10 @@ export default function Guide() {
       ),
     },
     {
-      disable: false,
+      disable: standAlone,
       id: 'component-manage',
-      icon: compManageGuideIcon,
+      noTooltip: true,
+      icon: standAlone ? odcDisableIcon : compManageGuideIcon,
       title: intl.formatMessage({
         id: 'OBD.pages.Guide.ComponentManagement',
         defaultMessage: '组件管理',
@@ -158,51 +174,58 @@ export default function Guide() {
         id: 'OBD.pages.Guide.YouCanInstallAndUninstall.1',
         defaultMessage: '可对集群进行 OCP Express、OBAgent 等组件安装、卸载',
       }),
-      action: (
-        <Dropdown
-          // getPopupContainer={() => document.getElementById('component-manage')}
-          menu={{
-            items: [
-              {
-                label: intl.formatMessage({
-                  id: 'OBD.pages.Guide.ComponentInstallation',
-                  defaultMessage: '组件安装',
-                }),
-                key: '/componentDeploy',
-              },
-              {
-                label: intl.formatMessage({
-                  id: 'OBD.pages.Guide.ComponentUninstallation',
-                  defaultMessage: '组件卸载',
-                }),
-                key: '/componentUninstall',
-              },
-            ],
+      ...(standAlone ? (
+        <></>
+      ) : (
+        {
+          action: (
+            <Dropdown
+              // getPopupContainer={() => document.getElementById('component-manage')}
+              menu={{
+                items: [
+                  {
+                    label: intl.formatMessage({
+                      id: 'OBD.pages.Guide.ComponentInstallation',
+                      defaultMessage: '组件安装',
+                    }),
+                    key: '/componentDeploy',
+                  },
+                  {
+                    label: intl.formatMessage({
+                      id: 'OBD.pages.Guide.ComponentUninstallation',
+                      defaultMessage: '组件卸载',
+                    }),
+                    key: '/componentUninstall',
+                  },
+                ],
 
-            onClick: (val) => {
-              history.push(val.key);
-            },
-          }}
-        >
-          <Button
-            className={buttonStyle}
-            style={locale === 'zh-CN' ? { width: 84 } : { width: 130 }}
-          >
-            <Space>
-              {intl.formatMessage({
-                id: 'OBD.pages.Guide.Management',
-                defaultMessage: '管理',
-              })}
+                onClick: (val) => {
+                  history.push(val.key);
+                },
+              }}
+            >
+              <Button
+                className={buttonStyle}
+                style={locale === 'zh-CN' ? { width: 84 } : { width: 130 }}
+              >
+                <Space>
+                  {intl.formatMessage({
+                    id: 'OBD.pages.Guide.Management',
+                    defaultMessage: '管理',
+                  })}
 
-              <DownOutlined style={{ color: '#5C6B8A' }} />
-            </Space>
-          </Button>
-        </Dropdown>
-      ),
+                  <DownOutlined style={{ color: '#5C6B8A' }} />
+                </Space>
+              </Button>
+            </Dropdown>
+          ),
+        }
+      )),
     },
     {
       disable: true,
       id: 'oms',
+      noTooltip: false,
       icon: omsGuideDisableIcon,
       title: intl.formatMessage({
         id: 'OBD.pages.Guide.OceanbaseDataMigration',
@@ -213,20 +236,22 @@ export default function Guide() {
         defaultMessage: '是数据库一站式数据传输和同步产品',
       }),
     },
-  ]);
+  ];
+
   const { setCurrentStep: setOBCurrentStep, DOCS_PRODUCTION } =
     useModel('global');
   const CustomCard = ({
-    disable = false,
+    disable,
     icon,
     title,
     detail,
     tooltipText,
     action,
     id,
+    noTooltip,
   }: CustomCardProps) => {
     const CardWrap = (prop: React.PropsWithChildren<any>) => {
-      if (disable) {
+      if (!noTooltip) {
         return (
           <Tooltip
             align={{ offset: [40, 60] }}
@@ -333,7 +358,7 @@ export default function Guide() {
             justify="center"
             align="middle"
           >
-            {guideConfigListRef.current.map((guideConfig, idx) => {
+            {guideConfigListRef.map((guideConfig, idx) => {
               return (
                 <Col
                   key={idx}

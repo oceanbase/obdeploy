@@ -2,7 +2,7 @@ import { getObdInfo } from '@/services/ob-deploy-web/Info';
 import {
   getErrorInfo,
   handleQuit,
-  IPserversValidator,
+  hasDuplicateIPs,
   serverReg,
   serversValidator,
 } from '@/utils';
@@ -25,6 +25,7 @@ import {
 import { Button, Form, Popconfirm, Select, Space, Tooltip } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { getLocale, useModel } from 'umi';
+import validator from 'validator';
 import {
   commonStyle,
   configServerComponent,
@@ -368,7 +369,6 @@ export default function NodeConfig() {
   };
 
   const ocpServersValidator = (_: any, value: string[]) => {
-    let validtor = true;
     if (value?.length > 1) {
       return Promise.reject(
         new Error(
@@ -379,23 +379,18 @@ export default function NodeConfig() {
         ),
       );
     }
-    if (value && value.length) {
-      value.some((item) => {
-        validtor = serverReg.test(item.trim());
-        return !serverReg.test(item.trim());
-      });
-    }
-    if (validtor) {
+    if (value?.some((item) => !validator.isIP(item))) {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
+            defaultMessage: '请选择正确的 OCP Express 节点',
+          }),
+        ),
+      );
+    } else {
       return Promise.resolve();
     }
-    return Promise.reject(
-      new Error(
-        intl.formatMessage({
-          id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
-          defaultMessage: '请选择正确的 OCP Express 节点',
-        }),
-      ),
-    );
   };
 
   const columns: ProColumns<API.DBConfig>[] = [
@@ -467,15 +462,36 @@ export default function NodeConfig() {
             }),
           },
           {
-            validator: (_: any, value: string[]) =>
-              IPserversValidator(
-                _,
-                value,
-                allOBServer,
-                'OBServer',
-                allZoneOBServer,
-                finalValidate,
-              ),
+            validator: (_: any, value: string[]) => {
+              if (value.length !== 0) {
+                let inputServer = [];
+                const currentV = value[value.length - 1];
+                inputServer = allOBServer.concat(currentV);
+                const serverValue = finalValidate.current
+                  ? allOBServer
+                  : inputServer;
+
+                if (value?.some((item) => !validator.isIP(item))) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.component.NodeConfig.TheValidatorNode',
+                      defaultMessage: '请输入正确的 OBProxy 节点',
+                    }),
+                  );
+                } else if (
+                  (hasDuplicateIPs(value) && dbConfigData.length === 1) ||
+                  (hasDuplicateIPs(serverValue) && dbConfigData.length > 1)
+                ) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.component.NodeConfig.TheValidatorNode2',
+                      defaultMessage: '禁止输入重复节点',
+                    }),
+                  );
+                }
+              }
+              return Promise.resolve();
+            },
           },
         ],
       },

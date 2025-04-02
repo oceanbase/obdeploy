@@ -31,11 +31,12 @@ def ocp_tenant_check(plugin_context, *args, **kwargs):
     servers_min_pool_memory = plugin_context.get_variable('servers_min_pool_memory')
     servers_log_disk_size = plugin_context.get_variable('servers_log_disk_size')
     get_system_memory = plugin_context.get_variable('get_system_memory')
+    check_item_status_pass = plugin_context.get_variable('check_item_status_pass')
     wait_2_pass = plugin_context.get_variable('wait_2_pass')
     server = cluster_config.servers[0]
 
     global_conf = cluster_config.get_global_conf()
-    has_ocp = 'ocp-express' in plugin_context.components or 'ocp-server-ce' in plugin_context.components
+    has_ocp = 'ocp-express' in plugin_context.components or 'ocp-server-ce' in plugin_context.components or 'ocp-server' in plugin_context.components
     if not has_ocp and any([key.startswith('ocp_meta') for key in global_conf]):
         has_ocp = True
     if has_ocp and ocp_need_bootstrap and parameter_check:
@@ -96,4 +97,12 @@ def ocp_tenant_check(plugin_context, *args, **kwargs):
         return plugin_context.return_true()
     else:
         stdio.stop_loading('fail')
-        return plugin_context.return_false()
+        kernel_check_items = plugin_context.get_variable('kernel_check_items')
+        for check_item in kernel_check_items:
+            if check_item_status_pass(check_item['check_item']):
+                system_env_error = True
+                break
+        else:
+            if not check_item_status_pass('aio') or not check_item_status_pass('ulimit'):
+                system_env_error = True
+        return plugin_context.return_false(system_env_error=system_env_error)

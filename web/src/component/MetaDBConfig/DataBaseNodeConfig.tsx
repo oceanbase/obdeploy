@@ -10,9 +10,11 @@ import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 
 import ServerTags from '@/pages/Obdeploy/ServerTags';
+import { hasDuplicateIPs } from '@/utils';
 import { getAllServers } from '@/utils/helper';
+import validator from 'validator';
+import CustomAlert from '../CustomAlert';
 import styles from './index.less';
-import { IPserversValidator } from '@/utils';
 
 interface DataBaseNodeConfigProps {
   tableFormRef: React.MutableRefObject<
@@ -151,14 +153,34 @@ export default function DataBaseNodeConfig({
           },
           {
             validator: (_: any, value: string[]) => {
-              return IPserversValidator(
-                _,
-                value,
-                allOBServer,
-                'OBServer',
-                allZoneOBServer,
-                finalValidate,
-              );
+              if (value.length !== 0) {
+                let inputServer = [];
+                const currentV = value[value.length - 1];
+                inputServer = allOBServer.concat(currentV);
+                const serverValue = finalValidate.current
+                  ? allOBServer
+                  : inputServer;
+
+                if (value?.some((item) => !validator.isIP(item))) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.TheValidatorNode',
+                      defaultMessage: '请输入正确的 IP 地址',
+                    }),
+                  );
+                } else if (
+                  (hasDuplicateIPs(value) && dbConfigData.length === 1) ||
+                  (hasDuplicateIPs(serverValue) && dbConfigData.length > 1)
+                ) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.TheValidatorNode2',
+                      defaultMessage: '禁止输入重复节点',
+                    }),
+                  );
+                }
+              }
+              return Promise.resolve();
             },
           },
         ],
@@ -249,12 +271,22 @@ export default function DataBaseNodeConfig({
 
   return (
     <div className={styles.nodeConfigContainer}>
-      <p className={styles.titleText} style={{ marginBottom: 4 }}>
+      <p className={styles.titleText} style={{ marginBottom: 16 }}>
         {intl.formatMessage({
           id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.DatabaseNodeConfiguration',
           defaultMessage: '数据库节点配置',
         })}
       </p>
+      {allOBServer?.some((item) => item === '127.0.0.1') && (
+        <CustomAlert
+          type="info"
+          description={intl.formatMessage({
+            id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.Description',
+            defaultMessage:
+              '采用 127.0.0.1 地址的数据库不支持扩展为分布式集群和配置主备租户',
+          })}
+        />
+      )}
       <EditableProTable<API.DBConfig>
         bordered={false}
         className={styles.nodeEditabletable}

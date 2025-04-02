@@ -25,13 +25,13 @@ def scale_out(plugin_context, workflow, *args, **kwargs):
     pre_exist_server = list(filter(lambda x: x not in added_servers, cluster_config.servers))
 
     workflow.add_with_kwargs(const.STAGE_FIRST, {'target_servers': added_servers}, 'start_check_pre', 'status_check', 'parameter_check', 'system_limits_check', 'resource_check', 'environment_check')
-    if const.COMP_OB_CE == component_name:
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
         workflow.add_with_kwargs(const.STAGE_FIRST, {'target_servers': added_servers}, 'obshell_port_check')
     workflow.add_with_kwargs(const.STAGE_FIRST, {'target_servers': added_servers}, 'ocp_tenant_check')
 
     workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap')
 
     workflow.add_with_kwargs(const.STAGE_THIRD, {'target_servers': pre_exist_server}, 'connect', 'scale_out')
-    if const.COMP_OB_CE == component_name:
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
         workflow.add_with_kwargs(const.STAGE_THIRD, {'target_servers': added_servers}, 'obshell_start', 'obshell_bootstrap')
     plugin_context.return_true()
