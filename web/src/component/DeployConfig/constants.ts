@@ -42,7 +42,7 @@ export function getCompoents(
     desc: intl.formatMessage({
       id: 'OBD.component.DeployConfig.FinancialLevelDistributedDatabasesAre',
       defaultMessage:
-        '金融级分布式数据库，具备数据强一致，高扩展、高性价比稳定可靠等特征',
+        '作为 OCP MetaDB, 建议采用多可用区（Zone）模式部署，结合负载均衡与高可用配置，确保多节点 OCP 的高可用性。',
     }),
     url: OBD_DOCS,
   };

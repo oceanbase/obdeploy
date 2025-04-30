@@ -14,13 +14,17 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
+from const import COMP_JRE
+import os
 
 def check_requirement(plugin_context, file_map=None, requirement_map=None, *args, **kwargs):
     lib_check = False
     need_libs = set()
     java_bin = getattr(plugin_context.options, 'java_bin', 'java')
     cmd = '%s -version' % java_bin
-    if not LocalClient.execute_command(cmd, stdio=plugin_context.stdio):
+    java_tool_path = os.path.join(os.getenv('HOME'), COMP_JRE, 'bin/java')
+    java_tool_cmd = '%s -version' % java_tool_path
+    if not LocalClient.execute_command(cmd, stdio=plugin_context.stdio) and not LocalClient.execute_command(java_tool_cmd, stdio=plugin_context.stdio):
         for file_item in file_map.values():
             need_libs.add(requirement_map[file_item.require])
     return plugin_context.return_true(checked=lib_check, requirements=need_libs)

@@ -97,7 +97,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
 
     cmd = '%s --help'
     path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd, stdio)
-    if result:
+    if result is not None:
         stdio.error(
             '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
                 result.stderr, obclient_bin))
@@ -160,7 +160,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
         if not tbl_path:
             cmd = '%s -h'
             path, result = file_path_check(dbgen_bin, TOOL_TPCH, 'tpch/bin/dbgen', cmd, stdio)
-            if result:
+            if result is not None:
                 stdio.error('%s\n%s is not an executable file. Please use `--dbgen-bin` to set.\nYou may not have obtpch installed' % (result.stderr, dbgen_bin))
                 return
             dbgen_bin = path

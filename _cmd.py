@@ -918,7 +918,7 @@ class ClusterDeployCommand(ClusterMirrorCommand):
                 obd.set_options(self.opts)
             res = obd.deploy_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
-            if res and const.COMP_OB_STANDALONE not in obd.deploy.deploy_config.components:
+            if res and COMMAND_ENV.get(const.INTERACTIVE_INSTALL, '0') == '0':
                 obd.stdio.print(FormatText.success('Please execute ` obd cluster start %s ` to start' % self.cmds[0]))
             return res
         else:

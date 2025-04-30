@@ -120,6 +120,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
             'aio': err.CheckStatus(),
             'net': err.CheckStatus(),
             'ntp': err.CheckStatus(),
+            'cpu': err.CheckStatus(),
         }
         check_status[server].update(kernel_check_status)
         if work_dir_check:
