@@ -112,7 +112,7 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
                 if key == 'jdbc_url' and monitor_user:
                     monitor_password = monitor_password.replace("'", """'"'"'""")
                     cmd += f' --with-property=ocp.monitordb.host:{jdbc_host}' \
-                           f' --with-property=ocp.monitordb.username:{monitor_user + "@" + monitor_tenant}' \
+                           f' --with-property=ocp.monitordb.username:{monitor_user + "@" + monitor_tenant + cluster_name}' \
                            f' --with-property=ocp.monitordb.port:{jdbc_port}' \
                            f' --with-property=ocp.monitordb.password:\'{monitor_password}\'' \
                            f' --with-property=ocp.monitordb.database:{monitor_db}'

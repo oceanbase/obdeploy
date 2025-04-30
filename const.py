@@ -52,6 +52,9 @@ COMP_OCEANBASE_DIAGNOSTIC_TOOL = "oceanbase-diagnostic-tool"
 COMP_OBDIAG = "obdiag"
 COMP_JRE = 'openjdk-jre'
 
+TPCC_PATH = "/usr/ob-benchmarksql/OB-BenchmarkSQL-5.0.jar"
+TPCH_PATH = "/usr/tpc-h-tools/tpc-h-tools/bin/dbgen"
+
 # ocp
 COMP_OCP_EXPRESS = 'ocp-express'
 COMP_OCP_SERVER = 'ocp-server'
@@ -127,4 +130,7 @@ IDLE_TIME_BEFORE_SHUTDOWN_MINITES = 30
 #obshell task type
 TENANT_BACKUP = 'backup'
 TENANT_RESTORE = 'restore'
+
+#standalone
+INTERACTIVE_INSTALL = 'INTERACTIVE_INSTALL'
 

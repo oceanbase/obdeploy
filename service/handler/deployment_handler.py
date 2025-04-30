@@ -546,6 +546,12 @@ class DeploymentHandler(BaseHandler):
             log.get_logger().warn("start %s failed", name)
         log.get_logger().info("finish do start %s", name)
         
+        ## get obd namespace data
+        data = {}
+        for component, _ in self.obd.namespaces.items():
+            data[component] = _.get_variable('run_result')
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
+        
     @serial("stop")
     def stop(self, name, background_tasks):
         task_manager = task.get_task_manager()
@@ -564,6 +570,12 @@ class DeploymentHandler(BaseHandler):
         if not stop_success:
             log.get_logger().warn("stop %s failed", name)
         log.get_logger().info("finish do stop %s", name)
+        
+        ## get obd namespace data
+        data = {}
+        for component, _ in self.obd.namespaces.items():
+            data[component] = _.get_variable('run_result')
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
     def get_install_task_info(self, name):
         task_info = task.get_task_manager().get_task_info(name, task_type="install")

@@ -63,7 +63,7 @@ def display(plugin_context, cursor, display_encrypt_password='******', *args, **
             with_observer = True
             info_dict['user'] = user
             info_dict['password'] = password
-            cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % ((passwd_format(password) if password else '') if not display_encrypt_password else display_encrypt_password))
+            cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % ((passwd_format(password) if password else '') if not display_encrypt_password else passwd_format(display_encrypt_password)))
             break
 
     if (with_observer and server_config.get('obproxy_sys_password', '')) or not with_observer:
@@ -71,7 +71,7 @@ def display(plugin_context, cursor, display_encrypt_password='******', *args, **
         password = server_config.get('obproxy_sys_password', '')
         info_dict['user'] = user
         info_dict['password'] = password
-        cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % ((passwd_format(password) if password else '') if not display_encrypt_password else display_encrypt_password))
+        cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A \n' % (server.ip, server_config['listen_port'], user, '-p%s ' % ((passwd_format(password) if password else '') if not display_encrypt_password else passwd_format(display_encrypt_password)))
 
     stdio.print(cmd)
     info_dict['cmd'] = cmd

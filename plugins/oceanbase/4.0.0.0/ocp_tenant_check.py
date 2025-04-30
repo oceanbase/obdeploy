@@ -61,7 +61,7 @@ def ocp_tenant_check(plugin_context, *args, **kwargs):
 
         servers_sys_memory = {}
         if tenant_memory:
-            sys_memory_size = 1 << 30
+            sys_memory_size = global_conf.get('__min_full_resource_pool_memory', 2 << 30)
             if 'sys_tenant' in global_conf and 'memory_size' in global_conf['sys_tenant']:
                 sys_memory_size = global_conf['sys_tenant']['memory_size']
             for server in cluster_config.servers:

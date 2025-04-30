@@ -38,6 +38,9 @@ class TelemetryHandler(BaseHandler):
             return TelemetryData(data={}, msg=msg)
         repositories = self.obd.load_local_repositories(deploy.deploy_info, False)
         repositories = self.obd.sort_repository_by_depend(repositories, deploy.deploy_config)
+        if const.COMP_OB_CE not in deploy.deploy_config.components:
+            msg = 'get deploy config failed for %s' % name
+            return TelemetryData(data={}, msg=msg)
         clients = self.obd.get_clients(deploy.deploy_config, repositories)
         cluster_config = deploy.deploy_config.components[const.COMP_OB_CE]
         data = {}

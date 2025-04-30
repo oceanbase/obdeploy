@@ -36,6 +36,11 @@ def cursor_check(plugin_context, need_connect=True, *args, **kwargs):
     meta_cursor = ''
     monitor_cursor = ''
     if jdbc_url:
+        cluster_name = ''
+        if server_config.get('jdbc_username', ''):
+            jdbc_username = server_config['jdbc_username']
+            if '#' in jdbc_username:
+                cluster_name = '#' + jdbc_username.split('#')[1]
         matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
         if not matched:
             stdio.error('jdbc_url is not valid')
@@ -46,10 +51,10 @@ def cursor_check(plugin_context, need_connect=True, *args, **kwargs):
         user = server_config['jdbc_username']
         password = server_config['jdbc_password']
         meta_user = server_config['ocp_meta_username']
-        meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
+        meta_tenant = server_config['ocp_meta_tenant']['tenant_name'] + cluster_name
         meta_password = server_config['ocp_meta_password']
         monitor_user = server_config['ocp_monitor_username']
-        monitor_tenant = server_config['ocp_monitor_tenant']['tenant_name']
+        monitor_tenant = server_config['ocp_monitor_tenant']['tenant_name'] + cluster_name
         monitor_password = server_config['ocp_monitor_password']
         connected = False
         cursor = None

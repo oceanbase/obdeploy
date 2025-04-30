@@ -45,7 +45,7 @@ from _lock import LockManager, LockMode
 from _optimize import OptimizeManager
 from _environ import ENV_REPO_INSTALL_MODE, ENV_BASE_DIR
 from _types import Capacity
-from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE
+from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE, TPCC_PATH, TPCH_PATH, COMP_JRE
 from ssh import LocalClient
 
 
@@ -3921,11 +3921,17 @@ class ObdHome(object):
                                 self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
                 return False
 
-        if not self.install_tool(TOOL_SYSBENCH):
-            return False
+        sysbench_bin = getattr(opts, 'sysbench_bin', 'sysbench')
+        sysbench_cmd = f"{sysbench_bin} --help"
+        if not LocalClient.execute_command(sysbench_cmd):
+            if not self.install_tool(TOOL_SYSBENCH):
+                return False
 
-        if not self.install_tool(COMP_OBCLIENT):
-            return False
+        obclient_bin = getattr(opts, 'obclient_bin', 'obclient')
+        obclient_cmd = f"{obclient_bin} --help"
+        if not LocalClient.execute_command(obclient_cmd):
+            if not self.install_tool(COMP_OBCLIENT):
+                return False
 
         ob_repository = None
         repository = None
@@ -4050,11 +4056,20 @@ class ObdHome(object):
                                 self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
                 return False
 
-        if not self.install_tool(TOOL_TPCH):
-            return False
+        dbgen_bin = getattr(opts, 'dbgen_bin')
+        if not dbgen_bin:
+            dbgen_bin = TPCH_PATH
+        dbgen_cmd = f"{dbgen_bin} -h"
+        result = LocalClient.execute_command(dbgen_cmd)
+        if result.code > 1:
+            if not self.install_tool(TOOL_TPCH):
+                return False
 
-        if not self.install_tool(COMP_OBCLIENT):
-            return False
+        obclient_bin = getattr(opts, 'obclient_bin', 'obclient')
+        obclient_cmd = f"{obclient_bin} --help"
+        if not LocalClient.execute_command(obclient_cmd):
+            if not self.install_tool(COMP_OBCLIENT):
+                return False
 
         repository = repositories[0]
         namespace = self.get_namespace(repository.name)
@@ -4281,11 +4296,25 @@ class ObdHome(object):
                                 self._call_stdio('print', '%s %s is stopped' % (server, repository.name))
                 return False
 
-        if not self.install_tool(TOOL_TPCC):
-            return False
+        java_bin = getattr(opts, 'java_bin', 'java')
+        java_cmd = f"{java_bin} -version"
+        if not LocalClient.execute_command(java_cmd):
+            if not self.install_tool(COMP_JRE):
+                return False
 
-        if not self.install_tool(COMP_OBCLIENT):
-            return False
+        bmsql_dir = getattr(opts, 'bmsql_dir')
+        if not bmsql_dir:
+            bmsql_dir = TPCC_PATH
+        if not os.path.exists(bmsql_dir):
+            if not self.install_tool(TOOL_TPCC):
+                return False
+            
+
+        obclient_bin = getattr(opts, 'obclient_bin', 'obclient')
+        obclient_cmd = f"{obclient_bin} --help"
+        if not LocalClient.execute_command(obclient_cmd):
+            if not self.install_tool(COMP_OBCLIENT):
+                return False
 
         ob_repository = None
         repository = None
@@ -5584,7 +5613,7 @@ class ObdHome(object):
             return False
         return True
 
-    def register_license(self, name):
+    def load_license(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
         self.set_deploy(deploy)
@@ -5662,8 +5691,8 @@ class ObdHome(object):
 
         for repository in repositories:
             if repository.name in const.COMPS_OB:
-                if Version('4.2.0.0') <= repository.version <= Version('4.2.5.0'):
-                    self._call_stdio('error', 'Oceanbase must be higher than version 4.2.5.0 .')
+                if Version('4.2.0.0') <= repository.version <= Version('4.2.1.8'):
+                    self._call_stdio('error', 'Oceanbase must be higher than version 4.2.1.8 .')
                     return None
                 elif Version('4.3.0.0') <= repository.version <= Version('4.3.3.0'):
                     self._call_stdio('error', 'Oceanbase must be higher than version 4.3.3.0 .')

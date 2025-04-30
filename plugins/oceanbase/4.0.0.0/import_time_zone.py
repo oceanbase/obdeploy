@@ -19,7 +19,7 @@ import os
 import time
 
 import const
-from tool import Exector
+from tool import Exector, COMMAND_ENV
 from collections import defaultdict
 from _stdio import FormatText
 
@@ -104,8 +104,9 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
                         stdio.warn('execute import_srs_data.py failed')
                     break
             cursors.append(tenant_cursor)
-            cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
-            if cluster_config.name == const.COMP_OB_STANDALONE:
-                cmd = FormatText.success(cmd)
+            cmd = 'obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+            if COMMAND_ENV.get('INTERACTIVE_INSTALL') == '1':
+                continue
+            cmd = FormatText.success(cmd)
             stdio.print(cmd)
     return plugin_context.return_true(tenant_cursor=cursors)

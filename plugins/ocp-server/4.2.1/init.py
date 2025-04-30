@@ -82,6 +82,8 @@ def _ocp_lib(plugin_context, client, home_path, soft_dir='', stdio=None, **kwarg
         add_pkg(name='oceanbase-standalone-utils', version=ob_version, release=ob_release)
     ob_with_opti_pkgs = []
     for pkg in pkgs:
+        if pkg.name in [const.COMP_OB,'{}-libs'.format(const.COMP_OB), '{}-utils'.format(const.COMP_OB)]:
+            continue
         if pkg.name in const.COMPS_OB and pkg.version >= Version('4.3.0.0'):
             ob_with_opti_pkgs.append(pkg)
             continue

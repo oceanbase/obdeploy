@@ -139,6 +139,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
             'aio': err.CheckStatus(),
             'net': err.CheckStatus(),
             'ntp': err.CheckStatus(),
+            'cpu': err.CheckStatus(),
             'ocp tenant memory': err.CheckStatus(),
             'ocp tenant disk': err.CheckStatus()
         }
