@@ -134,8 +134,7 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
                         err.EC_CONFLICT_PORT.format(server=ip, port=port),
                         [err.SUG_USE_OTHER_PORT.format()]
                     )
-
-        if not client.execute_command('lscpu | grep Flags | grep avx').stdout:
+        if len(re.findall(r'(^avx\s+)|(\s+avx\s+)|(\s+avx$)', client.execute_command('lscpu | grep avx').stdout)) == 0 and os.uname()[4].startswith('x86'):
             critical(server, 'cpu', err.EC_CPU_NOT_SUPPORT_AVX.format(server=server), [err.SUG_CHANGE_SERVER.format()])
     if success:
         for ip in servers_net_interface:
