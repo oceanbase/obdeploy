@@ -170,7 +170,7 @@ EC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_m
 EC_OBSERVER_GET_MEMINFO_FAIL = OBDErrorCodeTemplate(2011, "{server}: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
 EC_OBSERVER_FAIL_TO_START_OCS = OBDErrorCodeTemplate(2012, 'Failed to start {server} obshell')
 EC_OBSERVER_UNKONE_SCENARIO = OBDErrorCodeTemplate(2013, 'Unknown scenario: {scenario}')
-EC_CPU_NOT_SUPPORT_AVX = OBDErrorCodeTemplate(2014, "{server}'s cpu not support avx")
+EC_CPU_NOT_SUPPORT_AVX = OBDErrorCodeTemplate(2014, "{server}'s cpu does not support avx")
 EC_OBSERVER_DISABLE_AUTOSTART = OBDErrorCodeTemplate(2015, "{server}: Failed to modify the configuration of the automatic startup. Please check whether the current user has sudo permissions")
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
