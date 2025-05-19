@@ -1809,10 +1809,12 @@ class ObdHome(object):
 
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
-
+        components_kwargs = {}
+        for repository in repositories:
+            components_kwargs[repository.name] = {"source_option": "deploy"}
         deploy_config.disable_encrypt_dump()
         workflows = self.get_workflows('init')
-        if not self.run_workflow(workflows):
+        if not self.run_workflow(workflows, **components_kwargs):
             return False
         deploy_config.enable_encrypt_dump()
 
