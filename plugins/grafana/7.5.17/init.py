@@ -27,7 +27,7 @@ def critical(*arg, **kwargs):
     stdio.error(*arg, **kwargs)
 
 
-def init(plugin_context, *args, **kwargs):
+def init(plugin_context, source_option=None, *args, **kwargs):
     global stdio, force
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -103,7 +103,7 @@ def init(plugin_context, *args, **kwargs):
                     ret = client.execute_command('ls %s' % target_path)
                     if not ret or ret.stdout.strip():
                         critical(EC_FAIL_TO_INIT_PATH.format(server=server, key=k, msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=target_path)))
-                        critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                        source_option == "deploy" and critical(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                         mkdir_ret = False
                         continue
                     client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (target_path, link_path, target_path, link_path))
