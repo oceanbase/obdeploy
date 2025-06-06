@@ -1,21 +1,19 @@
 import { intl } from '@/utils/intl';
+import { message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
-import { message } from 'antd';
 
-import * as OCP from '@/services/ocp_installer_backend/OCP';
-import { useRequest } from 'ahooks';
-import { getErrorInfo, errorHandler } from '@/utils';
 import PreCehckComponent from '@/component/PreCheck/preCheck';
-import { formatOcpPreCheckStatusData } from '../helper';
+import * as OCP from '@/services/ocp_installer_backend/OCP';
+import { errorHandler, getErrorInfo } from '@/utils';
+import { useRequest } from 'ahooks';
 import NP from 'number-precision';
+import { formatOcpPreCheckStatusData } from '../helper';
 
 interface PreCheckProps {
   isNewDB: boolean;
 }
 
-// result: RUNNING | FALIED | SUCCESSFUL
-// status: RUNNING | FINISHED
 export default function PreCheck({
   current,
   setCurrent,
@@ -26,7 +24,7 @@ export default function PreCheck({
     setErrorsList,
     errorsList,
     ocpConfigData,
-    ERR_CODE
+    ERR_CODE,
   } = useModel('global');
   const { setInstallTaskId } = useModel('ocpInstallData');
 
@@ -95,7 +93,7 @@ export default function PreCheck({
             setFailedList(newFailedList);
             setShowFailedList(newFailedList);
           }
-          // const isFinished = !!data?.total && data?.finished === data?.total;
+
           const isFinished = data.task_info.status === 'FINISHED';
           setCheckFinished(isFinished);
           if (isFinished) {

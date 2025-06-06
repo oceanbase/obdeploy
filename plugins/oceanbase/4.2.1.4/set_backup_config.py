@@ -47,7 +47,7 @@ def check_nfs_path(paths, client):
 
 def set_backup_config(plugin_context, tenant_name, obshell_clients,  *args, **kwargs):
     def check_uri(uri):
-        all_path = get_all_parent_paths(data_backup_uri[len('file://'):])
+        all_path = get_all_parent_paths(uri[len('file://'):])
         for server in plugin_context.cluster_config.servers:
             client = clients[server]
             if not check_nfs_path(all_path, client):

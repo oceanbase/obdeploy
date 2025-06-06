@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import time
 from copy import deepcopy
 from optparse import Values
 
@@ -30,6 +31,19 @@ def get_missing_required_parameters(parameters):
 
 
 def get_ocp_depend_config(cluster_config, stdio):
+    def get_jdbc_ip_and_port():
+        ret = {}
+        if (obproxy_server_config.get('vip_address') and obproxy_server_config.get('vip_port')) or obproxy_server_config.get('dns'):
+            if obproxy_server_config.get('dns'):
+                ret = {'ip': obproxy_server_config['dns'], 'port': obproxy_server_config['listen_port']}
+                stdio.verbose("get obproxy dns: {}".format(obproxy_server_config['dns']))
+            elif obproxy_server_config.get('vip_address') and obproxy_server_config.get('vip_port'):
+                ret = {'ip': obproxy_server_config['vip_address'], 'port': obproxy_server_config['vip_port']}
+                stdio.verbose("get obproxy vip: {} ".format(obproxy_server_config['vip_address'] + ":" + str(obproxy_server_config['vip_port'])))
+        else:
+            ret = {"ip": obproxy_server.ip, "port": obproxy_server_config['listen_port']}
+        return ret
+
     # depends config
     env = {}
     depend_observer = False
@@ -62,8 +76,12 @@ def get_ocp_depend_config(cluster_config, stdio):
             obproxy_servers = cluster_config.get_depend_servers(comp)
             obproxy_server = obproxy_servers[0]
             obproxy_server_config = cluster_config.get_depend_config(comp, obproxy_server)
-            depend_info['server_ip'] = obproxy_server.ip
-            depend_info['mysql_port'] = obproxy_server_config['listen_port']
+            ip_ret = get_jdbc_ip_and_port()
+            if not ip_ret:
+                stdio.error("get vip or dns failed!")
+                return False
+            depend_info['server_ip'] = ip_ret['ip']
+            depend_info['mysql_port'] = ip_ret['port']
             break
     for server in cluster_config.servers:
         default_server_config = deepcopy(cluster_config.get_server_conf_with_default(server))

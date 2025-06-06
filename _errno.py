@@ -172,6 +172,9 @@ EC_OBSERVER_FAIL_TO_START_OCS = OBDErrorCodeTemplate(2012, 'Failed to start {ser
 EC_OBSERVER_UNKONE_SCENARIO = OBDErrorCodeTemplate(2013, 'Unknown scenario: {scenario}')
 EC_CPU_NOT_SUPPORT_AVX = OBDErrorCodeTemplate(2014, "{server}'s cpu does not support avx")
 EC_OBSERVER_DISABLE_AUTOSTART = OBDErrorCodeTemplate(2015, "{server}: Failed to modify the configuration of the automatic startup. Please check whether the current user has sudo permissions")
+EC_OBSERVER_LOG_INCOMPLETE = OBDErrorCodeTemplate(2016, "Primary tenant {primary_tenant} have not full log, not support create standby cluster, rerun with '--type=LOCATION' if you want to create standby tenant.")
+EC_OBSERVER_LOG_RECOVER = OBDErrorCodeTemplate(2017, "Continuous log synchronization is not enabled. Please execute the command `obd cluster tenant recover {cluster_name} {tenant_name} --unlimited` to enable continuous log synchronization")
+EC_OBSERVER_LOCATION_CREATE_STANDBY = OBDErrorCodeTemplate(2018, "For the standby tenant created by {primary_tenant} in log archive mode, it is prohibited to create a network-mode standby tenant for this standby tenant.")
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 

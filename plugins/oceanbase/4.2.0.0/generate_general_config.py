@@ -329,6 +329,10 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
                         log_disk_size = (memory_limit - system_memory) * 3 + system_memory
                     if auto_set_datafile_size:
                         datafile_size = min(disk_free - log_disk_size, (memory_limit - system_memory) * 3 + system_memory)
+                        if datafile_size < 0:
+                            stdio.error(err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir_mount, avail=str(Capacity(disk_free)), need=str(Capacity((memory_limit - system_memory) * 3 + system_memory))))
+                            success = False
+                            continue
                         if not datafile_maxsize:
                             datafile_maxsize = max(disk_free - log_disk_size, (memory_limit - system_memory) * 3 + system_memory)
                 else:

@@ -29,10 +29,27 @@ def backup(plugin_context, tenant_name, obshell_clients,  *args, **kwargs):
 
     cursor = plugin_context.get_return('connect').get_return('cursor')
     sql = "select * from oceanbase.DBA_OB_TENANTS where tenant_name = '%s';" % tenant_name
-    if not cursor.fetchone(sql):
+    rv = cursor.fetchone(sql)
+    if not rv:
         stdio.stop_loading('fail')
         stdio.error("tenant `%s` not exist" % tenant_name)
         return plugin_context.return_false()
+    if rv['TENANT_ROLE'] == 'STANDBY':
+        if rv['STATUS'] != 'NORMAL':
+            stdio.stop_loading('fail')
+            stdio.error("The current tenant %s is in status: %s (expected: NORMAL). Creating a backup task is not supported." % (tenant_name, rv['STATUS']))
+            return plugin_context.return_false()
+        else:
+            sql = "select * from oceanbase.v$ob_ls_log_restore_status where tenant_id = '%s';" % rv['TENANT_ID']
+            sync_status_rv = cursor.fetchone(sql)
+            if not sync_status_rv:
+                stdio.stop_loading('fail')
+                stdio.error("'%s': get sync_status failed" % tenant_name)
+                return plugin_context.return_false()
+            if sync_status_rv['SYNC_STATUS'] != 'NORMAL':
+                stdio.stop_loading('fail')
+                stdio.error("'%s': tenant sync_status is %s, not NORMAL" % (tenant_name, sync_status_rv['SYNC_STATUS']))
+                return plugin_context.return_false()
 
     for obshell_client in obshell_clients.values():
         break

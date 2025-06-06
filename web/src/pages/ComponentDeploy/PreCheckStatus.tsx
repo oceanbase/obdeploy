@@ -190,16 +190,6 @@ export default function PreCheckStatus() {
               });
             if (nameSuccess) {
               const { config } = nameData;
-              //后端不会返回密码 需要从原配置中获取
-              // let newConfigData = config
-              //   ? {
-              //       ...config,
-              //       auth: {
-              //         ...config?.auth,
-              //         password: configData.auth?.password,
-              //       },
-              //     }
-              //   : {};
               setComponentConfig(config);
               handleRetryCheck(config);
             } else {

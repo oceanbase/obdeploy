@@ -47,6 +47,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
         if strict_check:
             success = False
             check_fail(server, item, error, suggests)
+            print_with_suggests(error, suggests)
             stdio.error(error)
         else:
             stdio.warn(error)

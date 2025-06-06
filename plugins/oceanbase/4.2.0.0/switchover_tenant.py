@@ -72,6 +72,8 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_ex
 def verify_password(cursor, tenant_name, stdio, key, password='', user='root', mode='mysql'):
     if exec_sql_in_tenant('select 1', cursor, tenant_name, mode, user=user, password=password, raise_exception=False, retries=5):
         return True
+    if key == 'standbyro_password':
+        key = 'standbyro-password'
     stdio.error("Authentication failed, no valid password for {}:{}. please retry with '--{}=xxxxxx'".format(tenant_name, user, key))
     return False
 
@@ -129,7 +131,7 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
         get_standbys_plugin = plugin_manager.get_best_py_script_plugin('get_standbys', repository.name, repository.version)
         ret = call_plugin(get_standbys_plugin, primary_deploy_name=standby_deploy_name, primary_tenant=standby_tenant, exclude_tenant=[primary_deploy_name, primary_tenant])
         if not ret:
-            error("Find primary tenant {}:{}'s others standby tenants failed".format(primary_deploy_name, primary_tenant))
+            error("Find standby tenant {}:{}'s others standby tenants failed".format(standby_deploy_name, standby_tenant))
             return
     standby_standby_tenants = ret.get_return('standby_tenants')
     stdio.verbose("Standby tenant {}:{}'s others standby tenants:{}".format(standby_deploy_name, standby_tenant, standby_standby_tenants))
@@ -296,53 +298,9 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     except Exception as e:
         retry_message = 'After resolving the issue, you can retry by manually executing SQL:\'{}\' with the root user in the tenant {}:{}.'.format(sql, primary_deploy_name, primary_tenant)
         exception("Set the new standby tenant {}:{}'s log restore to {}:{} failed:{}. \n {}".format(primary_deploy_name, primary_tenant, standby_deploy_name, standby_tenant, e, retry_message))
-    
-    # 5. set old primary`s standby tenant as standby tenants of the new primary`s  if need
-    exception_flag = False
-    if primary_standby_tenants:
-        message = ''
-        for tenant_info in primary_standby_tenants:
-            message += '{}:{} '.format(tenant_info[0], tenant_info[1])
-        stdio.verbose("set {}:{}'s standby tenants:{} as standby tenants of the tenant {}:{}".format(primary_deploy_name, primary_tenant, message, standby_deploy_name, standby_tenant))
 
-        ip_list = get_ip_list(standby_cursor, standby_deploy_name, standby_tenant, stdio)
-        if not ip_list:
-            stdio.stop_loading('fail')
-            return
-        for tenant_info in primary_standby_tenants:
-            deploy_name = tenant_info[0]
-            tenant_name = tenant_info[1]
-            sql = 'ALTER SYSTEM SET LOG_RESTORE_SOURCE = "SERVICE={} USER=standbyro@{} PASSWORD={}"'.format(ip_list, standby_tenant, standbyro_password)
-            try:
-                exec_sql_in_tenant(sql, cursors.get(deploy_name), tenant_name, 'mysql', user='root', password=standby_tenant_password, raise_exception=True, retries=5)
-            except Exception as e:
-                retry_message = 'After resolving the issue, you can retry by manually executing SQL:\'{}\' with the root user in the tenant {}:{}.'.format(sql, deploy_name, tenant_name)
-                stdio.exception("Set the old primary`s standby tenant {}:{} as a standby tenant of the new primary`s standby tenant {}:{} failed:{}. \n {}".format(deploy_name, tenant_name, standby_deploy_name, standby_tenant, e, retry_message))
-                exception_flag = True
 
-    # 6. set old standby tenant`s standby tenant as standby tenants of the new standby tenant if need
-    if standby_standby_tenants:
-        message = ''
-        for tenant_info in standby_standby_tenants:
-            message += '{}:{} '.format(tenant_info[0], tenant_info[1])
-        stdio.verbose("set {}:{}'s standby tenants:{} as standby tenants of the tenant {}:{}".format(standby_deploy_name, standby_tenant, message, primary_deploy_name, primary_tenant))
-        ip_list = get_ip_list(primary_cursor, primary_deploy_name, primary_tenant, stdio)
-        if not ip_list:
-            stdio.stop_loading('fail')
-            return
-        for tenant_info in standby_standby_tenants:
-            deploy_name = tenant_info[0]
-            tenant_name = tenant_info[1]
-            sql = 'ALTER SYSTEM SET LOG_RESTORE_SOURCE = "SERVICE={} USER=standbyro@{} PASSWORD={}"'.format(ip_list, primary_tenant, standbyro_password)
-            try:
-                exec_sql_in_tenant(sql, cursors.get(deploy_name), tenant_name, 'mysql', user='root', password=standby_tenant_password, raise_exception=True, retries=5)
-            except Exception as e:
-                retry_message = 'After resolving the issue, you can retry by manually executing SQL:\'{}\' with the root user in the tenant {}:{}.'.format(sql, deploy_name, tenant_name)
-                exception("Set the old standby`s standby tenant {}:{} as a standby tenant of the new standby`s standby tenant {}:{} failed:{}. \n {}".format(deploy_name, tenant_name, primary_deploy_name, primary_tenant, e, retry_message))
+    plugin_context.set_variable('old_primary_standby_tenants', primary_standby_tenants)
+    plugin_context.set_variable('old_standby_standby_tenants', standby_standby_tenants)
 
-    if exception_flag:
-        stdio.stop_loading('failed')
-    else:
-        stdio.stop_loading('succeed')
-    stdio.print('You can use the command "obd cluster tenant show {} -g" to view the relationship between the primary and standby tenants.'.format(standby_deploy_name))
     return plugin_context.return_true()

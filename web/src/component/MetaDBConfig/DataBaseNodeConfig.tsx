@@ -5,7 +5,7 @@ import type {
   ProColumns,
 } from '@ant-design/pro-components';
 import { EditableProTable, ProForm } from '@ant-design/pro-components';
-import { Popconfirm, Select, Tooltip } from 'antd';
+import { message, Popconfirm, Select, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 
@@ -20,6 +20,7 @@ interface DataBaseNodeConfigProps {
   tableFormRef: React.MutableRefObject<
     EditableFormInstance<API.DBConfig> | undefined
   >;
+
   dbConfigData: API.DBConfig[];
   setDBConfigData: React.Dispatch<React.SetStateAction<API.DBConfig[]>>;
   finalValidate: React.MutableRefObject<boolean>;
@@ -362,6 +363,15 @@ export default function DataBaseNodeConfig({
             if (editorServers.length) {
               if (!rootService || !editorServers.includes(rootService)) {
                 newRootService = editorServers[0];
+              }
+              if (editorServers.find((item) => item === '127.0.0.1')) {
+                message.warning(
+                  intl.formatMessage({
+                    id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.B663133E',
+                    defaultMessage:
+                      '依据 OceanBase 最佳实践，建议使用非 127.0.0.1 IP 地址',
+                  }),
+                );
               }
             } else {
               newRootService = undefined;

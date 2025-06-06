@@ -90,7 +90,7 @@ def load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server
         raise e
 
 
-def start_pre(plugin_context, *args, **kwargs):
+def start_pre(plugin_context, obagent_repo=None, *args, **kwargs):
     def generate_or_update_config():
         prometheus_conf_content = None
         if client.execute_command('ls {}'.format(runtime_prometheus_conf)):
@@ -144,7 +144,6 @@ def start_pre(plugin_context, *args, **kwargs):
     yaml = YamlLoader(stdio=stdio)
     pid_path = {}
     cmd_args_map = {}
-    obagent_repo = None
     if 'obagent' in cluster_config.depends:
         for repository in plugin_context.repositories:
             if repository.name == 'obagent':

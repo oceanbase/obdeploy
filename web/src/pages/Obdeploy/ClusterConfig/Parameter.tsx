@@ -243,14 +243,19 @@ const AdaptiveInput = ({
   );
 };
 //参数来由：当Parameter在form.item下时自带有onchange，value
-export default function Parameter({
-  value: itemValue,
-  onChange,
-  onBlur,
-  defaultValue,
-}: ParameterProps) {
+export default function Parameter(props) {
+  const { value: itemValue, onChange, onBlur, defaultValue } = props;
+
+  const abc = {
+    value: defaultValue,
+    adaptive: props.adaptive,
+    type: props.type,
+    auto: props.auto,
+    unitDisable: props.unitDisable,
+    isChanged: props.isChanged,
+  };
   const [parameterValue, setParameterValue] = useState<API.ParameterValue>(
-    itemValue || {},
+    itemValue || abc,
   );
   const { type } = parameterValue;
   const defaultUnit = useRef<string>(
@@ -270,6 +275,7 @@ export default function Parameter({
       }
     }
   }, [parameterValue]);
+
   return (
     <Space className={parameterValue?.auto && styles.paramContent} size={8}>
       <Select

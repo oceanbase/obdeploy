@@ -1,7 +1,6 @@
 import CheckBadge from '@/component/CheckBadge';
 import ArrowIcon from '@/component/Icon/ArrowIcon';
 import NewIcon from '@/component/Icon/NewIcon';
-import { DOCS_SOP } from '@/constant/docs';
 import { OCP_UPGRADE_STATUS_LIST } from '@/constant/index';
 import { intl } from '@/utils/intl';
 import { ProCard } from '@ant-design/pro-components';
@@ -271,7 +270,15 @@ const UpdatePreCheck: React.FC<UpdatePreCheckProps> = ({
           <Card
             bordered={false}
             title={`${
-              precheckOcpUpgradeStatus === 'RUNNING' ? '检查中' : '检查完成'
+              precheckOcpUpgradeStatus === 'RUNNING'
+                ? intl.formatMessage({
+                    id: 'OBD.component.PreCheck.preCheck.Checking',
+                    defaultMessage: '检查中',
+                  })
+                : intl.formatMessage({
+                    id: 'OBD.component.PreCheck.preCheck.CheckCompleted',
+                    defaultMessage: '检查完成',
+                  })
             }`}
           >
             <div

@@ -1095,6 +1095,24 @@ def aes_decrypt(ciphertext, key):
     plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
     return plaintext.decode('utf-8')
 
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
+    if not user:
+        user = 'SYS' if mode == 'oracle' else 'root'
+    # find tenant ip, port
+    tenant_cursor = None
+    query_sql = "select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
+    tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
+    for tenant_server_port in tenant_server_ports:
+        tenant_ip = tenant_server_port['SVR_IP']
+        tenant_port = tenant_server_port['SQL_PORT']
+        tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password if retries % 2 or not len(args) > 0 else args[0], ip=tenant_ip, port=tenant_port, print_exception=False)
+        if tenant_cursor:
+            break
+    if not tenant_cursor and retries:
+        time.sleep(1)
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
+    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
+
             
                 
 

@@ -45,7 +45,7 @@ from _lock import LockManager, LockMode
 from _optimize import OptimizeManager
 from _environ import ENV_REPO_INSTALL_MODE, ENV_BASE_DIR
 from _types import Capacity
-from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE, TPCC_PATH, TPCH_PATH, COMP_JRE
+from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE, TPCC_PATH, TPCH_PATH, COMP_JRE, LOCATION_MODE, SERVICE_MODE
 from ssh import LocalClient
 
 
@@ -939,7 +939,9 @@ class ObdHome(object):
                             continue
                         else:
                             return False
-
+                config_map = {
+                    'observer_root_password': 'root_password'
+                }
                 for component_name in deploy_config.components:
                     if config_status == DeployConfigStatus.NEED_REDEPLOY:
                         break
@@ -947,6 +949,22 @@ class ObdHome(object):
                         continue
                     old_cluster_config = deploy.deploy_config.components[component_name]
                     new_cluster_config = deploy_config.components[component_name]
+                    if component_name in const.COMPS_ODP:
+                        for comp in const.COMPS_OB:
+                            if comp in new_cluster_config.depends:
+                                new_ob_config = new_cluster_config.get_depend_config(comp)
+                                new_ob_config = {} if new_ob_config is None else new_ob_config
+                                old_ob_config = old_cluster_config.get_depend_config(comp)
+                                old_ob_config = {} if old_ob_config is None else old_ob_config
+                                for key in config_map:
+                                    if new_cluster_config.get_global_conf().get(key) != new_ob_config.get(
+                                            config_map[key]):
+                                        if self.enable_encrypt:
+                                            deploy_config.disable_encrypt_dump()
+                                        if old_ob_config.get(config_map[key]) != new_ob_config.get(config_map[key]):
+                                            new_cluster_config.update_global_conf(key, new_ob_config.get(config_map[key]))
+                                        else:
+                                            deploy_config.components[comp].update_global_conf(config_map[key], new_cluster_config.get_global_conf().get(key))
                     if old_cluster_config == new_cluster_config:
                         continue
                     if config_status == DeployConfigStatus.UNCHNAGE:
@@ -1647,7 +1665,7 @@ class ObdHome(object):
         for component_name in getattr(self.options, 'components', '').split(','):
             if component_name:
                 components.add(component_name)
-                self.get_namespace(component_name).set_variable('generate_config_mini', True)
+                self.get_namespace(component_name).set_variable('generate_config_mini', not getattr(self.options, 'max', False))
                 self.get_namespace(component_name).set_variable('generate_password', False)
                 self.get_namespace(component_name).set_variable('auto_depend', True)
 
@@ -2231,7 +2249,7 @@ class ObdHome(object):
         self._call_stdio('stop_loading', 'succeed')
         return self._start_cluster(deploy, repositories)
 
-    def _start_cluster(self, deploy, repositories, scale_out=False):
+    def _start_cluster(self, deploy, repositories, components_kwargs=None, scale_out=False):
         self._call_stdio('verbose', 'Get deploy config')
         deploy_config = deploy.deploy_config
         deploy_info = deploy.deploy_info
@@ -2281,7 +2299,7 @@ class ObdHome(object):
                 if repository.name in const.COMPS_OB:
                     ob_repository = repository
                     break
-            if ob_repository:
+            if ob_repository and ob_repository in self.repositories:
                 finally_check_plugin_name = [value for value in start_check_workflows.workflows.get(ob_repository.name).stage.values()][-1][-1].name
                 if self.get_namespace(ob_repository.name).get_return(finally_check_plugin_name).get_return('system_env_error'):
                     self._call_stdio('print', FormatText.success('You can use the `obd cluster init4env {name}` command to automatically configure system parameters'.format(name=name)))
@@ -2293,6 +2311,12 @@ class ObdHome(object):
                 start_args[repo.name] = {}
                 start_args[repo.name]["install_utils_to_servers"] = self.install_utils_to_servers
                 start_args[repo.name]["get_repositories_utils"] = self.get_repositories_utils
+        if components_kwargs:
+            for comp, kwargs in components_kwargs.items():
+                if start_args.get(comp):
+                    start_args[comp].update(kwargs)
+                else:
+                    start_args[comp] = kwargs
         start_workflows = self.get_workflows('start', **{'new_clients': ssh_clients})
         if not self.run_workflow(start_workflows, sorted_components=components, **start_args):
             return False
@@ -2316,7 +2340,7 @@ class ObdHome(object):
             return True
         return True
 
-    def create_tenant(self, name):
+    def create_tenant(self, name, tenant_config=None):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
         self.set_deploy(deploy)
@@ -2344,8 +2368,19 @@ class ObdHome(object):
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
 
+        for repository in repositories:
+            if repository.name in const.COMPS_OB:
+                ob_repository = repository
+                break
+        else:
+            self._call_stdio('error', 'No oceanbase component in deploy %s' % name)
+            return False
+        create_tenant_options = []
+        if tenant_config:
+            create_tenant_options.append(tenant_config)
+
         workflows = self.get_workflows('create_tenant', no_found_act='ignore')
-        if not self.run_workflow(workflows, no_found_act='ignore'):
+        if not self.run_workflow(workflows, no_found_act='ignore', **{ob_repository.name: {"create_tenant_options": create_tenant_options}}):
             return False
         return True
 
@@ -2386,7 +2421,12 @@ class ObdHome(object):
         if list(set(primary_repositories_name_list)) != list(set(standby_repositories_name_list)):
             self._call_stdio('error', 'Version not match. standby version: {} , primary version: {}.'.format(standby_repositories_name_list[0], primary_repositories_name_list[0]))
             return False
+
         self.set_repositories(standby_repositories)
+        standby_type = getattr(self.options, 'type')
+        if standby_type not in [SERVICE_MODE, LOCATION_MODE]:
+            self._call_stdio('error', "The value of type must be 'SERVICE' or 'LOCATION' and cannot be other values")
+            return False
 
         workflows = self.get_workflows('create_standby_tenant', no_found_act='ignore')
         if not self.run_workflow(workflows, no_found_act='ignore'):
@@ -2405,7 +2445,12 @@ class ObdHome(object):
             return False
         standby_repositories = self.get_component_repositories(deploy.deploy_info, const.COMPS_OB)
         self.set_repositories(standby_repositories)
+        self.search_param_plugin_and_apply(standby_repositories, deploy.deploy_config)
         setattr(self.options, 'tenant_name', tenant_name)
+
+        workflows = self.get_workflows("standby_log_restore_type_check", no_found_act='ignore')
+        if not self.run_workflow(workflows, no_found_act='ignore'):
+            return False
 
         workflows = self.get_workflows('switchover_tenant', no_found_act='ignore')
         if not self.run_workflow(workflows, no_found_act='ignore'):
@@ -2435,6 +2480,14 @@ class ObdHome(object):
         self.set_deploy(deploy)
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
+            return False
+        
+        tenant_name = getattr(self.options, 'tenant_name')
+        if not tenant_name:
+            self._call_stdio('error', 'Additional tenant-name is required.')
+            return False
+        if tenant_name == 'sys':
+            self._call_stdio('error', 'Prohibit deleting sys tenant.')
             return False
         
         deploy_info = deploy.deploy_info
@@ -5810,6 +5863,77 @@ class ObdHome(object):
 
         workflows = self.get_workflows('cancel_backup_or_restore_task')
         if not self.run_workflow(workflows, **{ob_repository.name: {"tenant_name": tenant_name, "task_type": task_type}}):
+            return False
+        return True
+
+    def log_recover(self, deploy_name, tenant_name):
+        scn = getattr(self.options, 'scn', None)
+        timestamp = getattr(self.options, 'timestamp', None)
+        unlimited = getattr(self.options, 'unlimited', False)
+
+        if sum([bool(scn), bool(timestamp), bool(unlimited)]) > 1:
+            self._call_stdio('error', "Only one type of input is supported among (scn, timestamp, unlimited).")
+            return False
+
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(deploy_name)
+        self.set_deploy(deploy)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % deploy_name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        self._call_stdio('verbose', 'Deploy status judge')
+        if deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('print', 'Deploy "%s" is %s' % (deploy_name, deploy_info.status.value))
+            return False
+        self._call_stdio('verbose', 'Get deploy config')
+        deploy_config = deploy.deploy_config
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        self.set_repositories(repositories)
+
+        # Get the client
+        ssh_clients = self.get_clients(deploy_config, repositories)
+
+        workflows = self.get_workflows('standby_log_recover', no_found_act='ignore')
+        if not self.run_workflow(workflows, no_found_act='ignore'):
+            return False
+        return True
+
+    def switch_log_source(self, deploy_name, tenant_name):
+        source_type = getattr(self.options, 'type')
+        if source_type not in [SERVICE_MODE, LOCATION_MODE]:
+            self._call_stdio('error', "The value of type must be 'SERVICE' or 'LOCATION' and cannot be other values")
+            return False
+
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(deploy_name)
+        self.set_deploy(deploy)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % deploy_name)
+            return False
+
+        deploy_info = deploy.deploy_info
+        self._call_stdio('verbose', 'Deploy status judge')
+        if deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('print', 'Deploy "%s" is %s' % (deploy_name, deploy_info.status.value))
+            return False
+        self._call_stdio('verbose', 'Get deploy config')
+        deploy_config = deploy.deploy_config
+
+        self._call_stdio('start_loading', 'Get local repositories')
+        # Get the repository
+        repositories = self.load_local_repositories(deploy_info)
+        self.set_repositories(repositories)
+
+        # Get the client
+        ssh_clients = self.get_clients(deploy_config, repositories)
+
+        workflows = self.get_workflows('switchover_log_source', no_found_act='ignore')
+        if not self.run_workflow(workflows, no_found_act='ignore'):
             return False
         return True
 

@@ -23,7 +23,7 @@ def obshell_client(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     obshell_clients = {}
     for server in cluster_config.servers:
-        server_config = cluster_config.get_server_conf(server)
+        server_config = cluster_config.get_server_conf_with_default(server)
         root_password = server_config.get('root_password', '')
         obshell_port = server_config.get('obshell_port')
         client = ClientSet(server.ip, obshell_port, PasswordAuth(root_password))

@@ -34,7 +34,26 @@ def delete_relation_in_inner_config(cluster_config, tenant_name, cluster_config_
         else:
             del relation_dict[tenant_name]
         cluster_config.update_component_attr('standby_relation', relation_dict if relation_dict else {}, save=False)
-        
+
+
+def delete_primary_in_inner_config(cluster_config, tenant_name, cluster_config_deleted, tenant_name_deleted):
+    primary_dict = cluster_config.get_component_attr('primary_tenant')
+    primary_tenant_deleted = [cluster_config_deleted, tenant_name_deleted]
+    if primary_dict:
+        if tenant_name not in primary_dict:
+            return
+        primary_info = primary_dict.get(tenant_name, [])
+        if tenant_name_deleted:
+            for primary_kv in primary_info:
+                if list(primary_kv) == primary_tenant_deleted:
+                    primary_info.remove(primary_kv)
+                    break
+            if len(primary_info) == 0:
+                del primary_dict[tenant_name]
+        else:
+            del primary_dict[tenant_name]
+        cluster_config.update_component_attr('primary_tenant', primary_dict if primary_dict else {}, save=False)
+
         
 def delete_standbyro_password(deploy_name, tenant_name, cluster_config, stdio):
     if not cluster_config:
@@ -86,7 +105,9 @@ def delete_standby_info(plugin_context, cluster_configs={}, delete_password=True
                 if not relation_cluster_config:
                     continue
                 delete_relation_in_inner_config(relation_cluster_config, relation_tenant, deploy_name, inner_tenant_name, stdio)
+                delete_primary_in_inner_config(relation_cluster_config, relation_tenant, deploy_name, inner_tenant_name)
             delete_relation_in_inner_config(cluster_config, inner_tenant_name, deploy_name, '', stdio)
+            delete_primary_in_inner_config(cluster_config, inner_tenant_name, deploy_name, '')
     # dump
     for deployment_name in cluster_configs:
         cluster_config = cluster_configs[deployment_name]
@@ -94,5 +115,7 @@ def delete_standby_info(plugin_context, cluster_configs={}, delete_password=True
             stdio.warn('delete standby_relation failed, deployment_name: {}'.format(deployment_name))
         if not cluster_config.update_component_attr('standbyro_password', cluster_config.get_component_attr('standbyro_password'), save=True):
             stdio.warn('delete standbyro_password failed, deployment_name: {}'.format(deployment_name))
+        if not cluster_config.update_component_attr('primary_tenant', cluster_config.get_component_attr('primary_tenant'), save=True):
+            stdio.warn('delete primary_tenant failed, deployment_name: {}'.format(deployment_name))
 
     return plugin_context.return_true()

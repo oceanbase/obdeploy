@@ -1225,6 +1225,10 @@ class ClusterTenantCreateStandByCommand(ClusterTenantCreateCommand):
         self.parser.add_option('-t', '-n', '--tenant-name', type='string', help="The standby tenant name. The default tenant name is consistent with the primary tenant name.", default='')
         self.parser.add_option('--standbyro-password', type='string', help="standbyro user password.")
         self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password,for crate standby user.")
+        self.parser.add_option('--type', type='string', help="Standby tenant data sync mode. Supports 'SERVICE' and 'LOCATION' modes. Defaults: 'SERVICE'.", default='SERVICE')
+        self.parser.add_option('-d', '--data_backup_uri', type='string',help='The path to the directory where the backups are stored.')
+        self.parser.add_option('-a', '--archive_log_uri', type='string',help='The Path to the directory where archive logs are stored.')
+        self.parser.add_option('-D', '--decryption', type='string', help='The decryption password for all backups. example: key1,key2,key3')
 
 
     def init(self, cmd, args):
@@ -1409,7 +1413,7 @@ class ClusterTenantRestoreCommand(ClusterMirrorCommand):
         self.parser.add_option('--replica_type ', type='string', help='The replica type of the tenant.')
         self.parser.add_option('-p', '--primary_zone', type='string', help="The primary zone of the tenant to be restored.")
         self.parser.add_option('-T', '--timestamp', type='string', help='The timestamp to restore to.')
-        self.parser.add_option('-S', '--scn', type='int', help="The SCN to restore to.. Default: 0.")
+        self.parser.add_option('-S', '--scn', type='int', help="The SCN to restore to. Default: 0.")
         self.parser.add_option('-s', '--ha_high_thread_score', type='int', help='The high thread score for HA. Range: [0, 100]')
         self.parser.add_option('-c', '--concurrency', type='int', help='The number of threads to use for the restore operation.')
         self.parser.add_option('-D', '--decryption', type='string', help='The decryption password for all backups. example: key1,key2,key3')
@@ -1500,6 +1504,43 @@ class ClusterTenantCancelRestoreTaskCommand(ClusterMirrorCommand):
         else:
             return self._show_help()
 
+class ClusterTenantRecoverCommand(ClusterMirrorCommand):
+    def __init__(self):
+        super(ClusterTenantRecoverCommand, self).__init__('recover', 'Modify the recovery target of the new standby tenant')
+        self.parser.add_option('-T', '--timestamp', type='string', help='The timestamp to restore to.')
+        self.parser.add_option('-S', '--scn', type='int', help="The SCN to restore to.")
+        self.parser.add_option('-u', '--unlimited', action='store_true', help="Continuously replay archived source logs")
+
+    def init(self, cmd, args):
+        super(ClusterTenantRecoverCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.log_recover(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+class ClusterTenantSwitchLogSourceCommand(ClusterMirrorCommand):
+    def __init__(self):
+        super(ClusterTenantSwitchLogSourceCommand, self).__init__('switch-log-source', 'Switch standby tenant sync mode')
+        self.parser.add_option('--type', type='string', help="Standby tenant data sync mode. Supports 'SERVICE' and 'LOCATION' modes. Defaults: 'SERVICE'.", default='SERVICE')
+        self.parser.add_option('-a', '--archive_log_uri', type='string',help='The Path to the directory where archive logs are stored.')
+        self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password,for crate standby user.")
+        self.parser.add_option('--standbyro-password', type='string', help="standbyro user password.")
+
+    def init(self, cmd, args):
+        super(ClusterTenantSwitchLogSourceCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.switch_log_source(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
 
 class ClusterTenantCommand(MajorCommand):
 
@@ -1520,6 +1561,8 @@ class ClusterTenantCommand(MajorCommand):
         self.register_command(ClusterTenantQueryRestoreTaskCommand())
         self.register_command(ClusterTenantCancelBackupTaskCommand())
         self.register_command(ClusterTenantCancelRestoreTaskCommand())
+        self.register_command(ClusterTenantRecoverCommand())
+        self.register_command(ClusterTenantSwitchLogSourceCommand())
 
 
 class ClusterMajorCommand(MajorCommand):

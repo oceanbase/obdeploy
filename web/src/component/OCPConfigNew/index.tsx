@@ -1,16 +1,15 @@
 import { intl } from '@/utils/intl';
-import { useRef } from 'react';
 import { ProForm } from '@ant-design/pro-components';
-import { Space, Button, message } from 'antd';
+import { Button, message, Space } from 'antd';
+import { useRef, useState } from 'react';
 import { useModel } from 'umi';
-import { useState } from 'react';
 
-import ExitBtn from '../ExitBtn';
+import { getTailPath } from '@/utils/helper';
 import CustomFooter from '../CustomFooter';
+import ExitBtn from '../ExitBtn';
 import ResourcePlan from './ResourcePlan';
 import ServiceConfig from './ServiceConfig';
 import UserConfig from './UserConfig';
-import { getTailPath } from '@/utils/helper';
 
 type TenantType = {
   name: {
@@ -77,7 +76,7 @@ export type MsgInfoType = {
 // 使用旧的数据库多 OCP部署选择
 export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
   const isUseNewDBRef = useRef<boolean>(getTailPath() === 'install');
-  const isOldDB = getTailPath() === 'configuration'
+  const isOldDB = getTailPath() === 'configuration';
   const { ocpConfigData, setOcpConfigData, setErrorVisible, setErrorsList } =
     useModel('global');
   const { useRunningUser, isSingleOcpNode } = useModel('ocpInstallData');
@@ -99,7 +98,21 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
     let newOcpserver: any = {
       ...(ocpserver || {}),
       ...dataSource.ocpserver,
+      dns:
+        dataSource.ocpserver?.dnsType !== 'vip'
+          ? dataSource.ocpserver?.dns
+          : undefined,
+      vip_port:
+        dataSource.ocpserver?.dnsType === 'vip'
+          ? dataSource.ocpserver?.vip_port
+          : undefined,
+      vip_address:
+        dataSource.ocpserver?.dnsType === 'vip'
+          ? dataSource.ocpserver?.vip_address
+          : undefined,
+      dnsType: undefined,
     };
+
     let result = {
       ...ocpConfigData,
       components: {
@@ -134,7 +147,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
           }),
         );
       }
-      if(metaMsgInfo?.validateStatus === 'error'){
+      if (metaMsgInfo?.validateStatus === 'error') {
         errorPromises.push(
           Promise.reject({
             errorFields: [
@@ -146,7 +159,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
           }),
         );
       }
-      if(tenantMsgInfo?.validateStatus === 'error'){
+      if (tenantMsgInfo?.validateStatus === 'error') {
         errorPromises.push(
           Promise.reject({
             errorFields: [
@@ -158,7 +171,10 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
           }),
         );
       }
-      return Promise.allSettled([...errorPromises,form.validateFields(rulePath)])
+      return Promise.allSettled([
+        ...errorPromises,
+        form.validateFields(rulePath),
+      ]);
     }
     return Promise.allSettled([form.validateFields(rulePath)]);
   };
@@ -178,11 +194,11 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
     return res;
   };
 
-  const formValidScrollHelper = (result:PromiseSettledResult<any>[])=>{
+  const formValidScrollHelper = (result: PromiseSettledResult<any>[]) => {
     let errorFields = [];
-    for(let item of result){
-      if(item.status === 'rejected'){
-        errorFields.push(...item.reason.errorFields)
+    for (let item of result) {
+      if (item.status === 'rejected') {
+        errorFields.push(...item.reason.errorFields);
       }
     }
     for (let errField of errorFields) {
@@ -247,7 +263,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
       },
     });
     message.destroy();
-  }
+  };
 
   const nextStep = async () => {
     let validatePromise: Promise<any>;
@@ -285,7 +301,6 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
     log_dir = `/home/${val}/logs`;
     soft_dir = `/home/${val}/software`;
   }
-
   let initialValues: FormValues = {
     ocpserver: {
       home_path: ocpserver?.home_path || home_path,

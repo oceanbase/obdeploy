@@ -1,18 +1,17 @@
 import {
   configServerComponent,
-  graphnaComponent,
+  grafanaComponent,
   obagentComponent,
   obproxyComponent,
-  ocpexpressComponent,
   prometheusComponent,
 } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { useModel } from '@umijs/max';
 
 /**
- * @param extra 是否携带 Prometheus Graphna
+ * @param extra 是否携带 Prometheus grafana
  */
-export const useComponents = (extra?: boolean) => {
+export const useComponents = (extra?: boolean, standAlone?: boolean) => {
   const {
     OCP_EXPRESS,
     OBAGENT_DOCS,
@@ -22,48 +21,32 @@ export const useComponents = (extra?: boolean) => {
     DOCS_GRAFANA,
   } = useModel('global');
   let params = [
-    {
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.Proxy',
-        defaultMessage: '代理',
-      }),
-      key: 'agency',
-      onlyAll: true,
-      content: [
-        {
-          key: obproxyComponent,
-          name: 'OBProxy',
-          onlyAll: true,
-          desc: intl.formatMessage({
-            id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
-            defaultMessage:
-              '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
-          }),
-          doc: OBPROXY_DOCS,
-        },
-      ],
-    },
-    {
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.Tools',
-        defaultMessage: '工具',
-      }),
-      key: 'ocpexpressTool',
-      onlyAll: true,
-      content: [
-        {
-          key: ocpexpressComponent,
-          name: 'OCP Express',
-          onlyAll: true,
-          desc: intl.formatMessage({
-            id: 'OBD.pages.components.InstallConfig.ItIsAManagementAnd',
-            defaultMessage:
-              '是专为 OceanBase 设计的管控平台，可实现对集群、租户的监控管理、诊断等核心能力。',
-          }),
-          doc: OCP_EXPRESS,
-        },
-      ],
-    },
+    ...(!standAlone
+      ? [
+          {
+            group: intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.Proxy',
+              defaultMessage: '代理',
+            }),
+            key: 'agency',
+            onlyAll: true,
+            content: [
+              {
+                key: obproxyComponent,
+                name: 'OBProxy',
+                onlyAll: true,
+                desc: intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
+                  defaultMessage:
+                    '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
+                }),
+                doc: OBPROXY_DOCS,
+              },
+            ],
+          },
+        ]
+      : []),
+
     {
       group: intl.formatMessage({
         id: 'OBD.pages.components.InstallConfig.Tools',
@@ -85,30 +68,37 @@ export const useComponents = (extra?: boolean) => {
         },
       ],
     },
-    {
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.InstallConfig.Tools',
-        defaultMessage: '工具',
-      }),
-      key: 'configServerTool',
-      onlyAll: true,
-      content: [
-        {
-          key: configServerComponent,
-          name: 'obconfigserver',
-          onlyAll: true,
-          desc: intl.formatMessage({
-            id: 'OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration',
-            defaultMessage:
-              '是一个可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。',
-          }),
-          doc: OBCONFIGSERVER_DOCS,
-        },
-      ],
-    },
+
+    ...(!standAlone
+      ? [
+          {
+            group: intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.Tools',
+              defaultMessage: '工具',
+            }),
+            key: 'configServerTool',
+            onlyAll: true,
+            content: [
+              {
+                key: configServerComponent,
+                name: 'OBConfigServer',
+                onlyAll: true,
+                desc: intl.formatMessage({
+                  id: 'OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration',
+                  defaultMessage:
+                    '是一个可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。',
+                }),
+                doc: OBCONFIGSERVER_DOCS,
+              },
+            ],
+          },
+        ]
+      : []),
   ];
+
   if (extra) {
     params = [
+      ...params,
       {
         group: '工具',
         key: 'prometheusTool',
@@ -118,26 +108,33 @@ export const useComponents = (extra?: boolean) => {
             key: prometheusComponent,
             name: 'Prometheus',
             onlyAll: true,
-            desc: '',
+            desc: intl.formatMessage({
+              id: 'OBD.pages.Obdeploy.InstallConfig.ISDM1245',
+              defaultMessage:
+                '是一套开源的监控&报警&时间序列数据库的组合，基本原理是通过HTTP 协议周期性抓取被监控组件的状态。',
+            }),
             doc: DOCS_PROMETHEUS,
           },
         ],
       },
       {
         group: '工具',
-        key: 'graphnaTool',
+        key: 'grafanaTool',
         onlyAll: true,
         content: [
           {
-            key: graphnaComponent,
-            name: 'Graphna',
+            key: grafanaComponent,
+            name: 'Grafana',
             onlyAll: true,
-            desc: '',
+            desc: intl.formatMessage({
+              id: 'OBD.pages.Obdeploy.InstallConfig.ISDM1246',
+              defaultMessage:
+                '是一款采用 go 语言编写的开源应用，主要用于大规模指标数据的可视化展现，是网络架构和应用分析中最流行的时序数据展示工具。',
+            }),
             doc: DOCS_GRAFANA,
           },
         ],
       },
-      ...params,
     ];
   }
   return params;

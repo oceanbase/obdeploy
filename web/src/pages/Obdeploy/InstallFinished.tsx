@@ -307,18 +307,23 @@ export default function InstallProcess() {
       },
     },
   );
-  const { run: fetchConnectInfo } = useRequest(queryConnectionInfo, {
-    onSuccess: ({ success, data }) => {
-      if (success) {
-        setConnectInfo(connectInfoForPwd(data?.items, configData?.components));
-      }
+  const { run: fetchConnectInfo, } = useRequest(
+    queryConnectionInfo,
+    {
+      onSuccess: ({ success, data }) => {
+        if (success) {
+          setConnectInfo(
+            connectInfoForPwd(data?.items, configData?.components),
+          );
+        }
+      },
+      onError: (e: any) => {
+        const errorInfo = getErrorInfo(e);
+        setErrorVisible(true);
+        setErrorsList([...errorsList, errorInfo]);
+      },
     },
-    onError: (e: any) => {
-      const errorInfo = getErrorInfo(e);
-      setErrorVisible(true);
-      setErrorsList([...errorsList, errorInfo]);
-    },
-  });
+  );
 
   const { run: handleInstallLog, loading } = useRequest(queryInstallLog, {
     onSuccess: (

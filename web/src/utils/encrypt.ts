@@ -16,7 +16,7 @@ export const encryptPwdForConfig = (
 ) => {
   const newConfigData = cloneDeep(configData);
 
-  const { obagent, obproxy, oceanbase, ocpserver, ocpexpress } =
+  const { obagent, obproxy, oceanbase, ocpserver, prometheus, grafana } =
     newConfigData.components || newConfigData;
 
   if (newConfigData.auth?.password)
@@ -37,6 +37,16 @@ export const encryptPwdForConfig = (
       }
     });
   }
+  if (prometheus?.basic_auth_users?.admin) {
+    prometheus.basic_auth_users.admin =
+      encrypt(prometheus.basic_auth_users.admin, publicKey) ||
+      prometheus.basic_auth_users.admin;
+  }
+  if (grafana?.login_password) {
+    grafana.login_password =
+      encrypt(grafana.login_password, publicKey) || grafana.login_password;
+  }
+
   if (oceanbase?.root_password) {
     oceanbase.root_password =
       encrypt(oceanbase.root_password, publicKey) || oceanbase.root_password;
@@ -67,14 +77,11 @@ export const encryptPwdForConfig = (
       encrypt(ocpserver.metadb.password, publicKey) ||
       ocpserver.metadb.password;
   }
-  if (ocpexpress?.admin_passwd) {
-    ocpexpress.admin_passwd =
-      encrypt(ocpexpress.admin_passwd, publicKey) || ocpexpress.admin_passwd;
-  }
   if (obproxy?.obproxy_sys_password) {
     obproxy.obproxy_sys_password =
       encrypt(obproxy.obproxy_sys_password, publicKey) ||
       obproxy.obproxy_sys_password;
   }
+
   return newConfigData;
 };

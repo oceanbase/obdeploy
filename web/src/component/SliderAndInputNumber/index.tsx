@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { InputNumber, Slider, Row, Col } from '@oceanbase/design';
+import { Col, InputNumber, Row, Slider } from '@oceanbase/design';
+import React, { useEffect, useState } from 'react';
 
 import styles from './index.less';
 
@@ -39,10 +39,6 @@ const SliderAndInputNumber: React.FC<SliderAndInputNumberProps> = ({
         <Slider
           max={max}
           min={min}
-          // marks={{
-          //   0: min,
-          //   100: max
-          // }}
           value={currentValue}
           onChange={onHandleChange}
         />

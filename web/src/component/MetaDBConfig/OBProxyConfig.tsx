@@ -1,18 +1,38 @@
-import { commonInputStyle, commonPortStyle } from '@/pages/constants';
+import {
+  commonInputStyle,
+  commonPortStyle,
+  commonStyle,
+} from '@/pages/constants';
 import { intl } from '@/utils/intl';
-import { ProCard, ProForm, ProFormSelect } from '@ant-design/pro-components';
+import {
+  ProCard,
+  ProForm,
+  ProFormDigit,
+  ProFormSelect,
+  ProFormText,
+} from '@ant-design/pro-components';
 import { useUpdateEffect } from 'ahooks';
-import { Input, Row, Space, Switch } from 'antd';
+import { Col, Input, message, Row, Space, Tooltip } from 'antd';
 import { FormInstance } from 'antd/lib/form';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 
 import { obproxyAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import { getErrorInfo, ocpServersValidator } from '@/utils';
+import {
+  dnsValidator,
+  getErrorInfo,
+  ocpServersValidator,
+  serversValidator,
+} from '@/utils';
 import { formatMoreConfig } from '@/utils/helper';
 import useRequest from '@/utils/useRequest';
+import {
+  CaretDownOutlined,
+  CaretRightOutlined,
+  QuestionCircleOutlined,
+} from '@ant-design/icons';
 import InputPort from '../InputPort';
 import styles from './index.less';
 export default function OBProxyConfig({
@@ -124,8 +144,8 @@ export default function OBProxyConfig({
     setProxyMoreLoading(false);
   };
 
-  const handleCluserMoreChange = () => {
-    setIsShowMoreConfig(!isShowMoreConfig);
+  const handleCluserMoreChange = (checked) => {
+    setIsShowMoreConfig(checked);
     if (!proxyMoreConfig?.length) {
       getProxyMoreParamsters();
     }
@@ -138,6 +158,15 @@ export default function OBProxyConfig({
         : `/home/${deployUser}`;
     form.setFieldValue(['obproxy', 'home_path'], homePath);
   }, [deployUser]);
+  const [show, setShow] = useState<boolean>(false);
+  const [cluserMoreChange, setCluserMoreChange] = useState<boolean>(false);
+  const dns = ProForm.useWatch(['obproxy', 'dnsType'], form);
+
+  useEffect(() => {
+    if (obproxy?.dns !== undefined || obproxy?.vip_address !== undefined) {
+      setShow(true);
+    }
+  }, []);
 
   return (
     <ProCard
@@ -169,8 +198,150 @@ export default function OBProxyConfig({
           id: 'OBD.component.MetaDBConfig.OBProxyConfig.ObproxyNodes',
           defaultMessage: 'OBProxy 节点',
         })}
+        onChange={(value) => {
+          if (value.find((item) => item === '127.0.0.1')) {
+            message.warning(
+              intl.formatMessage({
+                id: 'OBD.component.MetaDBConfig.DataBaseNodeConfig.B663133E',
+                defaultMessage:
+                  '依据 OceanBase 最佳实践，建议使用非 127.0.0.1 IP 地址',
+              }),
+            );
+          }
+        }}
       />
+      <div
+        style={{
+          background: '#f8fafe',
+          marginBottom: 16,
+          padding: 16,
+        }}
+      >
+        <Space size={8} onClick={() => setShow(!show)}>
+          {show ? <CaretDownOutlined /> : <CaretRightOutlined />}
 
+          <Tooltip
+            title={intl.formatMessage({
+              id: 'OBD.pages.components.obproxyConfig.D42DEEB0',
+              defaultMessage:
+                '主要用于 OCP 访问 MetaDB 集群，建议部署多节点 OBProxy 时提供 VIP/DNS 地址，避免后期更改 OBProxy 访问地址。若不配置，系统默认选择第一个 IP 地址设置连接串。',
+            })}
+          >
+            <span>
+              {intl.formatMessage({
+                id: 'OBD.pages.components.obproxyConfig.D42DEEB1',
+                defaultMessage: '负载均衡管理',
+              })}
+            </span>
+            <QuestionCircleOutlined style={{ marginLeft: 4 }} />
+          </Tooltip>
+        </Space>
+        {show && (
+          <Row gutter={[8, 0]} style={{ marginTop: 24 }}>
+            <Col span={8}>
+              <ProFormSelect
+                mode="single"
+                name={['obproxy', 'dnsType']}
+                label={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.B4449036',
+                  defaultMessage: '访问方式',
+                })}
+                placeholder={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                  defaultMessage: '请选择',
+                })}
+                options={[
+                  {
+                    label: intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.B4449037',
+                      defaultMessage: 'VIP',
+                    }),
+                    value: 'vip',
+                  },
+                  {
+                    label: intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.B4449038',
+                      defaultMessage: 'DNS（域名）',
+                    }),
+                    value: 'dns',
+                  },
+                ]}
+              />
+            </Col>
+            {dns !== undefined && (
+              <>
+                <Col span={8}>
+                  <ProFormText
+                    name={
+                      dns === 'vip'
+                        ? ['obproxy', 'vip_address']
+                        : ['obproxy', 'dns']
+                    }
+                    label={
+                      dns === 'vip' ? (
+                        intl.formatMessage({
+                          id: 'OBD.pages.components.NodeConfig.B4449039',
+                          defaultMessage: 'IP 地址',
+                        })
+                      ) : (
+                        <Tooltip
+                          title={intl.formatMessage({
+                            id: 'OBD.pages.components.obproxyConfig.D42DEEB0',
+                            defaultMessage:
+                              '主要用于 OCP 访问 MetaDB 集群，建议部署多节点 OBProxy 时提供 VIP/DNS 地址，避免后期更改 OBProxy 访问地址。若不配置，系统默认选择第一个 IP 地址设置连接串。',
+                          })}
+                        >
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.NodeConfig.B4449033',
+                            defaultMessage: '域名',
+                          })}
+                          <QuestionCircleOutlined style={{ marginLeft: 4 }} />
+                        </Tooltip>
+                      )
+                    }
+                    formItemProps={{
+                      rules: [
+                        {
+                          required: true,
+                          message: '此项是必填项',
+                        },
+                        ...[
+                          dns === 'vip'
+                            ? {
+                                validator: (_: any, value: string[]) =>
+                                  serversValidator(_, [value], 'OBServer'),
+                              }
+                            : {
+                                validator: (_: any, value: string[]) =>
+                                  dnsValidator(_, [value]),
+                              },
+                        ],
+                      ],
+                    }}
+                  />
+                </Col>
+                {dns === 'vip' && (
+                  <Col span={8}>
+                    <ProFormDigit
+                      name={['obproxy', 'vip_port']}
+                      initialValue={2883}
+                      label={intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.B4449032',
+                        defaultMessage: '访问端口',
+                      })}
+                      fieldProps={{ style: commonStyle }}
+                      placeholder={intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.PleaseEnter',
+                        defaultMessage: '请输入',
+                      })}
+                    />
+                  </Col>
+                )}
+              </>
+            )}
+          </Row>
+        )}
+      </div>
       <Row>
         <Space size="large">
           <InputPort
@@ -211,16 +382,24 @@ export default function OBProxyConfig({
         <Input addonAfter={<span>{obproxyAddonAfter}</span>} />
       </ProForm.Item>
       <div className={styles.moreSwitch}>
-        {intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.OBProxyConfig.MoreConfigurations',
-          defaultMessage: '更多配置',
-        })}
-
-        <Switch
-          className="ml-20"
-          checked={isShowMoreConfig}
-          onChange={handleCluserMoreChange}
-        />
+        <Space
+          size={8}
+          onClick={() => {
+            setCluserMoreChange(!cluserMoreChange);
+            handleCluserMoreChange(!cluserMoreChange);
+          }}
+          style={{
+            fontSize: 16,
+          }}
+        >
+          {cluserMoreChange ? <CaretDownOutlined /> : <CaretRightOutlined />}
+          <span style={{ width: 150 }}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.OBProxyConfig.MoreConfigurations',
+              defaultMessage: '更多配置',
+            })}
+          </span>
+        </Space>
       </div>
       <ConfigTable
         parameterRules={parameterRules}

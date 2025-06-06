@@ -20,14 +20,13 @@ def drop_tenant(plugin_context, cursor, *args, **kwargs):
     def error(*arg, **kwargs):
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
-        
-    cluster_config = plugin_context.cluster_config
+
     stdio = plugin_context.stdio
     options = plugin_context.options
 
     tenant_name = getattr(options, 'tenant_name', '')
     if not tenant_name:
-        error('Pease set tenant name')
+        error('Please set tenant name')
         return
     elif tenant_name == 'sys':
         error('Prohibit deleting sys tenant')

@@ -86,7 +86,6 @@
 - name: obshell_port
   name_local: obshell 服务端口
   require: true
-  essential: true
   type: INT
   default: 2886
   min_value: 1025
@@ -1827,7 +1826,6 @@
   description_local: ocp express的元数据库使用的租户规格
 - name: ocp_meta_tenant_max_cpu
   name_local: OCP express元数据库租户的CPU数
-  essential: true
   require: false
   type: INT
   default: 1
@@ -1836,7 +1834,6 @@
   description_local: ocp express的元数据库使用的CPU数量
 - name: ocp_meta_tenant_memory_size
   name_local: OCP express元数据库租户内存
-  essential: true
   require: false
   type: CAPACITY_MB
   default: 2G
@@ -1845,7 +1842,6 @@
   description_local: ocp express的元数据库使用的租户内存大小
 - name: ocp_meta_tenant_log_disk_size
   name_local: OCP express元数据库租户日志磁盘大小
-  essential: true
   require: false
   type: CAPACITY_MB
   default: 6656M

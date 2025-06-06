@@ -1,7 +1,9 @@
 import CustomFooter from '@/component/CustomFooter';
+import ErrorCompToolTip from '@/component/ErrorCompToolTip';
 import SelectCluster from '@/component/SelectCluster';
 import { useComponents } from '@/hooks/useComponents';
 import { componentChangeDeploymentsInfo } from '@/services/component-change/componentChange';
+import { queryAllComponentVersions } from '@/services/ob-deploy-web/Components';
 import { checkLowVersion, handleQuit } from '@/utils';
 import { intl } from '@/utils/intl';
 import { InfoCircleOutlined } from '@ant-design/icons';
@@ -15,7 +17,6 @@ import DataEmpty from '../../.././/public/assets/data-empty.svg';
 import { componentVersionTypeToComponent } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
-
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
@@ -59,13 +60,35 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
           .map((item) => item.component_name);
         // 切换集群  全选
         // 组件挂载 如果有选择的组件就不重新选 如果没有选择的组件全选
-        if (undeployedComponents && !selectedConfig.length)
+        if (undeployedComponents && !selectedConfig?.length)
           setSelectedConfig(undeployedComponents);
       }
     },
   });
 
   const componentsList = componentsListRes?.data;
+
+  // 获取当前所有的安装包
+  const { data: allComponentVersions } = useRequest(
+    queryAllComponentVersions,
+    {},
+  );
+
+  const componentNameList = componentsList?.component_list?.map(
+    (item) => item.component_name,
+  );
+
+  const realComponent = allComponentVersions?.data?.items?.map((item) => ({
+    ...item,
+    name:
+      item.name === 'obproxy' && item?.info[0]?.version_type === 'ce'
+        ? 'obproxy-ce'
+        : item.name,
+  }));
+
+  const oceanbaseVersionsData = realComponent?.filter((item) =>
+    componentNameList?.includes(item.name),
+  );
 
   const getColumns = (component: API.BestComponentInfo) => {
     const targetComponent = componentsGroupInfo?.find((comp) =>
@@ -83,7 +106,10 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
         dataIndex: 'component_name',
         className: styles.firstCell,
         width: 160,
-        render: (text) => {
+        render: (text, record) => {
+          const UnableToObtainTheAvailable = oceanbaseVersionsData?.find(
+            (i) => i.name === record.component_name,
+          );
           return (
             <span>
               {targetComponent?.content[0].name || text}
@@ -93,6 +119,15 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
                     defaultMessage: '（已部署）',
                   })
                 : null}
+              {!UnableToObtainTheAvailable ? (
+                <ErrorCompToolTip
+                  title={intl.formatMessage({
+                    id: 'OBD.component.DeployConfig.UnableToObtainTheAvailable',
+                    defaultMessage: '无法获取可用安装包',
+                  })}
+                  status="error"
+                />
+              ) : null}
             </span>
           );
         },
@@ -169,7 +204,7 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
       let target = false;
       target =
         record.component_name === 'obagent' &&
-        selectedConfig.includes('ocp-express');
+        selectedConfig?.includes('ocp-express');
       for (const val of selectedConfig) {
         if (target && val === 'ocp-express') continue;
         if (val !== record.component_name) {
@@ -180,7 +215,7 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
     } else {
       if (
         record.component_name === 'ocp-express' &&
-        !selectedConfig.includes('obagent')
+        !selectedConfig?.includes('obagent')
       ) {
         setSelectedConfig([
           ...selectedConfig,
@@ -196,10 +231,20 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
   const preStep = () => {
     history.push('/guide');
   };
+  // 排除缺少安装包
+  const UnableCom = oceanbaseVersionsData
+    ?.filter((i) => selectedConfig?.includes(i.name))
+    ?.map((item) => item.name);
+
+  useEffect(() => {
+    if (selectedConfig?.length > 0 && UnableCom?.length > 0) {
+      setSelectedConfig(UnableCom);
+    }
+  }, [selectedConfig, realComponent]);
 
   const nextStep = () => {
     const selectedComponent = componentsList?.component_list.filter(
-      (component) => selectedConfig.includes(component.component_name),
+      (component) => selectedConfig?.includes(component.component_name),
     );
     if (selectedComponent) {
       let tempConfig: API.ComponentChangeConfig = {};
@@ -259,7 +304,7 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
 
   useEffect(() => {
     const tempComp = componentsList?.component_list.filter((comp) =>
-      selectedConfig.includes(comp.component_name),
+      selectedConfig?.includes(comp.component_name),
     );
     if (tempComp?.length) {
       setMemorySize(
@@ -337,8 +382,15 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
                         !component.deployed
                           ? {
                               hideSelectAll: true,
-                              selectedRowKeys: selectedConfig,
+                              // 默认勾选项，需排除掉缺少必要安装包
+                              selectedRowKeys: UnableCom,
                               onSelect: handleSelect,
+                              getCheckboxProps: (record) => ({
+                                disabled: !oceanbaseVersionsData?.find(
+                                  (i) => i.name === record.component_name,
+                                ),
+                                name: record.component_name,
+                              }),
                             }
                           : undefined
                       }
@@ -381,7 +433,7 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
             })}
           </Button>
           <Button
-            disabled={selectedConfig.length === 0}
+            disabled={selectedConfig?.length === 0}
             type="primary"
             onClick={nextStep}
           >

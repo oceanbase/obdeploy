@@ -163,7 +163,6 @@ export const CONFIG_KEYS = {
   oceanbase: ['cpu_count', 'memory_limit', 'data_file', 'log_file'],
   obproxy: ['cpu_count', 'memory_limit', 'data_file', 'log_file'],
   // obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
-  // ocpexpress: ['home_path', 'port'],
 };
 
 export const selectOcpexpressConfig = [
@@ -183,6 +182,7 @@ export const showConfigKeys = {
     'rpc_port',
     'scenario',
   ],
+ 
 
   obproxy: [
     'home_path',

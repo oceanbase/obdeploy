@@ -18,10 +18,11 @@ import { useEffect, useState } from 'react';
 import { getLocale, useModel } from 'umi';
 import {
   configServerComponent,
+  grafanaComponent,
   obagentComponent,
-  ocpexpressComponent,
   onlyComponentsKeys,
   pathRule,
+  prometheusComponent,
 } from '../constants';
 import { formatParameters } from '../Obdeploy/ClusterConfig';
 import EnStyles from './indexEn.less';
@@ -221,13 +222,6 @@ export default function ComponentConfig() {
         parameters: formatParameters(dataSource.obproxy?.parameters),
       };
     }
-    if (selectedConfig.includes(ocpexpressComponent) && !lowVersion) {
-      newComponents.ocpexpress = {
-        ...(components.ocpexpress || {}),
-        ...dataSource?.ocpexpress,
-        parameters: formatParameters(dataSource.ocpexpress?.parameters),
-      };
-    }
     if (selectedConfig.includes(obagentComponent)) {
       newComponents.obagent = {
         ...(components.obagent || {}),
@@ -240,6 +234,20 @@ export default function ComponentConfig() {
         ...(components.obconfigserver || {}),
         ...dataSource?.obconfigserver,
         parameters: formatParameters(dataSource.obconfigserver?.parameters),
+      };
+    }
+    if (selectedConfig.includes(grafanaComponent)) {
+      newComponents.grafana = {
+        ...(components?.grafana || {}),
+        ...dataSource.grafana,
+        parameters: formatParameters(dataSource.grafana?.parameters),
+      };
+    }
+    if (selectedConfig.includes(prometheusComponent)) {
+      newComponents.prometheus = {
+        ...(components?.prometheus || {}),
+        ...dataSource.prometheus,
+        parameters: formatParameters(dataSource.prometheus?.parameters),
       };
     }
     setComponentConfig({
@@ -281,9 +289,8 @@ export default function ComponentConfig() {
       validateTrigger={['onBlur', 'onChange']}
     >
       <Space className={styles.spaceWidth} direction="vertical" size="middle">
-        {selectedConfig.includes('obproxy-ce') ||
-        selectedConfig.includes(ocpexpressComponent) ||
-        selectedConfig.includes(configServerComponent) ? (
+        {selectedConfig?.includes('obproxy-ce') ||
+        selectedConfig?.includes(configServerComponent) ? (
           <ProCard
             className={styles.pageCard}
             bodyStyle={{ paddingBottom: 0 }}
@@ -293,7 +300,7 @@ export default function ComponentConfig() {
             })}
           >
             <Space size={24}>
-              {selectedConfig.includes('obproxy-ce') ? (
+              {selectedConfig?.includes('obproxy-ce') ? (
                 <ProFormSelect
                   name={['obproxy', 'servers']}
                   label={intl.formatMessage({
@@ -319,7 +326,7 @@ export default function ComponentConfig() {
                   }}
                 />
               ) : null}
-              {selectedConfig.includes(ocpexpressComponent) ? (
+              {/* {selectedConfig.includes(ocpexpressComponent) ? (
                 <ProFormSelect
                   name={['ocpexpress', 'servers']}
                   label={intl.formatMessage({
@@ -359,8 +366,8 @@ export default function ComponentConfig() {
                     onBlur: () => setOcpServerDropdownVisible(false),
                   }}
                 />
-              ) : null}
-              {selectedConfig.includes(configServerComponent) ? (
+              ) : null} */}
+              {selectedConfig?.includes(configServerComponent) ? (
                 <ProFormSelect
                   name={['obconfigserver', 'servers']}
                   label={intl.formatMessage({

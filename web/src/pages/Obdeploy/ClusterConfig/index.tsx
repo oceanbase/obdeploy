@@ -4,27 +4,33 @@ import InputPort from '@/component/InputPort';
 import MoreConfigTable from '@/component/MoreConfigTable';
 import type { MsgInfoType } from '@/component/OCPConfigNew';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import { getErrorInfo } from '@/utils';
-import { formatMoreConfig, getInitialParameters } from '@/utils/helper';
+import { getErrorInfo, PASSWORD_REGEX, validatePassword } from '@/utils';
+import {
+  formatMoreConfig,
+  getInitialParameters,
+  getPasswordRules,
+} from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
+import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormRadio } from '@ant-design/pro-components';
-import { Form, message, Row, Space, Switch } from 'antd';
+import { Password } from '@oceanbase/ui';
+import { useUpdateEffect } from 'ahooks';
+import { Form, message, Row, Space } from 'antd';
+import { isEmpty } from 'lodash';
 import { useEffect, useState } from 'react';
 import { getLocale, useModel } from 'umi';
-
-import { getPasswordRules } from '@/utils/helper';
-import { useUpdateEffect } from 'ahooks';
-import { isEmpty } from 'lodash';
 import {
   commonInputStyle,
   commonPortStyle,
   configServerComponent,
+  grafanaComponent,
   obagentComponent,
   obproxyComponent,
   ocpexpressComponent,
   onlyComponentsKeys,
   pathRule,
+  prometheusComponent,
 } from '../../constants';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
@@ -81,12 +87,15 @@ export default function ClusterConfig() {
     MODE_CONFIG_RULE,
   } = useModel('global');
   const { components = {}, home_path } = configData || {};
+
   const {
     oceanbase = {},
     ocpexpress = {},
     obproxy = {},
     obagent = {},
     obconfigserver = {},
+    prometheus = {},
+    grafana = {},
   } = components;
   const [form] = ProForm.useForm();
   const [currentMode, setCurrentMode] = useState(
@@ -96,18 +105,23 @@ export default function ClusterConfig() {
     ['oceanbase', 'parameters', 'ocp_meta_password', 'params'],
     form,
   );
-  const [passwordVisible, setPasswordVisible] = useState(true);
-  // const [adminPasswdVisible, setAdminPasswdVisible] = useState(true);
+  // 密码校验是否通过
+  const [grafanaPassed, setGrafanaPassed] = useState<boolean>(true);
+  const [prometheusPassed, setPrometheusPassed] = useState<boolean>(true);
+  const [show, setShow] = useState<boolean>(clusterMore);
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
   const [componentsMoreLoading, setComponentsMoreLoading] = useState(false);
   const [obRootPwd, setRootPwd] = useState<string>(
     oceanbase?.root_password || '',
   );
-  const [ocpExpressPwd, setOcpExpressPwd] = useState<string>(
-    ocpexpress?.admin_passwd || '',
+  const [prometheusPwd, setPrometheusPwd] = useState<string>(
+    prometheus?.basic_auth_users?.admin || '',
   );
+  const [grafanaPwd, setGrafanaPwd] = useState<string>(
+    grafana?.login_password || '',
+  );
+
   const [obPwdMsgInfo, setObPwdMsgInfo] = useState<MsgInfoType>();
-  const [ocpPwdMsgInfo, setOcpPwdMsgInfo] = useState<MsgInfoType>();
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
 
   const [metadbParameterRules, setMetadbParameterRules] = useState<RulesDetail>(
@@ -156,10 +170,15 @@ export default function ClusterConfig() {
     setRootPwd(password);
   };
 
-  const ocpexpressPwdChange = (password: string) => {
-    form.setFieldValue(['ocpexpress', 'admin_passwd'], password);
-    form.validateFields([['ocpexpress', 'admin_passwd']]);
-    setOcpExpressPwd(password);
+  const prometheusPwdChange = (password: string) => {
+    form.setFieldValue(['prometheus', 'basic_auth_users', 'admin'], password);
+    form.validateFields([['prometheus', 'basic_auth_users', 'admin']]);
+    setPrometheusPwd(password);
+  };
+  const grafanaPwdChange = (password: string) => {
+    form.setFieldValue(['grafana', 'login_password'], password);
+    form.validateFields([['grafana', 'login_password']]);
+    setGrafanaPwd(password);
   };
 
   const setData = (dataSource: FormValues) => {
@@ -169,13 +188,6 @@ export default function ClusterConfig() {
         ...(components.obproxy || {}),
         ...dataSource.obproxy,
         parameters: formatParameters(dataSource.obproxy?.parameters),
-      };
-    }
-    if (selectedConfig.includes(ocpexpressComponent) && !lowVersion) {
-      newComponents.ocpexpress = {
-        ...(components.ocpexpress || {}),
-        ...dataSource.ocpexpress,
-        parameters: formatParameters(dataSource.ocpexpress?.parameters),
       };
     }
     if (selectedConfig.includes(obagentComponent)) {
@@ -190,6 +202,20 @@ export default function ClusterConfig() {
         ...(components.obconfigserver || {}),
         ...dataSource.obconfigserver,
         parameters: formatParameters(dataSource.obconfigserver?.parameters),
+      };
+    }
+    if (selectedConfig.includes(grafanaComponent)) {
+      newComponents.grafana = {
+        ...(components?.grafana || {}),
+        ...dataSource.grafana,
+        parameters: formatParameters(dataSource.grafana?.parameters),
+      };
+    }
+    if (selectedConfig.includes(prometheusComponent)) {
+      newComponents.prometheus = {
+        ...(components?.prometheus || {}),
+        ...dataSource.prometheus,
+        parameters: formatParameters(dataSource.prometheus?.parameters),
       };
     }
     newComponents.oceanbase = {
@@ -315,6 +341,20 @@ export default function ClusterConfig() {
               newComponentsMoreConfig,
             ),
           },
+          grafana: {
+            parameters: getInitialParameters(
+              grafana?.component,
+              grafana?.parameters,
+              newComponentsMoreConfig,
+            ),
+          },
+          prometheus: {
+            parameters: getInitialParameters(
+              prometheus?.component,
+              prometheus?.parameters,
+              newComponentsMoreConfig,
+            ),
+          },
           obconfigserver: {
             parameters: getInitialParameters(
               obconfigserver?.component,
@@ -378,6 +418,7 @@ export default function ClusterConfig() {
       redo_dir: oceanbase?.redo_dir || undefined,
       mysql_port: oceanbase?.mysql_port || 2881,
       rpc_port: oceanbase?.rpc_port || 2882,
+      obshell_port: oceanbase?.obshell_port || 2886,
       parameters: getInitialParameters(
         oceanbase?.component,
         oceanbase?.parameters,
@@ -400,6 +441,22 @@ export default function ClusterConfig() {
       parameters: getInitialParameters(
         obagent?.component,
         obagent?.parameters,
+        componentsMoreConfig,
+      ),
+    },
+    prometheus: {
+      port: prometheus?.port || 9090,
+      parameters: getInitialParameters(
+        prometheus?.component,
+        prometheus?.parameters,
+        componentsMoreConfig,
+      ),
+    },
+    grafana: {
+      port: grafana?.port || 3000,
+      parameters: getInitialParameters(
+        grafana?.component,
+        grafana?.parameters,
         componentsMoreConfig,
       ),
     },
@@ -514,6 +571,7 @@ export default function ClusterConfig() {
               style={{ height: 86, ...commonInputStyle }}
               innerInputStyle={{ width: 388 }}
             />
+
             <Row>
               <Space direction="vertical" size={0}>
                 <Form.Item
@@ -567,16 +625,30 @@ export default function ClusterConfig() {
                 />
               </Space>
             </Row>
+            <InputPort
+              name={['oceanbase', 'obshell_port']}
+              label={'OBShell 端口'}
+              fieldProps={{ style: commonPortStyle }}
+            />
             <div className={styles.moreSwitch}>
-              {intl.formatMessage({
-                id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
-                defaultMessage: '更多配置',
-              })}
-              <Switch
-                className="ml-20"
-                checked={clusterMore}
-                onChange={handleCluserMoreChange}
-              />
+              <Space
+                size={8}
+                onClick={() => {
+                  setShow(!show);
+                  handleCluserMoreChange(!show);
+                }}
+                style={{
+                  fontSize: 16,
+                }}
+              >
+                {show ? <CaretDownOutlined /> : <CaretRightOutlined />}
+                <span style={{ width: 150 }}>
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
+                    defaultMessage: '更多配置',
+                  })}
+                </span>
+              </Space>
             </div>
 
             <ConfigTable
@@ -596,26 +668,70 @@ export default function ClusterConfig() {
                 id: 'OBD.pages.components.ClusterConfig.ComponentConfiguration',
                 defaultMessage: '组件配置',
               })}
-              className="card-padding-bottom-24"
             >
-              {selectedConfig.includes('ocp-express') && !lowVersion && (
-                <CustomPasswordInput
-                  msgInfo={ocpPwdMsgInfo}
-                  setMsgInfo={setOcpPwdMsgInfo}
-                  form={form}
-                  onChange={ocpexpressPwdChange}
-                  useFor="ocp"
-                  useOldRuler={true}
-                  value={ocpExpressPwd}
-                  name={['ocpexpress', 'admin_passwd']}
+              {selectedConfig.includes(grafanaComponent) && (
+                <Form.Item
                   label={intl.formatMessage({
-                    id: 'OBD.Obdeploy.ClusterConfig.OcpExpressAdministratorPassword',
-                    defaultMessage: 'OCP Express 管理员密码',
+                    id: 'OBD.pages.components.ClusterConfig.DKFFMK27',
+                    defaultMessage: 'Grafana 密码',
                   })}
-                  innerInputStyle={{ width: 388 }}
-                  style={{ height: 86, ...commonInputStyle }}
-                />
+                  name={['grafana', 'login_password']}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.DKFFMK28',
+                        defaultMessage: '请输入或随机生成 Grafana 密码',
+                      }),
+                    },
+                    {
+                      validator: validatePassword(grafanaPassed),
+                    },
+                  ]}
+                  initialValue={grafanaPwd}
+                >
+                  <Password
+                    generatePasswordRegex={PASSWORD_REGEX}
+                    onValidate={(value) => {
+                      setGrafanaPassed(value);
+                    }}
+                    style={{ width: 388, borderColor: '#CDD5E4' }}
+                    onChange={grafanaPwdChange}
+                  />
+                </Form.Item>
               )}
+              {selectedConfig.includes(prometheusComponent) && (
+                <Form.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.DKFFMK29',
+                    defaultMessage: 'Prometheus 密码',
+                  })}
+                  name={['prometheus', 'basic_auth_users', 'admin']}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.DKFFMK26',
+                        defaultMessage: '请输入或随机生成 Prometheus 密码',
+                      }),
+                    },
+                    {
+                      validator: validatePassword(prometheusPassed),
+                    },
+                  ]}
+                  initialValue={prometheusPwd}
+                >
+                  <Password
+                    generatePasswordRegex={PASSWORD_REGEX}
+                    onValidate={(value) => {
+                      setPrometheusPassed(value);
+                    }}
+                    style={{ width: 388, borderColor: '#CDD5E4' }}
+                    onChange={prometheusPwdChange}
+                  />
+                </Form.Item>
+              )}
+
               <ComponentsPort
                 lowVersion={lowVersion}
                 selectedConfig={selectedConfig}

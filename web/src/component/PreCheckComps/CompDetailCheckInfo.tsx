@@ -93,23 +93,31 @@ export default function CompDetailCheckInfo({
                 size="middle"
                 style={{ marginTop: 16 }}
               >
-                {item?.more.map((moreItem) => (
-                  <ProCard
-                    className={styles.infoSubCard}
-                    style={{ border: '1px solid #e2e8f3' }}
-                    split="vertical"
-                    key={moreItem.label}
-                  >
-                    <Table
-                      className={`${styles.infoCheckTable}  ob-table`}
-                      columns={getMoreColumns(moreItem.label)}
-                      dataSource={moreItem?.parameters}
-                      pagination={false}
-                      scroll={{ y: 300 }}
-                      rowKey="key"
-                    />
-                  </ProCard>
-                ))}
+                {item?.more.map((moreItem) => {
+                  // obproxy_sys_password 不单独展示
+                  const obproxyPassword =
+                    moreItem?.parameters?.length === 1 &&
+                    moreItem?.parameters[0]?.key === 'obproxy_sys_password';
+                  return (
+                    <ProCard
+                      className={styles.infoSubCard}
+                      style={{ border: '1px solid #e2e8f3' }}
+                      split="vertical"
+                      key={moreItem.label}
+                    >
+                      {!obproxyPassword ? (
+                        <Table
+                          className={`${styles.infoCheckTable}  ob-table`}
+                          columns={getMoreColumns(moreItem.label)}
+                          dataSource={moreItem?.parameters}
+                          pagination={false}
+                          scroll={{ y: 300 }}
+                          rowKey="key"
+                        />
+                      ) : null}
+                    </ProCard>
+                  );
+                })}
               </Space>
             ) : null}
           </ProCard>

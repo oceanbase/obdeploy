@@ -2,14 +2,15 @@ import InputPort from '@/component/InputPort';
 import {
   commonStyle,
   configServerComponent,
+  grafanaComponent,
   obagentComponent,
   obproxyComponent,
-  ocpexpressComponent,
+  prometheusComponent,
 } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { ProForm } from '@ant-design/pro-components';
-import { Row, Space, Tooltip } from 'antd';
+import { Col, Row, Tooltip } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
 
 interface ComponentsPortProps {
@@ -33,11 +34,11 @@ export default function ComponentsPort({
   );
 
   return (
-    <>
-      {(selectedConfig.includes(obproxyComponent) ||
-        selectedConfig.includes('obproxy-ce')) && (
-        <Row>
-          <Space size="large">
+    <Row>
+      {(selectedConfig?.includes(obproxyComponent) ||
+        selectedConfig?.includes('obproxy-ce')) && (
+        <>
+          <Col span={6}>
             <InputPort
               name={['obproxy', 'listen_port']}
               label={intl.formatMessage({
@@ -46,7 +47,8 @@ export default function ComponentsPort({
               })}
               fieldProps={{ style: commonStyle }}
             />
-
+          </Col>
+          <Col span={6}>
             <InputPort
               name={['obproxy', 'prometheus_listen_port']}
               label={
@@ -63,12 +65,14 @@ export default function ComponentsPort({
                         'OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。',
                     })}
                   >
-                    <QuestionCircleOutlined className="ml-10" />
+                    <QuestionCircleOutlined style={{ marginLeft: 4 }} />
                   </Tooltip>
                 </>
               }
               fieldProps={{ style: commonStyle }}
             />
+          </Col>
+          <Col span={6}>
             <InputPort
               name={['obproxy', 'rpc_listen_port']}
               label={intl.formatMessage({
@@ -77,12 +81,13 @@ export default function ComponentsPort({
               })}
               fieldProps={{ style: commonStyle }}
             />
-          </Space>
-        </Row>
+          </Col>
+        </>
       )}
-      {selectedConfig.includes(obagentComponent) && (
-        <Row>
-          <Space size="large">
+
+      {selectedConfig?.includes(obagentComponent) && (
+        <>
+          <Col span={6}>
             <InputPort
               name={['obagent', 'monagent_http_port']}
               label={intl.formatMessage({
@@ -91,7 +96,8 @@ export default function ComponentsPort({
               })}
               fieldProps={{ style: commonStyle }}
             />
-
+          </Col>
+          <Col span={6}>
             <InputPort
               name={['obagent', 'mgragent_http_port']}
               label={intl.formatMessage({
@@ -100,60 +106,60 @@ export default function ComponentsPort({
               })}
               fieldProps={{ style: commonStyle }}
             />
-          </Space>
-        </Row>
+          </Col>
+        </>
       )}
-      {(selectedConfig.includes(ocpexpressComponent) ||
-        selectedConfig.includes(configServerComponent)) &&
-        !lowVersion && (
-          <Row>
-            <Space size="large">
-              {selectedConfig.includes(ocpexpressComponent) && (
-                <InputPort
-                  name={['ocpexpress', 'port']}
-                  label={intl.formatMessage({
-                    id: 'OBD.pages.components.ClusterConfig.PortOcpExpress',
-                    defaultMessage: 'OCP Express 端口',
-                  })}
-                  fieldProps={{ style: commonStyle }}
-                  portError={
-                    PortOcpExpressFormValue === PortListentFormValue &&
-                    intl.formatMessage(
-                      {
-                        id: 'OBD.pages.components.InstallConfig.PortOccupied',
-                        defaultMessage:
-                          '端口${PortOcpExpressFormValue}已被占用，请修改',
-                      },
-                      { PortOcpExpressFormValue: PortOcpExpressFormValue },
-                    )
-                  }
-                />
-              )}
-
-              {selectedConfig.includes(configServerComponent) && (
-                <InputPort
-                  name={['obconfigserver', 'listen_port']}
-                  label={intl.formatMessage({
-                    id: 'OBD.Obdeploy.ClusterConfig.ObconfigserverServicePort',
-                    defaultMessage: 'OBConfigserver 服务端口',
-                  })}
-                  fieldProps={{ style: commonStyle }}
-                  portError={
-                    PortOcpExpressFormValue === PortListentFormValue &&
-                    intl.formatMessage(
-                      {
-                        id: 'OBD.pages.components.InstallConfig.PortOccupied',
-                        defaultMessage:
-                          '端口${PortListentFormValue}已被占用，请修改',
-                      },
-                      { PortListentFormValue: PortListentFormValue },
-                    )
-                  }
-                />
-              )}
-            </Space>
-          </Row>
-        )}
-    </>
+      {selectedConfig?.includes(configServerComponent) && !lowVersion && (
+        <>
+          {selectedConfig?.includes(configServerComponent) && (
+            <Col span={6}>
+              <InputPort
+                name={['obconfigserver', 'listen_port']}
+                label={intl.formatMessage({
+                  id: 'OBD.Obdeploy.ClusterConfig.ObconfigserverServicePort',
+                  defaultMessage: 'OBConfigserver 服务端口',
+                })}
+                fieldProps={{ style: commonStyle }}
+                portError={
+                  PortOcpExpressFormValue === PortListentFormValue &&
+                  intl.formatMessage(
+                    {
+                      id: 'OBD.pages.components.InstallConfig.PortOccupied',
+                      defaultMessage:
+                        '端口${PortListentFormValue}已被占用，请修改',
+                    },
+                    { PortListentFormValue: PortListentFormValue },
+                  )
+                }
+              />
+            </Col>
+          )}
+        </>
+      )}
+      {selectedConfig?.includes(prometheusComponent) && (
+        <Col span={6}>
+          <InputPort
+            name={['prometheus', 'port']}
+            label={intl.formatMessage({
+              id: 'OBD.Obdeploy.ClusterConfig.PrometheusServicePort',
+              defaultMessage: 'Prometheus 服务端口',
+            })}
+            fieldProps={{ style: commonStyle }}
+          />
+        </Col>
+      )}
+      {selectedConfig.includes(grafanaComponent) && (
+        <Col span={6}>
+          <InputPort
+            name={['grafana', 'port']}
+            label={intl.formatMessage({
+              id: 'OBD.Obdeploy.ClusterConfig.GrafanaServicePort',
+              defaultMessage: 'Grafana 服务端口',
+            })}
+            fieldProps={{ style: commonStyle }}
+          />
+        </Col>
+      )}
+    </Row>
   );
 }

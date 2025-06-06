@@ -234,7 +234,7 @@ def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_
                 for param, param_info in check_available_param.items():
                     if get_option(param, None) is None and param_info[0] < primary_tenant_info[param]:
                         recreate_cmd += ' --{}={}{} '.format(param, param_info[0], param_info[1])
-                        stdio.warn("available {} is less then primary tenant's {} quota, primary tenant's {}:{}{}, current available:{}{}".format(param, param, primary_tenant_info[param], param_info[1], param_info[0], param_info[1]))
+                        stdio.warn("available {} is less then primary tenant's {} quota, primary tenant's {}{}, current available:{}{}".format(param, param, primary_tenant_info[param], param_info[1], param_info[0], param_info[1]))
 
                 if recreate_cmd:
                     stdio.error("Resource confirmation: if you insist to take the risk, please recreate the tenant with '{}'".format(recreate_cmd))
@@ -256,8 +256,8 @@ def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_
 
                 if memory_size is None:
                     memory_size = mem_available
-                    if log_disk_size is None:
-                        log_disk_size = log_disk_available
+                if log_disk_size is None:
+                    log_disk_size = log_disk_available
 
                 if mem_available < memory_size:
                     return error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(memory_size)))
