@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from const import LOCATION_MODE
+
 def get_ip_list(cursor, deploy_name, tenant, stdio):
     if not cursor:
         stdio.verbose("Connect to {} failed.".format(deploy_name))
@@ -35,8 +37,10 @@ def get_ip_list(cursor, deploy_name, tenant, stdio):
 def get_standbys(plugin_context, primary_tenant='', relation_tenants=[], all_tenant_names=[], exclude_tenant=[], cursors={}, skip_no_primary_cursor=False, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
-    cmds = plugin_context.cmds
-    primary_deploy_name = cmds[0] if cmds else plugin_context.cluster_config.deploy_name
+    cluster_version = plugin_context.cluster_config.version
+    cluster_configs = kwargs.get('cluster_configs')
+    primary_deploy_name = kwargs.get('primary_deploy_name')
+    primary_deploy_name = primary_deploy_name if primary_deploy_name else plugin_context.cluster_config.deploy_name
     primary_tenant = primary_tenant if primary_tenant else getattr(options, 'tenant_name', '')
     stdio.start_loading('Get standbys info')
     if skip_no_primary_cursor and (not cursors or not cursors.get(primary_deploy_name)):
@@ -79,11 +83,39 @@ def get_standbys(plugin_context, primary_tenant='', relation_tenants=[], all_ten
             if not cursor:
                 stdio.verbose("Connect to {} failed.".format(relation_deploy_name))
                 continue
-            res = cursor.fetchone('select TENANT_ROLE from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s', (relation_tenant_name, ), raise_exception=False)
+            res = cursor.fetchone('select TENANT_ROLE,TENANT_ID from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s', (relation_tenant_name, ), raise_exception=False)
             if not res:
                 continue
             if res['TENANT_ROLE'] == 'PRIMARY':
                 continue
+
+            if cluster_version >= '4.2.1.9':
+                tenant_cluster_info = cluster_configs.get(relation_deploy_name)
+                if not tenant_cluster_info:
+                    stdio.verbose("Get {} cluster info is failed.".format(relation_deploy_name))
+                    continue
+
+                sql = 'SELECT TYPE FROM oceanbase.CDB_OB_LOG_RESTORE_SOURCE where TENANT_ID=%s' % res['TENANT_ID']
+                res = cursor.fetchone(sql, raise_exception=False)
+                if not res:
+                    stdio.verbose('Select {} log restore source is failed.'.format(relation_deploy_name))
+                    continue
+
+                primary_dict = tenant_cluster_info.get_component_attr('primary_tenant')
+                primary_info = []
+                if primary_dict:
+                    primary_info = primary_dict.get(relation_tenant_name, [])
+                    if primary_info:
+                        primary_match = (primary_info[0][0] == primary_deploy_name and primary_info[0][1] == primary_tenant)
+                        primary_match_empty_tenant = (primary_tenant == '' and primary_info[0][0] == primary_deploy_name)
+                        if primary_match or primary_match_empty_tenant:
+                            sql = 'select ob_version() as version'
+                            res = cursor.fetchone(sql, raise_exception=False)
+                            standby_tenants.append([relation_deploy_name, relation_tenant_name, res['version']])
+                            continue
+                if res['TYPE'] == LOCATION_MODE or primary_info:
+                    continue
+
             res = cursor.fetchone('select a.VALUE as `VALUE` from oceanbase.cdb_ob_log_restore_source as a, oceanbase.DBA_OB_TENANTS as b where a.TENANT_ID=b.TENANT_ID and b.TENANT_NAME = %s', (relation_tenant_name, ), raise_exception=False)
             if res is False:
                 stdio.stop_loading('stop_loading', 'fail')
@@ -104,7 +136,9 @@ def get_standbys(plugin_context, primary_tenant='', relation_tenants=[], all_ten
                 sql = 'select ob_version() as version'
                 res = cursor.fetchone(sql, raise_exception=False)
                 standby_tenants.append([relation_deploy_name, relation_tenant_name, res['version']])
-                
+                if cluster_version >= '4.2.1.9':
+                    primary_info = {relation_tenant_name: [[primary_deploy_name, primary_tenant]]}
+                    tenant_cluster_info.update_component_attr('primary_tenant', primary_info, save=True)
     plugin_context.set_variable('standby_tenants', standby_tenants)
     stdio.stop_loading('succeed')
     return plugin_context.return_true(standby_tenants=standby_tenants)

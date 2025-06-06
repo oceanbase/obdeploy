@@ -44,7 +44,7 @@ def obshell_start(plugin_context, *args, **kwargs):
             # start obshell
             server_config = cluster_config.get_server_conf(server)
             password = server_config.get('root_password', '')
-            client.add_env('OB_ROOT_PASSWORD', password if client._is_local else ConfigUtil.passwd_format(password))
+            client.add_env('OB_ROOT_PASSWORD', password if client._is_local else ConfigUtil.passwd_format(password), True)
             cmd = 'cd %s; %s/bin/obshell admin start --ip %s --port %s' % (server_config['home_path'], server_config['home_path'], server.ip, server_config['obshell_port'])
             stdio.verbose('start obshell: %s' % cmd)
             if not client.execute_command(cmd):

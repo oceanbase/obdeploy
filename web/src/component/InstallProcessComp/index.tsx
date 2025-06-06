@@ -17,6 +17,9 @@ interface InstallProcessCompProps {
   installStatus: string;
   statusData: API.TaskInfo;
   showProgress: number;
+
+  type: string;
+  progressCoverWidth?: number;
 }
 let timerLogScroll: NodeJS.Timer | null = null;
 export default function InstallProcessComp({
@@ -24,8 +27,11 @@ export default function InstallProcessComp({
   installStatus,
   statusData,
   showProgress,
+  progressCoverWidth,
+  type,
 }: InstallProcessCompProps) {
-  const progressCoverInitWidth = 282;
+  const tenantType = type === 'tenant';
+  const progressCoverInitWidth = tenantType ? progressCoverWidth : 282;
   const [toBottom, setToBottom] = useState(true);
   const [progressCoverStyle, setProgreddCoverStyle] = useState({
     width: progressCoverInitWidth,
@@ -150,14 +156,18 @@ export default function InstallProcessComp({
               defaultMessage: '部署中...',
             })}
           </div>
-          <div className={styles.computer}>
+          <div className={tenantType ? styles.tenantComputer : styles.computer}>
             <div
               className={`computer-animate ${styles.computerAnimate} `}
               data-anim-path="/assets/computer/data.json"
             ></div>
           </div>
-          <div className={styles.progress}>
+          <div
+            style={tenantType ? { left: 135 } : {}}
+            className={styles.progress}
+          >
             <video
+              style={tenantType ? { width: 205 } : {}}
               className={`${styles.progressVedio} progress-animate video-js`}
               muted
             >
@@ -170,14 +180,22 @@ export default function InstallProcessComp({
               <div className={styles.progressStart}></div>
             </div>
           </div>
-          <div className={styles.spaceman}>
+          <div
+            className={styles.spaceman}
+            style={tenantType ? { left: 110, top: 40 } : {}}
+          >
             <div
               className={`spaceman-animate ${styles.spacemanAnimate}`}
+              style={tenantType ? { width: 220 } : {}}
               data-anim-path="/assets/spaceman/data.json"
             ></div>
           </div>
-          <div className={styles.database}>
+          <div
+            className={styles.database}
+            style={tenantType ? { right: 25 } : {}}
+          >
             <div
+              style={tenantType ? { width: 100 } : {}}
               className={`database-animate ${styles.sqlAnimate}`}
               data-anim-path="/assets/database/data.json"
             ></div>
@@ -193,7 +211,12 @@ export default function InstallProcessComp({
           data-aspm-param={``}
           data-aspm-expo
         >
-          {getText(statusData?.current)}
+          {tenantType
+            ? intl.formatMessage({
+                id: 'OBD.pages.components.InstallProces.87DB05E2',
+                defaultMessage: '租户创建中',
+              })
+            : getText(statusData?.current)}
         </span>
       </ProCard>
       <ProCard

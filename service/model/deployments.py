@@ -87,6 +87,7 @@ class OceanBase(BaseModel):
     redo_dir: str = Body('', description='clog path')
     parameters: List[Parameter] = Body(None, description='config parameter')
     topology: List[Zone] = Body(..., description='topology')
+    obshell_port: int = Body(..., description='obshell port')
 
 
 class ObProxy(BaseModel):
@@ -101,6 +102,9 @@ class ObProxy(BaseModel):
     listen_port: int = Body(..., description='sql port')
     parameters: List[Parameter] = Body(None, description='config parameter')
     servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
+    vip_address: str = Body('', description='obproxy servers vip address')
+    vip_port: str = Body('', description='obproxy servers vip port')
+    dns: str = Body('', description='obproxy servers dns')
 
 
 class OcpExpress(BaseModel):
@@ -144,6 +148,26 @@ class ObConfigserver(BaseModel):
     servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
     listen_port: int = Body(..., description='server port')
 
+class Prometheus(BaseModel):
+    component: str = Body('', description='prometheus component name,ex:prometheus')
+    version: str = Body(..., description='version')
+    release: str = Body(..., description='prometheus release no')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    home_path: str = Body('', description='install prometheus home path')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1']")
+    port: int = Body(..., description='server port')
+    basic_auth_users: dict = Body(..., description='auth user and password')
+
+class Grafana(BaseModel):
+    component: str = Body('', description='grafana component name,ex:prometheus')
+    version: str = Body(..., description='version')
+    release: str = Body(..., description='grafana release no')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    home_path: str = Body('', description='install grafana home path')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1']")
+    port: int = Body(..., description='server port')
+    login_password: str = Body(..., description='login password')
+
 class ComponentConfig(BaseModel):
     oceanbase: OceanBase
     obproxy: Optional[ObProxy]
@@ -151,6 +175,8 @@ class ComponentConfig(BaseModel):
     obagent: Optional[ObAgent]
     obclient: Optional[ObClient]
     obconfigserver: Optional[ObConfigserver]
+    prometheus: Optional[Prometheus]
+    grafana: Optional[Grafana]
 
 
 class DeploymentConfig(BaseModel):
@@ -262,6 +288,11 @@ class InstallLog(BaseModel):
     offset: int = Body(0, description='log offset')
 
 
+class CreateTenantLog(BaseModel):
+    log: str = Body('', description='create tenant log')
+    offset: int = Body(0, description='log offset')
+
+
 class Deployment(BaseModel):
     name: str = Body(..., description='deployment name')
     status: str = Body(..., description='status, ex:CONFIGURED,DEPLOYED,STARTING,RUNNING,DESTROYED,UPGRADING')
@@ -335,3 +366,17 @@ class ScenarioType(BaseModel):
 class TelemetryData(BaseModel):
     data: dict = Body(..., description='telemetry data')
     msg: str = Body('', description='telemetry message')
+
+
+class CreateTenantConfig(BaseModel):
+    tenant_name: str = Body('', description='tenant name')
+    max_cpu: float = Body(None, description='max_cpu num')
+    min_cpu: float = Body(None, description='min_cpu num')
+    memory_size: str = Body(None, description='memory size')
+    log_disk_size: str = Body(None, description='log disk size')
+    mode: str = Body(..., description='tenant mode. {mysql, oracle}')
+    charset: str = Body(..., description='database charset')
+    variables: str = Body(..., description="Set the variables for the system tenant. [ob_tcp_invited_nodes='%'].")
+    time_zone: str = Body(..., description='Tenant time zone. The default tenant time_zone is [+08:00].')
+    optimize: str = Body('', description='Specify scenario optimization when creating a tenant, the default is consistent with the cluster dimension.\n{express_oltp, complex_oltp, olap, htap, kv}')
+    password: str = Body(..., description='When creating a tenant, set password for user.')

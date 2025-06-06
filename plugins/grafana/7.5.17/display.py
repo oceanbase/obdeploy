@@ -19,11 +19,15 @@ from tool import NetUtil
 
 stdio = None
 
+def passwd_format(passwd):
+    return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
-def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
+def display(plugin_context, cursor, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
+    if not config_encrypted:
+        display_encrypt_password = None
     results = []
     if plugin_context.get_variable('is_restart'):
         cursor = plugin_context.get_return('connect').get_return('cursor')
@@ -41,11 +45,12 @@ def display(plugin_context, cursor, display_encrypt_password='******', *args, **
             url = '%s://%s:%s/d/oceanbase' % (protocol, ip, server_config['port'])
         else:
             url = '%s://%s:%s' % (protocol, ip, server_config['port'])
+        password = api_cursor.password if not display_encrypt_password else display_encrypt_password
         results.append({
             'ip': ip,
             'port': server_config['port'],
             'user': user,
-            'password': api_cursor.password if not display_encrypt_password else display_encrypt_password,
+            'password': passwd_format(password) if password else '',
             'url': url,
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })

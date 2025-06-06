@@ -673,9 +673,63 @@ export async function createUpgradePrecheck(
     },
   );
 }
+export async function createTenants(
+  params: {
+    name?: string;
+  },
+  body?: API.OcpDeploymentConfig,
+  options?: { [key: string]: any },
+) {
+  const { name } = params;
+  return request<API.createUpgradePrecheck_>(
+    `/api/v1/deployments/${name}/tenants`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      data: body,
+      ...(options || {}),
+    },
+  );
+}
 
-export async function getWebType(options?: { [key: string]: any }) {
-  return request<API.OBResponse>('/api/v1/web/types', {
+export async function getTenantsTaskStatus(
+  params: {
+    name?: string;
+    taskId?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { name, taskId } = params;
+  return request<API.OBResponse>(
+    `/api/v1/deployments/${name}/tenants/${taskId}`,
+    {
+      method: 'GET',
+      ...(options || {}),
+    },
+  );
+}
+export async function getUnitResource(
+  params: {
+    name?: string;
+  },
+  options?: { [key: string]: any },
+) {
+  const { name } = params;
+  return request<API.OBResponse>(`/api/v1/deployments/${name}/unitresource`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+export async function getScenario(
+  params: {
+    name?: string;
+  },
+  options?: { [key: string]: any },
+) {
+  const { name } = params;
+  return request<API.OBResponse>(`/api/v1/deployments/${name}/scenario`, {
     method: 'GET',
     ...(options || {}),
   });

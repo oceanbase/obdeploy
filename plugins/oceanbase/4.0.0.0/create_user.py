@@ -45,8 +45,21 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
                 break
     if not tenant_cursor and retries:
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
-    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries - 1, args=args, stdio=stdio)
+    if not tenant_cursor:
+        return False
+    while tenant_cursor.execute('show databases;', exc_level='verbose') is False:
+        stdio.verbose('Server is initializing...')
+        time.sleep(2)
+    try_times = 300
+    while try_times:
+        rv = tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio)
+        if rv is False:
+            try_times -= 1
+            time.sleep(1)
+            continue
+        break
+    return rv
 
 
 def create_user(plugin_context, create_tenant_options=[], cursor=None, scale_out_component='',  *args, **kwargs):

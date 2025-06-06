@@ -53,7 +53,7 @@ export default () => {
   >([]);
   const [componentsVersionInfo, setComponentsVersionInfo] =
     useState<API.ComponentsVersionInfo>({});
-
+ 
   const { run: handleQuitProgress } = useRequest(exitProcess, {
     onError: (e: any) => {
       const errorInfo = getErrorInfo(e);
@@ -127,7 +127,6 @@ export default () => {
     setLoadTypeVisible,
     selectedLoadType,
     setSelectedLoadType,
-
     timerProgress,
     ...docs,
   };

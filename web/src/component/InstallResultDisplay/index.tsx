@@ -1,6 +1,6 @@
 import { intl } from '@/utils/intl';
 import React, { useEffect } from 'react';
-// import { useSelector } from 'umi';
+
 import ArrowIcon from '@/component/Icon/ArrowIcon';
 import NewIcon from '@/component/Icon/NewIcon';
 import * as OCP from '@/services/ocp_installer_backend/OCP';
@@ -382,12 +382,10 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                     type="inner"
                     className={`${styles.componentCard}`}
                     style={{ border: '1px solid #e2e8f3' }}
-                    //   key={oceanBaseInfo.group}
                   >
                     <Table
                       className={`${styles.componentTable} ob-table`}
                       rowKey="name"
-                      // loading={loading}
                       columns={columns}
                       pagination={false}
                       dataSource={

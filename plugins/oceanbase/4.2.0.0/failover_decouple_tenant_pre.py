@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import sys
+from const import SERVICE_MODE
 
 if sys.version_info.major == 2:
     import MySQLdb as mysql
@@ -33,6 +34,7 @@ else:
 def failover_decouple_tenant_pre(plugin_context, cursors={}, *args, **kwargs):
     stdio = plugin_context.stdio
     standby_deploy_name = plugin_context.cluster_config.deploy_name
+    cluster_config = plugin_context.cluster_config
     options = plugin_context.options
     cmds = plugin_context.cmds
     option_type = cmds[2]
@@ -59,32 +61,52 @@ def failover_decouple_tenant_pre(plugin_context, cursors={}, *args, **kwargs):
 
         # query primary tenant connect info
     if option_type == 'failover':
-        res = standby_cursor.fetchone('select a.VALUE as `VALUE` from oceanbase.cdb_ob_log_restore_source as a, oceanbase.DBA_OB_TENANTS as b where a.TENANT_ID=b.TENANT_ID and b.TENANT_NAME = %s', (standby_tenant, ), raise_exception=False)
-        if not res:
-            stdio.error("Query tenant {}:{}'s primary tenant info fail, place confirm current tenant is have the primary tenant.".format(standby_deploy_name, standby_tenant))
-            stdio.stop_loading('fail')
+        source_ret = standby_cursor.fetchone("SELECT TYPE FROM oceanbase.CDB_OB_LOG_RESTORE_SOURCE where TENANT_ID=%s", (standby_info_res['TENANT_ID'], ), raise_exception=False)
+        if not source_ret:
+            stdio.error("in {} tenant {} find log restore source is failed".format(standby_deploy_name, standby_tenant))
             return
-        primary_info_arr = res['VALUE'].split(',')
-        primary_info_dict = {}
-        for primary_info in primary_info_arr:
-            kv = primary_info.split('=')
-            primary_info_dict[kv[0]] = kv[1]
-        user = primary_info_dict.get('USER')
-        password = primary_info_dict.get('PASSWORD')
-        primary_ip_list = primary_info_dict.get('IP_LIST').split(';')
-
-        for ip_list in primary_ip_list:
-            ip = ip_list.split(':')[0]
-            port = ip_list.split(':')[1]
-            stdio.verbose('connect primary tenant server: %s -P%s -u%s -p%s' % (ip, port, user, password))
-            try:
-                db_cursor = connect(ip, port, user, password)
-                db_cursor.execute('select * from oceanbase.DBA_OB_TENANTS')
-                stdio.error('Primary tenant status is alive, not support failover.')
+        if source_ret['TYPE'] == SERVICE_MODE:
+            res = standby_cursor.fetchone('select a.VALUE as `VALUE` from oceanbase.cdb_ob_log_restore_source as a, oceanbase.DBA_OB_TENANTS as b where a.TENANT_ID=b.TENANT_ID and b.TENANT_NAME = %s', (standby_tenant, ), raise_exception=False)
+            if not res:
+                stdio.error("Query tenant {}:{}'s primary tenant info fail, place confirm current tenant is have the primary tenant.".format(standby_deploy_name, standby_tenant))
                 stdio.stop_loading('fail')
                 return
-            except:
-                pass
+            primary_info_arr = res['VALUE'].split(',')
+            primary_info_dict = {}
+            for primary_info in primary_info_arr:
+                kv = primary_info.split('=')
+                primary_info_dict[kv[0]] = kv[1]
+            user = primary_info_dict.get('USER')
+            password = primary_info_dict.get('PASSWORD')
+            primary_ip_list = primary_info_dict.get('IP_LIST').split(';')
+
+            for ip_list in primary_ip_list:
+                ip = ip_list.split(':')[0]
+                port = ip_list.split(':')[1]
+                stdio.verbose('connect primary tenant server: %s -P%s -u%s -p%s' % (ip, port, user, password))
+                try:
+                    db_cursor = connect(ip, port, user, password)
+                    db_cursor.execute('select * from oceanbase.DBA_OB_TENANTS')
+                    stdio.error('Primary tenant status is alive, not support failover.')
+                    stdio.stop_loading('fail')
+                    return
+                except:
+                    pass
+        else:
+            primary_dict = cluster_config.get_component_attr('primary_tenant')
+            if primary_dict:
+                primary_info = primary_dict.get(standby_tenant, [])
+                if primary_info:
+                    primary_cluster = primary_info[0][0]
+                    primary_tenant = primary_info[0][1]
+                    primary_cursor = cursors.get(primary_cluster)
+                    if primary_cursor:
+                        sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'" % primary_tenant
+                        res = primary_cursor.fetchone(sql)
+                        if res:
+                            stdio.error('Primary tenant status is alive, not support failover.')
+                            stdio.stop_loading('fail')
+                            return
     # check tenant type
     if standby_info_res['TENANT_TYPE'] != 'USER':
         stdio.error("Standby tenant {}:{}'s type is invalid, Expect: USER , Current:{}".format(standby_deploy_name, standby_tenant, standby_info_res['TENANT_TYPE']))

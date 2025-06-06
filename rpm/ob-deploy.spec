@@ -69,8 +69,19 @@ mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
 mkdir -p $BUILD_DIR/SOURCES/{site-packages}
 mkdir -p ${RPM_BUILD_ROOT}/usr/bin
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd
+
+if [ "$BUILD_OBSHELL" == "TRUE" ]; then
+    sed -i '/obshell/ s/^/#/' plugins-requirements3.txt
+    git clone git@github.com:oceanbase/obshell-sdk-python.git
+    cd $SRC_DIR/obshell-sdk-python
+    python setup.py sdist bdist_wheel
+    pip install ./dist/*.whl --target=$BUILD_DIR/SOURCES/site-packages -i http://mirrors.aliyun.com/pypi/simple/  --trusted-host mirrors.aliyun.com
+    cd $SRC_DIR
+fi
+
 pip install -r plugins-requirements3.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 pip install -r service/service-requirements.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+
 # pyinstaller -y --clean -n obd-web -p $BUILD_DIR/SOURCES/site-packages -F service/app.py
 pyinstaller --hidden-import=decimal -p $BUILD_DIR/SOURCES/site-packages --hidden-import service.app --hidden-import=configparser --hidden-import=Crypto.Hash.SHA --hidden-import=Crypto.PublicKey.RSA --hidden-import=Crypto.Signature.PKCS1_v1_5 --hidden-import=Crypto.Cipher.PKCS1_OAEP -F obd.py
 rm -f obd.py obd.spec
@@ -143,6 +154,15 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Fri Jun 06 2025 obd 3.3.0
+ -new features: adapt to Oceanbase-CE 4.3.5.2
+ -new features: add tenant deployment and operation maintenance based on archive
+ -new features: obd web support for standalone/commercial Oceanbase deployment
+ -new features: obd web support for tenant creation
+ -new features: obd web support for Prometheus & Grafana deployment
+ -new features: obd web support for ODP configuration of VIP/DNS
+ -bug fixes: fixed the issue of improper display of username in the whitelist installation report
+ -bug fixes: fixed the issue with unexpected directory validation when adding new components
 * Tue Apr 01 2025 obd 3.2.0
  -new features: adapt to Oceanbase-Standalone 4.2.5.3
  -new features: support encrypted password storage

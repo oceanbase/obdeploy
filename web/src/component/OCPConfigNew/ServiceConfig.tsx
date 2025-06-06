@@ -95,17 +95,20 @@ export default function ServiceConfig({
   }, []);
 
   useEffect(() => {
-    const userRoot = deployUser === 'root';
     form.setFieldsValue({
       ocpserver: {
         home_path:
-          !useRunningUser && userRoot
+          !useRunningUser && deployUser === 'root'
             ? `/${deployUser}`
             : `/home/${deployUser}`,
-        log_dir: userRoot ? `/${deployUser}/logs` : `/home/${deployUser}/logs`,
-        soft_dir: userRoot
-          ? `/${deployUser}/software`
-          : `/home/${deployUser}/software`,
+        log_dir:
+          deployUser === 'root'
+            ? `/${deployUser}/logs`
+            : `/home/${deployUser}/logs`,
+        soft_dir:
+          deployUser === 'root'
+            ? `/${deployUser}/software`
+            : `/home/${deployUser}/software`,
       },
     });
   }, [deployUser]);

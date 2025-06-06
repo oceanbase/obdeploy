@@ -100,12 +100,17 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
   };
   const setData = (dataSource: FormValues) => {
     let newAuth = { ...auth, ...dataSource.auth };
+    const currentDnsType = dataSource.obproxy?.dnsType === 'vip';
     let newComponents: API.Components = { ...components };
     dataSource.oceanbase.home_path;
     newComponents.obproxy = {
       ...(components.obproxy || {}),
       ...dataSource.obproxy,
       parameters: formatParameters(dataSource.obproxy?.parameters),
+      dnsType: undefined,
+      dns: !currentDnsType ? dataSource.obproxy?.dns : undefined,
+      vip_port: currentDnsType ? dataSource.obproxy?.vip_port : undefined,
+      vip_address: currentDnsType ? dataSource.obproxy?.vip_address : undefined,
     };
     newComponents.ocpserver = {
       ...(components.ocpserver || {}),
@@ -236,6 +241,10 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
     },
     ocpserver: {
       servers: ocpserver?.servers?.length ? ocpserver?.servers : undefined,
+      vip_address: ocpserver?.vip_address,
+      dns: ocpserver?.dns,
+      dnsType: ocpserver?.vip_address !== undefined ? 'vip' : 'dns',
+      vip_port: ocpserver?.vip_port || 2883,
     },
     oceanbase: {
       root_password: oceanbase?.root_password || undefined,
@@ -243,6 +252,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
       redo_dir: oceanbase?.redo_dir || '/data/log1',
       mysql_port: oceanbase?.mysql_port || 2881,
       rpc_port: oceanbase?.rpc_port || 2882,
+      obshell_port: oceanbase?.obshell_port || 2886,
       home_path: oceanbase?.home_path || '/home/admin',
       parameters: getInitialParameters(
         oceanbase?.component,
@@ -260,6 +270,10 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
         obproxy?.parameters,
         proxyMoreConfig,
       ),
+      vip_address: obproxy?.vip_address,
+      dns: obproxy?.dns,
+      dnsType: obproxy?.vip_address !== undefined ? 'vip' : 'dns',
+      vip_port: obproxy?.vip_port || 2883,
     },
     launch_user: launch_user || undefined,
   };

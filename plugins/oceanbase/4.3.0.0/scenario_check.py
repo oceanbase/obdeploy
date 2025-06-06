@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def scenario_check(plugin_context, scenario='', *args, **kwargs):
+def scenario_check(plugin_context, create_tenant_options=[], scenario='', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
 
     scenarios = ['express_oltp', 'complex_oltp', 'olap', 'htap', 'kv']
     scenario_check = lambda scenario: scenario in scenarios
-    scenario = getattr(plugin_context.options, 'optimize', scenario)
+    if len(create_tenant_options) == 1:
+        scenario = getattr(create_tenant_options[0], 'optimize', '')
+    scenario = scenario if scenario else getattr(plugin_context.options, 'optimize', scenario)
     global_config = cluster_config.get_global_conf_with_default()
     default_scenario = global_config.get('scenario')
     if not scenario:

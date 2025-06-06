@@ -27,7 +27,7 @@ from _deploy import DeployStatus, DeployConfigStatus
 from _errno import CheckStatus, FixEval
 from _plugin import PluginType
 from _rpm import Version
-from const import COMP_JRE, COMP_OCP_EXPRESS
+from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMP_OB_CE
 from service.api.v1.deployments import DeploymentInfo
 from service.handler.base_handler import BaseHandler
 from service.handler.rsa_handler import RSAHandler
@@ -40,6 +40,7 @@ from service.common import log, task, util, const
 from service.common.task import TaskStatus, TaskResult
 from service.common.task import Serial as serial
 from service.common.task import AutoRegister as auto_register
+from service.model.task import TaskInfo as Task_info
 from ssh import LocalClient
 from tool import COMMAND_ENV
 from const import TELEMETRY_COMPONENT_OB
@@ -224,7 +225,7 @@ class DeploymentHandler(BaseHandler):
         if config.components.oceanbase is not None:
             self.generate_oceanbase_config(cluster_config, config, name, config.components.oceanbase)
         if config.components.obproxy is not None:
-            cluster_config[config.components.obproxy.component] = self.generate_component_config(config, const.OBPROXY, ['cluster_name', 'prometheus_listen_port', 'listen_port', 'rpc_listen_port'])
+            cluster_config[config.components.obproxy.component] = self.generate_component_config(config, const.OBPROXY, ['cluster_name', 'prometheus_listen_port', 'listen_port', 'rpc_listen_port', 'vip_address', 'vip_port', 'dns'])
         if config.components.obagent is not None:
             cluster_config[config.components.obagent.component] = self.generate_component_config(config, const.OBAGENT, ['monagent_http_port', 'mgragent_http_port'])
         if config.components.ocpexpress is not None:
@@ -232,6 +233,10 @@ class DeploymentHandler(BaseHandler):
             cluster_config[config.components.ocpexpress.component] = ocp_pwd
         if config.components.obconfigserver is not None:
             cluster_config[config.components.obconfigserver.component] = self.generate_component_config(config, const.OB_CONFIGSERVER, ['listen_port'])
+        if config.components.prometheus is not None:
+            cluster_config[config.components.prometheus.component] = self.generate_component_config(config, const.PROMETHEUS, ['port', 'basic_auth_users'])
+        if config.components.grafana is not None:
+            cluster_config[config.components.grafana.component] = self.generate_component_config(config, const.GRAFANA, ['port', 'login_password'])
         cluster_config_yaml_path = ''
         log.get_logger().info('dump config from path: %s' % cluster_config_yaml_path)
         with tempfile.NamedTemporaryFile(delete=False, prefix="obd", suffix="yaml", mode="w", encoding="utf-8") as f:
@@ -253,10 +258,16 @@ class DeploymentHandler(BaseHandler):
 
         ext_keys.insert(0, 'home_path')
         for key in ext_keys:
-            if config_dict[key]:
-                if key == 'admin_passwd':
+            if config_dict.get(key):
+                if key in ['admin_passwd', 'login_password']:
                     passwd = RSAHandler().decrypt_private_key(config_dict[key])
                     comp_config['global'][key] = passwd
+                    continue
+                if key == 'basic_auth_users':
+                    decrypt_basic_auth_users = {}
+                    for user, password in config_dict[key].items():
+                        decrypt_basic_auth_users[user] = RSAHandler().decrypt_private_key(password)
+                    comp_config['global'][key] = decrypt_basic_auth_users
                     continue
                 comp_config['global'][key] = config_dict[key]
 
@@ -305,7 +316,7 @@ class DeploymentHandler(BaseHandler):
 
         for key in config_dict:
             if config_dict[key] and key in {'mysql_port', 'rpc_port', 'home_path', 'data_dir', 'redo_dir', 'appname',
-                                            'root_password'}:
+                                            'root_password', 'obshell_port'}:
                 if key == 'root_password':
                     passwd = RSAHandler().decrypt_private_key(config_dict[key])
                     oceanbase_config['global'][key] = passwd
@@ -327,6 +338,8 @@ class DeploymentHandler(BaseHandler):
             cluster_config[const.OCEANBASE_CE] = oceanbase_config
         elif oceanbase.component == const.OCEANBASE:
             cluster_config[const.OCEANBASE] = oceanbase_config
+        elif oceanbase.component == const.OCEANBASE_STANDALONE:
+            cluster_config[const.OCEANBASE_STANDALONE] = oceanbase_config
         else:
             log.get_logger().error('oceanbase component : %s not exist' % oceanbase.component)
             raise Exception('oceanbase component : %s not exist' % oceanbase.component)
@@ -381,6 +394,16 @@ class DeploymentHandler(BaseHandler):
             param_check_status = self.context['deployment']['param_check_status']
             connect_check_status = self.context['deployment']['connect_check_status']
         connect_check_status_flag = True
+
+        task_info = task.get_task_manager().get_task_info(name, task_type="precheck")
+        if task_info is not None:
+            if task_info.status == TaskStatus.FINISHED:
+                precheck_result.status = task_info.result
+                if task_info.result == TaskResult.FAILED:
+                    precheck_result.message = '{}'.format(task_info.exception)
+            else:
+                precheck_result.status = TaskResult.RUNNING
+
         for component in components:
             namespace_union = {}
             namespace = self.obd.get_namespace(component)
@@ -402,14 +425,6 @@ class DeploymentHandler(BaseHandler):
                     all_passed, finished, total = self.parse_precheck_result(all_passed, component, finished, info, server, total, result)
         info.sort(key=lambda p: p.status)
 
-        task_info = task.get_task_manager().get_task_info(name, task_type="precheck")
-        if task_info is not None:
-            if task_info.status == TaskStatus.FINISHED:
-                precheck_result.status = task_info.result
-                if task_info.result == TaskResult.FAILED:
-                    precheck_result.message = '{}'.format(task_info.exception)
-            else:
-                precheck_result.status = TaskResult.RUNNING
         precheck_result.info = info
         precheck_result.total = total
         if total == 0:
@@ -485,8 +500,10 @@ class DeploymentHandler(BaseHandler):
         repositories = self.obd.sort_repository_by_depend(repositories, self.obd.deploy.deploy_config)
         start_success = True
         connection_info_list = list()
-
+        obagent_repository = None
         for repository in repositories:
+            if repository.name == const.OBAGENT:
+                obagent_repository = repository
             opt = Values()
             setattr(opt, "components", repository.name)
             self.obd.set_options(opt)
@@ -498,7 +515,10 @@ class DeploymentHandler(BaseHandler):
             self.obd.set_repositories([repository])
             if repository.name == COMP_OCP_EXPRESS:
                 self.obd.set_repositories(repositories)
-            ret = self.obd._start_cluster(self.obd.deploy, repositories=[repository])
+            component_kwargs = {}
+            if repository.name == const.PROMETHEUS:
+                component_kwargs = {repository.name: {"obagent_repo": obagent_repository}}
+            ret = self.obd._start_cluster(self.obd.deploy, repositories=[repository], components_kwargs=component_kwargs)
             if not ret:
                 log.get_logger().warn("failed to start component: %s", repository.name)
                 start_success = False
@@ -530,11 +550,11 @@ class DeploymentHandler(BaseHandler):
     @serial("start")
     def start(self, name, background_tasks):
         task_manager = task.get_task_manager()
-        task_info = task_manager.get_task_info(name, task_type="install")
+        task_info = task_manager.get_task_info(name, task_type="start")
         if task_info is not None and task_info.status != TaskStatus.FINISHED:
             raise Exception("task {0} exists and not finished".format(name))
         task_manager.del_task_info(name, task_type="start")
-        return self._do_start(name)
+        background_tasks.add_task(self._do_start, name)
         
     @auto_register("start")
     def _do_start(self, name):
@@ -551,15 +571,21 @@ class DeploymentHandler(BaseHandler):
         for component, _ in self.obd.namespaces.items():
             data[component] = _.get_variable('run_result')
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
+
+    def get_start_task_info(self, name):
+        return self.get_task_info_log(name, "start")
         
     @serial("stop")
     def stop(self, name, background_tasks):
         task_manager = task.get_task_manager()
-        task_info = task_manager.get_task_info(name, task_type="install")
+        task_info = task_manager.get_task_info(name, task_type="stop")
         if task_info is not None and task_info.status != TaskStatus.FINISHED:
             raise Exception("task {0} exists and not finished".format(name))
         task_manager.del_task_info(name, task_type="stop")
-        return self._do_stop(name)
+        background_tasks.add_task(self._do_stop, name)
+    
+    def get_stop_task_info(self, name):
+        return self.get_task_info_log(name, "stop")
         
     @auto_register("stop")
     def _do_stop(self, name):
@@ -577,8 +603,8 @@ class DeploymentHandler(BaseHandler):
             data[component] = _.get_variable('run_result')
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
-    def get_install_task_info(self, name):
-        task_info = task.get_task_manager().get_task_info(name, task_type="install")
+    def get_task_info_log(self, name, task_type):
+        task_info = task.get_task_manager().get_task_info(name, task_type=task_type)
         if task_info is None:
             raise Exception("task {0} not found".format(name))
         deploy = self.get_deploy(name)
@@ -628,6 +654,9 @@ class DeploymentHandler(BaseHandler):
         return TaskInfo(total=total_count, finished=finished_count if task_result != TaskResult.SUCCESSFUL else total_count, current=current, status=task_result, info=info_list,
                         msg=msg)
 
+    def get_install_task_info(self, name):
+        return self.get_task_info_log(name, "install")
+
     def __build_connection_info(self, component, info):
         if info is None:
             log.get_logger().warn("component {0} info from display is None".format(component))
@@ -638,14 +667,32 @@ class DeploymentHandler(BaseHandler):
                               connect_url=info['cmd'] if info['type'] == 'db' else info['url'])
 
     def list_connection_info(self, name):
+        deploy = self.get_deploy(name)
+        repositories = self.obd.load_local_repositories(deploy.deploy_info)
+        self.obd.set_repositories(repositories)
+        self.obd.set_deploy(deploy)
+        ob_repository = None
+        obshell_dashboard_info = None
+        for repository in repositories:
+            if repository.name in COMPS_OB:
+                ob_repository = repository
+                break
+        if ob_repository:
+            obshell_dashboard_workflows = self.obd.get_workflows('obshell_dashboard', repositories=[ob_repository],
+                                                                 no_found_act='ignore')
+            if self.obd.run_workflow(obshell_dashboard_workflows, repositories=[ob_repository]):
+                dashboard_info = self.obd.get_namespace(ob_repository.name).get_return('obshell_dashboard').get_return('obshell_dashboard')
+                if dashboard_info:
+                    obshell_dashboard_info = ConnectionInfo(component='obshell_dashboard', access_url=dashboard_info, user='', password='', connect_url='')
         pwd_rege = r"-p'[^']*'\s*"
         if self.context["connection_info"][name] is not None:
             log.get_logger().info("get deployment {0} connection info from context".format(name))
             for item in self.context["connection_info"][name]:
                 item.password = ''
                 item.connect_url = re.sub(pwd_rege, '', item.connect_url)
+            obshell_dashboard_info and self.context["connection_info"][name].append(obshell_dashboard_info)
             return self.context["connection_info"][name]
-        deploy = self.get_deploy(name)
+
         connection_info_list = list()
         task_info = self.get_install_task_info(name)
         component_info = task_info.info
@@ -667,6 +714,7 @@ class DeploymentHandler(BaseHandler):
                 connection_info_list.append(connection_info_copy)
             else:
                 log.get_logger().warn("can not get connection info for component: {0}".format(component))
+        obshell_dashboard_info and connection_info_list.append(obshell_dashboard_info)
         return connection_info_list
 
     def get_deploy(self, name):
@@ -990,13 +1038,14 @@ class DeploymentHandler(BaseHandler):
         return None, None
 
     def get_install_log_by_component(self, component_name):
-        trace_id = self.context['component_trace'][component_name]
+        stdout = self.get_log_by_trace_id(self.context['component_trace'][component_name])
+        if not stdout:
+            stdout = self.get_log_by_trace_id(self.context['component_trace']['deploy'])
+        return stdout
+
+    def get_log_by_trace_id(self, trace_id):
         cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, self.obd.stdio.log_path, trace_id)
         stdout = LocalClient.execute_command(cmd).stdout
-        if not stdout:
-            trace_id = self.context['component_trace']['deploy']
-            cmd = 'grep -h "\[{}\]" {}* | sed "s/\[{}\] //g" '.format(trace_id, self.obd.stdio.log_path, trace_id)
-            stdout = LocalClient.execute_command(cmd).stdout
         return stdout
 
     def get_scenario_by_version(self, version, language='zh-CN'):
@@ -1063,3 +1112,130 @@ class DeploymentHandler(BaseHandler):
                 data.append(ScenarioType(type=scenario['type'], desc=scenario['desc'], value=scenario['value']))
         return data
 
+    def unit_resource(self, name):
+        deploy = self.obd.deploy_manager.get_deploy_config(name)
+        if not deploy:
+            raise Exception(f"get deploy failed by '{name}'.")
+        self.obd.set_deploy(deploy)
+        repositories = self.obd.load_local_repositories(deploy.deploy_info)
+        self.obd.set_repositories(repositories)
+        get_available_unit_resource_workflow = self.obd.get_workflows('get_available_unit_resource', repositories=repositories, no_found_act='ignore')
+        if not self.obd.run_workflow(get_available_unit_resource_workflow, repositories=repositories):
+            raise Exception("get unit resource failed.")
+        ob_repository = None
+        for repository in repositories:
+            if repository.name in COMPS_OB:
+                ob_repository = repository
+                break
+        return self.obd.get_namespace(ob_repository.name).get_return('get_unit_resources').get_return('unit_resource')
+
+    @serial("create_tenant")
+    def create_tenant(self, name, background_tasks, config):
+        task_manager = task.get_task_manager()
+        task_info = task_manager.get_task_info(name, task_type="create_tenant")
+        if task_info is not None:
+            if task_info.status != TaskStatus.FINISHED:
+                raise Exception("The task of creating tenants is currently running")
+            else:
+                task_manager.del_task_info(name, task_type="create_tenant")
+        self.context['create_tenant']['task_id'] = self.context['create_tenant']['task_id'] + 1 if self.context['create_tenant']['task_id'] else 1
+        background_tasks.add_task(self._create_tenant, name, self.context['create_tenant']['task_id'], config)
+        task_status = TaskStatus.RUNNING.value
+        task_res = TaskResult.RUNNING.value
+        task_message = 'create_tenant'
+        ret = Task_info(id=self.context['create_tenant']['task_id'], status=task_status, result=task_res, total='create tenant', message=task_message)
+        self.context['task_info'][self.context['create_tenant'][ret.id]] = ret
+        return ret
+
+    @auto_register('create_tenant')
+    def _create_tenant(self, name, task_id, config):
+        log.get_logger().info("start create tenant")
+        options = dict()
+        options['tenant_name'] = config.tenant_name
+        options['max_cpu'] = config.max_cpu
+        options['min_cpu'] = config.min_cpu
+        options['memory_size'] = config.memory_size
+        options['log_disk_size'] = config.log_disk_size
+        options['mode'] = config.mode
+        options['charset'] = config.charset
+        options['variables'] = config.variables
+        options['time_zone'] = config.time_zone
+        options['optimize'] = config.optimize
+        options[config.tenant_name+'_root_password'] = RSAHandler().decrypt_private_key(config.password)
+        task_info = self.context['task_info'][self.context['create_tenant'][task_id]]
+        trace_id = str(uuid())
+        self.context['create_tenant_trace'][task_id] = trace_id
+        ret = self.obd.stdio.init_trace_logger(self.obd.stdio.log_path, trace_id=trace_id, recreate=True)
+        if ret is False:
+            log.get_logger().warn("create tenant task: {}, start log init error".format(task_id))
+        if not self.obd.create_tenant(name, Values(options)):
+            task_info.status = TaskStatus.FINISHED
+            task_info.result = TaskResult.FAILED
+            raise Exception("Create tenant failed")
+        ob_repository = None
+        for repository in self.obd.repositories:
+            if repository.name in COMPS_OB:
+                ob_repository = repository
+                break
+        self.context['task_info'][self.context['create_tenant'][task_id]].message = self.obd.get_namespace(ob_repository.name).get_return('import_time_zone').get_return('cmd')
+        task_info.status = TaskStatus.FINISHED
+        task_info.result = TaskResult.SUCCESSFUL
+
+
+    def get_create_tenant_task_info(self, task_id):
+        log.get_logger().info('get create tenant task info')
+        task_info = self.context['task_info'][self.context['create_tenant'][task_id]]
+        if task_info is None:
+            raise Exception("task {0} not found".format(task_id))
+        return task_info
+
+    def get_tenant_scenario(self, name):
+        deploy = self.obd.deploy_manager.get_deploy_config(name)
+        if not deploy:
+            raise Exception(f"get deploy failed by '{name}'.")
+        self.obd.set_deploy(deploy)
+        repositories = self.obd.load_local_repositories(deploy.deploy_info)
+        self.obd.set_repositories(repositories)
+        tenant_scenario_workflow = self.obd.get_workflows('tenant_scenario', repositories=repositories, no_found_act='ignore')
+        if not self.obd.run_workflow(tenant_scenario_workflow, repositories=repositories):
+            raise Exception("get tenant scenario failed.")
+        ob_repository = None
+        for repository in repositories:
+            if repository.name in COMPS_OB:
+                ob_repository = repository
+                break
+        scenarios_set = None
+        if ob_repository.version >= Version('4.3.0.0'):
+            scenarios_set = self.obd.get_namespace(ob_repository.name).get_return('tenant_scenario').get_return('scenarios')
+        scenario_4_3_0_0 = [
+            {
+                'type': 'Express OLTP',
+                'desc': '适用于贸易、支付核心系统、互联网高吞吐量应用程序等工作负载。没有外键等限制、没有存储过程、没有长交易、没有大交易、没有复杂的连接、没有复杂的子查询。',
+                'value': 'express_oltp'
+            },
+            {
+                'type': 'Complex OLTP',
+                'desc': '适用于银行、保险系统等工作负载。他们通常具有复杂的联接、复杂的相关子查询、用 PL 编写的批处理作业，以及长事务和大事务。有时对短时间运行的查询使用并行执行',
+                'value': 'complex_oltp'
+            },
+            {
+                'type': 'HTAP',
+                'desc': '适用于混合 OLAP 和 OLTP 工作负载。通常用于从活动运营数据、欺诈检测和个性化建议中获取即时见解',
+                'value': 'htap'
+            },
+            {
+                'type': 'OLAP',
+                'desc': '用于实时数据仓库分析场景',
+                'value': 'olap'
+            },
+            {
+                'type': 'OBKV',
+                'desc': '用于键值工作负载和类似 Hbase 的宽列工作负载，这些工作负载通常具有非常高的吞吐量并且对延迟敏感',
+                'value': 'kv'
+            },
+        ]
+        scenario_info = []
+        for scenario in scenario_4_3_0_0:
+            if scenarios_set and scenario['value'] in scenarios_set:
+                scenario_info.append(ScenarioType(type=scenario['type'], desc=scenario['desc'], value=scenario['value']))
+        return scenario_info

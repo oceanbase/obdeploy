@@ -71,6 +71,7 @@ const getMoreColumns = (
         const param = {
           defaultValue,
         };
+
         if (defaultUnit) param.defaultUnit = defaultUnit;
         if (rulesList?.length) {
           const targetRuleDetail = rulesList?.find(
@@ -94,6 +95,7 @@ const getMoreColumns = (
             },
           }));
         }
+
         return (
           <Form.Item
             validateFirst={true}
@@ -101,7 +103,7 @@ const getMoreColumns = (
             name={[componentKey, 'parameters', record.name || '', 'params']}
             rules={rules}
           >
-            <Parameter {...param} />
+            <Parameter {...record.parameterValue} />
           </Form.Item>
         );
       },

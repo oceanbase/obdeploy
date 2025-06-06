@@ -113,6 +113,8 @@ class ComponentHandler(BaseHandler):
             componentInfo.version_type = const.CE
         for componentInfo in component_dict[const.OCEANBASE]:
             componentInfo.version_type = const.BUSINESS
+        for componentInfo in component_dict[const.OCEANBASE_STANDALONE]:
+            componentInfo.version_type = const.STANDALONE
         for componentInfo in component_dict[const.OBPROXY_CE]:
             componentInfo.version_type = const.CE
         for componentInfo in component_dict[const.OBPROXY]:
@@ -179,7 +181,7 @@ class ComponentHandler(BaseHandler):
             repository.set_version(parameter_filter.version)
             workflows = self.obd.get_workflows('get_generate_keys', repositories=[repository])
             component_kwargs = {repository.name: {"return_generate_keys": True, "generate_consistent_config": True, "spacename": spacename, "clients": {}}}
-            workflow_ret = self.obd.run_workflow(workflows, repositories=[repository], **component_kwargs)
+            workflow_ret = self.obd.run_workflow(workflows, repositories=[repository], no_found_act='ignore', **component_kwargs)
             auto_keys = []
             if parameter_filter.component not in const.no_generate_comps:
                 if not workflow_ret:

@@ -166,10 +166,12 @@ export const getErrorInfo = ({ response, data, type, errorPipeline }: any) => {
   };
 };
 
+// 特殊字符支持 ~!@#%^&*_\-+=|(){}[]:;,.?/
+export const PASSWORD_REGEX =
+  /^(?=(.*[a-z]){2,})(?=(.*[A-Z]){2,})(?=(.*\d){2,})(?=(.*[~!@#%^&*_\-+=|(){}\[\]:;,.?/]){2,})[A-Za-z\d~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/;
+
 export const getRandomPassword = (isToken?: boolean) => {
-  const randomPasswordReg = isToken
-    ? /[A-Za-z\d]{32}/
-    : /^(?=(.*[a-z]){2,})(?=(.*[A-Z]){2,})(?=(.*\d){2,})(?=(.*[~!@#%^&*_\-+=|(){}\[\]:;,.?/]){2,})[A-Za-z\d~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/;
+  const randomPasswordReg = isToken ? /[A-Za-z\d]{32}/ : PASSWORD_REGEX;
   const newValue = new RandExp(randomPasswordReg).gen();
   if (randomPasswordReg.test(newValue)) {
     return newValue;
@@ -268,6 +270,31 @@ export const ocpServersValidator = (_: any, value: string[]) => {
     return Promise.resolve();
   }
 };
+// 适用于 IP/NETMASK 地址，包含百分号（%）或下划线（_）的 IP 地址
+export const IPValidator = (_: any, value: string[]) => {
+  const ipPattern = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+  const wildcardPattern = /^(?:\d{1,3}\.){3}[\d%_]+$/;
+  const cidrPattern =
+    /^(?:\d{1,3}\.){3}\d{1,3}\/(?:\d{1,2}|(?:\d{1,3}\.){3}\d{1,3})$/;
+
+  for (const ip of value) {
+    if (
+      !ipPattern.test(ip) &&
+      !wildcardPattern.test(ip) &&
+      !cidrPattern.test(ip)
+    ) {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.InvalidIpFormat',
+            defaultMessage: 'IP 地址格式无效',
+          }),
+        ),
+      );
+    }
+  }
+  return Promise.resolve();
+};
 
 export const validateErrors = async (
   errorFileds: any[],
@@ -288,8 +315,35 @@ export const validateErrors = async (
   }
 };
 
+export const dnsValidator = (_: any, value: string[]) => {
+  if (!value || value.length === 0) {
+    // return Promise.reject('请输入有效的域名');
+    return Promise.reject(
+      intl.formatMessage({
+        id: 'OBD.pages.components.NodeConfig.DJSND890',
+        defaultMessage: '请输入有效的域名',
+      }),
+    );
+  }
+
+  // 域名规则正则表达式
+  const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  for (const server of value) {
+    if (!domainRegex.test(server)) {
+      return Promise.reject(
+        intl.formatMessage({
+          id: 'OBD.pages.components.NodeConfig.DJSND891',
+          defaultMessage: '域名格式不正确',
+        }),
+      );
+    }
+  }
+
+  return Promise.resolve();
+};
 export const serversValidator = (_: any, value: string[], type: string) => {
-  if (value?.some((item) => !validator.isIP(item))) {
+  if (value.length > 0 && value?.some((item) => !validator.isIP(item))) {
     if (type === 'OBServer') {
       return Promise.reject(
         new Error(

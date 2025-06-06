@@ -50,10 +50,12 @@ def passwd_format(passwd):
     return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 
-def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
+def display(plugin_context, cursor, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     stdio.start_loading('Wait for observer init')
     cluster_config = plugin_context.cluster_config
+    if not config_encrypted:
+        display_encrypt_password = None
     if plugin_context.get_variable('restart_manager'):
         cursor = plugin_context.get_return('connect').get_return('cursor')
     try:
@@ -63,9 +65,9 @@ def display(plugin_context, cursor, display_encrypt_password='******', *args, **
                 if servers:
                     stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'],
                         lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title=cluster_config.name)
-                    user = 'root@%s' % cursor.tenant
+                    user = 'root@%s' % (cursor.tenant if cursor.tenant else 'sys')
                     password = cluster_config.get_global_conf().get('root_password', '') if not display_encrypt_password else display_encrypt_password
-                    cmd = 'obclient -h%s -P%s -u%ssys %s-Doceanbase -A' % (servers[0]['svr_ip'], servers[0]['inner_port'], user, '-p%s ' % passwd_format(password) if password else '')
+                    cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A' % (servers[0]['svr_ip'], servers[0]['inner_port'], user, '-p%s ' % passwd_format(password) if password else '')
                     stdio.print(cmd)
                     stdio.stop_loading('succeed')
                     info_dict = {

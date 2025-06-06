@@ -57,6 +57,7 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
 
     if plugin_context.get_variable('tenant_exists'):
         return plugin_context.return_true()
+    cmd = ''
     for options in multi_options:
         global tenant_cursor
         tenant_cursor = None
@@ -83,4 +84,4 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
                     break
             cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
             stdio.print(cmd)
-    return plugin_context.return_true()
+    return plugin_context.return_true(cmd=cmd)

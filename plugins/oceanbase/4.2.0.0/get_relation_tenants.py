@@ -28,7 +28,7 @@ def get_relation_tenants(plugin_context, repository, cluster_configs={}, *args, 
     if kwargs.get('option_mode') == 'create_standby_tenant':
         deploy_name = cmds[1]
         tenant_name = cmds[2]
-    if kwargs.get('option_mode') == 'switchover_tenant':
+    if kwargs.get('option_mode') in ['switchover_tenant', 'log_source']:
         deploy_name = cmds[0]
         tenant_name = cmds[1]
     stdio = plugin_context.stdio

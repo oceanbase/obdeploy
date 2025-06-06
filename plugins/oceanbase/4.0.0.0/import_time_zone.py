@@ -75,12 +75,16 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
     cursors = []
     if plugin_context.get_variable('tenant_exists'):
         return plugin_context.return_true()
+    cmd_str = ''
     for options in multi_options:
         global tenant_cursor
         tenant_cursor = None
         name = getattr(options, 'tenant_name', 'test')
         mode = getattr(options, 'mode', 'mysql')
         root_password = getattr(options, name+'_root_password', "")
+        if len(multi_options) == 1:
+            plugin_context.set_variable('tenant_name', name)
+            plugin_context.set_variable('root_password', root_password)
 
         if mode == 'oracle':
             stdio.verbose('Import time zone in oracle tenant is not supported')
@@ -104,9 +108,9 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
                         stdio.warn('execute import_srs_data.py failed')
                     break
             cursors.append(tenant_cursor)
-            cmd = 'obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+            cmd_str = 'obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
             if COMMAND_ENV.get('INTERACTIVE_INSTALL') == '1':
                 continue
-            cmd = FormatText.success(cmd)
+            cmd = FormatText.success(cmd_str)
             stdio.print(cmd)
-    return plugin_context.return_true(tenant_cursor=cursors)
+    return plugin_context.return_true(tenant_cursor=cursors, cmd=cmd_str)

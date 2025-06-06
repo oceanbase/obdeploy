@@ -62,8 +62,8 @@ def list_tenant(plugin_context, cursor, config_encrypted, relation_tenants={}, *
             return
 
         if tenant['TENANT_ROLE'] == 'STANDBY':
-            query_standby_tenant_sql = "SELECT LS_ID,SYNC_STATUS, ERR_CODE, COMMENT as ERROR_COMMENT,b.VALUE as PRIMARY_TENANT_INFO, (CASE WHEN SYNC_STATUS = 'NORMAL' THEN 5 WHEN SYNC_STATUS = 'RESTORE SUSPEND' THEN 4 WHEN SYNC_STATUS = 'SOURCE HAS A GAP' THEN 1 WHEN SYNC_STATUS = 'STANDBY LOG NOT MATCH' THEN 2 ELSE 3 END) AS SYNC_STATUS_WEIGHT FROM oceanbase.v$ob_ls_log_restore_status as a, oceanbase.cdb_ob_log_restore_source as b where a.tenant_id =%s order by SYNC_STATUS_WEIGHT limit 1"
-            res_status = cursor.fetchone(query_standby_tenant_sql, (tenant['TENANT_ID'], ))
+            query_standby_tenant_sql = "SELECT LS_ID,SYNC_STATUS, ERR_CODE, COMMENT as ERROR_COMMENT,b.VALUE as PRIMARY_TENANT_INFO, (CASE WHEN SYNC_STATUS = 'NORMAL' THEN 5 WHEN SYNC_STATUS = 'RESTORE SUSPEND' THEN 4 WHEN SYNC_STATUS = 'SOURCE HAS A GAP' THEN 1 WHEN SYNC_STATUS = 'STANDBY LOG NOT MATCH' THEN 2 ELSE 3 END) AS SYNC_STATUS_WEIGHT FROM oceanbase.v$ob_ls_log_restore_status as a, oceanbase.cdb_ob_log_restore_source as b where a.tenant_id =%s and b.tenant_id=%s order by SYNC_STATUS_WEIGHT limit 1"
+            res_status = cursor.fetchone(query_standby_tenant_sql, (tenant['TENANT_ID'], tenant['TENANT_ID'], ))
             res_status and standby_tenants.append(dict(tenant, **res_status))
             need_list_standby = True
         elif (deploy_name, tenant['TENANT_NAME']) in relation_tenants:

@@ -20,6 +20,7 @@ import {
   Alert,
   Button,
   Modal,
+  Popconfirm,
   Result,
   Space,
   Spin,
@@ -28,17 +29,19 @@ import {
 } from 'antd';
 import { isEmpty } from 'lodash';
 import { useState } from 'react';
+import CreatTenant from '../CreateTenantDrawer';
 import CustomFooter from '../CustomFooter';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
-const { Paragraph } = Typography;
+const { Paragraph, Text } = Typography;
 
 export enum ResultType {
   OBInstall = 'obInstall',
   CompInstall = 'componentInstall',
+  TenantInstall = 'tenantInstall',
 }
 
 interface InstallResultCompProps {
@@ -77,15 +80,17 @@ export default function InstallResultComp({
   ConfigserverAlert,
 }: InstallResultCompProps) {
   const [currentExpeandedName, setCurrentExpeandedName] = useState('');
+  const [obConnectInfo, setObConnectInfo] = useState('');
   const { deployUser = '', componentConfig = {} } = useModel('componentDeploy');
   const { home_path = '' } = componentConfig;
+  const [open, setOpen] = useState<boolean>(false);
 
   const onExpand = (expeanded: boolean, record: API.DeploymentReport) => {
     if (expeanded && !logs?.[record.name]) {
       setCurrentExpeandedName(record.name);
       if (type === ResultType.CompInstall) {
         handleInstallLog({ name, components: record.name });
-      } else {
+      } else if (type === ResultType.OBInstall) {
         handleInstallLog({ name, component_name: record.name });
       }
     }
@@ -160,7 +165,7 @@ export default function InstallResultComp({
   const { components = {} } = ocpConfigData;
   const { oceanbase = {} } = components;
 
-   // 上报遥测数据
+  // 上报遥测数据
   const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
     manual: true,
   });
@@ -180,6 +185,12 @@ export default function InstallResultComp({
       }
     },
   });
+
+  const obConnect = connectInfo?.find((item) =>
+    item.component.includes('oceanbase'),
+  );
+
+  const obConnectUrl = obConnect?.connect_url;
 
   return (
     <Space className={styles.spaceWidth} direction="vertical" size="middle">
@@ -211,7 +222,7 @@ export default function InstallResultComp({
               {type === ResultType.OBInstall
                 ? intl.formatMessage({
                     id: 'OBD.pages.components.InstallFinished.OceanbaseSuccessfullyDeployed',
-                    defaultMessage: 'OceanBase 部署成功',
+                    defaultMessage: 'OceanBase 部署成功!',
                   })
                 : intl.formatMessage({
                     id: 'OBD.component.InstallResultComp.ComponentDeploymentSucceeded',
@@ -315,23 +326,101 @@ export default function InstallResultComp({
         />
       </ProCard>
       <CustomFooter>
-        <Button
-          type="primary"
-          onClick={handleFinished}
-          data-aspm-click="c307514.d317297"
-          data-aspm-desc={intl.formatMessage({
-            id: 'OBD.pages.components.InstallFinished.DeploymentResultDeploymentCompleted',
-            defaultMessage: '部署结果-部署完成',
-          })}
-          data-aspm-param={``}
-          data-aspm-expo
-        >
-          {intl.formatMessage({
-            id: 'OBD.pages.components.InstallFinished.Complete',
-            defaultMessage: '完成',
-          })}
-        </Button>
+        {type === ResultType.OBInstall ? (
+          <>
+            <Popconfirm
+              title={
+                <>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>
+                    {intl.formatMessage({
+                      id: 'OBD.pages.components.InstallFinished.0116F3E1',
+                      defaultMessage: '确定要退出页面吗？',
+                    })}
+                  </div>
+                  <div style={{ color: '#5c6b8a', margin: '8px 0' }}>
+                    {intl.formatMessage({
+                      id: 'OBD.pages.components.InstallFinished.4C585A48',
+                      defaultMessage: '退出前，请确保已复制访问地址及账密信息',
+                    })}
+                  </div>
+                  <Text
+                    copyable={{
+                      text: `${obConnectUrl} ${obConnectInfo}`,
+                    }}
+                    style={{ color: '#006aff' }}
+                  >
+                    {intl.formatMessage({
+                      id: 'OBD.pages.components.InstallFinished.0B5951B4',
+                      defaultMessage: '复制链接信息',
+                    })}
+                  </Text>
+                </>
+              }
+              onConfirm={exitOnOk}
+              okText={intl.formatMessage({
+                id: 'OBD.pages.components.InstallFinished.CE82EA51',
+                defaultMessage: '退出',
+              })}
+              cancelText={intl.formatMessage({
+                id: 'OBD.pages.components.InstallFinished.F8BD249F',
+                defaultMessage: '取消',
+              })}
+              okButtonProps={{
+                danger: true,
+              }}
+              icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
+            >
+              <Button
+                type="default"
+                data-aspm-click="c307514.d317297"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallFinished.DeploymentResultDeploymentCompleted',
+                  defaultMessage: '部署结果-部署完成',
+                })}
+                data-aspm-param={``}
+                data-aspm-expo
+              >
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallFinished.B444903C',
+                  defaultMessage: '退出',
+                })}
+              </Button>
+            </Popconfirm>
+            {installStatus === 'SUCCESSFUL' && (
+              <Button type="primary" onClick={() => setOpen(true)}>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallFinished.15AD4E27',
+                  defaultMessage: '创建业务租户',
+                })}
+              </Button>
+            )}
+          </>
+        ) : (
+          <Button
+            type="primary"
+            onClick={handleFinished}
+            data-aspm-click="c307514.d317297"
+            data-aspm-desc={intl.formatMessage({
+              id: 'OBD.pages.components.InstallFinished.DeploymentResultDeploymentCompleted',
+              defaultMessage: '部署结果-部署完成',
+            })}
+            data-aspm-param={``}
+            data-aspm-expo
+          >
+            {intl.formatMessage({
+              id: 'OBD.pages.components.InstallFinished.Complete',
+              defaultMessage: '退出',
+            })}
+          </Button>
+        )}
       </CustomFooter>
+      <CreatTenant
+        open={open}
+        setOpen={setOpen}
+        obConnectInfo={obConnectInfo as string}
+        setObConnectInfo={setObConnectInfo}
+        obConnectUrl={obConnect?.access_url}
+      />
     </Space>
   );
 }

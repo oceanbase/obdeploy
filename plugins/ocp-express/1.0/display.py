@@ -18,11 +18,15 @@ from __future__ import absolute_import, division, print_function
 from const import ENCRYPT_PASSWORD
 from tool import NetUtil
 
+def passwd_format(passwd):
+    return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
-def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
+def display(plugin_context, cursor, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     servers = cluster_config.servers
+    if not config_encrypted:
+        display_encrypt_password = None
     results = []
     for server in servers:
         api_cursor = cursor.get(server)
@@ -30,11 +34,12 @@ def display(plugin_context, cursor, display_encrypt_password='******', *args, **
         if ip == '127.0.0.1':
             ip = NetUtil.get_host_ip()
         url = 'http://{}:{}'.format(ip, api_cursor.port)
+        password = cluster_config.get_global_conf_with_default().get('_admin_password_', 'oceanbase') if not display_encrypt_password else display_encrypt_password
         results.append({
             'ip': ip,
             'port': api_cursor.port,
             'user': "admin",
-            'password': cluster_config.get_global_conf_with_default().get('_admin_password_', 'oceanbase') if not display_encrypt_password else display_encrypt_password,
+            'password': passwd_format(password),
             'url': url,
             'status': 'active' if api_cursor and api_cursor.status(stdio) else 'inactive'
         })

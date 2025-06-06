@@ -1,9 +1,7 @@
 import Banner from '@/component/Banner';
-import * as OCP from '@/services/ocp_installer_backend/OCP';
 import { intl } from '@/utils/intl';
 import { DownOutlined } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
-import { useRequest } from 'ahooks';
 import { Button, Card, Col, Dropdown, Row, Space, Tag, Tooltip } from 'antd';
 import React from 'react';
 import { getLocale, history, useModel } from 'umi';
@@ -35,12 +33,8 @@ export default function Guide() {
   const isCN = locale === 'zh-CN';
   const buttonStyle = isCN ? styles.guideBtn : styles.guideBtnUS;
 
-  const { data: suicide } = useRequest(OCP.getWebType, {
-    defaultParams: [{}],
-  });
-
-  // 当前环境是否为单机版
-  const standAlone = suicide?.data === 'oceanbase-standalone';
+  // 适用于OBD 部署 320
+  const standAlone = false;
 
   const guideConfigListRef = [
     {
@@ -52,10 +46,13 @@ export default function Guide() {
         id: 'OBD.pages.Guide.OceanbaseAndSupportingTools',
         defaultMessage: 'OceanBase 及配套工具',
       }),
-      detail: intl.formatMessage({
-        id: 'OBD.pages.Guide.DistributedDatabasesAndVariousTools',
-        defaultMessage: '分布式数据库以及各类工具，方便客户管理、运维和使用',
-      }),
+      detail: standAlone
+        ? '单机以及各类工具，方便客户管理、运维和使用'
+        : intl.formatMessage({
+            id: 'OBD.pages.Guide.DistributedDatabasesAndVariousTools',
+            defaultMessage:
+              '分布式数据库以及各类工具，方便客户管理、运维和使用',
+          }),
       action: (
         <Button
           onClick={() => {
@@ -172,7 +169,7 @@ export default function Guide() {
       }),
       detail: intl.formatMessage({
         id: 'OBD.pages.Guide.YouCanInstallAndUninstall.1',
-        defaultMessage: '可对集群进行 OCP Express、OBAgent 等组件安装、卸载',
+        defaultMessage: '可集群进行 OBAgent、Prometheus 等组件安装、卸载',
       }),
       ...(standAlone ? (
         <></>

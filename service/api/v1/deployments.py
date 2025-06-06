@@ -18,7 +18,8 @@ from service.api import response_utils
 from service.api.response import OBResponse, DataList
 from service.handler import handler_utils
 from service.model.deployments import DeploymentConfig, PreCheckResult, RecoverChangeParameter, TaskInfo, \
-    ConnectionInfo, InstallLog, Deployment, DeploymentInfo, DeploymentReport, DeploymentStatus, ScenarioType
+    ConnectionInfo, InstallLog, Deployment, DeploymentInfo, DeploymentReport, DeploymentStatus, ScenarioType, \
+    CreateTenantConfig, CreateTenantLog
 
 router = APIRouter()
 
@@ -122,6 +123,23 @@ async def start(name: str, background_tasks: BackgroundTasks):
         return response_utils.new_internal_server_error_exception(ex)
     return response_utils.new_ok_response("")
 
+@router.get("/deployments/{name}/start/log",
+            response_model=OBResponse[InstallLog],
+            description='query start log',
+            operation_id='queryStartLog',
+            tags=['Deployments'])
+async def get_start_log(name: str = Path(description='deployment name'),
+                          offset: int = Query(None, description='log offset'),
+                          component_name: str = Query(None, description='component name')):
+    handler = handler_utils.new_deployment_handler()
+    task_info = handler.get_start_task_info(name)
+    if task_info is None:
+        return response_utils.new_not_found_exception("task {0} not found".format(name))
+    origin_log = handler.buffer.read() if component_name is None else handler.get_install_log_by_component(component_name)
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    log_info = InstallLog(log=masked_log[offset:], offset=len(masked_log))
+    return response_utils.new_ok_response(log_info)
+
 
 @router.post("/deployments/{name}/stop",
              response_model=OBResponse,
@@ -136,6 +154,22 @@ async def stop(name: str, background_tasks: BackgroundTasks):
         return response_utils.new_internal_server_error_exception(ex)
     return response_utils.new_ok_response("")
 
+@router.get("/deployments/{name}/stop/log",
+            response_model=OBResponse[InstallLog],
+            description='query stop log',
+            operation_id='queryStopLog',
+            tags=['Deployments'])
+async def get_stop_log(name: str = Path(description='deployment name'),
+                          offset: int = Query(None, description='log offset'),
+                          component_name: str = Query(None, description='component name')):
+    handler = handler_utils.new_deployment_handler()
+    task_info = handler.get_stop_task_info(name)
+    if task_info is None:
+        return response_utils.new_not_found_exception("task {0} not found".format(name))
+    origin_log = handler.buffer.read() if component_name is None else handler.get_install_log_by_component(component_name)
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    log_info = InstallLog(log=masked_log[offset:], offset=len(masked_log))
+    return response_utils.new_ok_response(log_info)
 
 @router.get("/deployments/{name}/connection",
             response_model=OBResponse[DataList[ConnectionInfo]],
@@ -266,5 +300,78 @@ async def get_destroy_task_info(
 async def get_destroy_task_info():
 
     return response_utils.new_ok_response('inknnsdlafasd')
+
+@router.get("/deployments/{name}/unitresource",
+             response_model=OBResponse,
+             description='unit resource',
+             operation_id='unitResource',
+             tags=['Deployments'])
+async def unit_resource(name: str):
+    handler = handler_utils.new_deployment_handler()
+    try:
+        unit_resource = handler.unit_resource(name)
+    except Exception as ex:
+        return response_utils.new_internal_server_error_exception(ex)
+    return response_utils.new_ok_response(unit_resource)
+
+
+@router.post("/deployments/{name}/tenants",
+             response_model=OBResponse,
+             description='create tenant',
+             operation_id='createTenant',
+             tags=['Deployments'])
+async def create_tenant(background_tasks: BackgroundTasks, config: CreateTenantConfig, name: str):
+    handler = handler_utils.new_deployment_handler()
+    handler.buffer.clear()
+    try:
+        task_info = handler.create_tenant(name, background_tasks, config)
+    except Exception as ex:
+        return response_utils.new_internal_server_error_exception(ex)
+    return response_utils.new_ok_response(task_info)
+
+
+@router.get("/deployments/{name}/tenants/{task_id}",
+             response_model=OBResponse,
+             description='create tenant task info',
+             operation_id='createTenantTaskInfo',
+             tags=['Deployments'])
+async def get_create_tenant_task(task_id: int = Path(description="create tenant task id")):
+    handler = handler_utils.new_deployment_handler()
+    try:
+        task_info = handler.get_create_tenant_task_info(task_id)
+    except Exception as ex:
+        return response_utils.new_internal_server_error_exception(ex)
+    return response_utils.new_ok_response(task_info)
+
+
+@router.get("/deployments/{name}/tenants/{task_id}/log",
+            response_model=OBResponse[InstallLog],
+            description='query create tenant log',
+            operation_id='queryCreateTenantLog',
+            tags=['Deployments'])
+async def get_install_log(offset: int = Query(None, description='log offset'),
+                          task_id: int = Path(description="create tenant task id"),
+                          detail_log: bool = Query(False, description="detail log")):
+    handler = handler_utils.new_deployment_handler()
+    task_info = handler.get_create_tenant_task_info(task_id)
+    if task_info is None:
+        return response_utils.new_not_found_exception("task {0} not found".format(task_id))
+    trace_id = handler.context['create_tenant_trace'][task_id]
+    origin_log = handler.buffer.read() if not detail_log else handler.get_log_by_trace_id(trace_id)
+    masked_log = handler.obd.stdio.table_log_masking(handler.obd.stdio.log_masking(origin_log))
+    log_info = CreateTenantLog(log=masked_log[offset:], offset=len(masked_log))
+    return response_utils.new_ok_response(log_info)
+
+
+@router.get("/deployments/{name}/scenario",
+            response_model=OBResponse[DataList[ScenarioType]],
+            description='get tenant scenario',
+            operation_id='getTenantScenario',
+            tags=['Deployments'])
+async def get_tenant_scenario(name: str):
+    handler = handler_utils.new_deployment_handler()
+    info = handler.get_tenant_scenario(name)
+    return response_utils.new_ok_response(info)
+
 
 

@@ -48,15 +48,19 @@ export const formatMoreConfig = (
 
     let configParameter = item?.config_parameters.filter((parameter) => {
       let configKeys = { ...showConfigKeys };
+
       if (!isSelectOcpexpress) {
         configKeys.oceanbase = [
           ...configKeys.oceanbase,
           ...selectOcpexpressConfig,
         ];
       }
-      return !configKeys?.[componentConfig.componentKey]?.includes(
-        parameter.name,
-      );
+
+      const componentKey =
+        componentConfig.componentKey === 'oceanbase-standalone'
+          ? 'oceanbase'
+          : componentConfig.componentKey;
+      return !configKeys?.[componentKey]?.includes(parameter.name);
     });
 
     const newConfigParameter: API.NewConfigParameter[] = configParameter.map(
@@ -536,6 +540,14 @@ export const connectInfoForPwd = (
       item.password = components.oceanbase?.root_password;
       item.connect_url = insertPwd(item.connect_url, item.password);
     }
+    if (item.component === 'obshell_dashboard') {
+      item.password = components.oceanbase?.root_password;
+      item.user = 'root';
+      item.connect_url = item.access_url;
+    }
+    if (item.component === 'oceanbase-standalone') {
+      item.password = components.oceanbase?.root_password;
+    }
     if (item.component === 'obproxy-ce') {
       if (components.obproxy.obproxy_sys_password) {
         item.password = components.obproxy.obproxy_sys_password;
@@ -548,6 +560,12 @@ export const connectInfoForPwd = (
     }
     if (item.component === 'ocp-express' && components.ocpexpress) {
       item.password = components.ocpexpress?.admin_passwd;
+    }
+    if (item.component === 'prometheus') {
+      item.password = components.prometheus?.basic_auth_users?.admin;
+    }
+    if (item.component === 'grafana') {
+      item.password = components.grafana?.login_password;
     }
   });
   return connectInfo;

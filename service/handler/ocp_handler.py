@@ -158,7 +158,7 @@ class OcpHandler(BaseHandler):
             comp_config['global'] = dict()
 
         for key in config_dict:
-            if config_dict[key] and key in ('cluster_name', 'prometheus_listen_port', 'listen_port', 'home_path'):
+            if config_dict[key] and key in ('cluster_name', 'prometheus_listen_port', 'listen_port', 'home_path', 'vip_address', 'vip_port', 'dns'):
                 comp_config['global'][key] = config_dict[key]
 
         comp_config['global']['enable_obproxy_rpc_service'] = False

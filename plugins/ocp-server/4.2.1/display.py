@@ -20,10 +20,12 @@ from tool import NetUtil
 from copy import deepcopy
 
 
-def display(plugin_context, display_encrypt_password='******', *args, **kwargs):
+def display(plugin_context, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     servers = cluster_config.servers
+    if not config_encrypted:
+        display_encrypt_password = None
     results = []
     start_env = plugin_context.get_variable('start_env')
     cursor = plugin_context.get_return('connect', spacename=cluster_config.name).get_return('cursor')

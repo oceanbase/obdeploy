@@ -9,7 +9,6 @@
 - name: login_password
   name_local: 登录密码
   require: true
-  essential: true
   type: STRING
   need_reload: true
   description_en: password for Grafana
@@ -67,7 +66,6 @@
 - name: port
   name_local: HTTP 端口
   require: true
-  essential: true
   type: INT
   default: 3000
   min_value: 1

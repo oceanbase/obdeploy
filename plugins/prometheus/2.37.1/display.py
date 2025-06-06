@@ -21,10 +21,15 @@ from tool import YamlLoader, NetUtil
 yaml = YamlLoader()
 
 
-def display(plugin_context, cursor, display_encrypt_password='******', *args, **kwargs):
+def passwd_format(passwd):
+    return "'{}'".format(passwd.replace("'", "'\"'\"'"))
+
+def display(plugin_context, cursor, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     servers = cluster_config.servers
+    if not config_encrypted:
+        display_encrypt_password = None
     results = []
     for server in servers:
         api_cursor = cursor.get(server)
@@ -36,12 +41,13 @@ def display(plugin_context, cursor, display_encrypt_password='******', *args, **
         if ip == '127.0.0.1':
             ip = NetUtil.get_host_ip()
         url = '%s://%s:%s' % (protocol, ip, server_config['port'])
+        password = (password if password else '') if not display_encrypt_password else display_encrypt_password
         results.append({
             'ip': ip,
             'port': api_cursor.port,
             'url': url,
             'user': user if user else '',
-            'password': (password if password else '') if not display_encrypt_password else display_encrypt_password,
+            'password': passwd_format(password) if password else '',
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })
     stdio.print_list(results, ['url', 'user', 'password', 'status'], lambda x: [x['url'], x['user'], x['password'], x['status']], title=cluster_config.name)

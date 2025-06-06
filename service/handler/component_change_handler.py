@@ -408,6 +408,15 @@ class ComponentChangeHandler(BaseHandler):
         if not deploy:
             deploy = self.obd.deploy_manager.get_deploy_config(name)
             self.obd.set_deploy(deploy)
+
+        task_info = task.get_task_manager().get_task_info(name, task_type="precheck")
+        if task_info is not None:
+            if task_info.status == TaskStatus.FINISHED:
+                precheck_result.status = task_info.result
+                if task_info.result == TaskResult.FAILED:
+                    precheck_result.message = '{}'.format(task_info.exception)
+            else:
+                precheck_result.status = TaskResult.RUNNING
         components = deploy.deploy_config._added_components
         info = []
         total = 0
@@ -434,15 +443,6 @@ class ComponentChangeHandler(BaseHandler):
                         continue
                     all_passed, finished, total = self.parse_precheck_result(all_passed, component, finished, info, server, total, result)
         info.sort(key=lambda p: p.status)
-
-        task_info = task.get_task_manager().get_task_info(name, task_type="precheck")
-        if task_info is not None:
-            if task_info.status == TaskStatus.FINISHED:
-                precheck_result.status = task_info.result
-                if task_info.result == TaskResult.FAILED:
-                    precheck_result.message = '{}'.format(task_info.exception)
-            else:
-                precheck_result.status = TaskResult.RUNNING
         precheck_result.info = info
         precheck_result.total = total
         if total == 0:
