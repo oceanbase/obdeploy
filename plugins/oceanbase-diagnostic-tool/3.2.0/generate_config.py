@@ -36,9 +36,6 @@ def generate_config(plugin_context, *args, **kwargs):
     options = plugin_context.options
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
-    print("---------------------------------------------------")
-    print(cluster_config)
-    print("---------------------------------------------------")
     global_conf = cluster_config.get_global_conf()
     deploy_name = plugin_context.deploy_name
     user_config = deploy_config.user

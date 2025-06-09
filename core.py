@@ -4494,7 +4494,7 @@ class ObdHome(object):
             self.set_deploy(deploy)
             self._call_stdio('verbose', 'Get deploy configuration')
             deploy_config = deploy.deploy_config
-        deploy_config.components = {tool_name: obdiag_config}
+        # deploy_config.components = {tool_name: obdiag_config}
         workflow_name='diag'
         pkg = self.mirror_manager.get_best_pkg(name=tool_name)
         if not pkg:

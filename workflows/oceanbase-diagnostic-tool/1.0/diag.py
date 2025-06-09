@@ -19,5 +19,5 @@ import const
 
 
 def diag(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'diag')
+    workflow.add(const.STAGE_FIRST, 'generate_config', 'diag')
     return plugin_context.return_true()
