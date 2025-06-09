@@ -86,7 +86,6 @@
 - name: obshell_port
   name_local: obshell 服务端口
   require: true
-  essential: true
   type: INT
   default: 2886
   min_value: 1025
@@ -1829,7 +1828,6 @@
   description_local: ocp express的元数据库使用的租户规格
 - name: ocp_meta_tenant_max_cpu
   name_local: OCP express元数据库租户的CPU数
-  essential: true
   require: false
   type: INT
   default: 1
@@ -1838,7 +1836,6 @@
   description_local: ocp express的元数据库使用的CPU数量
 - name: ocp_meta_tenant_memory_size
   name_local: OCP express元数据库租户内存
-  essential: true
   require: false
   type: CAPACITY_MB
   default: 2G
@@ -1847,7 +1844,6 @@
   description_local: ocp express的元数据库使用的租户内存大小
 - name: ocp_meta_tenant_log_disk_size
   name_local: OCP express元数据库租户日志磁盘大小
-  essential: true
   require: false
   type: CAPACITY_MB
   default: 6656M
@@ -1869,12 +1865,13 @@
   description_en: The database name for ocp meta db
   description_local: ocp express的元数据库使用的数据库名
 - name: ocp_meta_password
+  essential: true
   require: false
   type: STRING
   default: oceanbase
   need_redeploy: true
-  description_en: The database name for ocp meta db
-  description_local: ocp express的元数据库使用的数据库名
+  description_en: The password for ocp meta tenant
+  description_local: ocp express的元数据库租户密码
 - name: ocp_agent_monitor_password
   require: false
   type: STRING
@@ -1974,3 +1971,35 @@
   need_redeploy: true
   description_en: The tenant specifications for binlog meta db
   description_local: binlog 的meta数据库使用的租户定义
+- name: zone_region
+  require: false
+  type: STRING
+  default: 'deault_region'
+  min_value: NULL
+  max_value: NULL
+  need_reload: true
+  description_en: zone region
+  description_local: 单个zone的地域
+- name: zone_idc
+  require: false
+  type: STRING
+  default: 'default_idc'
+  min_value: NULL
+  max_value: NULL
+  need_reload: true
+  description_en: zone idc
+  description_local: 单个zone的机房
+- name: enable_auto_start
+  require: false
+  type: BOOL
+  default: false
+  need_reload: true
+  description_en: Support observer auto-start on boot
+  description_local: 支持 observer 开机自启动
+- name: install_utils
+  require: false
+  type: BOOL
+  default: false
+  need_reload: true
+  description_en: Install oceanbase-ce-utils package
+  description_local: 安装oceanbase-ce-utils包

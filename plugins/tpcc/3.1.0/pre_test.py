@@ -23,7 +23,7 @@ from ssh import LocalClient
 from tool import DirectoryUtil
 
 from ssh import LocalClient
-from const import TOOL_TPCC, TOOL_TPCC_BENCHMARKSQL, COMP_OBCLIENT, COMPS_ODP, COMPS_OB
+from const import TOOL_TPCC, TOOL_TPCC_BENCHMARKSQL, COMP_OBCLIENT, COMP_JRE
 from tool import get_option
 
 PROPS4OB_TEMPLATE = """
@@ -124,7 +124,7 @@ def pre_test(plugin_context, *args, **kwargs):
     obclient_bin = get_option(options, 'obclient_bin', 'obclient')
     cmd = '%s --help'
     path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd, stdio)
-    if result:
+    if result is not None:
         stdio.error(
             '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
                 result.stderr, obclient_bin))
@@ -134,12 +134,14 @@ def pre_test(plugin_context, *args, **kwargs):
 
     java_bin = get_option(options, 'java_bin', 'java')
     cmd = '%s -version'
-    path, result = file_path_check(java_bin, TOOL_TPCC, 'lib/bin/java', cmd, stdio)
-    if result:
-        stdio.error(
-            '%s\n%s is not an executable file. please use `--java-bin` to set.\nYou may not have java installed' % (
-                result.stderr, java_bin))
-        return
+    path, result = file_path_check(java_bin, COMP_JRE, 'bin/java', cmd, stdio)
+    if result is not None:
+        path, result = file_path_check(java_bin, TOOL_TPCC, 'lib/bin/java', cmd, stdio)
+        if result is not None:
+            stdio.error(
+                '%s\n%s is not an executable file. please use `--java-bin` to set.\nYou may not have java installed' % (
+                    result.stderr, java_bin))
+            return
     java_bin = path
     setattr(options, 'java_bin', java_bin)
 

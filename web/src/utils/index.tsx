@@ -5,6 +5,7 @@ import { message, Modal, notification } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
 import RandExp from 'randexp';
 import { getLocale, history } from 'umi';
+import validator from 'validator';
 import { SPECIAL_SYMBOLS_OCP } from './helper';
 
 export const handleResponseError = (desc: any, msg?: string | undefined) => {
@@ -109,6 +110,7 @@ export const handleQuit = (
       });
     },
   });
+  sessionStorage.removeItem('componentSelect');
 };
 
 export const checkLowVersion = (version: string) => {
@@ -116,6 +118,7 @@ export const checkLowVersion = (version: string) => {
 };
 
 export const getErrorInfo = ({ response, data, type, errorPipeline }: any) => {
+  sessionStorage.removeItem('componentSelect');
   if (errorPipeline?.length >= 5) {
     return {
       title: intl.formatMessage({
@@ -163,10 +166,12 @@ export const getErrorInfo = ({ response, data, type, errorPipeline }: any) => {
   };
 };
 
+// 特殊字符支持 ~!@#%^&*_\-+=|(){}[]:;,.?/
+export const PASSWORD_REGEX =
+  /^(?=(.*[a-z]){2,})(?=(.*[A-Z]){2,})(?=(.*\d){2,})(?=(.*[~!@#%^&*_\-+=|(){}\[\]:;,.?/]){2,})[A-Za-z\d~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/;
+
 export const getRandomPassword = (isToken?: boolean) => {
-  const randomPasswordReg = isToken
-    ? /[A-Za-z\d]{32}/
-    : /^(?=(.*[a-z]){2,})(?=(.*[A-Z]){2,})(?=(.*\d){2,})(?=(.*[~!@#%^&*_\-+=|(){}\[\]:;,.?/]){2,})[A-Za-z\d~!@#%^&*_\-+=|(){}\[\]:;,.?/]{8,32}$/;
+  const randomPasswordReg = isToken ? /[A-Za-z\d]{32}/ : PASSWORD_REGEX;
   const newValue = new RandExp(randomPasswordReg).gen();
   if (randomPasswordReg.test(newValue)) {
     return newValue;
@@ -177,8 +182,25 @@ export const getRandomPassword = (isToken?: boolean) => {
  * 异常处理程序
  * response 为浏览器的 Response 对象，而 data 才是后端实际返回的响应数据
  */
-export const errorHandler = ({ response, data }) => {
+export const errorHandler = ({ request, response, data }) => {
   const { status } = response || {};
+  const {
+    options: {
+      HIDE_ERROR_MESSAGE,
+      // 请求失败时，需要隐藏错误信息的错误码列表，根据返回的错误码是否在列表中
+      // 来决定是否隐藏全局的错误提示，常用于定制化处理特定请求错误的场景
+      HIDE_ERROR_MESSAGE_CODE_LIST,
+    } = {},
+  } = request || {};
+  const { error = {} } = data || {};
+  const { code } = error;
+
+  // 是否隐藏错误信息
+  const hideErrorMessage =
+    HIDE_ERROR_MESSAGE ||
+    (HIDE_ERROR_MESSAGE_CODE_LIST &&
+      HIDE_ERROR_MESSAGE_CODE_LIST.includes(code));
+
   // 所有的 500 状态报错，报错信息结构一致
   if (status !== 500) {
     // message.error(statusCodeMessage[status], 3);
@@ -198,7 +220,7 @@ export const errorHandler = ({ response, data }) => {
     const msg = detail;
     // || statusCodeMessage[status];
     // 有对应的错误信息才进行展示，避免遇到 204 等状态码(退出登录) 时，报一个空错误
-    if (msg) {
+    if (msg && !hideErrorMessage) {
       message.error(msg, 3);
     }
     // 403 状态为无权限情况，跳转到 403 页面
@@ -225,144 +247,53 @@ export const updateClusterNameReg = /^[a-zA-Z][a-zA-Z0-9_-]{0,30}[a-zA-Z0-9]$/;
 //用户格式：以英文字母开头，可包含英文、数字、下划线和连字符，且不超过32位
 export const nameReg = /^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/;
 
-const checkIsRepeatByAllServers = (allZoneServers: any, id: string) => {
-  let currentServers: string[] = [],
-    otherServers: string[] = [];
-  Object.keys(allZoneServers).forEach((key) => {
-    if (id === key) {
-      currentServers = [...allZoneServers[key]];
-    } else {
-      otherServers = [...otherServers, ...allZoneServers[key]];
-    }
-  });
-  for (let server of currentServers) {
-    if (otherServers.includes(server)) {
-      return true;
-    }
+export const hasDuplicateIPs = (inputServer: string[]): boolean => {
+  if (inputServer.length === 0) {
+    return false;
   }
-  return false;
+  // 将数组转换为Set，如果存在重复元素，Set的长度会比原数组短
+  const uniqueIPs = new Set(inputServer);
+  // 比较原数组长度和Set长度，如果不同则有重复
+  return inputServer.length !== uniqueIPs.size;
 };
-
-const checkIp = (value: string[], type: 'OBServer' | 'OBProxy'): ResultType => {
-  let response: ResultType = { success: false, msg: '' };
-  if (value && value.length) {
-    value.some((item) => {
-      response.success = serverReg.test(item.trim());
-      return !serverReg.test(item.trim());
-    });
-  }
-  if (!response.success) {
-    response.msg =
-      type === 'OBServer'
-        ? intl.formatMessage({
-            id: 'OBD.src.utils.EnterTheCorrectIpAddress',
-            defaultMessage: '请输入正确的 IP 地址',
-          })
-        : intl.formatMessage({
-            id: 'OBD.src.utils.SelectTheCorrectObproxyNode',
-            defaultMessage: '请选择正确的 OBProxy 节点',
-          });
-  }
-  return response;
-};
-
-const checkIsRepeatByPreServers = (
-  preAllServers: string[],
-  inputServer: string,
-) => {
-  if (preAllServers.includes(inputServer)) {
-    return true;
-  }
-  return false;
-};
-
-const checkRepeat = (
-  finalValidate,
-  allZoneServers,
-  id,
-  inputServer,
-  preAllServers,
-  type,
-) => {
-  let response: ResultType = { msg: '', success: true };
-  if (type === 'OBProxy') return response;
-  if (finalValidate.current) {
-    response.success = !checkIsRepeatByAllServers(allZoneServers, id);
-  } else {
-    response.success = !checkIsRepeatByPreServers(preAllServers, inputServer);
-  }
-  if (!response.success) {
-    response.msg = intl.formatMessage({
-      id: 'OBD.src.utils.DoNotEnterDuplicateNodes',
-      defaultMessage: '禁止输入重复节点',
-    });
-  }
-  return response;
-};
-
-type ResultType = {
-  success: boolean;
-  msg: string;
-};
-const resultHandlePipeline = (...results: ResultType[]): ResultType => {
-  for (let result of results) {
-    if (!result.success) {
-      return result;
-    }
-  }
-  return {
-    success: true,
-    msg: '',
-  };
-};
-export const IPserversValidator = (
-  _: any,
-  value: string[],
-  preAllServers: string[],
-  type: 'OBServer' | 'OBProxy',
-  allZoneServers?: any,
-  finalValidate?: any,
-) => {
-  let result: ResultType = {
-      success: false,
-      msg: '',
-    },
-    inputServer = value[0];
-  let id = _.field?.split('.')[0];
-  result = resultHandlePipeline(
-    checkIp(value, type),
-    checkRepeat(
-      finalValidate,
-      allZoneServers,
-      id,
-      inputServer,
-      preAllServers,
-      type,
-    ),
-  );
-  if (!result.success) return Promise.reject(new Error(result.msg));
-  return Promise.resolve();
-};
-
 export const ocpServersValidator = (_: any, value: string[]) => {
-  let validtor = true;
-  if (value && value.length) {
-    value.some((item) => {
-      validtor = serverReg.test(item.trim());
-      return !serverReg.test(item.trim());
-    });
-  }
-  if (validtor) {
+  if (value?.some((item) => !validator.isIP(item))) {
+    return Promise.reject(
+      new Error(
+        intl.formatMessage({
+          id: 'OBD.src.utils.SelectTheCorrectOcpNode',
+          defaultMessage: '请选择正确的 OCP 节点',
+        }),
+      ),
+    );
+  } else {
     return Promise.resolve();
   }
-  return Promise.reject(
-    new Error(
-      intl.formatMessage({
-        id: 'OBD.src.utils.SelectTheCorrectOcpNode',
-        defaultMessage: '请选择正确的 OCP 节点',
-      }),
-    ),
-  );
+};
+// 适用于 IP/NETMASK 地址，包含百分号（%）或下划线（_）的 IP 地址
+export const IPValidator = (_: any, value: string[]) => {
+  const ipPattern = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+  const wildcardPattern = /^(?:\d{1,3}\.){3}[\d%_]+$/;
+  const cidrPattern =
+    /^(?:\d{1,3}\.){3}\d{1,3}\/(?:\d{1,2}|(?:\d{1,3}\.){3}\d{1,3})$/;
+
+  for (const ip of value) {
+    if (
+      !ipPattern.test(ip) &&
+      !wildcardPattern.test(ip) &&
+      !cidrPattern.test(ip)
+    ) {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.InvalidIpFormat',
+            defaultMessage: 'IP 地址格式无效',
+          }),
+        ),
+      );
+    }
+  }
+  return Promise.resolve();
 };
 
 export const validateErrors = async (
@@ -384,58 +315,65 @@ export const validateErrors = async (
   }
 };
 
+export const dnsValidator = (_: any, value: string[]) => {
+  if (!value || value.length === 0) {
+    // return Promise.reject('请输入有效的域名');
+    return Promise.reject(
+      intl.formatMessage({
+        id: 'OBD.pages.components.NodeConfig.DJSND890',
+        defaultMessage: '请输入有效的域名',
+      }),
+    );
+  }
+
+  // 域名规则正则表达式
+  const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  for (const server of value) {
+    if (!domainRegex.test(server)) {
+      return Promise.reject(
+        intl.formatMessage({
+          id: 'OBD.pages.components.NodeConfig.DJSND891',
+          defaultMessage: '域名格式不正确',
+        }),
+      );
+    }
+  }
+
+  return Promise.resolve();
+};
 export const serversValidator = (_: any, value: string[], type: string) => {
-  let validtor = true;
-
-  // 当用127.0.0.1部署的集群后期没法扩容，强制扩容可能引发非预期问题
-  // 白屏禁止127.0.0.1 ip输入
-  if (value.some((item) => item === '127.0.0.1')) {
-    return Promise.reject(
-      new Error(
-        intl.formatMessage({
-          id: 'OBD.src.utils.EnterTheCorrectIpAddress',
-          defaultMessage: '请输入正确的 IP 地址',
-        }),
-      ),
-    );
-  }
-
-  if (value && value.length) {
-    value.some((item) => {
-      validtor = serverReg.test(item.trim());
-      return !serverReg.test(item.trim());
-    });
-  }
-  if (validtor) {
-    return Promise.resolve();
-  }
-  if (type === 'OBServer') {
-    return Promise.reject(
-      new Error(
-        intl.formatMessage({
-          id: 'OBD.pages.components.NodeConfig.EnterTheCorrectIpAddress',
-          defaultMessage: '请输入正确的 IP 地址',
-        }),
-      ),
-    );
-  } else if (type === 'obconfigserver') {
-    return Promise.reject(
-      new Error(
-        intl.formatMessage({
-          id: 'OBD.src.utils.SelectTheCorrectObconfigserverNode',
-          defaultMessage: '请选择正确的 obconfigserver 节点',
-        }),
-      ),
-    );
+  if (value.length > 0 && value?.some((item) => !validator.isIP(item))) {
+    if (type === 'OBServer') {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.EnterTheCorrectIpAddress',
+            defaultMessage: '请输入正确的 IP 地址',
+          }),
+        ),
+      );
+    } else if (type === 'obconfigserver') {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.src.utils.SelectTheCorrectObconfigserverNode',
+            defaultMessage: '请选择正确的 obconfigserver 节点',
+          }),
+        ),
+      );
+    } else {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
+            defaultMessage: '请选择正确的 OBProxy 节点',
+          }),
+        ),
+      );
+    }
   } else {
-    return Promise.reject(
-      new Error(
-        intl.formatMessage({
-          id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
-          defaultMessage: '请选择正确的 OBProxy 节点',
-        }),
-      ),
-    );
+    return Promise.resolve();
   }
 };
 

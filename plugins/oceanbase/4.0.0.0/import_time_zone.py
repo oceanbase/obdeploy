@@ -19,8 +19,9 @@ import os
 import time
 
 import const
-from tool import Exector
+from tool import Exector, COMMAND_ENV
 from collections import defaultdict
+from _stdio import FormatText
 
 
 tenant_cursor_cache = defaultdict(dict)
@@ -67,19 +68,27 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
 
     cursor = plugin_context.get_return('connect', spacename=cluster_config.name).get_return('cursor') if not cursor else cursor
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
-    if scale_out_component in const.COMPS_OCP_CE_AND_EXPRESS:
+    if scale_out_component in const.COMPS_OCP + ['ocp-express']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     if scale_out_component in ['obbinlog-ce']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     cursors = []
     if plugin_context.get_variable('tenant_exists'):
         return plugin_context.return_true()
+    cmd_str = ''
     for options in multi_options:
         global tenant_cursor
         tenant_cursor = None
         name = getattr(options, 'tenant_name', 'test')
         mode = getattr(options, 'mode', 'mysql')
         root_password = getattr(options, name+'_root_password', "")
+        if len(multi_options) == 1:
+            plugin_context.set_variable('tenant_name', name)
+            plugin_context.set_variable('root_password', root_password)
+
+        if mode == 'oracle':
+            stdio.verbose('Import time zone in oracle tenant is not supported')
+            return plugin_context.return_true()
 
         time_zone = getattr(options, 'time_zone', '')
         if not time_zone:
@@ -99,6 +108,9 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
                         stdio.warn('execute import_srs_data.py failed')
                     break
             cursors.append(tenant_cursor)
-            cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+            cmd_str = 'obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+            if COMMAND_ENV.get('INTERACTIVE_INSTALL') == '1':
+                continue
+            cmd = FormatText.success(cmd_str)
             stdio.print(cmd)
-    return plugin_context.return_true(tenant_cursor=cursors)
+    return plugin_context.return_true(tenant_cursor=cursors, cmd=cmd_str)

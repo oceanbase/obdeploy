@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import time
 from copy import deepcopy
 from optparse import Values
 
@@ -30,6 +31,19 @@ def get_missing_required_parameters(parameters):
 
 
 def get_ocp_depend_config(cluster_config, stdio):
+    def get_jdbc_ip_and_port():
+        ret = {}
+        if (obproxy_server_config.get('vip_address') and obproxy_server_config.get('vip_port')) or obproxy_server_config.get('dns'):
+            if obproxy_server_config.get('dns'):
+                ret = {'ip': obproxy_server_config['dns'], 'port': obproxy_server_config['listen_port']}
+                stdio.verbose("get obproxy dns: {}".format(obproxy_server_config['dns']))
+            elif obproxy_server_config.get('vip_address') and obproxy_server_config.get('vip_port'):
+                ret = {'ip': obproxy_server_config['vip_address'], 'port': obproxy_server_config['vip_port']}
+                stdio.verbose("get obproxy vip: {} ".format(obproxy_server_config['vip_address'] + ":" + str(obproxy_server_config['vip_port'])))
+        else:
+            ret = {"ip": obproxy_server.ip, "port": obproxy_server_config['listen_port']}
+        return ret
+
     # depends config
     env = {}
     depend_observer = False
@@ -45,11 +59,11 @@ def get_ocp_depend_config(cluster_config, stdio):
                 if 'server_ip' not in depend_info:
                     depend_info['server_ip'] = ob_server.ip
                     depend_info['mysql_port'] = ob_server_conf['mysql_port']
-                    depend_info['meta_tenant'] = ob_server_conf['ocp_meta_tenant']['tenant_name']
+                    depend_info['meta_tenant'] = ob_server_conf['ocp_meta_tenant']
                     depend_info['meta_user'] = ob_server_conf['ocp_meta_username']
                     depend_info['meta_password'] = ob_server_conf['ocp_meta_password']
                     depend_info['meta_db'] = ob_server_conf['ocp_meta_db']
-                    depend_info['monitor_tenant'] = ob_server_conf['ocp_monitor_tenant']['tenant_name']
+                    depend_info['monitor_tenant'] = ob_server_conf['ocp_monitor_tenant']
                     depend_info['monitor_user'] = ob_server_conf['ocp_monitor_username']
                     depend_info['monitor_password'] = ob_server_conf['ocp_monitor_password']
                     depend_info['monitor_db'] = ob_server_conf['ocp_monitor_db']
@@ -62,8 +76,12 @@ def get_ocp_depend_config(cluster_config, stdio):
             obproxy_servers = cluster_config.get_depend_servers(comp)
             obproxy_server = obproxy_servers[0]
             obproxy_server_config = cluster_config.get_depend_config(comp, obproxy_server)
-            depend_info['server_ip'] = obproxy_server.ip
-            depend_info['mysql_port'] = obproxy_server_config['listen_port']
+            ip_ret = get_jdbc_ip_and_port()
+            if not ip_ret:
+                stdio.error("get vip or dns failed!")
+                return False
+            depend_info['server_ip'] = ip_ret['ip']
+            depend_info['mysql_port'] = ip_ret['port']
             break
     for server in cluster_config.servers:
         default_server_config = deepcopy(cluster_config.get_server_conf_with_default(server))
@@ -77,13 +95,14 @@ def get_ocp_depend_config(cluster_config, stdio):
                 default_server_config['jdbc_port'] = depend_info['mysql_port']
                 default_server_config['jdbc_host'] = depend_info['server_ip']
                 default_server_config['ocp_meta_username'] = depend_info['meta_user'] if not original_server_config.get('ocp_meta_username', None) else original_server_config['ocp_meta_username']
-                default_server_config['ocp_meta_tenant']['tenant_name'] = depend_info['meta_tenant'] if not original_server_config.get('ocp_meta_tenant', None) else original_server_config['ocp_meta_tenant']['tenant_name']
+                default_server_config['ocp_meta_tenant'] = depend_info['meta_tenant'] if not original_server_config.get('ocp_meta_tenant', None) else original_server_config['ocp_meta_tenant']
                 default_server_config['ocp_meta_password'] = depend_info['meta_password'] if not original_server_config.get('ocp_meta_password', None) else original_server_config['ocp_meta_password']
                 default_server_config['ocp_meta_db'] = depend_info['meta_db'] if not original_server_config.get('ocp_meta_db', None) else original_server_config['ocp_meta_db']
                 default_server_config['ocp_monitor_username'] = depend_info['monitor_user'] if not original_server_config.get('ocp_monitor_username', None) else original_server_config['ocp_monitor_username']
-                default_server_config['ocp_monitor_tenant']['tenant_name'] = depend_info['monitor_tenant'] if not original_server_config.get('ocp_monitor_tenant', None) else original_server_config['ocp_monitor_tenant']['tenant_name']
+                default_server_config['ocp_monitor_tenant'] = depend_info['monitor_tenant'] if not original_server_config.get('ocp_monitor_tenant', None) else original_server_config['ocp_monitor_tenant']
                 default_server_config['ocp_monitor_password'] = depend_info['monitor_password'] if not original_server_config.get('ocp_monitor_password', None) else original_server_config['ocp_monitor_password']
                 default_server_config['ocp_monitor_db'] = depend_info['monitor_db'] if not original_server_config.get('ocp_monitor_db', None) else original_server_config['ocp_monitor_db']
+
         env[server] = default_server_config
     return env
 
@@ -117,7 +136,7 @@ def parameter_pre(plugin_context, **kwargs):
             tenant_info["database"] = server_config[prefix + "db"]
             tenant_info["db_username"] = server_config[prefix + "username"]
             tenant_info["db_password"] = server_config.get(prefix + "password", "")
-            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "")
+            tenant_info["{0}_root_password".format(tenant_info['tenant_name'])] = server_config.get(prefix + "password", "") if not server_config.get('ocp_root_password') else server_config['ocp_root_password']
             ocp_tenants.append(Values(tenant_info))
     plugin_context.set_variable("create_tenant_options", ocp_tenants)
 

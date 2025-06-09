@@ -59,6 +59,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
         if strict_check:
             success = False
             check_fail(server, item, error, suggests)
+            print_with_suggests(error, suggests)
             stdio.error(error)
         else:
             stdio.warn(error)
@@ -75,6 +76,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
             stdio.warn(_error)
         else:
             check_fail(server, item, _error, suggests)
+            print_with_suggests(_error, suggests)
             success = False
 
     def get_success():
@@ -84,6 +86,10 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
     def change_success():
         global success
         success = True
+
+
+    def print_with_suggests(error, suggests=[]):
+        stdio.error('{}, {}'.format(error, suggests[0].msg if suggests else ''))
 
     plugin_context.set_variable('check_pass', check_pass)
     plugin_context.set_variable('check_fail', check_fail)

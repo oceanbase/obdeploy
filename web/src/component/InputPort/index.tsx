@@ -9,6 +9,7 @@ interface InputPortProps {
   label: React.ReactNode;
   fieldProps?: any;
   message?: string;
+  portError?: string;
   limit?: boolean; //是否需要限制端口号范围
 }
 
@@ -21,6 +22,7 @@ export default function InputPort({
   fieldProps,
   message,
   limit = true,
+  portError,
 }: InputPortProps) {
   const rules: any = [
     {
@@ -48,6 +50,17 @@ export default function InputPort({
       },
     }));
   }
+  if (portError) {
+    rules.push(() => ({
+      validator(_: any, value: number) {
+        if (value) {
+          return Promise.reject(portError);
+        }
+        return Promise.resolve();
+      },
+    }));
+  }
+
   return (
     <ProFormDigit
       name={name}

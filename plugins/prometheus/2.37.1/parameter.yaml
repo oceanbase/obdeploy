@@ -26,7 +26,6 @@
 - name: port
   require: true
   name_local: 服务端口
-  essential: true
   default: 9090
   type: INT
   need_restart: true

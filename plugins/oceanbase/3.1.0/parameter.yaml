@@ -2189,3 +2189,28 @@
   need_restart: false
   description_en: password of observer root user
   description_local: sys租户root用户的密码
+- name: zone_region
+  require: false
+  type: STRING
+  default: 'deault_region'
+  min_value: NULL
+  max_value: NULL
+  need_reload: true
+  description_en: zone region
+  description_local: 单个zone的地域
+- name: zone_idc
+  require: false
+  type: STRING
+  default: 'default_idc'
+  min_value: NULL
+  max_value: NULL
+  need_reload: true
+  description_en: zone idc
+  description_local: 单个zone的机房
+- name: install_utils
+  require: false
+  type: BOOL
+  default: false
+  need_reload: true
+  description_en: Install oceanbase-ce-utils package
+  description_local: 安装oceanbase-ce-utils包

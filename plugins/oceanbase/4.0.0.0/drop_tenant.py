@@ -20,8 +20,7 @@ def drop_tenant(plugin_context, cursor, *args, **kwargs):
     def error(*arg, **kwargs):
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
-        
-    cluster_config = plugin_context.cluster_config
+
     stdio = plugin_context.stdio
     options = plugin_context.options
 

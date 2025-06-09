@@ -21,6 +21,7 @@ from collections import defaultdict
 from copy import deepcopy
 
 import const
+from _stdio import IO
 from tool import Exector
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 from _types import Capacity
@@ -72,7 +73,7 @@ def dump_standbyro_password(deploy_name, tenant_name, standbyro_password, cluste
     return True
 
 
-def create_standby_tenant(plugin_context, cursor=None, create_tenant_options=[], relation_tenants={}, cluster_configs={}, primary_tenant_info={}, standbyro_password='', *args, **kwargs):
+def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_tenant_options=[], relation_tenants={}, cluster_configs={}, primary_tenant_info={}, standbyro_password='', *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -233,7 +234,7 @@ def create_standby_tenant(plugin_context, cursor=None, create_tenant_options=[],
                 for param, param_info in check_available_param.items():
                     if get_option(param, None) is None and param_info[0] < primary_tenant_info[param]:
                         recreate_cmd += ' --{}={}{} '.format(param, param_info[0], param_info[1])
-                        stdio.warn("available {} is less then primary tenant's {} quota, primary tenant's {}:{}{}, current available:{}{}".format(param, param, primary_tenant_info[param], param_info[1], param_info[0], param_info[1]))
+                        stdio.warn("available {} is less then primary tenant's {} quota, primary tenant's {}{}, current available:{}{}".format(param, param, primary_tenant_info[param], param_info[1], param_info[0], param_info[1]))
 
                 if recreate_cmd:
                     stdio.error("Resource confirmation: if you insist to take the risk, please recreate the tenant with '{}'".format(recreate_cmd))
@@ -255,8 +256,8 @@ def create_standby_tenant(plugin_context, cursor=None, create_tenant_options=[],
 
                 if memory_size is None:
                     memory_size = mem_available
-                    if log_disk_size is None:
-                        log_disk_size = log_disk_available
+                if log_disk_size is None:
+                    log_disk_size = log_disk_available
 
                 if mem_available < memory_size:
                     return error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(memory_size)))
@@ -378,7 +379,7 @@ def create_standby_tenant(plugin_context, cursor=None, create_tenant_options=[],
                         cursor.execute(sql, raise_exception=True, stdio=stdio)
                     except Exception as e:
                         retry_message = 'After resolving this issue, you can clean up the environment by manually executing "obd cluster tenant drop {} -t {}", and then wait for a while before re-creating the standby tenant.'.format(standby_deploy_name, name)
-                        error("create standby tenant failed, error: {}".format(e))
+                        error("create standby tenant failed, error: {}".format(IO.log_masking_static(e.__str__()) if config_encrypted else e))
                         stdio.print(retry_message)
                         return
                 stdio.stop_loading('succeed')

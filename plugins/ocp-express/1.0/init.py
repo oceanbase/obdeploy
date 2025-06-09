@@ -30,7 +30,7 @@ def _clean(server, client, path, stdio=None):
         return True
 
 
-def init(plugin_context, *args, **kwargs):
+def init(plugin_context, source_option=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -84,7 +84,7 @@ def init(plugin_context, *args, **kwargs):
             if not ret or ret.stdout.strip():
                 global_ret = False
                 stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=err.InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
-                stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                source_option == "deploy" and stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 continue
         else:
             global_ret = False
@@ -100,7 +100,7 @@ def init(plugin_context, *args, **kwargs):
                 if not ret or ret.stdout.strip():
                     global_ret = False
                     stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='log dir', msg=err.InitDirFailedErrorMessage.NOT_EMPTY.format(path=log_dir)))
-                    stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                    source_option == "deploy" and stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 global_ret = False
@@ -111,7 +111,7 @@ def init(plugin_context, *args, **kwargs):
             if not client.execute_command('mkdir -p %s' % log_dir):
                 global_ret = False
                 stdio.error(err.EC_FAIL_TO_INIT_PATH.format(server=server, key='log dir', msg=err.InitDirFailedErrorMessage.NOT_EMPTY.format(path=log_dir)))
-                stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                source_option == "deploy" and stdio.error(err.EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 continue
         link_path = os.path.join(home_path, 'log')
         client.execute_command("if [ ! '%s' -ef '%s' ]; then ln -sf %s %s; fi" % (log_dir, link_path, log_dir, link_path))

@@ -65,6 +65,7 @@ def print_standby_graph(plugin_context, cursors={}, need_list_standby=False, rel
     deploy_name = plugin_context.deploy_name
     graph = get_option('graph', False)
     stdio = plugin_context.stdio
+    repository = kwargs.get('repository')
     if not cursors:
         stdio.error('Connect to OceanBase failed.')
         return
@@ -80,23 +81,49 @@ def print_standby_graph(plugin_context, cursors={}, need_list_standby=False, rel
                 continue
             primary_ip_list = []
             primary_info_dict = {}
-            ret = cursor.fetchone("select TENANT_ROLE from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s", (relation_tenant_name, ), raise_exception=False)
+            ret = cursor.fetchone("select TENANT_ROLE,TENANT_ID from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s", (relation_tenant_name, ), raise_exception=False)
             if not ret:
                 stdio.warn("tenant {} not exists in deploy_name:{}".format(relation_tenant_name, deploy_name))
                 continue
+
             if ret['TENANT_ROLE'] == 'STANDBY':
-                res = cursor.fetchone('select a.VALUE as `VALUE` from oceanbase.cdb_ob_log_restore_source as a, oceanbase.DBA_OB_TENANTS as b where a.TENANT_ID=b.TENANT_ID and b.TENANT_NAME = %s', (relation_tenant_name, ), raise_exception=False)
-                if not res:
-                    stdio.error('Query {}:{} primary info failed.'.format(relation_deploy_name, relation_tenant_name))
-                    stdio.stop_loading('fail')
-                    return
-                else:
-                    primary_info_arr = res['VALUE'].split(',')
-                    for primary_info in primary_info_arr:
-                        kv = primary_info.split('=')
-                        primary_info_dict[kv[0]] = kv[1]
-                    primary_ip_list = primary_info_dict.get('IP_LIST').split(';')
-                    primary_ip_list.sort()
+                if repository.version >= "4.2.1.9":
+                    cluster_configs = kwargs.get('cluster_configs')
+                    cluster_config = cluster_configs.get(relation_deploy_name)
+                    if not cluster_config:
+                        stdio.verbose("Find {} cluster config failed.".format(relation_deploy_name))
+                        continue
+                    primary_dict = cluster_config.get_component_attr('primary_tenant')
+                    if primary_dict:
+                        primary_info = primary_dict.get(relation_tenant_name, [])
+                        if primary_info:
+                            primary_cluster = primary_info[0][0]
+                            primary_tenant = primary_info[0][1]
+                            primary_curosr = cursors.get(primary_cluster)
+                            if not primary_curosr:
+                                stdio.verbose("Connect to {} failed.".format(primary_cluster))
+                            else:
+                                res = primary_curosr.fetchone('select TENANT_ID, group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from oceanbase.cdb_ob_access_point where tenant_name=%s)', (primary_tenant,), raise_exception=True)
+                                if not res:
+                                    stdio.verbose('Query {}:{} ip_list failed.'.format(primary_cluster, primary_tenant))
+                                else:
+                                    primary_ip_list = res['ip_list'].split(';')
+                                    primary_ip_list.sort()
+                                    primary_info_dict['TENANT_ID'] = res['TENANT_ID']
+
+                if not primary_info_dict or not primary_ip_list:
+                    res = cursor.fetchone('select a.VALUE as `VALUE` from oceanbase.cdb_ob_log_restore_source as a, oceanbase.DBA_OB_TENANTS as b where a.TENANT_ID=b.TENANT_ID and b.TENANT_NAME = %s', (relation_tenant_name, ), raise_exception=False)
+                    if not res:
+                        stdio.error('Query {}:{} primary info failed.'.format(relation_deploy_name, relation_tenant_name))
+                        stdio.stop_loading('fail')
+                        return
+                    else:
+                        primary_info_arr = res['VALUE'].split(',')
+                        for primary_info in primary_info_arr:
+                            kv = primary_info.split('=')
+                            primary_info_dict[kv[0]] = kv[1]
+                        primary_ip_list = primary_info_dict.get('IP_LIST').split(';')
+                        primary_ip_list.sort()
 
             res = cursor.fetchone('select TENANT_ID, group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from oceanbase.cdb_ob_access_point where tenant_name=%s)', (relation_tenant_name, ), raise_exception=True)
             if not res:

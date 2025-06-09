@@ -8,6 +8,7 @@ import type { FormInstance } from 'antd/lib/form';
 import { useModel } from 'umi';
 
 import { nameReg } from '@/utils';
+import { useEffect } from 'react';
 import styles from './index.less';
 
 export default function UserConfig({ form }: { form: FormInstance<any> }) {
@@ -17,13 +18,6 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
   const onChange = (e: CheckboxChangeEvent) => {
     let { checked } = e.target;
     setUseRunningUser(checked);
-    if (checked) {
-      let launch_user = form.getFieldValue('launch_user');
-      launch_user && setDeployUser(launch_user);
-    } else {
-      let user = form.getFieldValue(['auth', 'user']);
-      user && setDeployUser(user);
-    }
   };
 
   const userChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,6 +25,11 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
     setDeployUser(value);
   };
 
+  useEffect(() => {
+    if (!useRunningUser) {
+      form.setFieldValue('launch_user', undefined);
+    }
+  }, [useRunningUser]);
   return (
     <div className={styles.userConfigContainer}>
       <p className={styles.titleText}>
@@ -181,7 +180,6 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
           }
         >
           <Input
-            onChange={userChange}
             style={{ marginBottom: 24 }}
             placeholder={intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.UserConfig.PleaseEnter',

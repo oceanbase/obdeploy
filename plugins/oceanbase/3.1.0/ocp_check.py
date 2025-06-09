@@ -27,8 +27,13 @@ def ocp_check(plugin_context, cursor, *args, **kwargs):
     new_clients = kwargs.get('new_clients')
     clients = new_clients if new_clients else plugin_context.clients
     stdio = plugin_context.stdio
-    ocp_version = plugin_context.get_return('takeover_precheck', spacename='ocp-server-ce').get_return('ocp_version') if not kwargs.get('ocp_version', '') else kwargs.get('ocp_version')
-
+    if not kwargs.get('ocp_version', ''):
+        if plugin_context.get_return('takeover_precheck', spacename='ocp-server-ce'):
+            ocp_version = plugin_context.get_return('takeover_precheck', spacename='ocp-server-ce').get_return('ocp_version')
+        if plugin_context.get_return('takeover_precheck', spacename='ocp-server'):
+            ocp_version = plugin_context.get_return('takeover_precheck', spacename='ocp-server').get_return('ocp_version')
+    else:
+        ocp_version = kwargs.get('ocp_version', '')
     
     is_admin = True
     can_sudo = True

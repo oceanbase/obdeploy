@@ -17,7 +17,7 @@ from __future__ import absolute_import, division, print_function
 from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
 
 
-def init(plugin_context, *args, **kwargs):
+def init(plugin_context, source_option=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -62,7 +62,7 @@ def init(plugin_context, *args, **kwargs):
             if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" ]]; then exit 0; else exit 1; fi\''.format(home_path)):
                 global_ret = False
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
-                stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                source_option == "deploy" and stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 continue
 
         if not client.execute_command("bash -c 'mkdir -p %s/{run,bin,lib}'" % home_path):

@@ -72,7 +72,7 @@ def pre_test(plugin_context, *args, **kwargs):
 
     cmd = '%s --help'
     path, result = file_path_check(obclient_bin, COMP_OBCLIENT, 'bin/obclient', cmd)
-    if result:
+    if result is not None:
         stdio.error(
             '%s\n%s is not an executable file. Please use `--obclient-bin` to set.\nYou may not have obclient installed' % (
                 result.stderr, obclient_bin))
@@ -81,7 +81,7 @@ def pre_test(plugin_context, *args, **kwargs):
     setattr(options, 'obclient_bin', obclient_bin)
 
     path, result = file_path_check(sysbench_bin, TOOL_SYSBENCH, 'sysbench/bin/sysbench', cmd)
-    if result:
+    if result is not None:
         stdio.error(
             '%s\n%s is not an executable file. Please use `--sysbench-bin` to set.\nYou may not have ob-sysbench installed' % (
                 result.stderr, sysbench_bin))

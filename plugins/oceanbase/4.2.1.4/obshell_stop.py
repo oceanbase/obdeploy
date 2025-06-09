@@ -16,6 +16,8 @@
 from __future__ import absolute_import, division, print_function
 
 
+import os
+
 def obshell_stop(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
@@ -27,6 +29,9 @@ def obshell_stop(plugin_context, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         stdio.verbose('%s obshell stopping ...' % (server))
         home_path = server_config['home_path']
+        if not client.execute_command('ls %s/bin/obshell' % home_path):
+            stdio.warn(f'{home_path}/bin/obshell does not exist')
+            continue
         cmd = 'cd %s; %s/bin/obshell admin stop' % (home_path, home_path)
         if not client.execute_command(cmd):
             stdio.stop_loading('fail')

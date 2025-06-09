@@ -182,6 +182,15 @@ export default function DeployConfig({
         value: _version,
       });
     }
+    if (record.key === 'obproxy') {
+      setObproxyVersionInfo({
+        version,
+        release,
+        md5,
+        versionType,
+        value: _version,
+      });
+    }
   };
 
   const getColumns = () => {
@@ -278,94 +287,81 @@ export default function DeployConfig({
           }
 
           return (
-            // 版本联动 ocp是社区版，ob也得是社区版，obproxy不支持选择并且版本号与ob前两位一致
             <Tooltip title={selectVersion?.value}>
-              {record.key === OBPROXY ? (
-                // 用div包裹可以使Tooltip生效
-                <div>
-                  <Select
-                    suffixIcon={null}
-                    labelInValue
-                    value={selectVersion?.valueInfo}
-                    style={{ pointerEvents: 'none', width: 207 }}
-                  />
-                </div>
-              ) : (
-                <Select
-                  // optionLabelProp="data_value"
-                  value={selectVersion?.valueInfo}
-                  labelInValue
-                  onChange={(value) => onVersionChange(value, record)}
-                  style={{ width: 207 }}
-                  popupClassName={styles?.popupClassName}
-                >
-                  {_.map((item: {}) => {
-                    const metaDBLimit =
-                      isNewDB &&
-                      record.key === OCEANBASE &&
-                      item.version !== '4.2.1.8';
-                    const OptionValue = `${item.version}-${item?.release}-${item.md5}`;
-                    return (
-                      <Select.Option
-                        value={OptionValue}
-                        // data_value={item.version}
-                        disabled={metaDBLimit}
-                        key={OptionValue}
+              <Select
+                // optionLabelProp="data_value"
+                value={selectVersion?.valueInfo}
+                labelInValue
+                onChange={(value) => onVersionChange(value, record)}
+                style={{ width: 207 }}
+                popupClassName={styles?.popupClassName}
+              >
+                {_.map((item: {}) => {
+                  const metaDBLimit =
+                    isNewDB &&
+                    record.key === OCEANBASE &&
+                    item.version !== '4.2.1.8';
+                  const OptionValue = `${item.version}-${item?.release}-${item.md5}`;
+                  return (
+                    <Select.Option
+                      value={OptionValue}
+                      // data_value={item.version}
+                      disabled={metaDBLimit}
+                      key={OptionValue}
+                    >
+                      <Tooltip
+                        title={
+                          metaDBLimit &&
+                          isNewDB &&
+                          intl.formatMessage({
+                            id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
+                            defaultMessage:
+                              '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
+                          })
+                        }
                       >
-                        <Tooltip
-                          title={
-                            metaDBLimit &&
-                            isNewDB &&
-                            intl.formatMessage({
-                              id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
-                              defaultMessage:
-                                '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
-                            })
-                          }
+                        <span
+                          style={{
+                            textOverflow: 'ellipsis',
+                            width: '122px',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                          }}
                         >
-                          <span
-                            style={{
-                              textOverflow: 'ellipsis',
-                              width: '122px',
-                              overflow: 'hidden',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            V {item.version}
-                            {item?.release ? `-${item?.release}` : ''}
+                          V {item.version}
+                          {item?.release ? `-${item?.release}` : ''}
+                        </span>
+                        {item.versionType === 'ce' ? (
+                          <Tag className="default-tag ml-8">
+                            {intl.formatMessage({
+                              id: 'OBD.component.DeployConfig.CommunityEdition',
+                              defaultMessage: '社区版',
+                            })}
+                          </Tag>
+                        ) : (
+                          <Tag className="blue-tag ml-8">
+                            {intl.formatMessage({
+                              id: 'OBD.component.DeployConfig.CommercialEdition',
+                              defaultMessage: '商业版',
+                            })}
+                          </Tag>
+                        )}
+                        {item?.type === 'local' ? (
+                          <span className={styles.localTag}>
+                            <SafetyCertificateFilled />
+                            {intl.formatMessage({
+                              id: 'OBD.pages.components.InstallConfig.LocalImage',
+                              defaultMessage: '本地镜像',
+                            })}
                           </span>
-                          {item.versionType === 'ce' ? (
-                            <Tag className="default-tag ml-8">
-                              {intl.formatMessage({
-                                id: 'OBD.component.DeployConfig.CommunityEdition',
-                                defaultMessage: '社区版',
-                              })}
-                            </Tag>
-                          ) : (
-                            <Tag className="blue-tag ml-8">
-                              {intl.formatMessage({
-                                id: 'OBD.component.DeployConfig.CommercialEdition',
-                                defaultMessage: '商业版',
-                              })}
-                            </Tag>
-                          )}
-                          {item?.type === 'local' ? (
-                            <span className={styles.localTag}>
-                              <SafetyCertificateFilled />
-                              {intl.formatMessage({
-                                id: 'OBD.pages.components.InstallConfig.LocalImage',
-                                defaultMessage: '本地镜像',
-                              })}
-                            </span>
-                          ) : (
-                            ''
-                          )}
-                        </Tooltip>
-                      </Select.Option>
-                    );
-                  })}
-                </Select>
-              )}
+                        ) : (
+                          ''
+                        )}
+                      </Tooltip>
+                    </Select.Option>
+                  );
+                })}
+              </Select>
             </Tooltip>
           );
         },
@@ -991,7 +987,7 @@ export default function DeployConfig({
                         showIcon
                         style={{ marginTop: '16px' }}
                       />
-                      {isNewDB && metaDbAlert}
+                      {tableData.length !== 0 && isNewDB && metaDbAlert}
                     </>
                   ) : (
                     <Alert

@@ -38,6 +38,7 @@ def bootstrap(plugin_context, *args, **kwargs):
         InnerConfigItem('$_zone_idc'): 'idc'
     }
 
+    stdio.start_loading('oceanbase bootstrap')
     def is_bootstrap():
         sql = "select column_value from oceanbase.__all_core_table where table_name = '__all_global_stat' and column_name = 'baseline_schema_version'"
         ret = cursor.fetchone(sql, raise_exception=False, exc_level='verbose')
@@ -52,15 +53,17 @@ def bootstrap(plugin_context, *args, **kwargs):
     if cluster_config.name in added_components:
         for server in cluster_config.servers:
             server_config = cluster_config.get_server_conf(server)
+            server_config_default = cluster_config.get_server_conf_with_default(server)
             zone = server_config['zone']
             if zone in floor_servers:
                 floor_servers[zone].append('%s:%s' % (server.ip, server_config['rpc_port']))
             else:
                 floor_servers[zone] = []
                 zones_config[zone] = {}
-                bootstrap.append('REGION "sys_region" ZONE "%s" SERVER "%s:%s"' % (server_config['zone'], server.ip, server_config['rpc_port']))
+                bootstrap.append('REGION "%s" ZONE "%s" SERVER "%s:%s"' % (server_config_default['zone_region'], server_config['zone'], server.ip, server_config['rpc_port']))
 
             zone_config = zones_config[zone]
+            zone_config['$_zone_idc'] = server_config_default['zone_idc']
             for key in server_config:
                 if not isinstance(key, InnerConfigItem):
                     continue
@@ -105,5 +108,5 @@ def bootstrap(plugin_context, *args, **kwargs):
             all_server_online = True
         else:
             time.sleep(1)
-
+    stdio.stop_loading('succeed')
     return plugin_context.return_true()

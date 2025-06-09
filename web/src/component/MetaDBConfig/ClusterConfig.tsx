@@ -7,12 +7,14 @@ import {
   formatMoreConfig,
   generateRandomPassword as generatePassword,
   getPasswordRules,
+  getTailPath,
 } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
+import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
 import { ProFormText } from '@ant-design/pro-components';
 import { useUpdateEffect } from 'ahooks';
-import { Button, Row, Space, Switch } from 'antd';
+import { Button, Row, Space } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useState } from 'react';
 import { useModel } from 'umi';
@@ -20,6 +22,8 @@ import InputPort from '../InputPort';
 import styles from './index.less';
 
 export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
+  const isNewDB = getTailPath() === 'install';
+
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
   const { deployUser, useRunningUser } = useModel('ocpInstallData');
   const {
@@ -37,6 +41,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   const [rootPassword, setRootPassword] = useState<string>(
     oceanbase.root_password || '',
   );
+  const [showMoreConfig, setShowMoreConfig] = useState<boolean>(ocpClusterMore);
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
   const getInitialParameters = (
     currentComponent: string,
@@ -127,8 +132,8 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
     setClusterMoreLoading(false);
   };
 
-  const handleCluserMoreChange = () => {
-    setOcpClusterMore(!ocpClusterMore);
+  const handleCluserMoreChange = (checked: boolean) => {
+    setOcpClusterMore(checked);
     if (!ocpClusterMoreConfig?.length) {
       getClusterMoreParamsters();
     }
@@ -146,10 +151,9 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   };
 
   useUpdateEffect(() => {
+    const rootUser = deployUser === 'root';
     const homePath =
-      !useRunningUser && deployUser === 'root'
-        ? `/${deployUser}`
-        : `/home/${deployUser}`;
+      !useRunningUser && rootUser ? `/${deployUser}` : `/home/${deployUser}`;
     form.setFieldValue(['oceanbase', 'home_path'], homePath);
   }, [deployUser]);
 
@@ -296,22 +300,36 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
           />
         </Space>
       </Row>
+      <InputPort
+        name={['oceanbase', 'obshell_port']}
+        label={'OBShell 端口'}
+        fieldProps={{ style: commonPortStyle }}
+      />
       <div className={styles.moreSwitch}>
-        {intl.formatMessage({
-          id: 'OBD.component.MetaDBConfig.ClusterConfig.MoreConfigurations',
-          defaultMessage: '更多配置',
-        })}
-
-        <Switch
-          className="ml-20"
-          checked={ocpClusterMore}
-          onChange={handleCluserMoreChange}
-        />
+        <Space
+          size={8}
+          onClick={() => {
+            setShowMoreConfig(!showMoreConfig);
+            handleCluserMoreChange(!showMoreConfig);
+          }}
+          style={{
+            fontSize: 16,
+          }}
+        >
+          {showMoreConfig ? <CaretDownOutlined /> : <CaretRightOutlined />}
+          <span style={{ width: 150 }}>
+            {intl.formatMessage({
+              id: 'OBD.component.MetaDBConfig.ClusterConfig.MoreConfigurations',
+              defaultMessage: '更多配置',
+            })}
+          </span>
+        </Space>
       </div>
       <ConfigTable
         showVisible={ocpClusterMore}
         dataSource={ocpClusterMoreConfig}
         loading={clusterMoreLoading}
+        isNewDB={isNewDB}
       />
     </div>
   );

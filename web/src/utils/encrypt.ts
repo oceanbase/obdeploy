@@ -15,8 +15,10 @@ export const encryptPwdForConfig = (
   publicKey: string,
 ) => {
   const newConfigData = cloneDeep(configData);
-  const { obagent, obproxy, oceanbase, ocpserver, ocpexpress } =
+
+  const { obagent, obproxy, oceanbase, ocpserver, prometheus, grafana } =
     newConfigData.components || newConfigData;
+
   if (newConfigData.auth?.password)
     newConfigData.auth.password =
       encrypt(newConfigData.auth.password, publicKey) ||
@@ -35,9 +37,26 @@ export const encryptPwdForConfig = (
       }
     });
   }
+  if (prometheus?.basic_auth_users?.admin) {
+    prometheus.basic_auth_users.admin =
+      encrypt(prometheus.basic_auth_users.admin, publicKey) ||
+      prometheus.basic_auth_users.admin;
+  }
+  if (grafana?.login_password) {
+    grafana.login_password =
+      encrypt(grafana.login_password, publicKey) || grafana.login_password;
+  }
+
   if (oceanbase?.root_password) {
     oceanbase.root_password =
       encrypt(oceanbase.root_password, publicKey) || oceanbase.root_password;
+  }
+  if (oceanbase?.parameters) {
+    oceanbase.parameters.forEach((param) => {
+      if (param.key === 'ocp_meta_password' && param.value) {
+        param.value = encrypt(param.value, publicKey) || param.value;
+      }
+    });
   }
   if (ocpserver?.admin_password) {
     ocpserver.admin_password =
@@ -53,18 +72,16 @@ export const encryptPwdForConfig = (
       encrypt(ocpserver.monitor_tenant.password, publicKey) ||
       ocpserver.monitor_tenant.password;
   }
-  if(ocpserver?.metadb?.password){
-    ocpserver.metadb.password =  encrypt(ocpserver.metadb.password, publicKey) ||
-    ocpserver.metadb.password;
-  }
-  if (ocpexpress?.admin_passwd) {
-    ocpexpress.admin_passwd =
-      encrypt(ocpexpress.admin_passwd, publicKey) || ocpexpress.admin_passwd;
+  if (ocpserver?.metadb?.password) {
+    ocpserver.metadb.password =
+      encrypt(ocpserver.metadb.password, publicKey) ||
+      ocpserver.metadb.password;
   }
   if (obproxy?.obproxy_sys_password) {
     obproxy.obproxy_sys_password =
       encrypt(obproxy.obproxy_sys_password, publicKey) ||
       obproxy.obproxy_sys_password;
   }
+
   return newConfigData;
 };

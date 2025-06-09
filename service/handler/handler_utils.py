@@ -21,6 +21,7 @@ from service.handler.ocp_handler import OcpHandler
 from service.handler.metadb_handler import MetadbHandler
 from service.handler.component_change_handler import ComponentChangeHandler
 from service.handler.rsa_handler import RSAHandler
+from service.handler.telemetry_handler import TelemetryHandler
 
 
 def new_component_handler():
@@ -57,5 +58,12 @@ def new_server_info_handler():
 
 def new_component_change_handler():
     return ComponentChangeHandler()
+
+
 def new_rsa_handler():
     return RSAHandler()
+
+
+def new_telemetry_handler():
+    return TelemetryHandler()
+

@@ -13,7 +13,6 @@ import {
 } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormDigit } from '@ant-design/pro-components';
 import { getLocale, useModel } from '@umijs/max';
-import { useUpdateEffect } from 'ahooks';
 import { Button, Input, Tooltip } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useEffect, useState } from 'react';
@@ -46,6 +45,7 @@ export default function ServiceConfig({
   const { ocpConfigData } = useModel('global');
   const { isSingleOcpNode, ocpVersionInfo, deployUser, useRunningUser } =
     useModel('ocpInstallData');
+
   // ocp版本小于4.2.2密码使用旧规则，反之使用最新的密码规则
   const isLowVersion =
     Number(ocpVersionInfo?.version.split('.').reduce((pre, cur) => pre + cur)) <
@@ -61,8 +61,8 @@ export default function ServiceConfig({
   const defaultSiteUrl = ocpserver.ocp_site_url
     ? ocpserver.ocp_site_url
     : isSingleOcpNode === true && ip.length
-      ? `http://${ip[0]}:8080`
-      : '';
+    ? `http://${ip[0]}:8080`
+    : '';
   const [siteUrl, setSiteUrl] = useState<string>(defaultSiteUrl);
   const setPassword = (password: string) => {
     form.setFieldValue(['ocpserver', 'admin_password'], password);
@@ -86,7 +86,6 @@ export default function ServiceConfig({
     form.setFieldValue(['ocpserver', 'ocp_site_url'], value);
   };
 
-
   useEffect(() => {
     if (ip.length) {
       let url = `http://${ip[0]}:8080`;
@@ -95,15 +94,21 @@ export default function ServiceConfig({
     }
   }, []);
 
-  useUpdateEffect(() => {
+  useEffect(() => {
     form.setFieldsValue({
       ocpserver: {
         home_path:
           !useRunningUser && deployUser === 'root'
             ? `/${deployUser}`
             : `/home/${deployUser}`,
-        log_dir: `/home/${deployUser}/logs`,
-        soft_dir: `/home/${deployUser}/software`,
+        log_dir:
+          deployUser === 'root'
+            ? `/${deployUser}/logs`
+            : `/home/${deployUser}/logs`,
+        soft_dir:
+          deployUser === 'root'
+            ? `/${deployUser}/software`
+            : `/home/${deployUser}/software`,
       },
     });
   }, [deployUser]);
@@ -139,19 +144,19 @@ export default function ServiceConfig({
               title={
                 isLowVersion
                   ? intl.formatMessage(
-                    {
-                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                    },
-                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
-                  )
+                      {
+                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                      },
+                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
+                    )
                   : intl.formatMessage(
-                    {
-                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                    },
-                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
-                  )
+                      {
+                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                      },
+                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
+                    )
               }
             >
               <QuestionCircleOutlined className="ml-10" />
@@ -296,29 +301,27 @@ export default function ServiceConfig({
           )}
         </div>
       </ProForm.Item>
-      <div style={locale === 'zh-CN' ? {} : { marginLeft: 40 }}>
-        <ProFormDigit
-          name={['ocpserver', 'port']}
-          label={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ServiceConfig.ServicePort',
-            defaultMessage: '服务端口',
-          })}
-          fieldProps={{ style: commonPortStyle }}
-          placeholder={intl.formatMessage({
-            id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
-            defaultMessage: '请输入',
-          })}
-          rules={[
-            {
-              required: true,
-              message: intl.formatMessage({
-                id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
-                defaultMessage: '请输入',
-              }),
-            },
-          ]}
-        />
-      </div>
+      <ProFormDigit
+        name={['ocpserver', 'port']}
+        label={intl.formatMessage({
+          id: 'OBD.component.OCPConfigNew.ServiceConfig.ServicePort',
+          defaultMessage: '服务端口',
+        })}
+        fieldProps={{ style: commonPortStyle }}
+        placeholder={intl.formatMessage({
+          id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
+          defaultMessage: '请输入',
+        })}
+        rules={[
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.component.OCPConfigNew.ServiceConfig.PleaseEnter',
+              defaultMessage: '请输入',
+            }),
+          },
+        ]}
+      />
     </ProCard>
   );
 }

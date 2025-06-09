@@ -26,6 +26,7 @@ import {
 import { useRequest } from 'ahooks';
 import { Alert, Modal, Spin } from 'antd';
 import type { ResultProps } from 'antd/es/result';
+import { isEmpty } from 'lodash';
 import React, { useEffect, useState } from 'react';
 import { history, useModel } from 'umi';
 import CustomFooter from '../CustomFooter';
@@ -143,6 +144,30 @@ const InstallResult: React.FC<InstallResultProps> = ({
       getOcpNotUpgradingHost();
     }
   }, [type, installStatus, installResult]);
+
+  const { components = {} } = ocpConfigData;
+  const { oceanbase = {} } = components;
+
+  // 上报遥测数据
+  const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
+    manual: true,
+  });
+
+  useRequest(OCP.getTelemetryData, {
+    ready: !!oceanbase?.appname,
+    defaultParams: [
+      {
+        name: oceanbase?.appname,
+      },
+    ],
+    onSuccess: (res) => {
+      const data = res?.data;
+
+      if (!isEmpty(res?.data)) {
+        telemetryReport({ component: 'obd', content: data });
+      }
+    },
+  });
 
   const columns = [
     {
@@ -631,55 +656,8 @@ const InstallResult: React.FC<InstallResultProps> = ({
             data-aspm-param={``}
             data-aspm-expo
             type="primary"
-            // loading={suicideLoading}
             onClick={() => {
-              Modal.confirm({
-                title: intl.formatMessage({
-                  id: 'OBD.component.InstallResult.DoYouWantToExit',
-                  defaultMessage: '是否要退出页面？',
-                }),
-                icon: (
-                  <ExclamationCircleOutlined style={{ color: '#FF4B4B' }} />
-                ),
-
-                content: (
-                  <div>
-                    <div>
-                      {intl.formatMessage({
-                        id: 'OBD.component.InstallResult.BeforeExitingMakeSureThat',
-                        defaultMessage:
-                          '退出前，请确保已复制访问地址及账密信息',
-                      })}
-                    </div>
-                    <a>
-                      {intl.formatMessage({
-                        id: 'OBD.component.InstallResult.CopyInformation',
-                        defaultMessage: '复制信息',
-                      })}
-                      <CopyOutlined
-                        onClick={() =>
-                          handleCopy(
-                            ocpInfo?.password
-                              ? JSON.stringify(ocpInfo, null, 4)
-                              : '',
-                          )
-                        }
-                      />
-                    </a>
-                  </div>
-                ),
-
-                okText: intl.formatMessage({
-                  id: 'OBD.component.InstallResult.Exit',
-                  defaultMessage: '退出',
-                }),
-                okButtonProps: {
-                  danger: true,
-                },
-                onOk: () => {
-                  suicide();
-                },
-              });
+              suicide();
             }}
           >
             {intl.formatMessage({

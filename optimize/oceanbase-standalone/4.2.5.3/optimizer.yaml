@@ -1,0 +1,14 @@
+system_config:
+  default:
+    query_sql: select value from oceanbase.__all_virtual_sys_parameter_stat where name="{name}"
+    modify_sql: "alter system set {name}={value}"
+  tenant:
+    query_sql: select * from oceanbase.__all_virtual_tenant_parameter_info where name like "{name}" and tenant_id={tenant_id}
+    modify_sql: "alter system set {name}={value} {tenant_where}"
+variables:
+  default:
+    query_sql: "select value from oceanbase.__all_virtual_sys_variable where tenant_id = {tenant_id} and name = '{name}'"
+    modify_sql: "ALTER TENANT {tenant} SET VARIABLES {name} = {value}"
+exec_sql:
+  clean_cache:
+    modify_sql: "alter system flush plan cache global"

@@ -15,17 +15,20 @@
 
 from __future__ import absolute_import, division, print_function
 
+from const import ENCRYPT_PASSWORD
 from tool import NetUtil
 from copy import deepcopy
 
 
-def display(plugin_context, *args, **kwargs):
+def display(plugin_context, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     servers = cluster_config.servers
+    if not config_encrypted:
+        display_encrypt_password = None
     results = []
     start_env = plugin_context.get_variable('start_env')
-    cursor = plugin_context.get_return('connect', spacename='ocp-server-ce').get_return('cursor')
+    cursor = plugin_context.get_return('connect', spacename=cluster_config.name).get_return('cursor')
     for server in servers:
         api_cursor = cursor.get(server)
         server_config = start_env[server]
@@ -38,11 +41,11 @@ def display(plugin_context, *args, **kwargs):
             'ip': ip,
             'port': api_cursor.port,
             'user': "admin",
-            'password': server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password'],
+            'password': (server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password']),
             'url': url,
             'status': 'active' if api_cursor and api_cursor.status(stdio) else 'inactive'
         })
-    stdio.print_list(results, ['url', 'username', 'password', 'status'], lambda x: [x['url'], 'admin', server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password'], x['status']], title='%s' % cluster_config.name)
+    stdio.print_list(results, ['url', 'username', 'password', 'status'], lambda x: [x['url'], 'admin', (server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password']) if not display_encrypt_password else display_encrypt_password, x['status']], title='%s' % cluster_config.name)
     active_result = [r for r in results if r['status'] == 'active']
     info_dict = active_result[0] if len(active_result) > 0 else None
     if info_dict is not None:

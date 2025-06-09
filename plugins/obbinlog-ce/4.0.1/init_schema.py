@@ -58,7 +58,9 @@ def init_schema(plugin_context, binlog_cursor=None, **kwargs):
 
     for sql in sqls:
         binlog_cursor.execute(sql, raise_exception=True)
+        binlog_cursor.db.commit()
     binlog_cursor = binlog_cursor.usable_cursor
     sql = "UPDATE %s.config_template SET value='false' WHERE key_name='enable_resource_check';" % db
     binlog_cursor.execute(sql)
+    binlog_cursor.db.commit()
     return plugin_context.return_true()

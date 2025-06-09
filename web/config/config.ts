@@ -13,7 +13,7 @@ export default defineConfig({
     process.env.NODE_ENV === 'production'
       ? ['babel-plugin-dynamic-import-node']
       : [],
-  mfsu: {},
+  mfsu: { strategy: 'normal' },
   locale: {
     default: 'zh-CN',
     antd: false,
@@ -67,5 +67,12 @@ export default defineConfig({
     // 静态资源的文件限制调整为 1GB，避免视频等大文件资源阻塞项目启动
     config.performance.maxAssetSize(1000000000);
     return config;
+  },
+  jsMinifier: 'terser',
+  proxy: {
+    '/api/v1': {
+      target: 'http://11.161.204.51:8680', //自己的环境
+      // target: 'http://11.161.205.92:8680/', //谢凯的环境
+    },
   },
 });

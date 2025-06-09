@@ -11,23 +11,24 @@ import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import { getErrorInfo, handleQuit } from '@/utils';
 import { generateComplexPwd, generatePwd } from '@/utils/helper';
 import { intl } from '@/utils/intl';
+import { ExclamationCircleFilled } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
 import { getLocale, useModel } from '@umijs/max';
 import { useRequest } from 'ahooks';
 import { Alert, Button, Row, Space } from 'antd';
 import { useEffect } from 'react';
-import { ExclamationCircleFilled } from '@ant-design/icons';
 import {
   allComponentsKeys,
   componentsConfig,
   componentVersionTypeToComponent,
   configServerComponent,
   configServerComponentKey,
+  grafanaComponent,
   obagentComponent,
   obproxyComponent,
   ocpexpressComponent,
-  ocpexpressComponentKey,
   onlyComponentsKeys,
+  prometheusComponent,
 } from '../constants';
 import { formatConfigData as handleConfigData } from '../Obdeploy/CheckInfo';
 import { DeployedUserTitle } from './ComponentConfig';
@@ -66,6 +67,8 @@ export default function PreCheckInfo() {
     obproxy = {},
     ocpexpress = {},
     obagent = {},
+    grafana = {},
+    prometheus = {},
     obconfigserver = {},
     home_path,
     deployUser,
@@ -215,19 +218,27 @@ export default function PreCheckInfo() {
           parameters: obagent?.parameters,
         });
     }
-    // more是否有数据跟前面是否打开更多配置有关
-    if (!lowVersion && selectedConfig.includes('ocp-express')) {
-      content.push({
-        label: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.PortOcpExpress',
-          defaultMessage: 'OCP Express 端口',
-        }),
-        value: ocpexpress?.port,
+
+    if (selectedConfig.includes(grafanaComponent)) {
+      content = content.concat({
+        label: 'Grafana 服务端口',
+        value: grafana?.port,
       });
-      ocpexpress?.parameters?.length &&
+      grafana?.parameters?.length &&
         more.push({
-          label: componentsConfig[ocpexpressComponentKey].labelName,
-          parameters: ocpexpress?.parameters,
+          label: componentsConfig[grafanaComponent].labelName,
+          parameters: grafana?.parameters,
+        });
+    }
+    if (selectedConfig.includes(prometheusComponent)) {
+      content = content.concat({
+        label: 'Prometheus 服务端口',
+        value: prometheus?.port,
+      });
+      prometheus?.parameters?.length &&
+        more.push({
+          label: componentsConfig[prometheusComponent].labelName,
+          parameters: prometheus?.parameters,
         });
     }
 
@@ -235,7 +246,7 @@ export default function PreCheckInfo() {
       content = content.concat({
         label: intl.formatMessage({
           id: 'OBD.pages.Obdeploy.CheckInfo.ObconfigserverServicePort',
-          defaultMessage: 'obconfigserver 服务端口',
+          defaultMessage: 'OBConfigserver 服务端口',
         }),
         value: obconfigserver?.listen_port,
       });

@@ -23,7 +23,7 @@ def obshell_port_check(plugin_context, upgrade_check=False, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     critical = plugin_context.get_variable('critical')
-    servers_port = plugin_context.get_variable('servers_port')
+    servers_port = plugin_context.get_variable('servers_port', default={})
     port_check = upgrade_check or plugin_context.get_variable('port_check')
     if not port_check:
         return plugin_context.return_true()
@@ -32,8 +32,11 @@ def obshell_port_check(plugin_context, upgrade_check=False, *args, **kwargs):
         ip = server.ip
         client = clients[server]
         server_config = cluster_config.get_server_conf_with_default(server)
-        ports = servers_port[ip]
-        if port_check:
+        ports = servers_port.get(ip, {})
+        home_path = server_config['home_path']
+        obshell_pid_path = '%s/run/obshell.pid' % home_path
+        obshell_pid = client.execute_command('cat %s' % obshell_pid_path).stdout.strip()
+        if port_check and not (obshell_pid and client.execute_command('ls /proc/%s' % obshell_pid)):
             stdio.verbose('%s port check' % server)
             port = int(server_config.get('obshell_port'))
             if port in ports:

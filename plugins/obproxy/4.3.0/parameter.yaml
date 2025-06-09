@@ -470,7 +470,7 @@
   type: STRING
   default: ''
   need_restart: false
-  description_en: password pf obproxy sys user
+  description_en: password of obproxy sys user
 - name: observer_sys_password
   type: STRING
   default: ''
@@ -481,3 +481,15 @@
   default: ''
   need_restart: false
   description_en: password of observer root user
+- name: vip_address
+  type: STRING
+  default: ''
+  description_en: vip address of obproxy
+- name: vip_port
+  type: int
+  default: ''
+  description_en: vip port of obproxy
+- name: dns
+  type: STRING
+  default: ''
+  description_en: dns of obproxy

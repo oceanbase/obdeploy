@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import base64
 import os
 import bz2
 import random
@@ -32,9 +33,13 @@ import hashlib
 import socket
 import datetime
 from io import BytesIO
-from copy import copy
+from copy import copy, deepcopy
 
 import string
+
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import pad, unpad
 from ruamel.yaml import YAML, YAMLContextManager, representer
 
 from _errno import EC_SQL_EXECUTE_FAILED
@@ -526,7 +531,7 @@ class YamlLoader(YAML):
     def loads(self, yaml_content):
         try:
             stream = BytesIO()
-            yaml_content = str(yaml_content).encode()
+            yaml_content = str(yaml_content).encode() if isinstance(yaml_content, str) else yaml_content
             stream.write(yaml_content)
             stream.seek(0)
             return self.load(stream)
@@ -670,11 +675,26 @@ class CommandEnv(SafeStdio):
 
 
 class NetUtil(object):
+
     @staticmethod
     def get_host_ip():
         hostname = socket.gethostname()
         ip = socket.gethostbyname(hostname)
         return ip
+
+    @staticmethod
+    def get_all_ips():
+        import netifaces
+        ips = []
+        for interface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(interface)
+            if netifaces.AF_INET in addrs:  # IPv4 address
+                for addr_info in addrs[netifaces.AF_INET]:
+                    ips.append(addr_info['addr'])
+            if netifaces.AF_INET6 in addrs:  # IPv6 address
+                for addr_info in addrs[netifaces.AF_INET6]:
+                    ips.append(addr_info['addr'])
+        return ips
 
 
 COMMAND_ENV=CommandEnv()
@@ -1040,3 +1060,59 @@ def get_disk_info_by_path(path, client, stdio):
             disk_info[path] = {'total': int(total) << 10, 'avail': int(avail) << 10, 'need': 0, 'threshold': 2}
             stdio.verbose('get disk info for path {}, total: {} avail: {}'.format(path, disk_info[path]['total'], disk_info[path]['avail']))
     return disk_info
+
+
+def str2bool(value):
+    if value.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise ValueError('{} is not a valid boolean value'.format(value))
+
+def is_root_user(client):
+    return client.config.username == 'root'
+
+
+def string_to_md5_32bytes(input_str):
+    md5_hash = hashlib.md5()
+    md5_hash.update(input_str.encode('utf-8'))
+    return md5_hash.hexdigest()
+
+
+def aes_encrypt(plaintext, key):
+    iv = get_random_bytes(AES.block_size)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    ciphertext = cipher.encrypt(pad(plaintext.encode('utf-8'), AES.block_size))
+    return base64.b64encode(iv + ciphertext).decode('utf-8')
+
+
+def aes_decrypt(ciphertext, key):
+    raw_data = base64.b64decode(ciphertext)
+    iv = raw_data[:AES.block_size]
+    ciphertext = raw_data[AES.block_size:]
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+    return plaintext.decode('utf-8')
+
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
+    if not user:
+        user = 'SYS' if mode == 'oracle' else 'root'
+    # find tenant ip, port
+    tenant_cursor = None
+    query_sql = "select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
+    tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
+    for tenant_server_port in tenant_server_ports:
+        tenant_ip = tenant_server_port['SVR_IP']
+        tenant_port = tenant_server_port['SQL_PORT']
+        tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password if retries % 2 or not len(args) > 0 else args[0], ip=tenant_ip, port=tenant_port, print_exception=False)
+        if tenant_cursor:
+            break
+    if not tenant_cursor and retries:
+        time.sleep(1)
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
+    return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
+
+            
+                
+

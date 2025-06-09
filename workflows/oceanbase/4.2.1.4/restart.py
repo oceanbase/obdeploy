@@ -36,13 +36,13 @@ def restart(plugin_context, workflow, *args, **kwargs):
                 new_cluster_config.servers = zones_servers[zone]
             workflow.add_with_kwargs(const.STAGE_FIRST, {"cluster_config": cluster_config, "zone": pre_zone}, 'start_zone', "active_check")
             workflow.add_with_kwargs(const.STAGE_FIRST, {"cluster_config": cluster_config, "zone": zone}, "stop_zone", "stop")
-            if const.COMP_OB_CE == component_name:
+            if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
                 workflow.add(const.STAGE_FIRST, 'obshell_stop')
             if new_clients:
                 workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {"new_clients": new_clients, "cluster_config": cluster_config}, 'chown_dir')
             workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": new_cluster_config if new_cluster_config else cluster_config},
                                      'configserver_pre', 'start_pre', 'start', 'health_check')
-            if const.COMP_OB_CE == component_name:
+            if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
                 workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": new_cluster_config if new_cluster_config else cluster_config}, 'obshell_start', 'obshell_bootstrap')
             pre_zone = zone
         workflow.add_with_kwargs(const.STAGE_FIRST, {"cluster_config": cluster_config, "zone": pre_zone}, 'start_zone')
@@ -52,13 +52,13 @@ def restart(plugin_context, workflow, *args, **kwargs):
     else:
         # un_rolling
         workflow.add(const.STAGE_FIRST,  "stop")
-        if const.COMP_OB_CE == component_name:
+        if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
             workflow.add(const.STAGE_FIRST, 'obshell_stop')
         if new_clients:
             workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {"new_clients": new_clients}, 'chown_dir')
         workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": new_cluster_config if new_cluster_config else cluster_config},
                                  'configserver_pre', 'start_pre', 'start', 'health_check')
-        if const.COMP_OB_CE == component_name:
+        if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
             workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": new_cluster_config if new_cluster_config else cluster_config}, 'obshell_start', 'obshell_bootstrap')
 
     workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients}, 'connect')
@@ -66,7 +66,7 @@ def restart(plugin_context, workflow, *args, **kwargs):
     finally_plugins = ['display']
     if new_cluster_config:
         workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": clients, "cluster_config": cluster_config, "new_cluster_config": new_cluster_config, "repository_dir": kwargs.get('repository').repository_dir}, "reload")
-        if const.COMP_OB_CE == component_name:
+        if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
             workflow.add_with_kwargs(const.STAGE_FIRST, {"cluster_config": new_cluster_config}, "obshell_password_reload")
         cluster_config = new_cluster_config
     if new_clients:

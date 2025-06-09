@@ -1,17 +1,16 @@
-import { intl } from '@/utils/intl';
-import { Row, Col, Tooltip, Space, Table,Typography } from 'antd';
-import { ProCard } from '@ant-design/pro-components';
-import type { ConnectInfoPropType } from './type';
-import { componentsConfig } from '@/pages/constants';
-import type { ColumnsType } from 'antd/es/table';
-import styles from './index.less';
-import type { DBNodeType } from './type';
 import PasswordCard from '@/component/PasswordCard';
-import { leftCardStyle } from '.';
 import {
-  oceanbaseAddonAfter,
   obproxyAddonAfter,
+  oceanbaseAddonAfter,
 } from '@/constant/configuration';
+import { componentsConfig } from '@/pages/constants';
+import { intl } from '@/utils/intl';
+import { ProCard } from '@ant-design/pro-components';
+import { Col, Row, Space, Table, Tooltip, Typography } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { leftCardStyle } from '.';
+import styles from './index.less';
+import type { ConnectInfoPropType, DBNodeType } from './type';
 interface BasicInfo {
   isNewDB: boolean;
   configInfoProp: ConnectInfoPropType;
@@ -115,6 +114,11 @@ export default function ConfigInfo({
             defaultMessage: 'rpc 端口',
           }),
           colSpan: 3,
+          value: obConfigInfo?.rpc_port,
+        },
+        {
+          label: 'OBShell 端口',
+          colSpan: 4,
           value: obConfigInfo?.rpc_port,
         },
       ],
@@ -300,12 +304,12 @@ export default function ConfigInfo({
                   defaultMessage: '用户名',
                 })}
               >
-                 <Text
-                    style={{ width: 200 }}
-                    ellipsis={{ tooltip: userConfig.user }}
-                  >
-                    {userConfig.user}
-                  </Text>
+                <Text
+                  style={{ width: 200 }}
+                  ellipsis={{ tooltip: userConfig.user }}
+                >
+                  {userConfig.user}
+                </Text>
               </ProCard>
               <PasswordCard password={userConfig.password} />
               <ProCard

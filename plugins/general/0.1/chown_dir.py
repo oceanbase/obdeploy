@@ -48,7 +48,7 @@ def chown_dir(plugin_context, new_clients, *args, **kwargs):
                 chown_dir_flags = True
         for file in tmp_files:
             if new_client.execute_command('[ -f {} ]'.format(file)):
-                if cluster_config.name == const.COMP_OCP_SERVER_CE:
+                if cluster_config.name in const.COMPS_OCP:
                     global_config = cluster_config.get_global_conf()
                     launch_user = global_config.get('launch_user')
                     if launch_user:

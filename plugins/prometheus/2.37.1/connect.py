@@ -91,9 +91,10 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
                 username, password = list(config['basic_auth_users'].items())[0]
 
             new_config = None
+            new_password = None
             if new_cluster_config:
                 new_config = new_cluster_config.get_server_conf(server)
-                if new_config:
+                if new_config and new_config.get('basic_auth_users'):
                     new_username, new_password = list(new_config['basic_auth_users'].items())[0]
             password = new_password if new_config and count % 2 else password
 

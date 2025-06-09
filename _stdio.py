@@ -745,7 +745,17 @@ class IO(object):
             del kwargs['_disable_log']
         else:
             enaable_log = True
-        
+
+        print_msg = str(print_msg)
+        if "PASSWORD" in print_msg and "IP_LIST=" not in print_msg:
+            print_msg = self._format(print_msg, *args)
+            pk_regex = r'(?i)(password([:|=]))(?! \S)(.*?)(,|\s)'
+            pattern = re.compile(pk_regex)
+            is_match = pattern.search(print_msg)
+            if is_match:
+                password_length = len(is_match.group(3))
+                replacement = r"\1" + '*' * password_length + r"\4"
+                print_msg = pattern.sub(replacement, print_msg)
         kwargs['file'] and print(self._format(print_msg, *args), **kwargs)
         del kwargs['file']
         enaable_log and self.log(msg_lv, msg, *args, **kwargs)
@@ -804,7 +814,7 @@ class IO(object):
             self.exit(code)
 
     def contains_keys(self, msg):
-        keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT", "PASSWD"]
+        keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT", "PASSWD", "_PASSKEY", "SUDO", "ACCESS_"]
         return any(keyword in msg.upper() for keyword in keywords)
     
     def table_log_masking(self, msg):
@@ -816,7 +826,78 @@ class IO(object):
             if match:
                 masked_password = "*"*len(match.group(3))
                 str_msg = pattern.sub(rf"\1{masked_password}\4", str_msg)
+        elif 'access_' in str_msg:
+            access_regex = r"(access_id=)[^&]*|(access_key=)[^&,| ]*"
+            access_pattern = re.compile(access_regex)
+            def replace_with_stars(match):
+                full_match = match.group(0)  # Full match including prefix
+                key, value = full_match.split('=', 1)  # Split into key and value
+                masked_value = '*' * len(value)  # Create the mask
+                return f"{key}={masked_value}"
+            match = re.search(access_pattern, str_msg)
+            if match:
+                str_msg = re.sub(access_pattern, replace_with_stars, str_msg)
         return str_msg
+
+    @staticmethod
+    def log_masking_static(msg):
+        def contains_keys(msg):
+            keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT", "PASSWD", "_PASSKEY", "SUDO",
+                        "ACCESS_"]
+            return any(keyword in msg.upper() for keyword in keywords)
+
+        log_regex = [
+            r"((-P\s*\S+\s+.*?)-p\s*['\"]?)([^\s'\"']+)(['\"]*)",
+            r"(_PASSWORD\s*(=|to)\s*['\"]*)([^\s'\"']+)(['\"]*)",
+            r'(?i)(password([:|=]))(?! \S)(.*?)(,|\s)'
+        ]
+        patterns = []
+        is_match = False
+
+        for regex in log_regex:
+            patterns.append(re.compile(regex))
+        if isinstance(msg, str) and contains_keys(msg):
+            if "--prompt" in msg:
+                prompt_regex = r"((-P\s*\S+\s+.*?)-p\s*['\"]+)([^\s'\"']+)(['\"]*)"
+                pattern = re.compile(prompt_regex)
+                return pattern.sub(r"\1******\4", msg)
+            for pattern in patterns:
+                is_match = pattern.search(msg)
+                msg = pattern.sub(r"\1******\4", msg)
+            if is_match:
+                return msg
+            if "access_id" in msg or "access_key" in msg:
+                access_regex = r'(access_id=|access_key=)([^&\']+)'
+                access_pattern = re.compile(access_regex)
+                if access_pattern.search(msg):
+                    return access_pattern.sub(r'\1******', msg)
+
+            if "_passkey" in msg:
+                passkey_regex = r"([\"']?[\w]*_passkey[\w]*[\"']?\s*:\s*)(?:'([^']*)'|(None))"
+                passkey_pattern = re.compile(passkey_regex)
+                if passkey_pattern.search(msg):
+                    return passkey_pattern.sub(r'\1******', msg)
+
+            pwd_args_regex = r"(IDENTIFIED BY \S+.*args:\s*\[['\"]?|_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
+            arg_pattern = re.compile(pwd_args_regex)
+            if arg_pattern.search(msg):
+                return arg_pattern.sub(r"\1******\3", msg)
+
+            passwd_regex = r'(?i)((password|passwd)[:|=]\s*)(.*)'
+            pwd_pattern = re.compile(passwd_regex)
+            if pwd_pattern.search(msg):
+                return pwd_pattern.sub(r"\1******", msg)
+
+            http_regex = r'(?i)((password)\s*\":\s*\")(.*?)(\")'
+            http_pattern = re.compile(http_regex)
+            if http_pattern.search(msg):
+                return http_pattern.sub(r"\1******\4", msg)
+
+            echo_pwd_regex = r"(.*echo\s+)(.*)(\s+\|\s+sudo\s+-S)"
+            pwd_pattern = re.compile(echo_pwd_regex)
+            if pwd_pattern.search(msg):
+                return pwd_pattern.sub(r"\1******\3", msg)
+        return msg
 
     def log_masking(self, msg):
         log_regex = [
@@ -839,6 +920,18 @@ class IO(object):
                 msg = pattern.sub(r"\1******\4", msg)
             if is_match:
                 return msg
+            if "access_id" in msg or "access_key" in msg:
+                access_regex = r'(access_id=|access_key=)([^&\',]+)'
+                access_pattern = re.compile(access_regex)
+                if access_pattern.search(msg):
+                    return access_pattern.sub(r'\1******', msg)
+                
+            if "_passkey" in msg:
+                passkey_regex = r"([\"']?[\w]*_passkey[\w]*[\"']?\s*:\s*)(?:'([^']*)'|(None))"
+                passkey_pattern = re.compile(passkey_regex)
+                if passkey_pattern.search(msg):
+                    return passkey_pattern.sub(r'\1******', msg)
+
             pwd_args_regex = r"(IDENTIFIED BY \S+.*args:\s*\[['\"]?|_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
             arg_pattern = re.compile(pwd_args_regex)
             if arg_pattern.search(msg):
@@ -853,12 +946,18 @@ class IO(object):
             http_pattern = re.compile(http_regex)
             if http_pattern.search(msg):
                 return http_pattern.sub(r"\1******\4", msg)
+
+            echo_pwd_regex = r"(.*echo\s+)(.*)(\s+\|\s+sudo\s+-S)"
+            pwd_pattern = re.compile(echo_pwd_regex)
+            if pwd_pattern.search(msg):
+                return pwd_pattern.sub(r"\1******\3", msg)
         return msg
 
     def verbose(self, msg, *args, **kwargs):
         if self.level > self.VERBOSE_LEVEL:
             self.log(MsgLevel.VERBOSE, '%s %s' % (self._verbose_prefix, msg), *args, **kwargs)
             return
+        msg = self.log_masking(msg)
         self._print(MsgLevel.VERBOSE, '%s %s' % (self._verbose_prefix, msg), *args, **kwargs)
 
     if sys.version_info.major == 2:

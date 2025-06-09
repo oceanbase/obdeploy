@@ -6,6 +6,7 @@ import {
   PathCheckInfo,
   UserCheckInfo,
 } from '@/component/PreCheckComps';
+
 import { DEFAULT_PROXY_PWD } from '@/constant';
 import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import { createDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
@@ -25,12 +26,13 @@ import {
   componentVersionTypeToComponent,
   configServerComponent,
   configServerComponentKey,
+  grafanaComponent,
   modeConfig,
   obagentComponent,
   obproxyComponent,
   oceanbaseComponent,
-  ocpexpressComponentKey,
   onlyComponentsKeys,
+  prometheusComponent,
 } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
@@ -114,10 +116,12 @@ export default function CheckInfo() {
   const {
     oceanbase = {},
     obproxy = {},
-    ocpexpress = {},
     obagent = {},
     obconfigserver = {},
+    grafana = {},
+    prometheus = {},
   } = components;
+
   const { run: handleCreateConfig, loading } = useRequest(
     createDeploymentConfig,
     {
@@ -172,14 +176,8 @@ export default function CheckInfo() {
       (key) => key !== 'obagent' && tempSelectedConfig.includes(key),
     );
 
-    if (lowVersion) {
-      currentOnlyComponentsKeys = currentOnlyComponentsKeys.filter(
-        (key) => key !== 'ocpexpress',
-      );
-    }
-
     currentOnlyComponentsKeys.forEach((key) => {
-      if (componentsConfig?.[key]) {
+      if (key !== 'ocpexpress' && componentsConfig?.[key]) {
         componentsNodeConfigList.push({
           key,
           name: componentsConfig?.[key]?.name,
@@ -191,6 +189,8 @@ export default function CheckInfo() {
     return componentsNodeConfigList;
   };
 
+  // 当前 OB 环境是否为单机版
+  const standAlone = oceanbase?.component === 'oceanbase-standalone';
   const dbConfigColumns: ColumnsType<API.DBConfig> = [
     {
       title: intl.formatMessage({
@@ -217,20 +217,25 @@ export default function CheckInfo() {
         );
       },
     },
-    {
-      title: intl.formatMessage({
-        id: 'OBD.pages.components.CheckInfo.RootServerNodes',
-        defaultMessage: 'Root Server 节点',
-      }),
-      dataIndex: 'rootservice',
-      width: 200,
-      render: (text) => text || '-',
-    },
+    ...(!standAlone
+      ? [
+          {
+            title: intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.RootServerNodes',
+              defaultMessage: 'Root Server 节点',
+            }),
+            dataIndex: 'rootservice',
+            width: 200,
+            render: (text) => text || '-',
+          },
+        ]
+      : []),
   ];
 
   const componentsList = getComponentsList();
   const componentsNodeConfigList = getComponentsNodeConfigList();
   const initDir = `${home_path}/oceanbase/store`;
+
   const clusterConfigInfo = [
     {
       key: 'cluster',
@@ -297,15 +302,20 @@ export default function CheckInfo() {
           colSpan: 3,
           value: oceanbase?.rpc_port,
         },
+        {
+          label: 'OBShell 端口',
+          colSpan: 3,
+          value: oceanbase?.obshell_port,
+        },
       ],
 
       more: oceanbase?.parameters?.length
         ? [
-          {
-            label: componentsConfig[oceanbaseComponent].labelName,
-            parameters: oceanbase?.parameters,
-          },
-        ]
+            {
+              label: componentsConfig[oceanbaseComponent].labelName,
+              parameters: oceanbase?.parameters,
+            },
+          ]
         : [],
     },
   ];
@@ -344,6 +354,28 @@ export default function CheckInfo() {
         });
     }
 
+    if (selectedConfig.includes(grafanaComponent)) {
+      content = content.concat({
+        label: 'Grafana 服务端口',
+        value: grafana?.port,
+      });
+      grafana?.parameters?.length &&
+        more.push({
+          label: componentsConfig[grafanaComponent].labelName,
+          parameters: grafana?.parameters,
+        });
+    }
+    if (selectedConfig.includes(prometheusComponent)) {
+      content = content.concat({
+        label: 'Prometheus 服务端口',
+        value: prometheus?.port,
+      });
+      prometheus?.parameters?.length &&
+        more.push({
+          label: componentsConfig[prometheusComponent].labelName,
+          parameters: prometheus?.parameters,
+        });
+    }
     if (selectedConfig.includes(obagentComponent)) {
       content = content.concat(
         {
@@ -367,38 +399,12 @@ export default function CheckInfo() {
           parameters: obagent?.parameters,
         });
     }
-    // more是否有数据跟前面是否打开更多配置有关
-    if (!lowVersion && selectedConfig.includes('ocp-express')) {
-      content.push({
-        label: intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.PortOcpExpress',
-          defaultMessage: 'OCP Express 端口',
-        }),
-        value: ocpexpress?.port,
-      });
-      content.push({
-        label: intl.formatMessage({
-          id: 'OBD.pages.Obdeploy.CheckInfo.OcpExpressAdministratorPassword',
-          defaultMessage: 'OCP Express 管理员密码',
-        }),
-        value: (
-          <Tooltip title={ocpexpress?.admin_passwd} placement="topLeft">
-            <div className="ellipsis">{ocpexpress?.admin_passwd}</div>
-          </Tooltip>
-        ),
-      });
-      ocpexpress?.parameters?.length &&
-        more.push({
-          label: componentsConfig[ocpexpressComponentKey].labelName,
-          parameters: ocpexpress?.parameters,
-        });
-    }
 
     if (selectedConfig.includes(configServerComponent)) {
       content = content.concat({
         label: intl.formatMessage({
           id: 'OBD.pages.Obdeploy.CheckInfo.ObconfigserverServicePort',
-          defaultMessage: 'obconfigserver 服务端口',
+          defaultMessage: 'OBConfigserver 服务端口',
         }),
         value: obconfigserver?.listen_port,
       });

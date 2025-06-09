@@ -27,6 +27,7 @@ import copy
 from uuid import uuid1 as uuid, UUID
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
+import const
 from core import ObdHome
 from _stdio import IO, FormatText
 from _lock import LockMode
@@ -37,7 +38,7 @@ import _environ as ENV
 from ssh import LocalClient
 from const import (
     CONST_OBD_HOME,
-    VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS, COMP_OB_CE, COMP_ODP_CE, COMP_ODP, COMP_OCP_SERVER_CE,
+    VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS, COMP_OB_CE, COMP_ODP_CE, COMP_ODP, COMP_OCP_SERVER_CE, COMP_OB_STANDALONE,
     COMP_OCEANBASE_DIAGNOSTIC_TOOL, PKG_RPM_FILE,PKG_REPO_FILE, BUILD_PLUGIN_LIST
 )
 
@@ -48,6 +49,19 @@ OBD_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), 
 OBDIAG_HOME_PATH = os.path.join(os.environ.get(CONST_OBD_HOME, os.getenv('HOME')), COMP_OCEANBASE_DIAGNOSTIC_TOOL)
 COMMAND_ENV.load(os.path.join(OBD_HOME_PATH, '.obd_environ'), ROOT_IO)
 ROOT_IO.default_confirm = COMMAND_ENV.get(ENV.ENV_DEFAULT_CONFIRM, '0') == '1'
+
+
+class CmdReturn(object):
+    def __init__(self, cmd_result, code):
+        self.exit_code = code
+        self.result = cmd_result
+
+    @property
+    def code(self):
+        return self.exit_code
+
+    def __bool__(self):
+        return True if self.result else False
 
 
 class OptionHelpFormatter(IndentedHelpFormatter):
@@ -197,50 +211,49 @@ class ObdCommand(BaseCommand):
         if not COMMAND_ENV.get(ENV.ENV_OBD_ID):
             COMMAND_ENV.set(ENV.ENV_OBD_ID, uuid())
         if VERSION != version and BUILD_PLUGIN_LIST != '<B_PLUGIN_LIST>':
+            obd_path_len = len(self.OBD_PATH) + 1
             for part in ['workflows', 'plugins', 'config_parser', 'optimize', 'mirror/remote']:
                 obd_part_dir = os.path.join(self.OBD_PATH, part)
                 root_part_path = os.path.join(self.OBD_INSTALL_PATH, part)
-                if DirectoryUtil.mkdir(self.OBD_PATH):
+                if DirectoryUtil.mkdir(self.OBD_PATH, stdio=ROOT_IO):
                     if part != 'mirror/remote':
                         if os.path.exists(obd_part_dir):
                             backup_path = os.path.join(self.OBD_PATH, '.backup_plugin', VERSION + '_' + REVISION, part)
-                            if DirectoryUtil.mkdir(backup_path):
-                                DirectoryUtil.copy(obd_part_dir, backup_path, ROOT_IO)
-                            os.chdir(obd_part_dir)
+                            if DirectoryUtil.mkdir(backup_path, stdio=ROOT_IO):
+                                DirectoryUtil.copy(obd_part_dir, backup_path, stdio=ROOT_IO)
                             if part != 'config_parser':
-                                for file in glob.glob('*/*/*'):
+                                for file in glob.glob('%s/*/*/*' % obd_part_dir):
                                     if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file):
                                         continue
-                                    if file not in BUILD_PLUGIN_LIST:
+                                    if file[obd_path_len:] not in BUILD_PLUGIN_LIST:
                                         FileUtil.rm(file)
                             else:
-                                for file in glob.glob('*/*'):
+                                for file in glob.glob('%s/*/*' % obd_part_dir):
                                     if file not in BUILD_PLUGIN_LIST:
                                         FileUtil.rm(file)
 
                         if os.path.exists(root_part_path):
-                            os.chdir(root_part_path)
                             if part != 'config_parser':
-                                for file in glob.glob('*/*/*'):
-                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file):
+                                for file in glob.glob('%s/*/*/*' % obd_part_dir):
+                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file) or COMP_OB_STANDALONE in file:
                                         continue
-                                    if file not in BUILD_PLUGIN_LIST:
+                                    if file[obd_path_len:] not in BUILD_PLUGIN_LIST:
                                         if file.replace(COMP_ODP_CE, COMP_ODP).replace('3.2.1', '3.1.0') in BUILD_PLUGIN_LIST:
                                             continue
                                         FileUtil.rm(file)
                             else:
-                                for file in glob.glob('*/*'):
-                                    if file not in BUILD_PLUGIN_LIST:
+                                for file in glob.glob('%s/*/*' % obd_part_dir):
+                                    if file[obd_path_len:] not in BUILD_PLUGIN_LIST:
                                         FileUtil.rm(file)
                 if os.path.exists(root_part_path):
-                    DirectoryUtil.copy(root_part_path, obd_part_dir, ROOT_IO)
+                    DirectoryUtil.copy(root_part_path, obd_part_dir, stdio=ROOT_IO)
 
             backup_path = os.path.join(self.OBD_PATH, '.backup_plugin')
             if os.path.exists(backup_path):
                 dir_list = [os.path.join(backup_path, f) for f in os.listdir(backup_path)]
                 sorted_dir_list = sorted(dir_list, key=lambda dir: datetime.datetime.fromtimestamp(os.path.getmtime(dir)))
                 for dir in sorted_dir_list[12:]:
-                    DirectoryUtil.rm(dir)
+                    DirectoryUtil.rm(dir, stdio=ROOT_IO)
             version_fobj.seek(0)
             version_fobj.truncate()
             version_fobj.write(VERSION)
@@ -281,7 +294,10 @@ If you want to view detailed obd logs, please run: obd display-trace {trace_id}'
             if self.has_trace and self.enable_log:
                 self._init_log()
             ROOT_IO.track_limit += 1
-            ROOT_IO.verbose('cmd: %s' % self.cmds)
+            if self.name == 'set-epk':
+                ROOT_IO.verbose('cmd: %s' % "['******']")
+            else:
+                ROOT_IO.verbose('cmd: %s' % self.cmds)
             ROOT_IO.verbose('opts: %s' % self.opts)
             obd = ObdHome(home_path=self.OBD_PATH, dev_mode=self.dev_mode, lock_mode=self.lock_mode, stdio=ROOT_IO)
             obd.set_options(self.opts)
@@ -434,11 +450,14 @@ class EnvironmentUnsetCommand(HiddenObdCommand):
 
     def init(self, cmd, args):
         super(EnvironmentUnsetCommand, self).init(cmd, args)
-        self.parser.set_usage('%s [key] [value]' % self.prev_cmd)
+        self.parser.set_usage('%s [key]' % self.prev_cmd)
         return self
 
     def _do_command(self, obd):
         if len(self.cmds) == 1:
+            if self.cmds[0] in FORBIDDEN_VARS:
+                obd.stdio.error("Unset the environment variable {} is not allowed.".format(self.cmds[0]))
+                return False
             return COMMAND_ENV.delete(self.cmds[0], save=True, stdio=obd.stdio)
         else:
             return self._show_help()
@@ -728,6 +747,7 @@ class ClusterMirrorCommand(ObdCommand):
             data[component] = _.get_variable('run_result')
         return data
 
+
     def background_telemetry_task(self, obd, demploy_name=None):
         if demploy_name is None:
             demploy_name = self.cmds[0]
@@ -833,6 +853,9 @@ class WebCommand(ObdCommand):
         self.parser.add_option('-w', '--white', type='str', help="ip white list, eq: '127.0.0.1, 192.168.1.1'.", default='')
 
     def _do_command(self, obd):
+        if COMMAND_ENV.get(const.ENCRYPT_PASSWORD) == '1':
+            ROOT_IO.error('OBD Web has been disabled. Please execute the ` obd pwd encrypt disable ` command and try again')
+            return False
         from service.app import OBDWeb
         # white_ip_list = self.get_white_ip_list()
         url = '/#/updateWelcome' if self.cmds and self.cmds[0] in ('upgrade', 'update') else ''
@@ -898,7 +921,7 @@ class ClusterDeployCommand(ClusterMirrorCommand):
                 obd.set_options(self.opts)
             res = obd.deploy_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
-            if res:
+            if res and COMMAND_ENV.get(const.INTERACTIVE_INSTALL, '0') == '0':
                 obd.stdio.print(FormatText.success('Please execute ` obd cluster start %s ` to start' % self.cmds[0]))
             return res
         else:
@@ -928,10 +951,11 @@ class ClusterComponentAddCommand(ClusterMirrorCommand):
         self.parser.add_option('-c', '--config', type='string', help="Path to the configuration yaml file.")
         self.parser.add_option('-f', '--force', action='store_true', help="Force deploy, overwrite the home_path.", default=False)
         self.parser.add_option('-C', '--clean', action='store_true', help="Clean the home path if the directory belong to you.", default=False)
+        self.parser.add_option('--confirm', action='store_true', help='Confirm to restart the cluster after add ob-configserver.', default=False)
 
     def _do_command(self, obd):
         if self.cmds:
-            return obd.add_components(self.cmds[0])
+            return obd.add_components(self.cmds[0], need_confirm=not getattr(self.opts, 'confirm', False))
         else:
             return self._show_help()
 
@@ -1019,6 +1043,7 @@ class ClusterDisplayCommand(ClusterMirrorCommand):
 
     def __init__(self):
         super(ClusterDisplayCommand, self).__init__('display', 'Display the information for a cluster.')
+        self.parser.add_option('--encryption-passkey', '--epk', type='string', help="Encryption passkey.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1173,9 +1198,11 @@ class ClusterTenantCreateCommand(ClusterMirrorCommand):
         self.parser.add_option('--time-zone', type='string', help="Tenant time zone. The default tenant time_zone is [+08:00].")
         self.parser.add_option('-s', '--variables', type='string', help="Set the variables for the system tenant. [ob_tcp_invited_nodes='%'].", default="ob_tcp_invited_nodes='%'")
         self.parser.add_option('-o', '--optimize', type='string', help="Specify scenario optimization when creating a tenant, the default is consistent with the cluster dimension.\n{express_oltp, complex_oltp, olap, htap, kv}\nSupported since version 4.3.")
+        self.parser.add_option('--password', type='string', help="When creating a tenant, set password for user.")
 
     def _do_command(self, obd):
         if len(self.cmds) == 1:
+            setattr(self.opts, '%s_root_password' % getattr(self.opts, 'tenant_name', 'sys'), getattr(self.opts, 'password', ''))
             return obd.create_tenant(self.cmds[0])
         else:
             return self._show_help()
@@ -1201,6 +1228,10 @@ class ClusterTenantCreateStandByCommand(ClusterTenantCreateCommand):
         self.parser.add_option('-t', '-n', '--tenant-name', type='string', help="The standby tenant name. The default tenant name is consistent with the primary tenant name.", default='')
         self.parser.add_option('--standbyro-password', type='string', help="standbyro user password.")
         self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password,for crate standby user.")
+        self.parser.add_option('--type', type='string', help="Standby tenant data sync mode. Supports 'SERVICE' and 'LOCATION' modes. Defaults: 'SERVICE'.", default='SERVICE')
+        self.parser.add_option('-d', '--data_backup_uri', type='string',help='The path to the directory where the backups are stored.')
+        self.parser.add_option('-a', '--archive_log_uri', type='string',help='The Path to the directory where archive logs are stored.')
+        self.parser.add_option('-D', '--decryption', type='string', help='The decryption password for all backups. example: key1,key2,key3')
 
 
     def init(self, cmd, args):
@@ -1317,6 +1348,203 @@ class ClusterTenantOptimizeCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterInitServerEnvCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterInitServerEnvCommand, self).__init__('init4env', 'Init server environment.')
+
+    def _do_command(self, obd):
+        if self.cmds:
+            res = obd.init_cluster_env(self.cmds[0])
+            return res
+        else:
+            return self._show_help()
+
+
+class ClusterTenantSetBackupConfigCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantSetBackupConfigCommand, self).__init__('set-backup-config', 'Set backup config for tenant.')
+        self.parser.add_option('-d', '--data_backup_uri', type='string', help='The directory path where the backup will be stored.')
+        self.parser.add_option('-a', '--archive_log_uri', type='string', help='The directory path where the archive logs will be stored.')
+        self.parser.add_option('-c', '--log_archive_concurrency', type='int', help='Configure the total number of working threads for log archiving.')
+        self.parser.add_option('-b', '--binding', type='string', help="Set the archiving and business priority mode. Supports 'OPTIONAL' and 'MANDATORY' modes. Defaults: 'OPTIONAL'.")
+        self.parser.add_option('-s', '--ha_low_thread_score', type='int', help='Specifies the number of current working threads for low-priority threads.')
+        self.parser.add_option('-i', '--piece_switch_interval', type='string', help='Configure the piece switch interval. Range: [1d, 7d].')
+        self.parser.add_option('-l', '--archive_lag_target', type='string', help='Sets the target lag time for log archiving processes.')
+        self.parser.add_option('-D', '--delete_policy', type='string', help="Policy for deleting backup data. Only supports 'default'.")
+        self.parser.add_option('-r', '--delete_recovery_window', type='string', help='Defines the recovery window for which data delete policies apply.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantSetBackupConfigCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.tenant_set_backup_config(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+
+class ClusterTenantBackupCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantBackupCommand, self).__init__('backup', 'Backup the specified tenant.')
+        self.parser.add_option('-m', '--backup_mode', type='string', help="The backup mode: 'incremental' for incremental backup or 'full' for a full backup. Defaults: 'full'.")
+        self.parser.add_option('-e', '--encryption', type='string', help='The password for encrypting the backup set.')
+        self.parser.add_option('-P', '--plus_archive', type='string', help='Whether to include archive logs within the backup process for a combined data and log backup.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantBackupCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.tenant_backup(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+
+class ClusterTenantRestoreCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantRestoreCommand, self).__init__('restore', 'Restore tenant from backup.')
+        self.parser.add_option('-z', '--zone', type='string', help='The zones of the tenant. example: zone1,zone2,zone3')
+        self.parser.add_option('--unit_num', type='int', help='The number of units in each zone. Default: 1.', default=1)
+        self.parser.add_option('--replica_type ', type='string', help='The replica type of the tenant.')
+        self.parser.add_option('-p', '--primary_zone', type='string', help="The primary zone of the tenant to be restored.")
+        self.parser.add_option('-T', '--timestamp', type='string', help='The timestamp to restore to.')
+        self.parser.add_option('-S', '--scn', type='int', help="The SCN to restore to. Default: 0.")
+        self.parser.add_option('-s', '--ha_high_thread_score', type='int', help='The high thread score for HA. Range: [0, 100]')
+        self.parser.add_option('-c', '--concurrency', type='int', help='The number of threads to use for the restore operation.')
+        self.parser.add_option('-D', '--decryption', type='string', help='The decryption password for all backups. example: key1,key2,key3')
+        self.parser.add_option('-k', '--kms_encrypt_info', type='string', help='The KMS encryption information.')
+        self.parser.add_option('--memory_size', type='string', help='The memory size of the resource unit config')
+        self.parser.add_option('--max_cpu', type='int', help='The max cpu of the resource unit config, should be greater than 1.')
+        self.parser.add_option('--min_cpu', type='int', help='The min cpu of the resource unit config, should be greater than 1.If not set, the min cpu will be set to the max cpu.')
+        self.parser.add_option('--max_iops', type='int', help='The max iops of the resource unit config.If not set, the max iops will be set default value by observer.')
+        self.parser.add_option('--min_iops', type='int', help='The min iops of the resource unit config.If not set, the min iops will be set default value by observer.')
+        self.parser.add_option('--log_disk_size', type='string', help='The log disk size of the resource unit config.If not set, the log disk size will be set default value by observer.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantRestoreCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name> <data backup uri> <archive log uri> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 4:
+            return obd.tenant_restore(self.cmds[0], self.cmds[1], self.cmds[2], self.cmds[3])
+        else:
+            return self._show_help()
+
+
+class ClusterTenantQueryBackupTaskCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantQueryBackupTaskCommand, self).__init__('backup-show', 'Show backup task.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantQueryBackupTaskCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.query_backup_or_restore_task(self.cmds[0], self.cmds[1], 'backup')
+        else:
+            return self._show_help()
+
+
+class ClusterTenantQueryRestoreTaskCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantQueryRestoreTaskCommand, self).__init__('restore-show', 'Show restore task.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantQueryRestoreTaskCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.query_backup_or_restore_task(self.cmds[0], self.cmds[1], 'restore')
+        else:
+            return self._show_help()
+
+
+class ClusterTenantCancelBackupTaskCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantCancelBackupTaskCommand, self).__init__('backup-cancel', 'Cancel task for backup.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantCancelBackupTaskCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.cancel_backup_or_restore_task(self.cmds[0], self.cmds[1], 'backup')
+        else:
+            return self._show_help()
+
+
+class ClusterTenantCancelRestoreTaskCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterTenantCancelRestoreTaskCommand, self).__init__('restore-cancel', 'Cancel task for restore.')
+
+    def init(self, cmd, args):
+        super(ClusterTenantCancelRestoreTaskCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.cancel_backup_or_restore_task(self.cmds[0], self.cmds[1], 'restore')
+        else:
+            return self._show_help()
+
+class ClusterTenantRecoverCommand(ClusterMirrorCommand):
+    def __init__(self):
+        super(ClusterTenantRecoverCommand, self).__init__('recover', 'Modify the recovery target of the new standby tenant')
+        self.parser.add_option('-T', '--timestamp', type='string', help='The timestamp to restore to.')
+        self.parser.add_option('-S', '--scn', type='int', help="The SCN to restore to.")
+        self.parser.add_option('-u', '--unlimited', action='store_true', help="Continuously replay archived source logs")
+
+    def init(self, cmd, args):
+        super(ClusterTenantRecoverCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.log_recover(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+class ClusterTenantSwitchLogSourceCommand(ClusterMirrorCommand):
+    def __init__(self):
+        super(ClusterTenantSwitchLogSourceCommand, self).__init__('switch-log-source', 'Switch standby tenant sync mode')
+        self.parser.add_option('--type', type='string', help="Standby tenant data sync mode. Supports 'SERVICE' and 'LOCATION' modes. Defaults: 'SERVICE'.", default='SERVICE')
+        self.parser.add_option('-a', '--archive_log_uri', type='string',help='The Path to the directory where archive logs are stored.')
+        self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password,for crate standby user.")
+        self.parser.add_option('--standbyro-password', type='string', help="standbyro user password.")
+
+    def init(self, cmd, args):
+        super(ClusterTenantSwitchLogSourceCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> <tenant name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.switch_log_source(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+
 class ClusterTenantCommand(MajorCommand):
 
     def __init__(self):
@@ -1329,6 +1557,15 @@ class ClusterTenantCommand(MajorCommand):
         self.register_command(ClusterTenantFailoverCommand())
         self.register_command(ClusterTenantDecoupleCommand())
         self.register_command(ClusterTenantOptimizeCommand())
+        self.register_command(ClusterTenantSetBackupConfigCommand())
+        self.register_command(ClusterTenantBackupCommand())
+        self.register_command(ClusterTenantRestoreCommand())
+        self.register_command(ClusterTenantQueryBackupTaskCommand())
+        self.register_command(ClusterTenantQueryRestoreTaskCommand())
+        self.register_command(ClusterTenantCancelBackupTaskCommand())
+        self.register_command(ClusterTenantCancelRestoreTaskCommand())
+        self.register_command(ClusterTenantRecoverCommand())
+        self.register_command(ClusterTenantSwitchLogSourceCommand())
 
 
 class ClusterMajorCommand(MajorCommand):
@@ -1355,6 +1592,7 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(ClusterScaleoutCommand())
         self.register_command(ClusterComponentMajorCommand())
         self.register_command(ClusterTakeoverCommand())
+        self.register_command(ClusterInitServerEnvCommand())
 
 
 class TestMirrorCommand(ObdCommand):
@@ -2315,6 +2553,82 @@ class BinlogDropCommand(ObdCommand):
             return self._show_help()
 
 
+class HostCommand(MajorCommand):
+
+    def __init__(self):
+        super(HostCommand, self).__init__('host', 'Host tools')
+        self.register_command(HostPrecheckCommand())
+        self.register_command(HostInitCommand())
+
+
+class HostPrecheckCommand(ObdCommand):
+
+    def __init__(self):
+        super(HostPrecheckCommand, self).__init__('precheck', 'Pre check host system parameters')
+        self.parser.add_option('-p', '--password', type='str', help="Password of username, default is empty.")
+    def init(self, cmd, args):
+        super(HostPrecheckCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <username>  <server ip>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.precheck_host(self.cmds[0], self.cmds[1])
+        elif len(self.cmds) == 3:
+            if self.cmds[2] == 'code100':
+                cmd_ret = obd.precheck_host(self.cmds[0], self.cmds[1], dev=True)
+                if isinstance(cmd_ret, bool):
+                    return cmd_ret
+                return CmdReturn(cmd_ret, cmd_ret)
+        else:
+            return self._show_help()
+
+
+class HostInitCommand(ObdCommand):
+
+    def __init__(self):
+        super(HostInitCommand, self).__init__('init', 'Init server environment.')
+        self.parser.add_option('-p', '--password', type='str', help="Password of username, default is empty.")
+
+    def init(self, cmd, args):
+        super(HostInitCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <username>  <server ip>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.init_host(self.cmds[0], self.cmds[1])
+        elif len(self.cmds) == 3:
+            if self.cmds[2] == 'code101':
+                cmd_ret = obd.init_host(self.cmds[0], self.cmds[1], dev=True)
+                if isinstance(cmd_ret, bool):
+                    return cmd_ret
+                return CmdReturn(cmd_ret, cmd_ret)
+        else:
+            return self._show_help()
+
+
+class DevHostInitCommand(ObdCommand):
+
+    def __init__(self):
+        super(DevHostInitCommand, self).__init__('dev-init', 'Init server environment.')
+        self.parser.add_option('-p', '--password', type='str', help="If passwordless login is enabled, the password parameter can be omitted during authentication.")
+
+    def init(self, cmd, args):
+        super(DevHostInitCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <username>  <server ip> ... [server ip]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) >= 2:
+            cmd_ret = obd.init_host(self.cmds[0], self.cmds[1:], dev=True)
+            if isinstance(cmd_ret, bool):
+                return cmd_ret
+            return CmdReturn(cmd_ret, cmd_ret)
+        else:
+            return self._show_help()
+
+
 
 class ToolListCommand(ObdCommand):
 
@@ -2401,6 +2715,83 @@ class ToolUpdateCommand(ObdCommand):
         else:
             return self._show_help()
 
+class LicenseCommand(MajorCommand):
+    def __init__(self):
+        super(LicenseCommand, self).__init__('license', 'Register and display license.')
+        self.register_command(LicenseLoadCommand())
+        self.register_command(LicenseDisplayCommand())
+
+class LicenseLoadCommand(ObdCommand):
+    def __init__(self):
+        super(LicenseLoadCommand, self).__init__('load', 'Register license.')
+        self.parser.add_option('-f', '--file', type='string', help="license file", default=None)
+
+    def init(self, cmd, args):
+        super(LicenseLoadCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.load_license(self.cmds[0])
+        else:
+            return self._show_help()
+
+class LicenseDisplayCommand(ObdCommand):
+    def __init__(self):
+        super(LicenseDisplayCommand, self).__init__('show', 'Show the license.')
+    def init(self, cmd, args):
+        super(LicenseDisplayCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name>' % self.prev_cmd)
+        return self
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.show_license(self.cmds[0])
+        else:
+            return self._show_help()
+
+
+class PasswordMajorCommand(MajorCommand):
+    def __init__(self):
+        super(PasswordMajorCommand, self).__init__('pwd', 'Obd cluster password management.')
+        self.register_command(EncryptionManagerCommand())
+        self.register_command(SetPassKeyCommand())
+
+
+class EncryptionManagerCommand(ObdCommand):
+    def __init__(self):
+        super(EncryptionManagerCommand, self).__init__('encrypt', 'Enable or disable encryption')
+        self.parser.add_option('--encryption-passkey', '--epk', type='string', help="Encryption passkey.")
+
+    def init(self, cmd, args):
+        super(EncryptionManagerCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <enable or disable>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 1 and self.cmds[0] in ['enable', 'disable']:
+            return obd.encrypt_manager(self.cmds[0] == 'enable')
+        else:
+            return self._show_help()
+
+
+class SetPassKeyCommand(ObdCommand):
+    def __init__(self):
+        super(SetPassKeyCommand, self).__init__('set-epk', 'Set encryption pass key.')
+        self.parser.add_option('-c', '--current-passkey', type='string', help="Current encryption passkey")
+        self.parser.add_option('-f', '--force', action='store_true', help="Force set passkey. ")
+
+    def init(self, cmd, args):
+        super(SetPassKeyCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <new decryption passkey>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 1:
+            return obd.set_encryption_passkey(self.cmds[0])
+        else:
+            return self._show_help()
+
 
 class MainCommand(MajorCommand):
 
@@ -2420,6 +2811,9 @@ class MainCommand(MajorCommand):
         self.register_command(ToolCommand())
         self.register_command(ObdiagCommand())
         self.register_command(BinlogCommand())
+        self.register_command(HostCommand())
+        self.register_command(LicenseCommand())
+        self.register_command(PasswordMajorCommand())
         self.parser.version = '''OceanBase Deploy: %s
 REVISION: %s
 BUILD_BRANCH: %s
@@ -2441,7 +2835,11 @@ if __name__ == '__main__':
         sys.setdefaultencoding(defaultencoding)
     sys.path.append(os.path.join(ObdCommand.OBD_INSTALL_PATH, 'lib/site-packages'))
     ROOT_IO.track_limit += 2
-    if MainCommand().init(sys.argv[0], sys.argv[1:]).do_command():
-        ROOT_IO.exit(0)
-    ROOT_IO.exit(1)
+    ret = MainCommand().init(sys.argv[0], sys.argv[1:]).do_command()
+    if isinstance(ret, CmdReturn):
+        ROOT_IO.exit(ret.code)
+    else:
+        if ret:
+            ROOT_IO.exit(0)
+        ROOT_IO.exit(1)
 

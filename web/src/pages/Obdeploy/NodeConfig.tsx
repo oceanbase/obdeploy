@@ -1,15 +1,21 @@
 import { getObdInfo } from '@/services/ob-deploy-web/Info';
 import {
+  dnsValidator,
   getErrorInfo,
   handleQuit,
-  IPserversValidator,
+  hasDuplicateIPs,
   serverReg,
   serversValidator,
 } from '@/utils';
 import { getAllServers } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
-import { DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import {
+  CaretDownOutlined,
+  CaretRightOutlined,
+  DeleteOutlined,
+  QuestionCircleOutlined,
+} from '@ant-design/icons';
 import type {
   EditableFormInstance,
   ProColumns,
@@ -22,16 +28,29 @@ import {
   ProFormSelect,
   ProFormText,
 } from '@ant-design/pro-components';
-import { Button, Form, Popconfirm, Select, Space, Tooltip } from 'antd';
+import {
+  Button,
+  Col,
+  Form,
+  message,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Tooltip,
+} from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { getLocale, useModel } from 'umi';
+import validator from 'validator';
 import {
+  commonServerStyle,
   commonStyle,
   configServerComponent,
+  grafanaComponent,
   obagentComponent,
   obproxyComponent,
-  ocpexpressComponent,
   pathRule,
+  prometheusComponent,
 } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
@@ -69,12 +88,18 @@ export default function NodeConfig() {
     oceanbase = {},
     ocpexpress = {},
     obproxy = {},
+    prometheus = {},
+    grafana = {},
     obconfigserver = {},
   } = components;
   const [form] = ProForm.useForm();
   const [editableForm] = ProForm.useForm();
   const finalValidate = useRef<boolean>(false);
   const tableFormRef = useRef<EditableFormInstance<API.DBConfig>>();
+  const [show, setShow] = useState<boolean>(false);
+
+  // 当前 OB 环境是否为单机版
+  const standAlone = oceanbase?.component === 'oceanbase-standalone';
 
   const initDBConfigData = oceanbase?.topology?.length
     ? oceanbase?.topology?.map((item: API.Zone, index: number) => ({
@@ -82,26 +107,7 @@ export default function NodeConfig() {
         ...item,
         servers: item?.servers?.map((server) => server?.ip),
       }))
-    : [
-        {
-          id: (Date.now() + 1).toString(),
-          name: 'zone1',
-          servers: [],
-          rootservice: undefined,
-        },
-        {
-          id: (Date.now() + 2).toString(),
-          name: 'zone2',
-          servers: [],
-          rootservice: undefined,
-        },
-        {
-          id: (Date.now() + 3).toString(),
-          name: 'zone3',
-          servers: [],
-          rootservice: undefined,
-        },
-      ];
+    : [];
 
   const homePathSuffix = `/${oceanbase.appname}`;
 
@@ -115,13 +121,63 @@ export default function NodeConfig() {
     dbConfigData.map((item) => item.id),
   );
 
+  useEffect(() => {
+    const init = oceanbase?.topology?.map((item: API.Zone, index: number) => ({
+      id: (Date.now() + index).toString(),
+      ...item,
+      servers: item?.servers?.map((server) => server?.ip),
+    }));
+
+    if (
+      oceanbase?.topology?.length &&
+      init?.every((item) => item.servers.length > 0)
+    ) {
+      setDBConfigData(init);
+      setEditableRowKeys(init?.map((item) => item.id));
+    } else {
+      if (standAlone) {
+        const mock = [
+          {
+            id: (Date.now() + 1).toString(),
+            name: 'zone1',
+            servers: [],
+            rootservice: undefined,
+          },
+        ];
+        setDBConfigData(mock);
+        setEditableRowKeys(mock?.map((item) => item.id));
+      } else {
+        const mock = [
+          {
+            id: (Date.now() + 1).toString(),
+            name: 'zone1',
+            servers: [],
+            rootservice: undefined,
+          },
+          {
+            id: (Date.now() + 2).toString(),
+            name: 'zone2',
+            servers: [],
+            rootservice: undefined,
+          },
+          {
+            id: (Date.now() + 3).toString(),
+            name: 'zone3',
+            servers: [],
+            rootservice: undefined,
+          },
+        ];
+        setDBConfigData(mock);
+        setEditableRowKeys(mock?.map((item) => item.id));
+      }
+    }
+  }, [standAlone]);
+
   // all servers
   const [allOBServer, setAllOBServer] = useState<string[]>([]);
   // all zone servers
   const [allZoneOBServer, setAllZoneOBServer] = useState<any>({});
   const [lastDeleteServer, setLastDeleteServer] = useState<string>('');
-  const [ocpServerDropdownVisible, setOcpServerDropdownVisible] =
-    useState<boolean>(false);
 
   const { run: getUserInfo } = useRequest(getObdInfo, {
     onSuccess: ({ success, data }: API.OBResponseServiceInfo_) => {
@@ -147,16 +203,17 @@ export default function NodeConfig() {
 
   const setData = (dataSource: FormValues) => {
     let newComponents: API.Components = {};
+    const currentDnsType = dataSource.obproxy?.dnsType === 'vip';
     if (selectedConfig.includes(obproxyComponent)) {
       newComponents.obproxy = {
         ...(components.obproxy || {}),
         ...dataSource.obproxy,
-      };
-    }
-    if (selectedConfig.includes(ocpexpressComponent) && !lowVersion) {
-      newComponents.ocpexpress = {
-        ...(components.ocpexpress || {}),
-        ...dataSource?.ocpexpress,
+        dnsType: undefined,
+        dns: !currentDnsType ? dataSource.obproxy?.dns : undefined,
+        vip_port: currentDnsType ? dataSource.obproxy?.vip_port : undefined,
+        vip_address: currentDnsType
+          ? dataSource.obproxy?.vip_address
+          : undefined,
       };
     }
     if (selectedConfig.includes(obagentComponent)) {
@@ -171,6 +228,19 @@ export default function NodeConfig() {
         ...dataSource?.obconfigserver,
       };
     }
+    if (selectedConfig.includes(grafanaComponent)) {
+      newComponents.grafana = {
+        ...(components?.grafana || {}),
+        ...dataSource.grafana,
+      };
+    }
+    if (selectedConfig.includes(prometheusComponent)) {
+      newComponents.prometheus = {
+        ...(components?.prometheus || {}),
+        ...dataSource.prometheus,
+      };
+    }
+
     newComponents.oceanbase = {
       ...(components.oceanbase || {}),
       topology: dbConfigData?.map((item) => ({
@@ -241,7 +311,12 @@ export default function NodeConfig() {
   };
 
   const getComponentServers = (
-    component: 'obproxy' | 'ocpexpress' | 'obconfigserver',
+    component:
+      | 'obproxy'
+      | 'ocpexpress'
+      | 'obconfigserver'
+      | 'grafana'
+      | 'prometheus',
   ): string[] => {
     const allServers = getAllServers(dbConfigData);
     const compoentServers = form.getFieldValue([component, 'servers']);
@@ -249,6 +324,8 @@ export default function NodeConfig() {
       obproxy: 'OBProxy',
       ocpexpress: 'OCP Express',
       obconfigserver: 'obconfigserver',
+      prometheus: 'prometheus',
+      grafana: 'grafana',
     };
     const customComponentServers = compoentServers?.filter(
       (item: string) =>
@@ -311,11 +388,14 @@ export default function NodeConfig() {
       obproxy: {
         servers: getComponentServers('obproxy'),
       },
-      ocpexpress: {
-        servers: getComponentServers('ocpexpress'),
-      },
       obconfigserver: {
         servers: getComponentServers('obconfigserver'),
+      },
+      grafana: {
+        servers: getComponentServers('grafana'),
+      },
+      prometheus: {
+        servers: getComponentServers('prometheus'),
       },
     });
 
@@ -326,6 +406,9 @@ export default function NodeConfig() {
   useEffect(() => {
     if (!auth?.user) {
       getUserInfo();
+    }
+    if (obproxy?.dns !== undefined || obproxy?.vip_address !== undefined) {
+      setShow(true);
     }
   }, []);
 
@@ -368,7 +451,6 @@ export default function NodeConfig() {
   };
 
   const ocpServersValidator = (_: any, value: string[]) => {
-    let validtor = true;
     if (value?.length > 1) {
       return Promise.reject(
         new Error(
@@ -379,23 +461,18 @@ export default function NodeConfig() {
         ),
       );
     }
-    if (value && value.length) {
-      value.some((item) => {
-        validtor = serverReg.test(item.trim());
-        return !serverReg.test(item.trim());
-      });
-    }
-    if (validtor) {
+    if (value?.some((item) => !validator.isIP(item))) {
+      return Promise.reject(
+        new Error(
+          intl.formatMessage({
+            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
+            defaultMessage: '请选择正确的 OCP Express 节点',
+          }),
+        ),
+      );
+    } else {
       return Promise.resolve();
     }
-    return Promise.reject(
-      new Error(
-        intl.formatMessage({
-          id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
-          defaultMessage: '请选择正确的 OCP Express 节点',
-        }),
-      ),
-    );
   };
 
   const columns: ProColumns<API.DBConfig>[] = [
@@ -420,7 +497,8 @@ export default function NodeConfig() {
       ),
 
       dataIndex: 'name',
-      width: 224,
+
+      ...(standAlone ? { width: '30%' } : { width: 224 }),
       formItemProps: {
         rules: [
           {
@@ -454,6 +532,7 @@ export default function NodeConfig() {
           </Tooltip>
         </>
       ),
+      ...(standAlone ? { width: '30%' } : {}),
 
       dataIndex: 'servers',
       formItemProps: {
@@ -467,15 +546,36 @@ export default function NodeConfig() {
             }),
           },
           {
-            validator: (_: any, value: string[]) =>
-              IPserversValidator(
-                _,
-                value,
-                allOBServer,
-                'OBServer',
-                allZoneOBServer,
-                finalValidate,
-              ),
+            validator: (_: any, value: string[]) => {
+              if (value.length !== 0) {
+                let inputServer = [];
+                const currentV = value[value.length - 1];
+                inputServer = allOBServer.concat(currentV);
+                const serverValue = finalValidate.current
+                  ? allOBServer
+                  : inputServer;
+
+                if (value?.some((item) => !validator.isIP(item))) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.component.NodeConfig.TheValidatorNode',
+                      defaultMessage: '请输入正确的 OBProxy 节点',
+                    }),
+                  );
+                } else if (
+                  (hasDuplicateIPs(value) && dbConfigData.length === 1) ||
+                  (hasDuplicateIPs(serverValue) && dbConfigData.length > 1)
+                ) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.component.NodeConfig.TheValidatorNode2',
+                      defaultMessage: '禁止输入重复节点',
+                    }),
+                  );
+                }
+              }
+              return Promise.resolve();
+            },
           },
         ],
       },
@@ -488,70 +588,86 @@ export default function NodeConfig() {
         ) : null;
       },
     },
-    {
-      title: (
-        <>
-          {intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.RootserverNodes',
-            defaultMessage: 'RootServer 节点',
-          })}
-
-          <Tooltip
-            title={intl.formatMessage({
-              id: 'OBD.pages.components.NodeConfig.TheNodeWhereTheMaster',
-              defaultMessage:
-                '总控服务（RootService）所在节点，用于执行集群管理、服务器管理、自动负载均衡等操作。',
-            })}
-          >
-            <QuestionCircleOutlined className="ml-10" />
-          </Tooltip>
-        </>
-      ),
-
-      dataIndex: 'rootservice',
-      formItemProps: {
-        rules: [
+    ...(!standAlone
+      ? [
           {
-            required: true,
-            message: intl.formatMessage({
-              id: 'OBD.pages.components.NodeConfig.ThisOptionIsRequired',
-              defaultMessage: '此项是必选项',
-            }),
+            title: (
+              <>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.RootserverNodes',
+                  defaultMessage: 'RootServer 节点',
+                })}
+
+                <Tooltip
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.TheNodeWhereTheMaster',
+                    defaultMessage:
+                      '总控服务（RootService）所在节点，用于执行集群管理、服务器管理、自动负载均衡等操作。',
+                  })}
+                >
+                  <QuestionCircleOutlined className="ml-10" />
+                </Tooltip>
+              </>
+            ),
+
+            dataIndex: 'rootservice',
+            formItemProps: {
+              rules: [
+                {
+                  required: true,
+                  message: intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.ThisOptionIsRequired',
+                    defaultMessage: '此项是必选项',
+                  }),
+                },
+                {
+                  pattern: serverReg,
+                  message: intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.SelectTheCorrectRootserverNode',
+                    defaultMessage: '请选择正确的 RootServer 节点',
+                  }),
+                },
+              ],
+            },
+            width: 224,
+            renderFormItem: (_: any, { isEditable, record }: any) => {
+              // rootservice options are items entered by the OBServer
+              const options = record?.servers
+                ? formatOptions(record?.servers)
+                : [];
+              return isEditable ? (
+                <Select
+                  options={options}
+                  placeholder={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                    defaultMessage: '请选择',
+                  })}
+                />
+              ) : null;
+            },
           },
           {
-            pattern: serverReg,
-            message: intl.formatMessage({
-              id: 'OBD.pages.components.NodeConfig.SelectTheCorrectRootserverNode',
-              defaultMessage: '请选择正确的 RootServer 节点',
-            }),
+            title: '',
+            valueType: 'option',
+            width: 20,
           },
-        ],
-      },
-      width: 224,
-      renderFormItem: (_: any, { isEditable, record }: any) => {
-        // rootservice options are items entered by the OBServer
-        const options = record?.servers ? formatOptions(record?.servers) : [];
-        return isEditable ? (
-          <Select
-            options={options}
-            placeholder={intl.formatMessage({
-              id: 'OBD.pages.components.NodeConfig.PleaseSelect',
-              defaultMessage: '请选择',
-            })}
-          />
-        ) : null;
-      },
-    },
-    {
-      title: '',
-      valueType: 'option',
-      width: 20,
-    },
+        ]
+      : []),
   ];
 
   const initialValues: FormValues = {
     obproxy: {
       servers: obproxy?.servers?.length ? obproxy?.servers : undefined,
+      vip_address: obproxy?.vip_address,
+      dns: obproxy?.dns,
+      dnsType: obproxy?.vip_address !== undefined ? 'vip' : 'dns',
+      vip_port: obproxy?.vip_port || 2883,
+    },
+    prometheus: {
+      servers: prometheus?.servers?.length ? prometheus?.servers : undefined,
+    },
+    grafana: {
+      servers: grafana?.servers?.length ? grafana?.servers : undefined,
     },
     obconfigserver: {
       servers: obconfigserver?.servers?.length
@@ -572,6 +688,18 @@ export default function NodeConfig() {
         : undefined,
     };
   }
+
+  const componentsToCheck = [
+    obproxyComponent,
+    configServerComponent,
+    prometheusComponent,
+    grafanaComponent,
+  ];
+  const shouldIncludeComponent = componentsToCheck.some((component) =>
+    selectedConfig.includes(component),
+  );
+
+  const dns = ProForm.useWatch(['obproxy', 'dnsType'], form);
 
   return (
     <ProForm
@@ -597,18 +725,23 @@ export default function NodeConfig() {
             value={dbConfigData}
             editableFormRef={tableFormRef}
             onChange={setDBConfigData}
-            recordCreatorProps={{
-              newRecordType: 'dataSource',
-              record: () => ({
-                id: Date.now().toString(),
-                name: `zone${nameIndex}`,
-              }),
-              onClick: () => setNameIndex(nameIndex + 1),
-              creatorButtonText: intl.formatMessage({
-                id: 'OBD.pages.components.NodeConfig.AddZone',
-                defaultMessage: '新增 Zone',
-              }),
-            }}
+            recordCreatorProps={
+              // 单机版，关闭默认的新建按钮
+              !standAlone
+                ? {
+                    newRecordType: 'dataSource',
+                    record: () => ({
+                      id: Date.now().toString(),
+                      name: `zone${nameIndex}`,
+                    }),
+                    onClick: () => setNameIndex(nameIndex + 1),
+                    creatorButtonText: intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.AddZone',
+                      defaultMessage: '新增 Zone',
+                    }),
+                  }
+                : false
+            }
             editable={{
               type: 'multiple',
               form: editableForm,
@@ -660,9 +793,19 @@ export default function NodeConfig() {
                   editableItem?.id,
                   'servers',
                 ]);
+
                 if (editorServers.length) {
                   if (!rootService || !editorServers.includes(rootService)) {
                     newRootService = editorServers[0];
+                  }
+                  if (editorServers.find((item) => item === '127.0.0.1')) {
+                    message.warning(
+                      intl.formatMessage({
+                        id: 'OBD.component.MetaDBConfig.NodeConfig.B663132E',
+                        defaultMessage:
+                          '依据 OceanBase 最佳实践，建议使用非 127.0.0.1 IP 地址',
+                      }),
+                    );
                   }
                 } else {
                   newRootService = undefined;
@@ -741,66 +884,17 @@ export default function NodeConfig() {
             }}
           />
         </ProCard>
-        {selectedConfig.includes(ocpexpressComponent) ||
-        selectedConfig.includes(obproxyComponent) ||
-        selectedConfig.includes(configServerComponent) ? (
+        {shouldIncludeComponent ? (
           <ProCard
             className={styles.pageCard}
             title={intl.formatMessage({
               id: 'OBD.pages.components.NodeConfig.ComponentNodeConfiguration',
               defaultMessage: '组件节点配置',
             })}
-            bodyStyle={{ paddingBottom: '0' }}
+            bodyStyle={{ paddingBottom: '0', paddingLeft: '8px' }}
           >
-            <Space size={16}>
-              {selectedConfig.includes(ocpexpressComponent) && !lowVersion ? (
-                <ProFormSelect
-                  mode="tags"
-                  name={['ocpexpress', 'servers']}
-                  label={intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.OcpExpressNodes',
-                    defaultMessage: 'OCP Express 节点',
-                  })}
-                  fieldProps={{
-                    style: commonStyle,
-                    open: ocpServerDropdownVisible,
-                    onChange: (value) => {
-                      if (value?.length) {
-                        form.setFieldsValue({
-                          ocpexpress: {
-                            servers: [value[value.length - 1]],
-                          },
-                        });
-                      }
-                      setOcpServerDropdownVisible(false);
-                    },
-                    onFocus: () => setOcpServerDropdownVisible(true),
-                    onClick: () =>
-                      setOcpServerDropdownVisible(!ocpServerDropdownVisible),
-                    onBlur: () => setOcpServerDropdownVisible(false),
-                  }}
-                  validateTrigger={['onBlur']}
-                  placeholder={intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.PleaseSelect',
-                    defaultMessage: '请选择',
-                  })}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.components.NodeConfig.SelectOrEnterOcpExpress',
-                        defaultMessage: '请选择或输入 OCP Express 节点',
-                      }),
-                    },
-                    {
-                      validator: ocpServersValidator,
-                      validateTrigger: 'onBlur',
-                    },
-                  ]}
-                  options={formatOptions(allOBServer)}
-                />
-              ) : null}
-              {selectedConfig.includes(obproxyComponent) && (
+            {selectedConfig.includes(obproxyComponent) && (
+              <div style={{ paddingLeft: '16px' }}>
                 <ProFormSelect
                   mode="tags"
                   name={['obproxy', 'servers']}
@@ -808,7 +902,7 @@ export default function NodeConfig() {
                     id: 'OBD.pages.components.NodeConfig.ObproxyNodes',
                     defaultMessage: 'OBProxy 节点',
                   })}
-                  fieldProps={{ style: { width: 425 }, maxTagCount: 3 }}
+                  fieldProps={{ style: commonServerStyle, maxTagCount: 3 }}
                   placeholder={intl.formatMessage({
                     id: 'OBD.pages.components.NodeConfig.PleaseSelect',
                     defaultMessage: '请选择',
@@ -829,49 +923,253 @@ export default function NodeConfig() {
                   ]}
                   options={formatOptions(allOBServer)}
                 />
+                <div
+                  style={{
+                    background: '#f8fafe',
+                    marginTop: 16,
+                    marginBottom: 16,
+                    padding: 16,
+                  }}
+                >
+                  <Space size={8} onClick={() => setShow(!show)}>
+                    {show ? <CaretDownOutlined /> : <CaretRightOutlined />}
+
+                    <Tooltip
+                      title={intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.B4449024',
+                        defaultMessage:
+                          '用于业务访问 OceanBase 集群，建议部署多节点 OBProxy 时提供 VIP/DNS 地址，避免后期更改 OBProxy 访问地址。若不配置，系统默认选择第一个 IP 地址设置连接串。',
+                      })}
+                    >
+                      <span>
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.obproxyConfig.D42DEEB1',
+                          defaultMessage: '负载均衡管理',
+                        })}
+                      </span>
+                      <QuestionCircleOutlined style={{ marginLeft: 4 }} />
+                    </Tooltip>
+                  </Space>
+                  {show && (
+                    <Row gutter={[8, 0]} style={{ marginTop: 24 }}>
+                      <Col span={8}>
+                        <ProFormSelect
+                          mode="single"
+                          name={['obproxy', 'dnsType']}
+                          label={intl.formatMessage({
+                            id: 'OBD.pages.components.NodeConfig.B4449036',
+                            defaultMessage: '访问方式',
+                          })}
+                          placeholder={intl.formatMessage({
+                            id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                            defaultMessage: '请选择',
+                          })}
+                          options={[
+                            {
+                              label: intl.formatMessage({
+                                id: 'OBD.pages.components.NodeConfig.B4449037',
+                                defaultMessage: 'VIP',
+                              }),
+                              value: 'vip',
+                            },
+                            {
+                              label: intl.formatMessage({
+                                id: 'OBD.pages.components.NodeConfig.B4449038',
+                                defaultMessage: 'DNS（域名）',
+                              }),
+                              value: 'dns',
+                            },
+                          ]}
+                        />
+                      </Col>
+                      {
+                        <>
+                          <Col span={8}>
+                            <ProFormText
+                              name={
+                                dns === 'vip'
+                                  ? ['obproxy', 'vip_address']
+                                  : ['obproxy', 'dns']
+                              }
+                              label={
+                                dns === 'vip' ? (
+                                  intl.formatMessage({
+                                    id: 'OBD.pages.components.NodeConfig.B4449039',
+                                    defaultMessage: 'IP 地址',
+                                  })
+                                ) : (
+                                  <Tooltip
+                                    title={intl.formatMessage({
+                                      id: 'OBD.pages.components.NodeConfig.B4449034',
+                                      defaultMessage:
+                                        '用于指向 VIP 及端口的配置信息，平台未提供 VIP 与域名的映射关系，需自行准备域名解析服务。',
+                                    })}
+                                  >
+                                    {intl.formatMessage({
+                                      id: 'OBD.pages.components.NodeConfig.B4449033',
+                                      defaultMessage: '域名',
+                                    })}
+                                    <QuestionCircleOutlined
+                                      style={{ marginLeft: 4 }}
+                                    />
+                                  </Tooltip>
+                                )
+                              }
+                              formItemProps={{
+                                rules: [
+                                  {
+                                    required: true,
+                                    message: '此项是必填项',
+                                  },
+                                  ...[
+                                    dns === 'vip'
+                                      ? {
+                                          validator: (
+                                            _: any,
+                                            value: string[],
+                                          ) =>
+                                            serversValidator(
+                                              _,
+                                              [value],
+                                              'OBServer',
+                                            ),
+                                        }
+                                      : {
+                                          validator: (
+                                            _: any,
+                                            value: string[],
+                                          ) => dnsValidator(_, [value]),
+                                        },
+                                  ],
+                                ],
+                              }}
+                            />
+                          </Col>
+                          {dns === 'vip' && (
+                            <Col span={8}>
+                              <ProFormDigit
+                                name={['obproxy', 'vip_port']}
+                                label={intl.formatMessage({
+                                  id: 'OBD.pages.components.NodeConfig.B4449032',
+                                  defaultMessage: '访问端口',
+                                })}
+                                fieldProps={{ style: commonStyle }}
+                                placeholder={intl.formatMessage({
+                                  id: 'OBD.pages.components.NodeConfig.PleaseEnter',
+                                  defaultMessage: '请输入',
+                                })}
+                              />
+                            </Col>
+                          )}
+                        </>
+                      }
+                    </Row>
+                  )}
+                </div>
+              </div>
+            )}
+            <Row gutter={[16, 0]}>
+              {selectedConfig.includes(prometheusComponent) && (
+                <Col span={8}>
+                  <ProFormSelect
+                    mode="tags"
+                    name={['prometheus', 'servers']}
+                    label={'Prometheus 节点'}
+                    fieldProps={{ style: commonServerStyle, maxTagCount: 3 }}
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                      defaultMessage: '请选择',
+                    })}
+                    validateFirst
+                    rules={[
+                      {
+                        required: true,
+                        message: '请选择或输入 Prometheus 节点',
+                      },
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'OBServer'),
+                      },
+                    ]}
+                    options={formatOptions(allOBServer)}
+                  />
+                </Col>
+              )}
+
+              {selectedConfig.includes(grafanaComponent) && (
+                <Col span={8}>
+                  <ProFormSelect
+                    mode="tags"
+                    name={['grafana', 'servers']}
+                    label={'Grafana 节点'}
+                    fieldProps={{ style: commonServerStyle, maxTagCount: 3 }}
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                      defaultMessage: '请选择',
+                    })}
+                    validateFirst
+                    rules={[
+                      {
+                        required: true,
+                        message: '请选择或输入 grafana 节点',
+                      },
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'OBServer'),
+                      },
+                    ]}
+                    options={formatOptions(allOBServer)}
+                  />
+                </Col>
               )}
 
               {selectedConfig.includes(configServerComponent) && (
-                <ProFormSelect
-                  mode="tags"
-                  name={['obconfigserver', 'servers']}
-                  label={intl.formatMessage({
-                    id: 'OBD.pages.Obdeploy.NodeConfig.ObconfigserverNodes',
-                    defaultMessage: 'OBConfigServer节点',
-                  })}
-                  fieldProps={{
-                    style: { width: 305 },
-                  }}
-                  validateFirst
-                  placeholder={intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.PleaseSelect',
-                    defaultMessage: '请选择',
-                  })}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.Obdeploy.NodeConfig.SelectOrEnterObConfigserver',
-                        defaultMessage: '请选择或输入 OB ConfigServer 节点',
-                      }),
-                    },
-                    {
-                      validator: (_: any, value: string[]) =>
-                        serversValidator(_, value, 'obconfigserver'),
-                    },
-                  ]}
-                  options={formatOptions(allOBServer)}
-                />
+                <Col span={6}>
+                  <ProFormSelect
+                    mode="tags"
+                    name={['obconfigserver', 'servers']}
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.Obdeploy.NodeConfig.ObconfigserverNodes',
+                      defaultMessage: 'OBConfigServer 节点',
+                    })}
+                    fieldProps={{
+                      style: commonServerStyle,
+                    }}
+                    validateFirst
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                      defaultMessage: '请选择',
+                    })}
+                    rules={[
+                      {
+                        required: true,
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.Obdeploy.NodeConfig.SelectOrEnterObConfigserver',
+                          defaultMessage: '请选择或输入 OB ConfigServer 节点',
+                        }),
+                      },
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'obconfigserver'),
+                      },
+                    ]}
+                    options={formatOptions(allOBServer)}
+                  />
+                </Col>
               )}
-            </Space>
+            </Row>
           </ProCard>
         ) : null}
         <ProCard
           className={styles.pageCard}
-          title={intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.DeployUserConfiguration',
-            defaultMessage: '部署用户配置',
-          })}
+          title={
+            <>
+              部署连接配置
+              <span className={styles.titleExtra}>
+                请确保您选择的用户名和密码在如上所有主机上保持一致
+              </span>
+            </>
+          }
           bodyStyle={{ paddingBottom: '0' }}
         >
           <Space size={16}>

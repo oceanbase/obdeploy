@@ -75,6 +75,23 @@ export async function componentChangeLog(
   );
 }
 
+export async function tenantsChangeLog(
+  params: API.ComponentChangeLogParams,
+  options?: { [key: string]: any },
+) {
+  const { name, taskId, ...queryParams } = params;
+  return request<API.OBResponseInstallLog_>(
+    `/api/v1/deployments/${name}/tenants/${taskId}/log`,
+    {
+      method: 'GET',
+      params: {
+        ...queryParams,
+      },
+      ...(options || {}),
+    },
+  );
+}
+
 /** Get Del Component Log get del component task GET /api/v1/component_change/${param0}/del */
 export async function componentChangeDelComponentTask(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)

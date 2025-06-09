@@ -69,8 +69,19 @@ mkdir -p $BUILD_DIR/SOURCES ${RPM_BUILD_ROOT}
 mkdir -p $BUILD_DIR/SOURCES/{site-packages}
 mkdir -p ${RPM_BUILD_ROOT}/usr/bin
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd
+
+if [ "$BUILD_OBSHELL" == "TRUE" ]; then
+    sed -i '/obshell/ s/^/#/' plugins-requirements3.txt
+    git clone git@github.com:oceanbase/obshell-sdk-python.git
+    cd $SRC_DIR/obshell-sdk-python
+    python setup.py sdist bdist_wheel
+    pip install ./dist/*.whl --target=$BUILD_DIR/SOURCES/site-packages -i http://mirrors.aliyun.com/pypi/simple/  --trusted-host mirrors.aliyun.com
+    cd $SRC_DIR
+fi
+
 pip install -r plugins-requirements3.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 pip install -r service/service-requirements.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+
 # pyinstaller -y --clean -n obd-web -p $BUILD_DIR/SOURCES/site-packages -F service/app.py
 pyinstaller --hidden-import=decimal -p $BUILD_DIR/SOURCES/site-packages --hidden-import service.app --hidden-import=configparser --hidden-import=Crypto.Hash.SHA --hidden-import=Crypto.PublicKey.RSA --hidden-import=Crypto.Signature.PKCS1_v1_5 --hidden-import=Crypto.Cipher.PKCS1_OAEP -F obd.py
 rm -f obd.py obd.spec
@@ -99,11 +110,11 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
 \cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
-cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
+cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone && ln -s oceanbase-libs oceanbase-standalone-libs && ln -s oceanbase-libs oceanbase-ce-libs && ln -s oceanbase-ce-utils oceanbase-standalone-utils && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
 mv obproxy/3.1.0 obproxy/3.2.1
-cd ${RPM_BUILD_ROOT}/usr/obd/workflows && ln -s oceanbase oceanbase-ce && ln -sf ocp-server ocp-server-ce && ln -sf obproxy obproxy-ce
+cd ${RPM_BUILD_ROOT}/usr/obd/workflows && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone && ln -sf ocp-server ocp-server-ce && ln -sf obproxy obproxy-ce
 mv obproxy/3.1.0 obproxy/3.2.1
-cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce
+cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone
 cd ${RPM_BUILD_ROOT}/usr/obd/optimize && ln -s obproxy obproxy-ce
 
 
@@ -143,6 +154,34 @@ echo -e 'Installation of obd finished successfully\nPlease source /etc/profile.d
 #/sbin/chkconfig obd on
 
 %changelog
+* Fri Jun 06 2025 obd 3.3.0
+ -new features: adapt to Oceanbase-CE 4.3.5.2
+ -new features: add tenant deployment and operation maintenance based on archive
+ -new features: obd web support for standalone/commercial Oceanbase deployment
+ -new features: obd web support for tenant creation
+ -new features: obd web support for Prometheus & Grafana deployment
+ -new features: obd web support for ODP configuration of VIP/DNS
+ -bug fixes: fixed the issue of improper display of username in the whitelist installation report
+ -bug fixes: fixed the issue with unexpected directory validation when adding new components
+* Tue Apr 01 2025 obd 3.2.0
+ -new features: adapt to Oceanbase-Standalone 4.2.5.3
+ -new features: support encrypted password storage
+ -new features: support backup and recovery
+ -new features: support system parameter initialization
+ -new features: support Oceanbase auto-start on boot
+ -new features: adapt to Enterprise Edition OCP
+ -new features: support OceanBase Binlog upgrade
+ -new features: support adding components via edit-config
+ -new features: support setting passwords when creating tenants
+ -bug fixes: resolve the issue where modifying the Grafana password does not take effect
+ -bug fixes: fix the issue where the auto-repair button on the white screen is not functional
+ -bug fixes: resolve inaccurate tenant resource calculations when deploying OCP
+ -bug fixes: address a brief white screen issue when deploying OCP with an existing MetaDB on the white screen
+ -bug fixes: fix the issue where the Docker-based OCP deployment does not stop the container when upgrading to an RPM package deployment
+* Fri Feb 14 2025 obd 3.1.2
+ - bug fixes: abnormal OCP cluster upgrades for non-OBD deployments
+* Mon Jan 06 2025 obd 3.1.1
+ - bug fixes: the OBD WEB upgrade OCP failure issue
 * Thu Jan 02 2025 obd 3.1.0
  - new features: add support for OceanBase Binlog maintenance
  - optimizations: optimize the logic for validating tenant name legality during tenant creation

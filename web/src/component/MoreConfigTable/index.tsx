@@ -3,12 +3,13 @@ import ConfigTable, {
   parameterValidator,
 } from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import Parameter from '@/pages/Obdeploy/ClusterConfig/Parameter';
-import { serverReg } from '@/utils';
+import { serversValidator } from '@/utils';
 import { getPasswordRules } from '@/utils/helper';
 import { intl } from '@/utils/intl';
+import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
 import { ProForm } from '@ant-design/pro-components';
 import { useUpdateEffect } from 'ahooks';
-import { Switch } from 'antd';
+import { Space } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
 import { useState } from 'react';
 
@@ -27,6 +28,7 @@ export default function MoreConfigTable({
   loading,
   datasource,
 }: MoreConfigTableProps) {
+  const [show, setShow] = useState<boolean>(switchChecked);
   const proxyPasswordFormValue = ProForm.useWatch(
     ['obproxy', 'parameters', 'obproxy_sys_password', 'params'],
     form,
@@ -117,15 +119,7 @@ export default function MoreConfigTable({
             },
             () => ({
               validator: (_: any, param?: API.ParameterValue) => {
-                if (serverReg.test(param?.value || '')) {
-                  return Promise.resolve();
-                }
-                return Promise.reject(
-                  intl.formatMessage({
-                    id: 'OBD.Obdeploy.ClusterConfig.TheIpAddressFormatIs',
-                    defaultMessage: 'ip格式错误',
-                  }),
-                );
+                return serversValidator(_, param?.value, 'OBServer');
               },
             }),
           ],
@@ -173,24 +167,27 @@ export default function MoreConfigTable({
   return (
     <>
       <div style={{ height: 24, display: 'flex', alignItems: 'center' }}>
-        <span
+        <Space
+          size={8}
           style={{
             color: '#132039',
             fontWeight: 500,
             fontSize: 16,
             lineHeight: '24px',
           }}
+          onClick={() => {
+            setShow(!show);
+            switchOnChange(!show);
+          }}
         >
-          {intl.formatMessage({
-            id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
-            defaultMessage: '更多配置',
-          })}
-        </span>
-        <Switch
-          className="ml-20"
-          checked={switchChecked}
-          onChange={switchOnChange}
-        />
+          {show ? <CaretDownOutlined /> : <CaretRightOutlined />}
+          <div style={{ width: 150 }}>
+            {intl.formatMessage({
+              id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
+              defaultMessage: '更多配置',
+            })}
+          </div>
+        </Space>
       </div>
       <ConfigTable
         showVisible={switchChecked}

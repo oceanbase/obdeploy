@@ -40,7 +40,7 @@ def clean_home_path(home_path, client):
     return client.execute_command('rm -fr %s' % home_path, timeout=-1)
 
 
-def init(plugin_context, *args, **kwargs):
+def init(plugin_context, source_option=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -68,7 +68,7 @@ def init(plugin_context, *args, **kwargs):
             else:
                 global_ret = False
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=home_path)))
-                stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                source_option == "deploy" and stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
 
         if global_ret and not client.execute_command(f"""bash -c 'mkdir -p {os.path.join(home_path, '{run,bin,conf,log}')}'"""):
             stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path',msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=home_path)))

@@ -22,6 +22,7 @@ import tempfile
 import warnings
 from glob import glob
 from pathlib import Path
+from copy import copy
 
 from subprocess32 import Popen, PIPE
 
@@ -36,7 +37,7 @@ from multiprocessing.queues import Empty
 from multiprocessing import Queue, Process
 from multiprocessing.pool import ThreadPool
 
-from tool import COMMAND_ENV, DirectoryUtil, FileUtil, NetUtil, Timeout
+from tool import COMMAND_ENV, DirectoryUtil, FileUtil, NetUtil, Timeout, is_root_user
 from _stdio import SafeStdio
 from _errno import EC_SSH_CONNECT
 from _environ import ENV_DISABLE_RSYNC, ENV_DISABLE_RSA_ALGORITHMS, ENV_HOST_IP_MODE
@@ -324,6 +325,7 @@ class SshClient(SafeStdio):
         self.task_queue = None
         self.result_queue = None
         self._is_local = self.is_local()
+        self._disable_local = False
         if self._is_local:
             self.env = {}
         else:
@@ -345,6 +347,20 @@ class SshClient(SafeStdio):
             if self.env[key]:
                 env.append('export %s=%s$%s;' % (key, self.env[key], key))
         self.env_str = ''.join(env)
+
+    def disable_local(self, stdio=None):
+        if not self.config.password:
+            try:
+                self._login(stdio=stdio)
+            except:
+                if not self.config.username:
+                    err = EC_SSH_CONNECT.format(user=self.config.username, ip=self.config.host, message='username or password is empty')
+                    stdio.critical(err)
+                    return err
+        self._disable_local = True
+
+    def enable_local(self):
+        self._disable_local = False
 
     def add_env(self, key, value, rewrite=False, stdio=None):
         if key not in self.env or not self.env[key] or rewrite:
@@ -411,7 +427,7 @@ class SshClient(SafeStdio):
         except BaseException as e:
             stdio.exception('')
             err = EC_SSH_CONNECT.format(user=self.config.username, ip=self.config.host, message=e)
-        if err:
+        if err is not None:
             if exit:
                 stdio.critical(err)
                 return err
@@ -430,7 +446,7 @@ class SshClient(SafeStdio):
 
     def is_local(self):
         return self.is_localhost() and self.config.username == getpass.getuser() or \
-            (COMMAND_ENV.get(ENV_HOST_IP_MODE, '0') == '1' and self.config.host == NetUtil.get_host_ip())
+            (COMMAND_ENV.get(ENV_HOST_IP_MODE, '0') == '1' and self.config.host in NetUtil.get_all_ips())
 
     def connect(self, stdio=None, exit=True):
         if self._is_local:
@@ -490,7 +506,7 @@ class SshClient(SafeStdio):
         elif timeout <= 0:
             timeout = None
 
-        if self._is_local:
+        if not self._disable_local and self._is_local:
             return LocalClient.execute_command(command, self.env if self.env else None, timeout, stdio=stdio)
 
         verbose_msg = '%s execute: %s ' % (self.config, command)
@@ -819,3 +835,37 @@ class SshClient(SafeStdio):
         except:
             stdio.exception("")
             stdio.verbose('Failed to get %s' % remote_dir)
+
+
+def get_root_permission_client(client4plugin, server, stdio):
+    client = client4plugin.client
+    if is_root_user(client):
+        return client 
+    ret = client.execute_command('echo %s | sudo -S whoami' % client.config.password)
+    if not ret:
+        if not client.config.password:
+            user_password = getpass.getpass('%s: please input %s password: ' % (server, client.config.username))
+            user_config = SshConfig(host=client.config.host, port=client.config.port, username=client.config.username, password=user_password)
+            user_client = SshClient(user_config, stdio=stdio)
+            ret = user_client.execute_command('echo %s | sudo -S whoami' % user_client.config.password)
+            client = user_client
+        if not ret:
+            if not stdio.confirm('%s: Failed to verify sudo with password. Would you like to continue by entering the username and password with sudo or exit? ' % server):
+                stdio.error(ret.stderr)
+                return None
+            else:
+                retry_count = 2
+                while retry_count > 0:
+                    username = stdio.read('%s: please input username with sudo privileges. (default: root): ' % server, blocked=True).strip() or 'root'
+                    root_password = getpass.getpass('%s: please input %s password: ' % (server, username))
+                    config = SshConfig(host=client.config.host, port=client.config.port, username=username, password=root_password)
+                    client = SshClient(config, stdio=stdio)
+                    ret = client.execute_command('echo %s | sudo -S whoami' % root_password)
+                    if not ret:
+                        retry_count -= 1
+                    else:
+                        return client
+                if retry_count == 0:
+                    stdio.error('Incorrect password')
+                    return None
+    return client

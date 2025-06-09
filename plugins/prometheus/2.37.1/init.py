@@ -31,7 +31,7 @@ def _clean(server, client, path, stdio=None):
         return True
 
 
-def init(plugin_context, *args, **kwargs):
+def init(plugin_context, source_option=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -96,7 +96,7 @@ def init(plugin_context, *args, **kwargs):
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='home path',
                                                         msg=InitDirFailedErrorMessage.NOT_EMPTY.format(
                                                             path=home_path)))
-                stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                source_option == "deploy" and stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                 continue
         else:
             global_ret = False
@@ -112,7 +112,7 @@ def init(plugin_context, *args, **kwargs):
                     stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='data_dir',
                                                             msg=InitDirFailedErrorMessage.NOT_EMPTY.format(
                                                                 path=data_dir)))
-                    stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                    source_option == "deploy" and stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 global_ret = False
@@ -132,7 +132,7 @@ def init(plugin_context, *args, **kwargs):
                     stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='data_dir',
                                                             msg=InitDirFailedErrorMessage.NOT_EMPTY.format(
                                                                 path=data_dir)))
-                    stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                    source_option == "deploy" and stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
                     continue
             else:
                 global_ret = False

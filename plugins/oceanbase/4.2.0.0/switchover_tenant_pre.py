@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from _rpm import Version
+from const import LOCATION_MODE
 
 
 def switchover_tenant_pre(plugin_context, repository, cursors={}, cluster_configs={}, relation_tenants={}, *args, **kwargs):
@@ -37,35 +38,52 @@ def switchover_tenant_pre(plugin_context, repository, cursors={}, cluster_config
     if not res:
         stdio.error("Query tenant {}:{}'s primary tenant info fail, place confirm current tenant is have the primary tenant.".format(standby_deploy_name, standby_tenant))
         return
-    primary_info_dict = {}
+
     primary = {}
-    primary_info_arr = res['VALUE'].split(',')
-    for primary_info in primary_info_arr:
-        kv = primary_info.split('=')
-        primary_info_dict[kv[0]] = kv[1]
-    primary_ip_list = primary_info_dict.get('IP_LIST').split(';')
-    primary_ip_list.sort()
-    primary_tenant_id = int(primary_info_dict['TENANT_ID']) if primary_info_dict else None
-    # find primary tenant
-    for relation_kv in relation_tenants:
-        relation_deploy_name = relation_kv[0]
-        relation_tenant_name = relation_kv[1]
-        relation_cursor = cursors.get(relation_deploy_name)
-        if not relation_cursor:
-            stdio.verbose("fail to get {}'s cursor".format(relation_deploy_name))
-            continue
+    if kwargs.get('source_type', None) == LOCATION_MODE:
+        cluster_config = cluster_configs.get(standby_deploy_name)
+        if not cluster_configs:
+            stdio.error("Get {} cluster config is failed.".format(standby_deploy_name))
+            return
+        primary_dict = cluster_config.get_component_attr('primary_tenant')
+        if not primary_dict:
+            stdio.error('The primary_tenant data is empty in inner_config')
+            return
+        primary_info = primary_dict[standby_tenant]
+        if not primary_info:
+            stdio.error('Tenant {} cannot find the primary tenant information'.format(standby_tenant))
+            return
+        primary['primary_deploy_name'] = primary_info[0][0]
+        primary['primary_tenant'] = primary_info[0][1]
+    else:
+        primary_info_dict = {}
+        primary_info_arr = res['VALUE'].split(',')
+        for primary_info in primary_info_arr:
+            kv = primary_info.split('=')
+            primary_info_dict[kv[0]] = kv[1]
+        primary_ip_list = primary_info_dict.get('IP_LIST').split(';')
+        primary_ip_list.sort()
+        primary_tenant_id = int(primary_info_dict['TENANT_ID']) if primary_info_dict else None
+        # find primary tenant
+        for relation_kv in relation_tenants:
+            relation_deploy_name = relation_kv[0]
+            relation_tenant_name = relation_kv[1]
+            relation_cursor = cursors.get(relation_deploy_name)
+            if not relation_cursor:
+                stdio.verbose("fail to get {}'s cursor".format(relation_deploy_name))
+                continue
 
-        res = relation_cursor.fetchone('select TENANT_ID, group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from oceanbase.cdb_ob_access_point where tenant_name=%s)', (relation_tenant_name, ), raise_exception=True)
-        if not res or not res['ip_list']:
-            stdio.verbose("fail to get {}'s ip list".format(relation_deploy_name))
-            continue
+            res = relation_cursor.fetchone('select TENANT_ID, group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from oceanbase.cdb_ob_access_point where tenant_name=%s)', (relation_tenant_name, ), raise_exception=True)
+            if not res or not res['ip_list']:
+                stdio.verbose("fail to get {}'s ip list".format(relation_deploy_name))
+                continue
 
-        ip_list = res['ip_list'].split(';')
-        ip_list.sort()
-        if res['TENANT_ID'] == primary_tenant_id and ip_list == primary_ip_list:
-            primary['primary_deploy_name'] = relation_deploy_name
-            primary['primary_tenant'] = relation_tenant_name
-            break
+            ip_list = res['ip_list'].split(';')
+            ip_list.sort()
+            if res['TENANT_ID'] == primary_tenant_id and ip_list == primary_ip_list:
+                primary['primary_deploy_name'] = relation_deploy_name
+                primary['primary_tenant'] = relation_tenant_name
+                break
 
     if not primary:
         stdio.error('Tenant: {}:{} not found primary tenant'.format(standby_deploy_name, standby_tenant))

@@ -31,6 +31,9 @@ class OBDErrorCode(object):
     def __str__(self):
         return  self.msg
 
+    def __bool__(self):
+        return False
+
 
 class OBDErrorCodeTemplate(object):
 
@@ -142,6 +145,7 @@ WC_AIO_NOT_ENOUGH = OBDErrorCodeTemplate(1011, '({ip}) The recommended value of 
 WC_OBSERVER_SAME_DISK = OBDErrorCodeTemplate(1012, '({ip}) clog and data use the same disk ({disk})')
 WC_FAIL_TO_RESTART_OR_RELOAD = OBDErrorCodeTemplate(1021, 'The components has been {action}, but encountered problems when reloading or restarting. Details:\n{detail}')
 WC_FAIL_TO_RESTART_OR_RELOAD_AFTER_SCALE_OUT = OBDErrorCodeTemplate(1022, 'The cluster has been scaled out, but encountered problems when reloading or restarting. Details:\n{detail}')
+WC_CHANGE_SYSTEM_PARAMETER_FAILED = OBDErrorCodeTemplate(1023, '({server}) failed to change system parameter: {key})')
 
 # error code for observer
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
@@ -166,6 +170,11 @@ EC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_m
 EC_OBSERVER_GET_MEMINFO_FAIL = OBDErrorCodeTemplate(2011, "{server}: fail to get memory info.\nPlease configure 'memory_limit' manually in configuration file")
 EC_OBSERVER_FAIL_TO_START_OCS = OBDErrorCodeTemplate(2012, 'Failed to start {server} obshell')
 EC_OBSERVER_UNKONE_SCENARIO = OBDErrorCodeTemplate(2013, 'Unknown scenario: {scenario}')
+EC_CPU_NOT_SUPPORT_AVX = OBDErrorCodeTemplate(2014, "{server}'s cpu does not support avx")
+EC_OBSERVER_DISABLE_AUTOSTART = OBDErrorCodeTemplate(2015, "{server}: Failed to modify the configuration of the automatic startup. Please check whether the current user has sudo permissions")
+EC_OBSERVER_LOG_INCOMPLETE = OBDErrorCodeTemplate(2016, "Primary tenant {primary_tenant} have not full log, not support create standby cluster, rerun with '--type=LOCATION' if you want to create standby tenant.")
+EC_OBSERVER_LOG_RECOVER = OBDErrorCodeTemplate(2017, "Continuous log synchronization is not enabled. Please execute the command `obd cluster tenant recover {cluster_name} {tenant_name} --unlimited` to enable continuous log synchronization")
+EC_OBSERVER_LOCATION_CREATE_STANDBY = OBDErrorCodeTemplate(2018, "For the standby tenant created by {primary_tenant} in log archive mode, it is prohibited to create a network-mode standby tenant for this standby tenant.")
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 
@@ -256,6 +265,9 @@ EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT = OBDErrorCodeTemplate(6001, 'obdiag must
 EC_OBDIAG_OPTIONS_FORMAT_ERROR = OBDErrorCodeTemplate(6002, 'obdiag options {option} format error, please check the value : {value}')
 EC_OBDIAG_FUNCTION_FAILED = OBDErrorCodeTemplate(6003, 'Failed to execute obdiag function {function}')
 
+# obshell
+EC_OBSHELL_GENERAL_ERROR = OBDErrorCodeTemplate(6100, 'OBSHELL: {msg}')
+
 # Unexpected exceptions code
 EC_UNEXPECTED_EXCEPTION = OBDErrorCodeTemplate(9999, 'Unexpected exception: need to be posted on "https://ask.oceanbase.com", and we will help you resolve them.')
 
@@ -282,6 +294,7 @@ SUG_SYSCTL = OBDErrorSuggestionTemplate('Please execute `echo "{var}={value}" >>
 SUG_ULIMIT = OBDErrorSuggestionTemplate('Please execute `echo -e "* soft {name} {value}\\n* hard {name} {value}" >> /etc/security/limits.d/{name}.conf` as root in {ip}. if it dosen\'t work, please check whether UsePAM is yes in /etc/ssh/sshd_config.')
 SUG_CONNECT_EXCEPT = OBDErrorSuggestionTemplate('Connection exception or unsupported OS. Please retry or contact us.')
 SUG_UNSUPPORT_OS = OBDErrorSuggestionTemplate('It may be an unsupported OS, please contact us for assistance')
+SUG_CHANGE_SERVER = OBDErrorSuggestionTemplate('Please change the server.')
 SUG_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorSuggestionTemplate('`system_memory` should be less than {factor} * memory_limit/memory_limit_percentage.', fix_eval=[FixEval(FixEval.DEL, 'system_memory')])
 SUG_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE = OBDErrorSuggestionTemplate('Please execute `echo 1 > /proc/sys/vm/drop_caches` as root in {ip} to release cached.')
 SUG_OBSERVER_REDUCE_MEM = OBDErrorSuggestionTemplate('Please reduce the `memory_limit` or `memory_limit_percentage`', fix_eval=[FixEval(FixEval.DEL, 'memory_limit'), FixEval(FixEval.DEL, 'system_memory'), FixEval(FixEval.DEL, 'memory_limit_percentage')])
@@ -300,7 +313,7 @@ SUG_OCP_EXPRESS_REDUCE_META_DB_LOG_DISK = OBDErrorSuggestionTemplate('Please red
 SUG_OCP_EXPRESS_EDIT_ADMIN_PASSWD = OBDErrorSuggestionTemplate('Please edit the `admin_passwd`, must be 8 to 32 characters in length, and must contain at least two digits, two uppercase letters, two lowercase letters, and two of the following special characters:~!@#%^&*_-+=|(){{}}[]:;,.?/)', fix_eval=[FixEval(FixEval.DEL, 'admin_passwd')], auto_fix=True)
 SUG_RESTART_OR_RELOAD = OBDErrorSuggestionTemplate('Please restart or reload the cluster manually')
 SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR = OBDErrorSuggestionTemplate('Please ensure that the `jdbc_url` in the `config.yaml` configuration file is set correctly to establish a successful connection with your database')
-SUG_OCP_SERVER_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`\' as root in {ip}.')
+SUG_OCP_SERVER_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "{user} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers\'` as root in {ip}.')
 SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION = OBDErrorSuggestionTemplate('Please install java with version {version}. If java is already installed, please set `java_bin` to the expected java binary path')
 SUG_OCP_SERVER_REDUCE_MEM = OBDErrorSuggestionTemplate('Please reduce the `memory_size`', fix_eval=[FixEval(FixEval.DEL, 'memory_size')])
 SUG_OCP_SERVER_REDUCE_DISK = OBDErrorSuggestionTemplate('Please reduce the `logging_file_total_size_cap`', fix_eval=[FixEval(FixEval.DEL, 'logging_file_total_size_cap')])
@@ -310,6 +323,6 @@ SUG_SUDO_NOPASSWD = OBDErrorSuggestionTemplate('Please execute `bash -c \'echo "
 SUG_OCP_SERVER_EXIST_METADB_TENANT_NOT_ENOUGH = OBDErrorSuggestionTemplate('Please reduce the ocp meta tenant memory or ocp monitor tenant memory')
 SUG_OCP_SERVER_NOT_EXIST_METADB_TENANT_NOT_ENOUGH = OBDErrorSuggestionTemplate('Please increase the meta db memory_limit and reduce the ocp meta tenant memory or ocp monitor tenant memory')
 SUG_OB_SYS_USERNAME = OBDErrorSuggestionTemplate('Please delete the "ob_sys_username" parameter.')
-SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" component.''')
+SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" or "oceanbase-standalone" component.''')
 SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)
 SUB_OBSERVER_UNKONE_SCENARIO = OBDErrorSuggestionTemplate('Please select a valid scenario from the options: {scenarios}')

@@ -1,4 +1,4 @@
-- src_path: ./home/admin/ocp-server/lib/ocp-server-ce-$version-$release_simple.jar
+- src_path: ./home/admin/ocp-server/lib/$name-$version-$release_simple.jar
   target_path: lib/ocp-server.jar
   type: jar
   require: openjdk-jre

@@ -12,7 +12,6 @@ export default function AlertMetadb() {
       })}
       style={{
         marginBottom: 24,
-        height: 40,
       }}
     />
   );

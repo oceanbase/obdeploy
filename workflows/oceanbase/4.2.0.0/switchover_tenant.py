@@ -24,5 +24,5 @@ def switchover_tenant(plugin_context, workflow, *args, **kwargs):
         workflow.add(const.STAGE_FIRST, 'status')
         workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
     workflow.add_with_kwargs(const.STAGE_SECOND, {'option_mode': 'switchover_tenant'}, 'get_relation_tenants', 'get_deployment_connections')
-    workflow.add(const.STAGE_SECOND, 'switchover_tenant_pre', 'switchover_tenant')
+    workflow.add(const.STAGE_SECOND, 'switchover_tenant_pre', 'switchover_tenant', 'switchover_relation_tenants')
     plugin_context.return_true()

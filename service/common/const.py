@@ -26,9 +26,11 @@ PKG_ESTIMATED_SIZE.update({"oceanbase-ce": 347142720, "oceanbase": 358142928, "o
 
 OCEANBASE_CE = 'oceanbase-ce'
 OCEANBASE = 'oceanbase'
+OCEANBASE_STANDALONE = 'oceanbase-standalone'
 
 CE = "ce"
 BUSINESS = "business"
+STANDALONE = "standalone"
 
 OBPROXY_CE = 'obproxy-ce'
 OBPROXY = 'obproxy'
@@ -38,6 +40,8 @@ OCP_SERVER_CE = 'ocp-server-ce'
 OCP_SERVER = 'ocp-server'
 OBAGENT = 'obagent'
 OB_CONFIGSERVER = 'obconfigserver'
+PROMETHEUS = 'prometheus'
+GRAFANA = 'grafana'
 
 no_generate_comps = ['ob-configserver']
 
@@ -45,7 +49,7 @@ DESTROY_PLUGIN = "destroy"
 INIT_PLUGINS = ("init",)
 START_PLUGINS = ("start_check_pre", "start", "connect", "health_check", "display")
 DEL_COMPONENT_PLUGINS = ("stop", "destroy")
-CHANGED_COMPONENTS = ('obproxy-ce', 'obagent', 'ocp-express', 'ob-configserver', 'prometheus', 'grafana')
+CHANGED_COMPONENTS = ('obproxy-ce', 'obagent', 'ob-configserver', 'prometheus', 'grafana')
 UPGRADE_PLUGINS = ("upgrade")
 # filter component of oceanbase and obproxy version above 4.0
 VERSION_FILTER = {

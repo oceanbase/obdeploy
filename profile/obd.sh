@@ -69,10 +69,10 @@ function _obd_complete_func
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev=${!#}
 
-  all_cmds["obd"]="mirror cluster test update repo demo web obdiag display-trace binlog"
-  all_cmds["obd cluster"]="autodeploy tenant component start deploy redeploy restart reload destroy stop edit-config takeover export-to-ocp list display upgrade chst check4ocp reinstall scale_out"
+  all_cmds["obd"]="mirror cluster test update repo demo web obdiag display-trace binlog license pwd host"
+  all_cmds["obd cluster"]="autodeploy tenant component start deploy redeploy restart reload destroy stop edit-config takeover export-to-ocp list display upgrade chst check4ocp reinstall scale_out init4env"
   all_cmds["obd cluster *"]="_obd_reply_deploy_names"
-  all_cmds["obd cluster tenant"]="create drop show create-standby switchover failover decouple optimize"
+  all_cmds["obd cluster tenant"]="create drop show create-standby switchover failover decouple optimize set-backup-config backup restore backup-show restore-show backup-cancel restore-cancel switch-log-source recover"
   all_cmds["obd cluster tenant *"]="_obd_reply_deploy_names"
   all_cmds["obd cluster tenant create-standby *"]="_obd_reply_deploy_names"
   all_cmds["obd cluster tenant switchover *"]="_obd_reply_primary_standby_tenant_names $prev"
@@ -82,8 +82,19 @@ function _obd_complete_func
   all_cmds["obd cluster tenant switchover"]="_obd_reply_deploy_names"
   all_cmds["obd cluster tenant failover"]="_obd_reply_deploy_names"
   all_cmds["obd cluster tenant decouple"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant backup"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant set-backup-config"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant restore"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant backup-show"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant restore-show"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant backup-cancel"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant restore-cancel"]="_obd_reply_deploy_names"
+  all_cmds["obd cluster tenant switch-log-source"]="_obd_reply_deploy_names"
+  all_cmds["obd clister tenant recover"]="_obd_reply_deploy_names"
   all_cmds["obd cluster component"]="add del"
   all_cmds["obd cluster component *"]="_obd_reply_deploy_names"
+  all_cmds["obd license"]="load show"
+  all_cmds["obd license *"]="_obd_reply_deploy_names"
   all_cmds["obd mirror"]="clone create clean list update enable disable"
   all_cmds["obd mirror clone"]="_obd_reply_current_files"
   all_cmds["obd repo"]="list"
@@ -104,15 +115,17 @@ function _obd_complete_func
   all_cmds["obd obdiag rca run"]="_obd_reply_deploy_names"
   all_cmds["obd binlog"]="create show start stop drop"
   all_cmds["obd binlog *"]="_obd_reply_deploy_names"
-  all_cmds["obd binlog show"]="_obd_reply_deploy_names"
   all_cmds["obd binlog start"]="_obd_reply_deploy_names"
   all_cmds["obd binlog stop"]="_obd_reply_deploy_names"
   all_cmds["obd binlog drop"]="_obd_reply_deploy_names"
+  all_cmds["obd binlog create"]="_obd_reply_deploy_names"
   all_cmds["obd binlog create *"]="_obd_reply_deploy_names"
   all_cmds["obd binlog start *"]="_obd_reply_deploy_names"
   all_cmds["obd binlog stop *"]="_obd_reply_deploy_names"
   all_cmds["obd binlog drop *"]="_obd_reply_deploy_names"
   all_cmds["obd tool"]="list install uninstall update"
+  all_cmds["obd host"]="precheck init"
+  all_cmds["obd pwd"]="encrypt set-epk"
 
   # if [ -f "$env_file" ] && [ "$(grep '"OBD_DEV_MODE": "1"' "$env_file")" != "" ]; then
   all_cmds["obd"]+=" devmode env tool"
@@ -129,13 +142,13 @@ function _obd_complete_func
     return 0
     ;;
   -p|--path);&
-  -c|--config)
+  -c|--config|-f|--file)
     _obd_reply_current_files
     ;;
   *)
     valid_len=$COMP_CWORD
     words=( ${COMP_WORDS[@]::valid_len} )
-    index=valid_len
+    index=$valid_len
     while (( index >= 1 )); do
         target="${words[*]}"
         cmd=${all_cmds[$target]}

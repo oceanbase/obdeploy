@@ -53,12 +53,12 @@ def tenant_check(tenant):
     return True
 
 
-def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, *args, **kwargs):
+def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, tenant_name=None, root_password=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     options = plugin_context.options
     repositories = plugin_context.repositories
-    tenant_name = getattr(options, 'tenant_name', 'test')
+    tenant_name = tenant_name or getattr(options, 'tenant_name', 'test')
     if tenant_name:
         check_result = tenant_check(tenant_name)
         if not check_result:
@@ -80,7 +80,9 @@ def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, *args, **
         if not tenant:
             stdio.error('No such Tenant %s' % tenant_name)
             return plugin_context.return_false()
-        tenant_cursor = exec_sql_in_tenant(cursor, tenant_name)
+        mode = getattr(options, 'mode', 'mysql')
+        root_password = root_password or getattr(options, tenant_name+'_root_password', "")
+        tenant_cursor = exec_sql_in_tenant(cursor=cursor, tenant=tenant_name, mode=mode, password=root_password if root_password else '')
 
     def _optimize(json_files):
         for file in json_files:

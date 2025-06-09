@@ -20,6 +20,6 @@ import const
 
 def obshell_port_check(plugin_context, workflow, *args, **kwargs):
     component_name = plugin_context.cluster_config.name
-    if const.COMP_OB_CE == component_name:
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
         workflow.add(const.STAGE_FIRST, 'obshell_port_check')
     plugin_context.return_true()

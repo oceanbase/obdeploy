@@ -57,12 +57,18 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
 
     if plugin_context.get_variable('tenant_exists'):
         return plugin_context.return_true()
+    cmd = ''
     for options in multi_options:
         global tenant_cursor
         tenant_cursor = None
         name = getattr(options, 'tenant_name', 'test')
         mode = getattr(options, 'mode', 'mysql')
         time_zone = getattr(options, 'time_zone', '')
+
+        if mode == 'oracle':
+            stdio.verbose('Import time zone in oracle tenant is not supported')
+            return plugin_context.return_true()
+
         if not time_zone:
             time_zone = client.execute_command('date +%:z').stdout.strip()
         exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, stdio=stdio)
@@ -78,4 +84,4 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
                     break
             cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
             stdio.print(cmd)
-    return plugin_context.return_true()
+    return plugin_context.return_true(cmd=cmd)
