@@ -4754,8 +4754,8 @@ class ObdHome(object):
     
     def obdiag_func(self, args, deploy_name):
         tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
-        obdiag_config = Values()
-        setattr(obdiag_config, 'depends', [])
+        # obdiag_config = Values()
+        # setattr(obdiag_config, 'depends', [])
         deploy_config = DeployConfig('', config_parser_manager=object())
         if deploy_name:
             self._global_ex_lock()
@@ -4767,7 +4767,18 @@ class ObdHome(object):
             self.set_deploy(deploy)
             self._call_stdio('verbose', 'Get deploy configuration')
             deploy_config = deploy.deploy_config
-        # deploy_config.components = {tool_name: obdiag_config}
+            allow_components = const.COMPS_OB
+            component_name = ""
+            for component in deploy_config.components:
+                if component in allow_components:
+                    component_name = component
+                    break
+            if component_name == "":
+                self._call_stdio('error', err.EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT.format(components=allow_components))
+                return False
+            cluster_config = deploy_config.components[component_name]
+            deploy_config.components = {tool_name: cluster_config}
+
         workflow_name='diag'
         pkg = self.mirror_manager.get_best_pkg(name=tool_name)
         if not pkg:
@@ -4777,6 +4788,7 @@ class ObdHome(object):
         deployed = self.obdiag_deploy(workflow_name)
         tool = self.tool_manager.get_tool_config_by_name(tool_name)
         if deployed and tool:
+            self.repositories = [repository]
             workflows = self.get_workflows(workflow_name, [repository])
             return self.run_workflow(workflows, deploy_config.components, [repository], **{const.COMP_OCEANBASE_DIAGNOSTIC_TOOL: {"full_cmd": args, "deploy_config": deploy_config}})
         else:
