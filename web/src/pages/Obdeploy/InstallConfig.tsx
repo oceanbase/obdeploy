@@ -51,7 +51,6 @@ import {
   grafanaComponent,
   obagentComponent,
   obproxyComponent,
-  oceanbaseCeComponent,
   oceanbaseComponent,
   oceanbaseStandaloneComponent,
   ocpexpressComponent,
@@ -141,7 +140,7 @@ export default function InstallConfig() {
     key: 'database',
     content: [
       {
-        key: oceanbaseComponent,
+        key: standAlone ? oceanbaseStandaloneComponent : oceanbaseComponent,
         name: 'OceanBase Database',
         onlyAll: false,
         desc: intl.formatMessage({
@@ -213,7 +212,10 @@ export default function InstallConfig() {
             if (allComponentsName.includes(item.name)) {
               if (item?.info?.length) {
                 const initVersionInfo = item?.info[0] || {};
-                if (item.name === oceanbaseComponent) {
+                if (
+                  item.name === oceanbaseComponent ||
+                  item.name === oceanbaseStandaloneComponent
+                ) {
                   setOceanbaseType(currentOceanbaseVersionInfo?.version_type);
                   setOBVersionValue(
                     `${currentOceanbaseVersionInfo?.version}-${currentOceanbaseVersionInfo?.release}-${currentOceanbaseVersionInfo?.md5}`,
@@ -387,9 +389,15 @@ export default function InstallConfig() {
               ? 'oceanbase'
               : 'oceanbase-standalone',
           appname: values?.appname,
-          version: componentsVersionInfo?.[oceanbaseComponent]?.version,
-          release: componentsVersionInfo?.[oceanbaseComponent]?.release,
-          package_hash: componentsVersionInfo?.[oceanbaseComponent]?.md5,
+          version: standAlone
+            ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.version
+            : componentsVersionInfo?.[oceanbaseComponent]?.version,
+          release: standAlone
+            ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.release
+            : componentsVersionInfo?.[oceanbaseComponent]?.release,
+          package_hash: standAlone
+            ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.md5
+            : componentsVersionInfo?.[oceanbaseComponent]?.md5,
         },
       };
 
@@ -528,6 +536,10 @@ export default function InstallConfig() {
     }
   };
 
+  const combinedDataSources = [oceanbaseStandaloneComponent, oceanbaseComponent]
+    .flatMap((component) => componentsVersionInfo[component]?.dataSource || [])
+    .filter((dataSource) => dataSource !== undefined);
+
   const getColumns = (group: string, supportCheckbox: boolean) => {
     const columns: ColumnsType<API.TableComponentInfo> = [
       {
@@ -571,16 +583,11 @@ export default function InstallConfig() {
         className: styles.secondCell,
         render: (_, record) => {
           const versionInfo = componentsVersionInfo[record.key] || {};
-          const combinedDataSources = [
-            oceanbaseStandaloneComponent,
-            oceanbaseComponent,
-          ]
-            .flatMap(
-              (component) => componentsVersionInfo[component]?.dataSource || [],
-            )
-            .filter((dataSource) => dataSource !== undefined);
 
-          if (record?.key === oceanbaseComponent) {
+          if (
+            record?.key === oceanbaseComponent ||
+            record?.key === oceanbaseStandaloneComponent
+          ) {
             return (
               <Select
                 value={obVersionValue}
@@ -881,37 +888,27 @@ export default function InstallConfig() {
     }
   }, []);
 
-  // 判断当前环境是否有缺包
-  const versionAlert = () => {
-    const components = [
-      oceanbaseComponent,
-      oceanbaseCeComponent,
-      oceanbaseStandaloneComponent,
-      obproxyComponent,
-      configServerComponent,
-      obagentComponent,
-      prometheusComponent,
-      grafanaComponent,
-    ];
-
-    return components.every(
-      (component) => componentsVersionInfo[component]?.version,
-    );
-  };
-
   // 判断是否开启在线仓库
   const remoteMirror = listRemoteMirror?.items?.find(
     (item) => item.name === 'OceanBase-community-stable-el7',
   );
 
   useEffect(() => {
-    let deployMemory: number =
-      componentsVersionInfo?.[oceanbaseComponent]?.estimated_size || 0;
+    let deployMemory: number = 0;
+    if (standAlone) {
+      deployMemory +=
+        componentsVersionInfo?.[oceanbaseStandaloneComponent]?.estimated_size ||
+        0;
+    } else {
+      deployMemory +=
+        componentsVersionInfo?.[oceanbaseComponent]?.estimated_size || 0;
+    }
+
     let componentsMemory: number = 0;
     const keys = Object.keys(componentsVersionInfo);
     keys.forEach((key) => {
-      if (key !== 'oceanbaseComponent' && selectedConfig.includes(key)) {
-        componentsMemory += componentsVersionInfo[key]?.estimated_size;
+      if (key !== oceanbaseComponent && selectedConfig.includes(key)) {
+        componentsMemory += componentsVersionInfo[key]?.estimated_size || 0;
       }
     });
     setDeployMemory(deployMemory);
@@ -1066,35 +1063,38 @@ export default function InstallConfig() {
               direction="vertical"
               size="middle"
             >
-              {remoteMirror?.available === false && !versionAlert() && (
-                <Alert
-                  message={
-                    <>
-                      {intl.formatMessage({
-                        id: 'OBD.pages.components.InstallConfig.IfTheCurrentEnvironmentCannot',
-                        defaultMessage:
-                          '如当前环境无法正常访问外网，建议使用 OceanBase 离线安装包进行安装部署。',
-                      })}
-                      <a
-                        href="https://open.oceanbase.com/softwareCenter/community"
-                        target="_blank"
-                      >
+              {(remoteMirror?.available === false ||
+                listRemoteMirror?.items?.length === 0) &&
+                combinedDataSources?.length === 0 && (
+                  <Alert
+                    message={
+                      <>
                         {intl.formatMessage({
-                          id: 'OBD.pages.components.InstallConfig.GoToDownloadOfflineInstallation',
-                          defaultMessage: '前往下载离线安装',
+                          id: 'OBD.pages.components.InstallConfig.IfTheCurrentEnvironmentCannot',
+                          defaultMessage:
+                            '如当前环境无法正常访问外网，建议使用 OceanBase 离线安装包进行安装部署。',
                         })}
-                      </a>
-                    </>
-                  }
-                  type="error"
-                  showIcon
-                  style={{ marginTop: '16px' }}
-                />
-              )}
+                        <a
+                          href="https://open.oceanbase.com/softwareCenter/community"
+                          target="_blank"
+                        >
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.GoToDownloadOfflineInstallation',
+                            defaultMessage: '前往下载离线安装',
+                          })}
+                        </a>
+                      </>
+                    }
+                    type="error"
+                    showIcon
+                    style={{ marginTop: '16px' }}
+                  />
+                )}
 
-              {remoteMirror?.enabled === false &&
-                remoteMirror?.available === true &&
-                !versionAlert() && (
+              {((remoteMirror?.enabled === false &&
+                remoteMirror?.available === true) ||
+                listRemoteMirror?.items?.length === 0) &&
+                combinedDataSources?.length === 0 && (
                   <Alert
                     message={
                       <>
