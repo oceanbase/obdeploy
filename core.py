@@ -4730,7 +4730,7 @@ class ObdHome(object):
             obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, diagnostic_component_name, tool.config.version)
             return self.call_plugin(obdiag_plugin, target_repository)
         else:
-            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
+            self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=fuction_type))
             return False
 
 
@@ -4749,7 +4749,48 @@ class ObdHome(object):
             obdiag_plugin = self.plugin_manager.get_best_py_script_plugin(fuction_type, tool_name, repository.version)
             return self.call_plugin(obdiag_plugin, repository, clients={})
         else:
-            self._call_stdio('error', err.EC_OBDIAG_FUCYION_FAILED.format(fuction=fuction_type))
+            self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=fuction_type))
+            return False
+    
+    def obdiag_func(self, args, deploy_name):
+        tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
+        deploy_config = DeployConfig('', config_parser_manager=object())
+        if deploy_name:
+            self._global_ex_lock()
+            self._call_stdio('verbose', 'Get Deploy by name')
+            deploy = self.deploy_manager.get_deploy_config(deploy_name, read_only=True)
+            if not deploy:
+                self._call_stdio('error', 'No such deploy: %s.' % deploy_name)
+                return False
+            self.set_deploy(deploy)
+            self._call_stdio('verbose', 'Get deploy configuration')
+            deploy_config = deploy.deploy_config
+            allow_components = const.COMPS_OB
+            component_name = ""
+            for component in deploy_config.components:
+                if component in allow_components:
+                    component_name = component
+                    break
+            if component_name == "":
+                self._call_stdio('error', err.EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT.format(components=allow_components))
+                return False
+            cluster_config = deploy_config.components[component_name]
+            deploy_config.components = {tool_name: cluster_config}
+
+        workflow_name='diag'
+        pkg = self.mirror_manager.get_best_pkg(name=tool_name)
+        if not pkg:
+            self._call_stdio('critical', '%s package not found' % tool_name)
+            return False
+        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
+        deployed = self.obdiag_deploy(workflow_name)
+        tool = self.tool_manager.get_tool_config_by_name(tool_name)
+        if deployed and tool:
+            self.repositories = [repository]
+            workflows = self.get_workflows(workflow_name, [repository])
+            return self.run_workflow(workflows, deploy_config.components, [repository], **{const.COMP_OCEANBASE_DIAGNOSTIC_TOOL: {"full_cmd": args, "deploy_config": deploy_config}})
+        else:
+            self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=workflow_name))
             return False
         
     def obdiag_deploy(self, fuction_type):

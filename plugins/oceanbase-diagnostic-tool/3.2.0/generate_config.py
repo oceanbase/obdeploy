@@ -12,11 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from __future__ import absolute_import, division, print_function
 import os
 from tool import YamlLoader
 
-def generate_config(plugin_context, deploy_config, *args, **kwargs):
+
+def generate_config(plugin_context, *args, **kwargs):
+    if kwargs["full_cmd"][-1] == '-h' or kwargs["full_cmd"][-1] == '--help':
+        return plugin_context.return_true()
+    deploy_config = kwargs["deploy_config"]
     def get_option(key, default=''):
         value = getattr(options, key)
         if value is None:
@@ -112,9 +117,8 @@ def generate_config(plugin_context, deploy_config, *args, **kwargs):
         write_obdiag_config(config_data)
 
     try:
-        if run():
-            plugin_context.return_true()
+        run()
+        plugin_context.return_true()
     except KeyboardInterrupt:
         stdio.exception("obdiag config failed")
         return plugin_context.return_false()
-    

@@ -23,6 +23,7 @@ import textwrap
 import json
 import glob
 import datetime
+import copy
 from uuid import uuid1 as uuid, UUID
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
@@ -187,6 +188,8 @@ class BaseCommand(object):
         raise NotImplementedError
 
     def _show_help(self, *args, **kwargs):
+        if self.name == "obdiag":
+            return
         ROOT_IO.print(self._mk_usage())
         self.parser.exit(1)
 
@@ -1964,7 +1967,28 @@ class DisplayTraceCommand(ObdCommand):
         return True
 
 
-class ObdiagCommand(MajorCommand):
+class ObdiagCommand(ObdCommand):
+
+    def __init__(self):
+        super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')
+
+    def _do_command(self, obd):
+        args = copy.copy(self.args)
+        for i in range(len(self.args)):
+            if isinstance(self.args[i], str) and (self.args[i].startswith('--') or self.args[i].startswith('-')):
+                if self.args[i] == "--help" or self.args[i] == "-h":
+                    return obd.obdiag_func(self.args, None)
+                else:
+                    args.remove(self.args[i-1])
+                    return obd.obdiag_func(args, self.args[i-1])
+        if len(self.args) > 0:
+            args.remove(self.args[-1])
+            return obd.obdiag_func(args, self.args[-1])
+        else:
+            return self._show_help() 
+
+
+class ObdiagCommandBak(MajorCommand):
     
     def __init__(self):
         super(ObdiagCommand, self).__init__('obdiag', 'Oceanbase Diagnostic Tool')

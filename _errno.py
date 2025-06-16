@@ -263,7 +263,7 @@ EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
 EC_OBDIAG_NOT_FOUND = OBDErrorCodeTemplate(6000, 'Failed to executable obdiag command, you may not have obdiag installed')
 EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT = OBDErrorCodeTemplate(6001, 'obdiag must contain depend components {components}')
 EC_OBDIAG_OPTIONS_FORMAT_ERROR = OBDErrorCodeTemplate(6002, 'obdiag options {option} format error, please check the value : {value}')
-EC_OBDIAG_FUCYION_FAILED = OBDErrorCodeTemplate(6003, 'Failed to execute obdiag function {fuction}')
+EC_OBDIAG_FUNCTION_FAILED = OBDErrorCodeTemplate(6003, 'Failed to execute obdiag function {function}')
 
 # obshell
 EC_OBSHELL_GENERAL_ERROR = OBDErrorCodeTemplate(6100, 'OBSHELL: {msg}')
