@@ -19,6 +19,8 @@ from tool import YamlLoader
 
 
 def generate_config(plugin_context, *args, **kwargs):
+    if kwargs["full_cmd"][-1] == '-h' or kwargs["full_cmd"][-1] == '--help':
+        return
     deploy_config = kwargs["deploy_config"]
     def get_option(key, default=''):
         value = getattr(options, key)
