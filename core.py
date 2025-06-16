@@ -4754,8 +4754,6 @@ class ObdHome(object):
     
     def obdiag_func(self, args, deploy_name):
         tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
-        # obdiag_config = Values()
-        # setattr(obdiag_config, 'depends', [])
         deploy_config = DeployConfig('', config_parser_manager=object())
         if deploy_name:
             self._global_ex_lock()
