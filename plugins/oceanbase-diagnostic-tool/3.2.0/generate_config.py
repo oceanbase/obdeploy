@@ -20,7 +20,7 @@ from tool import YamlLoader
 
 def generate_config(plugin_context, *args, **kwargs):
     if kwargs["full_cmd"][-1] == '-h' or kwargs["full_cmd"][-1] == '--help':
-        return
+        return plugin_context.return_true()
     deploy_config = kwargs["deploy_config"]
     def get_option(key, default=''):
         value = getattr(options, key)
@@ -117,8 +117,8 @@ def generate_config(plugin_context, *args, **kwargs):
         write_obdiag_config(config_data)
 
     try:
-        if run():
-            plugin_context.return_true()
+        run()
+        plugin_context.return_true()
     except KeyboardInterrupt:
         stdio.exception("obdiag config failed")
         return plugin_context.return_false()
