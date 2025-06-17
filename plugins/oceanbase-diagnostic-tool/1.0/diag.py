@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
 import _errno as err
+import re
 
 
 def diag(plugin_context, *args, **kwargs):
@@ -31,4 +32,9 @@ def diag(plugin_context, *args, **kwargs):
     if not ret:
         stdio.error(err.EC_OBDIAG_NOT_FOUND.format())
         return plugin_context.return_false()
-    stdio.print(ret.stdout)
+    fixed_output = re.sub(
+        r'Usage: /.*?/obdiag',
+        'Usage: obd obdiag',
+        ret.stdout
+    )
+    stdio.print(fixed_output)

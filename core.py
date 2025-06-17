@@ -4775,7 +4775,7 @@ class ObdHome(object):
                 self._call_stdio('error', err.EC_OBDIAG_NOT_CONTAIN_DEPEND_COMPONENT.format(components=allow_components))
                 return False
             cluster_config = deploy_config.components[component_name]
-            deploy_config.components = {tool_name: cluster_config}
+            deploy_config.components[tool_name] = cluster_config
 
         workflow_name='diag'
         pkg = self.mirror_manager.get_best_pkg(name=tool_name)

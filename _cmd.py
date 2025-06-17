@@ -125,6 +125,8 @@ class AllowUndefinedOptionParser(OptionParser):
             value = rargs[0]
             OptionParser._process_long_opt(self, rargs, values)
         except BadOptionError as e:
+            if self.prog.split()[-1] == "obdiag":
+                return
             if self.allow_undefine:
                 key = e.opt_str
                 value = value[len(key)+1:]
@@ -138,6 +140,8 @@ class AllowUndefinedOptionParser(OptionParser):
             value = rargs[0]
             OptionParser._process_short_opts(self, rargs, values)
         except BadOptionError as e:
+            if self.prog.split()[-1] == "obdiag":
+                return
             if self.allow_undefine:
                 key = e.opt_str
                 value = value[len(key)+1:]
