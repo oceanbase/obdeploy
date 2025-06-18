@@ -48,6 +48,7 @@ no_generate_comps = ['ob-configserver']
 DESTROY_PLUGIN = "destroy"
 INIT_PLUGINS = ("init",)
 START_PLUGINS = ("start_check_pre", "start", "connect", "health_check", "display")
+STOP_PLUGINS = ("stop",)
 DEL_COMPONENT_PLUGINS = ("stop", "destroy")
 CHANGED_COMPONENTS = ('obproxy-ce', 'obagent', 'ob-configserver', 'prometheus', 'grafana')
 UPGRADE_PLUGINS = ("upgrade")
@@ -64,3 +65,6 @@ FINISHED = 'finished'
 
 GRACEFUL_TIMEOUT = 5
 
+TASK_TYPE_INSTALL = 'install'
+TASK_TYPE_START = 'start'
+TASK_TYPE_STOP = 'stop'

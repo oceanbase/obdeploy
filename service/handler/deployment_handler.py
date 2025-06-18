@@ -573,7 +573,7 @@ class DeploymentHandler(BaseHandler):
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
     def get_start_task_info(self, name):
-        return self.get_task_info_log(name, "start")
+        return self.get_task_info_log_by_type(name, "start")
         
     @serial("stop")
     def stop(self, name, background_tasks):
@@ -585,7 +585,7 @@ class DeploymentHandler(BaseHandler):
         background_tasks.add_task(self._do_stop, name)
     
     def get_stop_task_info(self, name):
-        return self.get_task_info_log(name, "stop")
+        return self.get_task_info_log_by_type(name, "stop")
         
     @auto_register("stop")
     def _do_stop(self, name):
@@ -603,43 +603,68 @@ class DeploymentHandler(BaseHandler):
             data[component] = _.get_variable('run_result')
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
-    def get_task_info_log(self, name, task_type):
+    def get_task_info_log_by_type(self, name, task_type):
         task_info = task.get_task_manager().get_task_info(name, task_type=task_type)
         if task_info is None:
             raise Exception("task {0} not found".format(name))
         deploy = self.get_deploy(name)
         components = deploy.deploy_config.components
-        total_count = (len(const.START_PLUGINS) + len(const.INIT_PLUGINS)) * len(components)
+        total_count = 0
+        if task_type == const.TASK_TYPE_INSTALL:
+            total_count = (len(const.START_PLUGINS) + len(const.INIT_PLUGINS)) * len(components)
+        elif task_type == const.TASK_TYPE_START:
+            total_count = len(const.START_PLUGINS) * len(components)
+        elif task_type == const.TASK_TYPE_STOP:
+            total_count = len(const.STOP_PLUGINS) * len(components)
         finished_count = 0
         current = ""
         task_result = TaskResult.RUNNING
         info_dict = dict()
 
         for component in components:
-            info_dict[component] = ComponentInfo(component=component, status=TaskStatus.PENDING,
-                                                 result=TaskResult.RUNNING)
-            if component in self.obd.namespaces:
-                for plugin in const.INIT_PLUGINS:
+                info_dict[component] = ComponentInfo(component=component, status=TaskStatus.PENDING,
+                                                    result=TaskResult.RUNNING)
+
+        if task_type == const.TASK_TYPE_INSTALL:
+            for component in components:
+                if component in self.obd.namespaces:
+                    for plugin in const.INIT_PLUGINS:
+                        if self.obd.namespaces[component].get_return(plugin) is not None:
+                            info_dict[component].status = TaskStatus.RUNNING
+                            finished_count += 1
+                            current = "{0}: {1} finished".format(component, plugin)
+                            if not self.obd.namespaces[component].get_return(plugin):
+                                info_dict[component].result = TaskResult.FAILED
+
+        if task_type == const.TASK_TYPE_INSTALL or task_type == const.TASK_TYPE_START:
+            for component in components:
+                for plugin in const.START_PLUGINS:
+                    if component not in self.obd.namespaces:
+                        break
                     if self.obd.namespaces[component].get_return(plugin) is not None:
                         info_dict[component].status = TaskStatus.RUNNING
                         finished_count += 1
                         current = "{0}: {1} finished".format(component, plugin)
                         if not self.obd.namespaces[component].get_return(plugin):
                             info_dict[component].result = TaskResult.FAILED
+                        else:
+                            if plugin == const.START_PLUGINS[-1]:
+                                info_dict[component].result = TaskResult.SUCCESSFUL
 
-        for component in components:
-            for plugin in const.START_PLUGINS:
-                if component not in self.obd.namespaces:
-                    break
-                if self.obd.namespaces[component].get_return(plugin) is not None:
-                    info_dict[component].status = TaskStatus.RUNNING
-                    finished_count += 1
-                    current = "{0}: {1} finished".format(component, plugin)
-                    if not self.obd.namespaces[component].get_return(plugin):
-                        info_dict[component].result = TaskResult.FAILED
-                    else:
-                        if plugin == const.START_PLUGINS[-1]:
-                            info_dict[component].result = TaskResult.SUCCESSFUL
+        if task_type == const.TASK_TYPE_STOP:
+            for component in components:
+                for plugin in const.STOP_PLUGINS:
+                    if component not in self.obd.namespaces:
+                        break
+                    if self.obd.namespaces[component].get_return(plugin) is not None:
+                        info_dict[component].status = TaskStatus.RUNNING
+                        finished_count += 1
+                        current = "{0}: {1} finished".format(component, plugin)
+                        if not self.obd.namespaces[component].get_return(plugin):
+                            info_dict[component].result = TaskResult.FAILED
+                        else:
+                            if plugin == const.STOP_PLUGINS[-1]:
+                                info_dict[component].result = TaskResult.SUCCESSFUL
 
         if task_info.status == TaskStatus.FINISHED:
             task_result = task_info.result
@@ -655,7 +680,7 @@ class DeploymentHandler(BaseHandler):
                         msg=msg)
 
     def get_install_task_info(self, name):
-        return self.get_task_info_log(name, "install")
+        return self.get_task_info_log_by_type(name, "install")
 
     def __build_connection_info(self, component, info):
         if info is None:
