@@ -123,6 +123,18 @@ async def start(name: str, background_tasks: BackgroundTasks):
         return response_utils.new_internal_server_error_exception(ex)
     return response_utils.new_ok_response("")
 
+@router.get("/deployments/{name}/start",
+            response_model=OBResponse[TaskInfo],
+            description='query start status',
+            operation_id='queryStartStatus',
+            tags=['Deployments'])
+async def get_start_status(name: str = Path(description='deployment name')):
+    handler = handler_utils.new_deployment_handler()
+    task_info = handler.get_start_task_info(name)
+    if task_info is None:
+        return response_utils.new_not_found_exception("task {0} not found".format(name))
+    return response_utils.new_ok_response(task_info)
+
 @router.get("/deployments/{name}/start/log",
             response_model=OBResponse[InstallLog],
             description='query start log',
@@ -153,6 +165,18 @@ async def stop(name: str, background_tasks: BackgroundTasks):
     except Exception as ex:
         return response_utils.new_internal_server_error_exception(ex)
     return response_utils.new_ok_response("")
+
+@router.get("/deployments/{name}/stop",
+            response_model=OBResponse[TaskInfo],
+            description='query stop status',
+            operation_id='queryStopStatus',
+            tags=['Deployments'])
+async def get_start_status(name: str = Path(description='deployment name')):
+    handler = handler_utils.new_deployment_handler()
+    task_info = handler.get_stop_task_info(name)
+    if task_info is None:
+        return response_utils.new_not_found_exception("task {0} not found".format(name))
+    return response_utils.new_ok_response(task_info)
 
 @router.get("/deployments/{name}/stop/log",
             response_model=OBResponse[InstallLog],
