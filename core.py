@@ -4791,6 +4791,8 @@ class ObdHome(object):
             return self.run_workflow(workflows, deploy_config.components, [repository], **{const.COMP_OCEANBASE_DIAGNOSTIC_TOOL: {"full_cmd": args, "deploy_config": deploy_config}})
         else:
             self._call_stdio('error', err.EC_OBDIAG_NOT_FOUND.format())
+            self._call_stdio('warn', '%s tool installation begins' % tool_name)
+            self.install_tool(tool_name)
             return False
         
     def obdiag_deploy(self, fuction_type):
