@@ -28,12 +28,14 @@ def diag(plugin_context, *args, **kwargs):
         exec_command = r"{install_dir}/{cmd}".format(install_dir=obdiag_install_dir, cmd=command)
         return LocalClient.execute_command(exec_command, env, timeout, stdio)
 
+    stdio.start_loading('obdiag working')
     ret = local_execute_command(f'{obdiag_bin} {" ".join(kwargs["full_cmd"])}')
+    stdio.stop_loading('obdiag working')
     if not ret:
         stdio.error(err.EC_OBDIAG_NOT_FOUND.format())
         return plugin_context.return_false()
     
-    fixed_output= ""
+    fixed_output = ret.stdout
     if kwargs["full_cmd"][-1] == "list":
         command_to_replace = kwargs["full_cmd"][0]
         pattern = rf'(\s*)obdiag\s+{re.escape(command_to_replace)}(\s|$)'
