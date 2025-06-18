@@ -47,7 +47,7 @@ def diag(plugin_context, *args, **kwargs):
     fixed_output = re.sub(
         r'Usage: /.*?/obdiag',
         'Usage: obd obdiag',
-        ret.stdout
+        fixed_output
     )
     fixed_output = re.sub(
         r'(<command>)(\s+\[options\])',
