@@ -101,8 +101,10 @@ def generate_config(plugin_context, *args, **kwargs):
             config={"obcluster": obcluster_config, "obproxy": obproxy_config}
             if obproxy_config["obproxy_port"]  == None:
                 obcluster_config["db_port"] = 2883
+                obcluster_config["db_host"] = obproxy_config["servers"]["nodes"][0]["ip"]
             else:
                 obcluster_config["db_port"] = obproxy_config["obproxy_port"]
+                obcluster_config["db_host"] = obproxy_config["servers"]["nodes"][0]["ip"]
         else:
             config={"obcluster": obcluster_config}
         return config

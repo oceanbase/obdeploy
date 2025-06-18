@@ -32,9 +32,26 @@ def diag(plugin_context, *args, **kwargs):
     if not ret:
         stdio.error(err.EC_OBDIAG_NOT_FOUND.format())
         return plugin_context.return_false()
+    
+    fixed_output= ""
+    if kwargs["full_cmd"][-1] == "list":
+        command_to_replace = kwargs["full_cmd"][0]
+        pattern = rf'(\s*)obdiag\s+{re.escape(command_to_replace)}(\s|$)'
+        replacement = rf'\1obd obdiag {command_to_replace}\2'
+        fixed_output = re.sub(
+                pattern,
+                replacement,
+                ret.stdout,
+                flags=re.MULTILINE | re.IGNORECASE
+            )
     fixed_output = re.sub(
         r'Usage: /.*?/obdiag',
         'Usage: obd obdiag',
         ret.stdout
+    )
+    fixed_output = re.sub(
+        r'(<command>)(\s+\[options\])',
+        r'\1 <deploy name>\2',
+        fixed_output
     )
     stdio.print(fixed_output)
