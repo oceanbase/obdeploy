@@ -65,8 +65,8 @@ def generate_config(plugin_context, *args, **kwargs):
                 nodeItem["ssh_username"] = parse_empty(user_config.username)
                 nodeItem["ssh_password"] = parse_empty(user_config.password)
                 nodeItem["private_key"] = parse_empty(user_config.key_file)
-                server_config = obproxy.get_server_conf(server)
-                obproxy_config["obproxy_port"] = server_config.get("listen_port")
+                server_config = obproxy.get_server_conf_with_default(server)
+                obproxy_config["obproxy_port"] = server_config.get("listen_port", 2883)
                 nodeItem["home_path"] = server_config.get("home_path")
                 obproxy_nodes.append(nodeItem)
         obproxy_config["servers"] = {"nodes": obproxy_nodes, "global": {}}
@@ -99,12 +99,8 @@ def generate_config(plugin_context, *args, **kwargs):
             obcluster_config["servers"] = {"nodes": observer_nodes, "global": {}}
         if len(obproxy_nodes) > 0:
             config={"obcluster": obcluster_config, "obproxy": obproxy_config}
-            if obproxy_config["obproxy_port"]  == None:
-                obcluster_config["db_port"] = 2883
-                obcluster_config["db_host"] = obproxy_config["servers"]["nodes"][0]["ip"]
-            else:
-                obcluster_config["db_port"] = obproxy_config["obproxy_port"]
-                obcluster_config["db_host"] = obproxy_config["servers"]["nodes"][0]["ip"]
+            obcluster_config["db_port"] = obproxy_config["obproxy_port"]
+            obcluster_config["db_host"] = obproxy_config["servers"]["nodes"][0]["ip"]
         else:
             config={"obcluster": obcluster_config}
         return config
