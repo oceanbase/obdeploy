@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 from ssh import LocalClient
 import _errno as err
+import re
 
 
 def diag(plugin_context, *args, **kwargs):
@@ -27,8 +28,32 @@ def diag(plugin_context, *args, **kwargs):
         exec_command = r"{install_dir}/{cmd}".format(install_dir=obdiag_install_dir, cmd=command)
         return LocalClient.execute_command(exec_command, env, timeout, stdio)
 
+    stdio.start_loading('obdiag working')
     ret = local_execute_command(f'{obdiag_bin} {" ".join(kwargs["full_cmd"])}')
+    stdio.stop_loading('obdiag working')
     if not ret:
         stdio.error(err.EC_OBDIAG_NOT_FOUND.format())
         return plugin_context.return_false()
-    stdio.print(ret.stdout)
+    
+    fixed_output = ret.stdout
+    if kwargs["full_cmd"][-1] == "list":
+        command_to_replace = kwargs["full_cmd"][0]
+        pattern = rf'(\s*)obdiag\s+{re.escape(command_to_replace)}(\s|$)'
+        replacement = rf'\1obd obdiag {command_to_replace}\2'
+        fixed_output = re.sub(
+                pattern,
+                replacement,
+                ret.stdout,
+                flags=re.MULTILINE | re.IGNORECASE
+            )
+    fixed_output = re.sub(
+        r'Usage: /.*?/obdiag',
+        'Usage: obd obdiag',
+        fixed_output
+    )
+    fixed_output = re.sub(
+        r'(<command>)(\s+\[options\])',
+        r'\1 <deploy name>\2',
+        fixed_output
+    )
+    stdio.print(fixed_output)
