@@ -1,6 +1,7 @@
 import { intl } from '@/utils/intl';
 import { ProCard } from '@ant-design/pro-components';
-import { Col, Row, Space, Table, Tooltip } from 'antd';
+import { useModel } from '@umijs/max';
+import { Col, Input, Row, Space, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import styles from './index.less';
 
@@ -20,12 +21,17 @@ interface CompDetailCheckInfo {
 export default function CompDetailCheckInfo({
   clusterConfigInfo,
 }: CompDetailCheckInfo) {
+  const { configData } = useModel('global');
+  const { components = {} } = configData || {};
+  const { oceanbase = {} } = components;
   const getMoreColumns = (label: string) => {
     const columns: ColumnsType<API.MoreParameter> = [
       {
-        title: label,
+        title:
+          oceanbase.component === 'oceanbase-standalone'
+            ? 'oceanbaseStandalone 参数名称'
+            : label,
         dataIndex: 'key',
-        render: (text) => text,
       },
       {
         title: intl.formatMessage({
@@ -33,13 +39,25 @@ export default function CompDetailCheckInfo({
           defaultMessage: '参数值',
         }),
         dataIndex: 'value',
-        render: (text, record) =>
-          record.adaptive
+        render: (text, record) => {
+          const content = record.key.includes('password') ? (
+            <Input.Password
+              value={text}
+              visibilityToggle={true}
+              readOnly
+              bordered={false}
+              style={{ padding: 0 }}
+            />
+          ) : (
+            <span>{text}</span>
+          );
+          return record.adaptive
             ? intl.formatMessage({
                 id: 'OBD.pages.components.CheckInfo.Adaptive',
                 defaultMessage: '自动分配',
               })
-            : text || '-',
+            : content || '-';
+        },
       },
       {
         title: intl.formatMessage({
@@ -57,6 +75,7 @@ export default function CompDetailCheckInfo({
 
     return columns;
   };
+
   return (
     <ProCard split="horizontal">
       <Row gutter={16}>
@@ -105,16 +124,14 @@ export default function CompDetailCheckInfo({
                       split="vertical"
                       key={moreItem.label}
                     >
-                      {!obproxyPassword ? (
-                        <Table
-                          className={`${styles.infoCheckTable}  ob-table`}
-                          columns={getMoreColumns(moreItem.label)}
-                          dataSource={moreItem?.parameters}
-                          pagination={false}
-                          scroll={{ y: 300 }}
-                          rowKey="key"
-                        />
-                      ) : null}
+                      <Table
+                        className={`${styles.infoCheckTable}  ob-table`}
+                        columns={getMoreColumns(moreItem.label)}
+                        dataSource={moreItem?.parameters}
+                        pagination={false}
+                        scroll={{ y: 300 }}
+                        rowKey="key"
+                      />
                     </ProCard>
                   );
                 })}

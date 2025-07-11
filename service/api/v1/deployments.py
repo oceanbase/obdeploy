@@ -396,6 +396,3 @@ async def get_tenant_scenario(name: str):
     handler = handler_utils.new_deployment_handler()
     info = handler.get_tenant_scenario(name)
     return response_utils.new_ok_response(info)
-
-
-

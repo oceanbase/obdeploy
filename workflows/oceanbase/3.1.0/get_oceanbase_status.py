@@ -17,13 +17,8 @@ from __future__ import absolute_import, division, print_function
 
 import const
 
-
-def add_component_pre(plugin_context, workflow, ob_repository, *args, **kwargs):
-    options = plugin_context.options
-    workflow.add_with_kwargs(const.STAGE_FIRST, {'auto_depend': True}, 'generate_config')
-    if not getattr(options, 'skip_cluster_status_check', False):
-        workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, ob_repository.name,
-                                               '4.0.0.0', {'scale_out_component': plugin_context.cluster_config.name}, 'connect')
-    workflow.add(const.STAGE_FIRST, 'init')
+def get_oceanbase_status(plugin_context, workflow, *args, **kwargs):
+    workflow.add(const.STAGE_FIRST, 'status')
+    workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
+    workflow.add(const.STAGE_SECOND, 'connect')
     return plugin_context.return_true()

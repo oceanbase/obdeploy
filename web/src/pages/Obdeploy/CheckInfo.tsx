@@ -16,7 +16,7 @@ import { generateRandomPassword, isExist } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
 import { ProCard } from '@ant-design/pro-components';
-import { Alert, Button, Col, Row, Space, Table, Tooltip } from 'antd';
+import { Alert, Button, Col, Input, Row, Space, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect } from 'react';
 import { getLocale, useModel } from 'umi';
@@ -31,6 +31,7 @@ import {
   obagentComponent,
   obproxyComponent,
   oceanbaseComponent,
+  oceanbaseStandaloneComponent,
   onlyComponentsKeys,
   prometheusComponent,
 } from '../constants';
@@ -235,7 +236,6 @@ export default function CheckInfo() {
   const componentsList = getComponentsList();
   const componentsNodeConfigList = getComponentsNodeConfigList();
   const initDir = `${home_path}/oceanbase/store`;
-
   const clusterConfigInfo = [
     {
       key: 'cluster',
@@ -260,7 +260,13 @@ export default function CheckInfo() {
           colSpan: 5,
           value: (
             <Tooltip title={oceanbase?.root_password} placement="topLeft">
-              <div className="ellipsis">{oceanbase?.root_password}</div>
+              <Input.Password
+                value={oceanbase?.root_password}
+                visibilityToggle={true}
+                readOnly
+                bordered={false}
+                style={{ padding: 0 }}
+              />
             </Tooltip>
           ),
         },
@@ -312,7 +318,9 @@ export default function CheckInfo() {
       more: oceanbase?.parameters?.length
         ? [
             {
-              label: componentsConfig[oceanbaseComponent].labelName,
+              label:
+                componentsConfig[oceanbaseComponent].labelName ||
+                componentsConfig[oceanbaseStandaloneComponent].labelName,
               parameters: oceanbase?.parameters,
             },
           ]
@@ -353,7 +361,6 @@ export default function CheckInfo() {
           parameters: obproxy?.parameters,
         });
     }
-
     if (selectedConfig.includes(grafanaComponent)) {
       content = content.concat({
         label: 'Grafana 服务端口',
@@ -376,6 +383,7 @@ export default function CheckInfo() {
           parameters: prometheus?.parameters,
         });
     }
+
     if (selectedConfig.includes(obagentComponent)) {
       content = content.concat(
         {
@@ -422,6 +430,56 @@ export default function CheckInfo() {
       }),
       content,
       more,
+    });
+
+    clusterConfigInfo.map((item) => {
+      if (item.key === 'cluster') {
+        if (selectedConfig.includes(prometheusComponent)) {
+          const prometheusPasswordItem = {
+            label: intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.PrometheusPassword',
+              defaultMessage: 'Prometheus 密码',
+            }),
+            colSpan: 5,
+            value: (
+              <Tooltip
+                title={prometheus?.basic_auth_users?.admin}
+                placement="topLeft"
+              >
+                <Input.Password
+                  value={prometheus?.basic_auth_users?.admin}
+                  visibilityToggle={true}
+                  readOnly
+                  bordered={false}
+                  style={{ padding: 0 }}
+                />
+              </Tooltip>
+            ),
+          };
+          item.content.splice(2, 0, prometheusPasswordItem);
+        }
+        if (selectedConfig.includes(grafanaComponent)) {
+          const grafanaPasswordItem = {
+            label: intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.GrafanaPassword',
+              defaultMessage: 'Grafana 密码',
+            }),
+            colSpan: 5,
+            value: (
+              <Tooltip title={grafana?.login_password} placement="topLeft">
+                <Input.Password
+                  value={grafana?.login_password}
+                  visibilityToggle={true}
+                  readOnly
+                  bordered={false}
+                  style={{ padding: 0 }}
+                />
+              </Tooltip>
+            ),
+          };
+          item.content.splice(2, 0, grafanaPasswordItem);
+        }
+      }
     });
   }
 

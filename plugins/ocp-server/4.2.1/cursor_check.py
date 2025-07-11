@@ -64,9 +64,9 @@ def cursor_check(plugin_context, need_connect=True, *args, **kwargs):
             try:
                 cursor = Cursor(ip=host, port=port, user=user, password=password, stdio=stdio)
                 if need_connect:
-                    meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio)
+                    meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio=stdio)
                     meta_cursor.execute("show databases;", raise_exception=False, exc_level='verbose')
-                    monitor_cursor = Cursor(host, port, monitor_user, monitor_tenant, monitor_password, stdio)
+                    monitor_cursor = Cursor(host, port, monitor_user, monitor_tenant, monitor_password, stdio=stdio)
                     monitor_cursor.execute("show databases;", raise_exception=False, exc_level='verbose')
                 connected = True
                 stdio.verbose('check cursor passed')
@@ -75,7 +75,7 @@ def cursor_check(plugin_context, need_connect=True, *args, **kwargs):
                 time.sleep(1)
             if not connected:
                 success = False
-                error(cluster_config.servers[0], 'metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR])
+                error(cluster_config.servers[0], 'metadb connect', err.EC_OCP_SERVER_CONNECT_METADB, [err.SUG_OCP_SERVER_JDBC_URL_CONFIG_ERROR.format()])
 
         if need_connect:
             if meta_cursor and meta_user != 'root':

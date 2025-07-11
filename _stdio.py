@@ -24,6 +24,7 @@ import traceback
 import inspect2
 import six
 import logging
+import ast
 from copy import deepcopy
 from logging import handlers
 
@@ -698,11 +699,16 @@ class IO(object):
                 self._print(MsgLevel.INFO, msg, end='')
         return self.get_input_stream().readline(not self.syncing and blocked)
 
-    def confirm(self, msg):
+    def confirm(self, msg, default_option=''):
         if self.default_confirm:
             self.verbose("%s and then auto confirm yes" % msg)
             return True
-        msg = '%s [y/n]: ' % msg
+        if default_option is False:
+            msg = '%s [y/n] [Default: n]: ' % msg
+        elif default_option is True:
+            msg = '%s [y/n] [Default: y]: ' % msg
+        else:
+            msg = '%s [y/n]: ' % msg
         self.print(msg, end='')
         if self.isatty() and not self.syncing:
             while True:
@@ -711,6 +717,10 @@ class IO(object):
                     if ans == 'y':
                         return True
                     if ans == 'n':
+                        return False
+                    if default_option is True:
+                        return True
+                    if default_option is False:
                         return False
                 except Exception as e:
                     if not e:
@@ -758,7 +768,7 @@ class IO(object):
                 print_msg = pattern.sub(replacement, print_msg)
         kwargs['file'] and print(self._format(print_msg, *args), **kwargs)
         del kwargs['file']
-        enaable_log and self.log(msg_lv, msg, *args, **kwargs)
+        enaable_log and self.log(msg_lv, print_msg, *args, **kwargs)
 
     def log(self, levelno, msg, *args, **kwargs):
         msg = self.log_masking(msg)
@@ -877,8 +887,11 @@ class IO(object):
                 passkey_pattern = re.compile(passkey_regex)
                 if passkey_pattern.search(msg):
                     return passkey_pattern.sub(r'\1******', msg)
+            
+            if "IDENTIFIED BY" in msg:
+                return desensitize_sql_pwd(msg)
 
-            pwd_args_regex = r"(IDENTIFIED BY \S+.*args:\s*\[['\"]?|_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
+            pwd_args_regex = r"(_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
             arg_pattern = re.compile(pwd_args_regex)
             if arg_pattern.search(msg):
                 return arg_pattern.sub(r"\1******\3", msg)
@@ -932,7 +945,10 @@ class IO(object):
                 if passkey_pattern.search(msg):
                     return passkey_pattern.sub(r'\1******', msg)
 
-            pwd_args_regex = r"(IDENTIFIED BY \S+.*args:\s*\[['\"]?|_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
+            if "IDENTIFIED BY" in msg:
+                return desensitize_sql_pwd(msg)
+            
+            pwd_args_regex = r"(_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
             arg_pattern = re.compile(pwd_args_regex)
             if arg_pattern.search(msg):
                 return arg_pattern.sub(r"\1******\3", msg)
@@ -1101,6 +1117,32 @@ def safe_stdio_decorator(default_stdio=None):
             return _type(func) if is_bond_method else func
     return decorated
 
+def desensitize_sql_pwd(sql_str):
+    if 'IDENTIFIED BY "' in sql_str:
+        pattern = r'(IDENTIFIED BY\s*)"[^"]*"'
+        replacement = r'\1"******"'
+        return re.sub(pattern, replacement, sql_str)
+    
+    if 'IDENTIFIED BY %s' in sql_str:
+        args_match = re.search(r'args:\s*(\[.*\])', sql_str)
+        if not args_match:
+            return sql_str
+            
+        try:
+            args_str = args_match.group(1)
+            args_list = ast.literal_eval(args_str)
+            identified_by_index = sql_str.index('IDENTIFIED BY %s')
+            prefix = sql_str[:identified_by_index]
+            placeholder_count = prefix.count('%s')
+            
+            if placeholder_count < len(args_list):
+                args_list[placeholder_count] = '******'
+                new_args_str = str(args_list)
+                return sql_str.replace(args_str, new_args_str)
+        except (SyntaxError, ValueError):
+            pass
+            
+    return sql_str
 
 class SafeStdioMeta(type):
 

@@ -47,8 +47,13 @@ def obshell_start(plugin_context, *args, **kwargs):
             client.add_env('OB_ROOT_PASSWORD', password if client._is_local else ConfigUtil.passwd_format(password), True)
             cmd = 'cd %s; %s/bin/obshell admin start --ip %s --port %s' % (server_config['home_path'], server_config['home_path'], server.ip, server_config['obshell_port'])
             stdio.verbose('start obshell: %s' % cmd)
-            if not client.execute_command(cmd):
-                stdio.error('%s obshell failed', server)
+            res = client.execute_command(cmd)
+            if not res:
+                if res.stderr:
+                    if '[ERROR]' in res.stderr:
+                        stdio.print(res.stderr)
+                    else:
+                        stdio.error(res.stderr)
                 stdio.stop_loading('fail')
                 return
     stdio.stop_loading('succeed')

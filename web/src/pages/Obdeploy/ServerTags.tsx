@@ -1,18 +1,20 @@
 import { intl } from '@/utils/intl';
-import { useEffect, useState, useRef } from 'react';
-import { Select, Tooltip, Tag } from 'antd';
+import { Select, Tag, Tooltip } from 'antd';
+import { useEffect, useRef, useState } from 'react';
 
 interface Props {
   value?: string[];
   onChange?: (values?: string[]) => void;
   name?: string;
   setLastDeleteServer: (value: string) => void;
+  standAlone?: boolean;
 }
 
 export default ({
   value: values,
   onChange,
   name,
+  standAlone,
   setLastDeleteServer,
 }: Props) => {
   const [visible, setVisible] = useState(false);
@@ -110,7 +112,11 @@ export default ({
   }, [currentValues]);
 
   const onSelectChange = (changeValues?: string[]) => {
-    setCurrentValues(changeValues);
+    // 单机版时，输入框只允许输入一个值
+    const firstValue =
+      changeValues?.length > 1 ? [changeValues[0]] : changeValues;
+    const value = standAlone ? firstValue : changeValues;
+    setCurrentValues(value);
     setLastDeleteServer('');
   };
 

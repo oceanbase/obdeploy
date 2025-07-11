@@ -361,8 +361,7 @@ class Upgrader(object):
         self.stdio.start_loading('Upgrade')
         repository = self.repositories[self.next_stage]
         repository_dir = repository.repository_dir
-        self.install_repository_to_servers(self.components, self.cluster_config, repository, self.clients,
-                                           self.unuse_lib_repository)
+        self.install_repository_to_servers(repository, self.unuse_lib_repository)
         if not self.run_workflow(self.stop_workflows, self.repositories[self.route_index - 1], self.cluster_config):
             self.stdio.stop_loading('stop_loading', 'fail')
             return False
@@ -409,7 +408,7 @@ class Upgrader(object):
             self.stop_zone(zone)
 
             self.stdio.print('upgrade zone "%s"' % zone)
-            self.install_repository_to_servers(self.components, self.cluster_config, repository, self.clients, self.unuse_lib_repository)
+            self.install_repository_to_servers(repository, self.unuse_lib_repository)
 
 
             if pre_zone:

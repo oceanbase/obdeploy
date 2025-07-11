@@ -18,13 +18,11 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def scale_out_pre(plugin_context, workflow, *args, **kwargs):
+def scale_out_pre(plugin_context, workflow, ob_repository, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     added_servers = cluster_config.added_servers
-    repositories = plugin_context.repositories
-    repository_names = [repository.name for repository in repositories]
     workflow.add_with_component_version_kwargs(const.STAGE_FIRST,
-                                               'oceanbase-ce' if 'oceanbase-ce' in repository_names else 'oceanbase',
+                                               ob_repository.name,
                                                '4.0.0.0', {'scale_out_component': plugin_context.cluster_config.name},
                                                'connect')
     workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'init')

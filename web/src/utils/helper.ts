@@ -55,12 +55,9 @@ export const formatMoreConfig = (
           ...selectOcpexpressConfig,
         ];
       }
-
-      const componentKey =
-        componentConfig.componentKey === 'oceanbase-standalone'
-          ? 'oceanbase'
-          : componentConfig.componentKey;
-      return !configKeys?.[componentKey]?.includes(parameter.name);
+      return !configKeys?.[componentConfig.componentKey]?.includes(
+        parameter.name,
+      );
     });
 
     const newConfigParameter: API.NewConfigParameter[] = configParameter.map(
@@ -521,7 +518,7 @@ export const generateComplexPwd = (
   return pwdArray.join('');
 };
 
-const insertPwd = (url: string, pwd: string) => {
+export const insertPwd = (url: string, pwd: string) => {
   const urlArr = url.split(' ');
   for (let i = 0; i < urlArr.length; i++) {
     if (urlArr[i].includes('-u')) {
@@ -547,6 +544,7 @@ export const connectInfoForPwd = (
     }
     if (item.component === 'oceanbase-standalone') {
       item.password = components.oceanbase?.root_password;
+      item.connect_url = insertPwd(item.connect_url, item.password);
     }
     if (item.component === 'obproxy-ce') {
       if (components.obproxy.obproxy_sys_password) {

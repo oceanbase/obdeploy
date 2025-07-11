@@ -18,10 +18,8 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def start(plugin_context, workflow, *args, **kwargs):
-    repositories = plugin_context.repositories
-    repository_names = [repository.name for repository in repositories]
+def start(plugin_context, workflow, ob_repository, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'parameter_pre')
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, const.COMP_OB_CE if const.COMP_OB_CE in repository_names else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OCP_EXPRESS}, 'connect', 'create_tenant', 'create_user')
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, ob_repository.name, '4.0.0.0', {'scale_out_component': const.COMP_OCP_EXPRESS}, 'connect', 'create_tenant', 'create_user')
     workflow.add(const.STAGE_FIRST, 'cursor_check', 'start', 'health_check')
     plugin_context.return_true()

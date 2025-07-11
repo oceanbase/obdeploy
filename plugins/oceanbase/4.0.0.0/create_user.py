@@ -37,7 +37,8 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
         for tenant_server_port in tenant_server_ports:
             tenant_ip = tenant_server_port['SVR_IP']
             tenant_port = tenant_server_port['SQL_PORT']
-            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password if retries % 2 or not len(args) > 0 else args[0], ip=tenant_ip, port=tenant_port, print_exception=False)
+            pwd = password if retries % 2 else ''
+            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=pwd, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=False)
             if tenant_cursor:
                 if tenant not in tenant_cursor_cache[cursor]:
                     tenant_cursor_cache[cursor][tenant] = {}
@@ -48,9 +49,10 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
         return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries - 1, args=args, stdio=stdio)
     if not tenant_cursor:
         return False
-    while tenant_cursor.execute('show databases;', exc_level='verbose') is False:
-        stdio.verbose('Server is initializing...')
-        time.sleep(2)
+    if mode == 'mysql':
+        while tenant_cursor.execute('show databases;', exc_level='verbose') is False:
+            stdio.verbose('Server is initializing...')
+            time.sleep(2)
     try_times = 300
     while try_times:
         rv = tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio)
@@ -88,15 +90,11 @@ def create_user(plugin_context, create_tenant_options=[], cursor=None, scale_out
         root_password = getattr(options, name+'_root_password', "")
         create_if_not_exists = getattr(options, 'create_if_not_exists', False)
 
-        if mode == 'oracle':
-            stdio.print('Create user in oracle tenant is not supported and --password is not supported')
-            return plugin_context.return_true()
-
         if root_password:
-            sql = "alter user root IDENTIFIED BY %s"
+            sql = f"""alter user {'root' if mode== 'mysql' else 'SYS' } IDENTIFIED BY "{root_password}" """;
             stdio.verbose(sql)
-            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, args=[root_password], stdio=stdio) and not create_if_not_exists:
-                stdio.error('failed to set root@{}\'s root_password'.format(name))
+            if not exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=name, mode=mode, stdio=stdio) and not create_if_not_exists:
+                stdio.error(f"failed to set {'root' if mode== 'mysql' else 'SYS' }@{name}\'s root_password")
                 return plugin_context.return_false()
 
         if database:
@@ -106,6 +104,10 @@ def create_user(plugin_context, create_tenant_options=[], cursor=None, scale_out
                 return plugin_context.return_false()
 
         if db_username:
+            if mode == 'oracle':
+                stdio.print('Create user in oracle tenant is not supported')
+                return plugin_context.return_true()
+
             create_sql, grant_sql = "", ""
             if mode == "mysql":
                 create_sql = "create user if not exists '{username}' IDENTIFIED BY %s;".format(username=db_username)

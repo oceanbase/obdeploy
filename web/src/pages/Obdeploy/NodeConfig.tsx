@@ -556,12 +556,7 @@ export default function NodeConfig() {
                   : inputServer;
 
                 if (value?.some((item) => !validator.isIP(item))) {
-                  return Promise.reject(
-                    intl.formatMessage({
-                      id: 'OBD.component.NodeConfig.TheValidatorNode',
-                      defaultMessage: '请输入正确的 OBProxy 节点',
-                    }),
-                  );
+                  return Promise.reject('请输入正确的 OBServer 节点');
                 } else if (
                   (hasDuplicateIPs(value) && dbConfigData.length === 1) ||
                   (hasDuplicateIPs(serverValue) && dbConfigData.length > 1)
@@ -584,6 +579,7 @@ export default function NodeConfig() {
           <ServerTags
             name={record.id}
             setLastDeleteServer={setLastDeleteServer}
+            standAlone={standAlone}
           />
         ) : null;
       },

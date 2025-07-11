@@ -25,6 +25,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
     change_conf = {}
     global_change_conf = {}
     global_ret = True
+    need_restart_key = []
 
     config_map = {
         'observer_sys_password': 'proxyro_password',
@@ -58,7 +59,13 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
             if key not in config or config[key] != new_config[key]:
                 item = cluster_config.get_temp_conf_item(key)
                 if item:
-                    if item.need_redeploy or item.need_restart:
+                    if item.need_restart:
+                        need_restart_key.append(key)
+                        stdio.verbose('%s can not be reload' % key)
+                        if not plugin_context.get_return("restart_pre"):
+                            global_ret = False
+                            continue
+                    elif item.need_redeploy:
                         stdio.verbose('%s can not be reload' % key)
                         global_ret = False
                         continue
@@ -81,6 +88,8 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
     sql = ''
     value = None
     for key in global_change_conf:
+        if key in set(need_restart_key):
+            continue
         success_conf[key] = []
         for server in servers:
             if key not in change_conf[server]:

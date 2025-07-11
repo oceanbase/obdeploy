@@ -69,6 +69,8 @@ def prepare_variables(plugin_context, name, context, component, server, *args, *
     executor = None
     command_variables = CommandVariables()
 
+    plugin_context.set_variable('skip_commands', False) 
+    
     for command in cmd_conf.all_commands:
         cmd_name = ConfigUtil.get_value_from_dict(command, 'name', transform_func=str)
         allow_components = ConfigUtil.get_list_from_dict(command, 'components', str)

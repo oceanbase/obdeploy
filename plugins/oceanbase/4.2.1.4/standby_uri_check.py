@@ -149,26 +149,44 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
                 return plugin_context.return_false()
             plugin_context.set_variable('standby_data_backup_uri', standby_data_backup_uri)
 
+            primary_cursor = plugin_context.get_variable('primary_tenant_cursor')
+            primary_tenant = plugin_context.get_variable('primary_tenant')
+            primary_id = plugin_context.get_variable('primary_tenant_id')
+            primary_archive_log_uri = get_uri(primary_cursor, 'archive', primary_id, primary_tenant)
+            if not primary_archive_log_uri:
+                stdio.stop_loading('failed')
+                return plugin_context.return_false()
+            if primary_archive_log_uri and primary_archive_log_uri.startswith('file://') and not check_nfs_uri(primary_archive_log_uri):
+                stdio.stop_loading('failed')
+                return plugin_context.return_false()
+            plugin_context.set_variable('primary_archive_log_uri', primary_archive_log_uri)
+
+            primary_data_backup_uri = get_uri(primary_cursor, 'backup', primary_id, primary_tenant)
+            if not primary_data_backup_uri:
+                stdio.stop_loading('failed')
+                return plugin_context.return_false()
+            if primary_data_backup_uri and primary_data_backup_uri.startswith('file://') and not check_nfs_uri(primary_data_backup_uri):
+                return plugin_context.return_false()
+            plugin_context.set_variable('primary_data_backup_uri', primary_data_backup_uri)
+
             if uri_check:
-                primary_cursor = plugin_context.get_variable('check_tenant_cursor')
-                primary_tenant = plugin_context.get_variable('check_tenant')
-                primary_id = plugin_context.get_variable('check_tenant_id')
-                primary_archive_log_uri = get_uri(primary_cursor, 'archive', primary_id, primary_tenant)
-                if not primary_archive_log_uri:
+                check_cursor = plugin_context.get_variable('check_tenant_cursor')
+                check_tenant = plugin_context.get_variable('check_tenant')
+                check_id = plugin_context.get_variable('check_tenant_id')
+                check_archive_log_uri = get_uri(check_cursor, 'archive', check_id, check_tenant)
+                if not check_archive_log_uri:
                     stdio.stop_loading('failed')
                     return plugin_context.return_false()
-                if primary_archive_log_uri and primary_archive_log_uri.startswith('file://') and not check_nfs_uri(primary_archive_log_uri):
+                if check_archive_log_uri and check_archive_log_uri.startswith('file://') and not check_nfs_uri(check_archive_log_uri):
                     stdio.stop_loading('failed')
                     return plugin_context.return_false()
-                plugin_context.set_variable('primary_archive_log_uri', primary_archive_log_uri)
-                
-                primary_data_backup_uri = get_uri(primary_cursor, 'backup', primary_id, primary_tenant)
-                if not primary_data_backup_uri:
+
+                check_data_backup_uri = get_uri(check_cursor, 'backup', check_id, check_tenant)
+                if not check_data_backup_uri:
                     stdio.stop_loading('failed')
                     return plugin_context.return_false()
-                if standby_data_backup_uri and standby_data_backup_uri.startswith('file://') and not check_nfs_uri(standby_data_backup_uri):
+                if check_data_backup_uri and check_data_backup_uri.startswith('file://') and not check_nfs_uri(check_data_backup_uri):
                     return plugin_context.return_false()
-                plugin_context.set_variable('primary_data_backup_uri', primary_data_backup_uri)
 
             stdio.stop_loading('succeed')
             return plugin_context.return_true()

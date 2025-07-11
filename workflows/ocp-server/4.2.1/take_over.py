@@ -18,10 +18,8 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def take_over(plugin_context, workflow, *args, **kwargs):
-    repositories = plugin_context.repositories
-    repository_names = [repository.name for repository in repositories]
+def take_over(plugin_context, workflow, ob_repository, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'takeover_connect', 'takeover_precheck')
-    workflow.add_with_component(const.STAGE_SECOND, const.COMP_OB_CE if const.COMP_OB_CE in repository_names else const.COMP_OB, 'connect', 'ocp_check')
+    workflow.add_with_component(const.STAGE_SECOND, ob_repository.name, 'connect', 'ocp_check')
     workflow.add(const.STAGE_THIRD, 'takeover')
     plugin_context.return_true()

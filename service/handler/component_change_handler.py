@@ -109,16 +109,14 @@ class ComponentChangeHandler(BaseHandler):
             deploy_info = deploy.deploy_info
             if deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and deploy.deploy_info.config_status == DeployConfigStatus.UNCHNAGE:
                 create_data = deploy_info.create_date if deploy_info.create_date else ''
-                if const.OCEANBASE in deploy_config.components.keys():
-                    cluster_config = deploy_config.components[const.OCEANBASE]
-                    deploy_name = DeployName(name=deploy.name, deploy_user=deploy_config.user.username, ob_servers=[server.ip for server in cluster_config.servers], ob_version=deploy_info.components[const.OCEANBASE]['version'], create_date=create_data)
-                    self.context['ob_servers'][deploy.name] = cluster_config.servers
-                    ret.append(deploy_name)
-                if const.OCEANBASE_CE in deploy_config.components.keys():
-                    cluster_config = deploy_config.components[const.OCEANBASE_CE]
-                    deploy_name = DeployName(name=deploy.name, deploy_user=deploy_config.user.username, ob_servers=[server.ip for server in cluster_config.servers], ob_version=deploy_info.components[const.OCEANBASE_CE]['version'], create_date=create_data)
-                    self.context['ob_servers'][deploy.name] = cluster_config.servers
-                    ret.append(deploy_name)
+                for oceanbase in const.COMPS_OCEANBASE:
+                    if oceanbase == const.OCEANBASE_STANDALONE:
+                        continue
+                    if oceanbase in deploy_config.components.keys():
+                        cluster_config = deploy_config.components[oceanbase]
+                        deploy_name = DeployName(name=deploy.name, deploy_user=deploy_config.user.username, ob_servers=[server.ip for server in cluster_config.servers], ob_version=deploy_info.components[oceanbase]['version'], create_date=create_data)
+                        self.context['ob_servers'][deploy.name] = cluster_config.servers
+                        ret.append(deploy_name)
         return ret
 
     def get_deployment_info(self, name):
@@ -132,7 +130,7 @@ class ComponentChangeHandler(BaseHandler):
         for component in components:
             version = deploy_info.components[component]['version']
             cluster_config = deploy_config.components[component]
-            if component == const.OCEANBASE or component == const.OCEANBASE_CE:
+            if component in const.COMPS_OCEANBASE and component != const.OCEANBASE_STANDALONE:
                 default_config = cluster_config.get_global_conf_with_default()
                 appname = default_config.get('appname', '')
                 self.context['ob_component'][name] = component

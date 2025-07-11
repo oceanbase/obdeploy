@@ -27,6 +27,7 @@ PKG_ESTIMATED_SIZE.update({"oceanbase-ce": 347142720, "oceanbase": 358142928, "o
 OCEANBASE_CE = 'oceanbase-ce'
 OCEANBASE = 'oceanbase'
 OCEANBASE_STANDALONE = 'oceanbase-standalone'
+COMPS_OCEANBASE = ['oceanbase-ce', 'oceanbase', 'oceanbase-standalone']
 
 CE = "ce"
 BUSINESS = "business"

@@ -740,9 +740,12 @@ class RepositoryMajorCommand(MajorCommand):
 
 class ClusterMirrorCommand(ObdCommand):
 
-    def init(self, cmd, args):
+    def init(self, cmd, args, need_deploy_name=True):
         super(ClusterMirrorCommand, self).init(cmd, args)
-        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        usage = '%s <deploy name> [options]'
+        if not need_deploy_name:
+            usage = '%s [options]'
+        self.parser.set_usage(usage % self.prev_cmd)
         return self
 
     def get_obd_namespaces_data(self, obd):
@@ -837,6 +840,10 @@ class DemoCommand(ClusterMirrorCommand):
         self.parser.allow_undefine = True
         self.parser.undefine_warn = False
 
+    def init(self, cmd, args, need_deploy_name=False):
+        super(DemoCommand, self).init(cmd, args, need_deploy_name)
+        return self
+
     def _do_command(self, obd):
         setattr(self.opts, 'force', True)
         setattr(self.opts, 'clean', True)
@@ -846,6 +853,33 @@ class DemoCommand(ClusterMirrorCommand):
 
         res = obd.demo()
         self.background_telemetry_task(obd, 'demo')
+        return res
+
+
+class PrefCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(PrefCommand, self).__init__('pref', 'Quickly start')
+        self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas. [oceanbase-ce,obproxy-ce,obagent,prometheus,grafana,ob-configserver]\nExample: \nstart oceanbase-ce: obd demo -c oceanbase-ce\n"
+         + "start -c oceanbase-ce V3.2.3: obd pref -c oceanbase-ce --oceanbase-ce.version=3.2.3\n"
+         + "start oceanbase-ce and obproxy-ce: obd pref -c oceanbase-ce,obproxy-ce", default='oceanbase-ce,obproxy-ce,obagent,prometheus,grafana')
+        self.parser.allow_undefine = True
+        self.parser.undefine_warn = False
+
+    def init(self, cmd, args, need_deploy_name=False):
+        super(PrefCommand, self).init(cmd, args, need_deploy_name)
+        return self
+
+    def _do_command(self, obd):
+        setattr(self.opts, 'force', True)
+        setattr(self.opts, 'clean', True)
+        setattr(self.opts, 'force', True)
+        setattr(self.opts, 'force_delete', True)
+        setattr(self.opts, 'max', True)
+        obd.set_options(self.opts)
+
+        res = obd.demo(name='pref')
+        self.background_telemetry_task(obd, 'pref')
         return res
 
 
@@ -916,20 +950,25 @@ class ClusterDeployCommand(ClusterMirrorCommand):
         self.parser.add_option('-C', '--clean', action='store_true', help="Clean the home path if the directory belong to you.", default=False)
         self.parser.add_option('-U', '--unuselibrepo', '--ulp', action='store_true', help="Disable OBD from installing the libs mirror automatically.")
         self.parser.add_option('-A', '--auto-create-tenant', '--act', action='store_true', help="Automatically create a tenant named `test` by using all the available resource of the cluster.")
+        self.parser.add_option('-i', '--interactive', action='store_true', help="Interactive deployment cluster, including deployment and startup.")
         # self.parser.add_option('-F', '--fuzzymatch', action='store_true', help="enable fuzzy match when search package")
 
     def _do_command(self, obd):
-        if self.cmds:
-            if getattr(self.opts, 'force', False) or getattr(self.opts, 'clean', False):
-                setattr(self.opts, 'skip_cluster_status_check', True)
-                obd.set_options(self.opts)
-            res = obd.deploy_cluster(self.cmds[0])
-            self.background_telemetry_task(obd)
-            if res and COMMAND_ENV.get(const.INTERACTIVE_INSTALL, '0') == '0':
-                obd.stdio.print(FormatText.success('Please execute ` obd cluster start %s ` to start' % self.cmds[0]))
-            return res
+        if getattr(self.opts, 'interactive'):
+            name = self.cmds[0] if self.cmds else ''
+            return obd.interactive_deploy(name)
         else:
-            return self._show_help()
+            if self.cmds:
+                if getattr(self.opts, 'force', False) or getattr(self.opts, 'clean', False):
+                    setattr(self.opts, 'skip_cluster_status_check', True)
+                    obd.set_options(self.opts)
+                res = obd.deploy_cluster(self.cmds[0])
+                self.background_telemetry_task(obd)
+                if res and COMMAND_ENV.get(const.INTERACTIVE_INSTALL, '0') == '0':
+                    obd.stdio.print(FormatText.success('Please execute ` obd cluster start %s ` to start' % self.cmds[0]))
+                return res
+            else:
+                return self._show_help()
 
 
 class ClusterScaleoutCommand(ClusterMirrorCommand):
@@ -2803,6 +2842,7 @@ class MainCommand(MajorCommand):
         super(MainCommand, self).__init__('obd', '')
         self.register_command(DevModeMajorCommand())
         self.register_command(DemoCommand())
+        self.register_command(PrefCommand())
         self.register_command(WebCommand())
         self.register_command(MirrorMajorCommand())
         self.register_command(ClusterMajorCommand())

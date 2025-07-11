@@ -85,9 +85,10 @@ export const componentsConfig = {
     }),
   },
   [oceanbaseStandaloneComponent]: {
-    name: oceanbaseStandaloneComponent,
+    // oceanbaseStandalone 不作为组件抬头，只在oceanbase组件中展示
+    name: oceanbaseComponent,
     showComponentName: 'OceanBase DataBase',
-    componentKey: oceanbaseStandaloneComponent,
+    componentKey: oceanbaseComponent,
     type: intl.formatMessage({
       id: 'OBD.pages.constants.Database',
       defaultMessage: '数据库',

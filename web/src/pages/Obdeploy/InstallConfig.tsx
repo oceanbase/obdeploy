@@ -99,6 +99,7 @@ export default function InstallConfig() {
     clusterMoreConfig,
     setClusterMoreConfig,
     OBD_DOCS,
+    OBD_STANDALONE_DOCS,
     OCP_EXPRESS,
     OBAGENT_DOCS,
     OBPROXY_DOCS,
@@ -148,7 +149,7 @@ export default function InstallConfig() {
           defaultMessage:
             '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
         }),
-        doc: OBD_DOCS,
+        doc: standAlone ? OBD_STANDALONE_DOCS : OBD_DOCS,
       },
     ],
   };

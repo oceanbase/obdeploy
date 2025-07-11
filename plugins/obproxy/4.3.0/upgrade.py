@@ -53,7 +53,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
     apply_param_plugin(cur_repository)
     if not run_workflow(stop_workflows, repositories=[cur_repository], **kwargs):
         return
-    install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
+    install_repository_to_servers(dest_repository)
 
     random_num = random.randint(1, 8191 - len(cluster_config.servers))
     num = 0

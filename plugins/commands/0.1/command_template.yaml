@@ -2,14 +2,14 @@ variables:
   ssh:
     - name: host
       config_key: host
-      components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+      components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy', 'ocp-server', 'ocp-server-ce', 'obbinlog-ce']
     - name: user
       config_key: username
-      components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+      components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy', 'ocp-server', 'ocp-server-ce', 'obbinlog-ce']
   server:
     - name: home_path
       config_key: home_path
-      components:  ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+      components:  ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy', 'ocp-server', 'ocp-server-ce', 'obbinlog-ce']
     - name: mysql_port
       config_key: mysql_port
       components: ['oceanbase',  'oceanbase-standalone','oceanbase-ce']
@@ -36,7 +36,7 @@ commands:
     wrapper: "ssh"
     interactive: true
   - name: log
-    components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy']
+    components: ['oceanbase',  'oceanbase-standalone','obproxy', 'oceanbase-ce', 'obproxy-ce', 'obagent', 'ocp-express', 'grafana', 'prometheus', 'ob-configserver', 'oblogproxy', 'ocp-server-ce', 'ocp-server']
     command: "cd {home_path}/log; echo 'ssh {user}@{host}'; ls -l; bash --login"
     wrapper: "ssh"
     interactive: true
@@ -52,6 +52,48 @@ commands:
     wrapper: "ssh"
     interactive: true
     no_interruption: true
+  - name: less
+    command: "less {home_path}/log/grafana.log"
+    components: ['grafana']
+    wrapper: "ssh"
+    interactive: true
+    no_interruption: true
+  - name: less
+    command: "less {home_path}/log/prometheus.log"
+    components: ['prometheus']
+    wrapper: "ssh"
+    interactive: true
+    no_interruption: true
+  - name: less
+    command: "less {home_path}/log/ocp-server.log"
+    components: ['ocp-server-ce', 'ocp-server']
+    wrapper: "ssh"
+    interactive: true
+    no_interruption: true
+  - name: less
+    command: "less {home_path}/log/ob-configserver.log"
+    components: ['ob-configserver']
+    wrapper: "ssh"
+    interactive: true
+    no_interruption: true
+  - name: less
+    command: "less {home_path}/log/monagent.log"
+    components: ['obagent']
+    wrapper: "ssh"
+    interactive: true
+    no_interruption: true
+  - name: less
+    command: "less {home_path}/log/ocp-express.log"
+    components: ['ocp-express']
+    wrapper: "ssh"
+    interactive: true
+    no_interruption: true
+  - name: less
+    command: "less {home_path}/log/logproxy.log"
+    components: ['oblogproxy', 'obbinlog-ce']
+    wrapper: "ssh"
+    interactive: true
+    no_interruption: true
   - name: pid
     wrapper: ssh_client
     command: "pgrep -u {user} -f ^{home_path}/bin/observer"
@@ -61,6 +103,41 @@ commands:
     wrapper: ssh_client
     command: "pgrep -u {user} -f ^{home_path}/bin/obproxy"
     components: ['obproxy', 'obproxy-ce']
+    no_excption: true
+  - name: pid
+    wrapper: ssh_client
+    command: "pgrep -u {user} -f ^{home_path}/prometheus"
+    components: ['prometheus']
+    no_excption: true
+  - name: pid
+    wrapper: ssh_client
+    command: "pgrep -u {user} -f ^{home_path}/bin/grafana-server"
+    components: ['grafana']
+    no_excption: true
+  - name: pid
+    wrapper: ssh_client
+    command: "pgrep -u {user} -f ^{home_path}/bin/ob_monagent"
+    components: ['obagent']
+    no_excption: true
+  - name: pid
+    wrapper: ssh_client
+    command: "pgrep -u {user} -f {home_path}/lib/ocp-server.jar"
+    components: ['ocp-server', 'ocp-server-ce']
+    no_excption: true
+  - name: pid
+    wrapper: ssh_client
+    command: "pgrep -u {user} -f {home_path}/bin/ob-configserver"
+    components: ['ob-configserver']
+    no_excption: true
+  - name: pid
+    wrapper: ssh_client
+    command: "pgrep -u {user} -f ^{home_path}/bin/logproxy"
+    components: ['oblogproxy', 'obbinlog-ce']
+    no_excption: true
+  - name: pid
+    wrapper: ssh_client
+    command: "pgrep -u {user} -f {home_path}/lib/ocp-express-server.jar"
+    components: ['ocp-express']
     no_excption: true
   - name: gdb
     wrapper: "ssh"

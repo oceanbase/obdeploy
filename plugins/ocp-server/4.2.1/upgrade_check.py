@@ -119,7 +119,7 @@ def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', in
                 meta_user = server_config['ocp_meta_username']
                 meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
                 meta_password = server_config['ocp_meta_password']
-                meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio)
+                meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio=stdio)
         sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL', 'ABORTED');" % database
         if meta_cursor.fetchone(sql)['num'] > 0:
             success = False

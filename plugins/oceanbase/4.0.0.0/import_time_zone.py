@@ -41,7 +41,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
         for tenant_server_port in tenant_server_ports:
             tenant_ip = tenant_server_port['SVR_IP']
             tenant_port = tenant_server_port['SQL_PORT']
-            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, print_exception=print_exception)
+            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, mode=mode, password=password, ip=tenant_ip, port=tenant_port, print_exception=print_exception)
             if tenant_cursor:
                 if tenant not in tenant_cursor_cache[cursor]:
                     tenant_cursor_cache[cursor][tenant] = {}
@@ -52,8 +52,12 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
         return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
     return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
 
+def is_support_sdk_import_timezone(version):
+    if (version >= '4.2.5.2' and version < '4.3.0.0') or version >= '4.3.5.2':
+        return True
+    return False
 
-def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scale_out_component='',  *args, **kwargs):
+def import_time_zone(plugin_context, config_encrypted, create_tenant_options=[], cursor=None, scale_out_component='',  *args, **kwargs):
     clients = plugin_context.clients
     repositories = plugin_context.repositories
     client = clients[plugin_context.cluster_config.servers[0]]
@@ -75,20 +79,17 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
     cursors = []
     if plugin_context.get_variable('tenant_exists'):
         return plugin_context.return_true()
-    cmd_str = ''
+    no_password_cmd = ''
     for options in multi_options:
         global tenant_cursor
         tenant_cursor = None
         name = getattr(options, 'tenant_name', 'test')
         mode = getattr(options, 'mode', 'mysql')
-        root_password = getattr(options, name+'_root_password', "")
+        root_password = getattr(options, name+'_root_password', "") or ''
         if len(multi_options) == 1:
             plugin_context.set_variable('tenant_name', name)
             plugin_context.set_variable('root_password', root_password)
-
-        if mode == 'oracle':
-            stdio.verbose('Import time zone in oracle tenant is not supported')
-            return plugin_context.return_true()
+            plugin_context.set_variable('mode', mode)
 
         time_zone = getattr(options, 'time_zone', '')
         if not time_zone:
@@ -100,17 +101,32 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
             exector = Exector(tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user, tenant_cursor.password, exector_path, stdio)
             for repository in repositories:
                 if repository.name in const.COMPS_OB:
-                    time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
-                    srs_data_param = os.path.join(repository.repository_dir, 'etc', 'default_srs_data_mysql.sql')
-                    if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
-                        stdio.warn('execute import_time_zone_info.py failed')
-                    if not exector.exec_script('import_srs_data.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), srs_data_param)):
-                        stdio.warn('execute import_srs_data.py failed')
-                    break
+                    if is_support_sdk_import_timezone(repository.version):
+                        sql = "ALTER SYSTEM LOAD MODULE DATA module = timezone tenant = '%s' infile = 'etc/'" % name
+                        res = cursor.execute(sql, stdio=stdio)
+                        if not res:
+                            stdio.warn("execute timezone sql failed")
+                        sql = "ALTER SYSTEM LOAD MODULE DATA module = gis tenant = '%s' infile = 'etc/';" % name
+                        res = cursor.execute(sql, stdio=stdio)
+                        if not res:
+                            stdio.warn("execute gis sql failed")
+                    else:
+                        time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
+                        srs_data_param = os.path.join(repository.repository_dir, 'etc', 'default_srs_data_mysql.sql')
+                        if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
+                            stdio.warn('execute import_time_zone_info.py failed')
+                        if not exector.exec_script('import_srs_data.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), srs_data_param)):
+                            stdio.warn('execute import_srs_data.py failed')
+                        break
             cursors.append(tenant_cursor)
-            cmd_str = 'obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
-            if COMMAND_ENV.get('INTERACTIVE_INSTALL') == '1':
-                continue
+            if mode == 'mysql':
+                cmd_str = "obclient -h%s -P\'%s\' %s -u%s -Doceanbase -A\n"
+                no_password_cmd = "obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n"
+            else:
+                cmd_str = "obclient -h%s -P\'%s\' %s -u%s -A\n"
+                no_password_cmd = "obclient -h%s -P\'%s\' -u%s -A\n"
+            cmd_str = cmd_str % (tenant_cursor.ip, tenant_cursor.port, f"-p'{root_password}'" if not config_encrypted else '', tenant_cursor.user)
+            no_password_cmd = no_password_cmd % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
             cmd = FormatText.success(cmd_str)
             stdio.print(cmd)
-    return plugin_context.return_true(tenant_cursor=cursors, cmd=cmd_str)
+    return plugin_context.return_true(tenant_cursor=cursors, cmd=no_password_cmd)

@@ -237,7 +237,6 @@ class CapacityMB(Capacity):
         if not self._origin:
             self.value = '0M'
 
-
 class StringList(ConfigItemType):
 
     def _format(self):

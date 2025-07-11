@@ -19,7 +19,7 @@ import os
 
 from _manager import Manager
 from _rpm import PackageInfo
-from _stdio import SafeStdio
+from _stdio import SafeStdio, FormatText
 from tool import YamlLoader, DirectoryUtil
 from const import COMP_OBCLIENT, COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBDIAG, TOOL_TPCH, TOOL_TPCC, TOOL_SYSBENCH, COMP_JRE
 
@@ -230,3 +230,60 @@ class ToolManager(Manager):
         if package.version > tool.config.version:
             return True
         return False
+    
+    def ln_to_global(self, client, tool_path, tool_name, stdio):
+        link_name = f'/usr/local/bin/{tool_name}'
+        if client.config.username == 'root':
+            cmd = f'ln -s {tool_path} {link_name}'
+        else:
+            cmd = f'sudo ln -s {tool_path} {link_name}'
+        ret = client.execute_command(cmd, stdio=stdio)
+        return ret
+    
+    def unln_to_global(self, client, tool_name, stdio):
+        link_name = f'/usr/local/bin/{tool_name}'
+        if client.config.username == 'root':
+            cmd = f'unlink {link_name}'
+        else:
+            cmd = f'sudo -s unlink {link_name}'
+        return client.execute_command(cmd, stdio=stdio)
+
+    
+    def add_path_to_bash_profile(self, path, stdio):
+        home_dir = os.getenv('HOME')
+        bash_profile_path = os.path.join(home_dir, '.bash_profile')
+        with open(bash_profile_path, 'r') as file:
+            content = file.readlines()
+        path_exists = any(
+            f'PATH={x.strip()}'
+            for x in content 
+            if 'PATH=' in x and path in x
+        )
+        if not path_exists:
+            with open(bash_profile_path, 'a') as file:
+                file.write(f'\nexport PATH="$PATH:{path}"\n')
+            stdio.print(FormatText.info("Please source ~/.bash_profile to enable it"))
+
+    def remove_path_from_bash_profile(self, path):
+        home_dir = os.getenv('HOME')
+        bash_profile_path = os.path.join(home_dir, '.bash_profile')
+        with open(bash_profile_path, 'r') as file:
+            content = file.readlines()
+        
+        new_content = []
+        path_found = False
+        for line in content:
+            if line.startswith("export PATH="):
+                line = line.strip()
+                line_content = line.split('=', 1)[1].strip('"')
+                paths = line_content.split(':')
+                if path in paths:
+                    paths.remove(path)
+                    path_found = True
+                new_line = f'export PATH="{":".join(paths)}"\n'
+                new_content.append(new_line)
+            else:
+                new_content.append(line)
+        if path_found:
+            with open(bash_profile_path, 'w') as file:
+                file.writelines(new_content)

@@ -12,11 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import const
+
 
 def scenario_check(plugin_context, create_tenant_options=[], scenario='', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-
     scenarios = ['express_oltp', 'complex_oltp', 'olap', 'htap', 'kv']
     scenario_check = lambda scenario: scenario in scenarios
     if len(create_tenant_options) == 1:

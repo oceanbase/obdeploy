@@ -59,7 +59,7 @@ export default function IndexPage() {
                   defaultMessage:
                     '检测到您打开了一个新的部署流程页面，请确认是否使用新页面继续部署工作？',
                 }),
-                width: 424,
+                // width: 424,
                 icon: <InfoCircleOutlined />,
                 content: intl.formatMessage({
                   id: 'OBD.src.pages.UseTheNewPageTo',
@@ -117,6 +117,7 @@ export default function IndexPage() {
 
   const contentConfig = {
     1: <InstallConfig />,
+    // 1: <InstallFinished />,
     2: <NodeConfig />,
     3: <ClusterConfig />,
     4: <PreCheck />,

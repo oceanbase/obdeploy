@@ -18,7 +18,7 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def add_component_pre(plugin_context, workflow, *args, **kwargs):
+def add_component_pre(plugin_context, workflow, ob_repository, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     added_components = cluster_config.get_deploy_added_components()
     if const.COMP_OB_CONFIGSERVER in added_components:
@@ -26,9 +26,7 @@ def add_component_pre(plugin_context, workflow, *args, **kwargs):
     if cluster_config.name not in added_components:
         return plugin_context.return_true()
     workflow.add_with_kwargs(const.STAGE_FIRST, {'auto_depend': True}, 'generate_config')
-    repositories = plugin_context.repositories
-    repository_names = [repository.name for repository in repositories]
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'oceanbase-ce' if 'oceanbase-ce' in repository_names else 'oceanbase',
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, ob_repository.name,
                                                '4.0.0.0', {'scale_out_component': plugin_context.cluster_config.name}, 'connect')
     workflow.add(const.STAGE_FIRST, 'init', 'start_check_pre', 'status_check', 'password_check', 'status_check', 'work_dir_check', 'port_check')
     workflow.add(const.STAGE_THIRD, 'parameter_pre')
