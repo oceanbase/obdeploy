@@ -28,6 +28,10 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, run_wor
     repository_dir = dest_repository.repository_dir
     kwargs['repository_dir'] = repository_dir
 
+    install_repository_to_servers = kwargs.get('install_repository_to_servers')
+    if install_repository_to_servers and not install_repository_to_servers(upgrade_repositories[-1]):
+        return plugin_context.return_false()
+
     start_workflows = get_workflows("upgrade_start", repositories=[dest_repository])
     init_workflows = get_workflows("init", repositories=[dest_repository])
     stop_workflows = get_workflows("stop", repositories=[cur_repository])

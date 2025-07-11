@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 import getpass
+import math
 import re
 import os
 import sys
@@ -26,12 +27,13 @@ from copy import deepcopy, copy
 from collections import defaultdict
 
 import tempfile
+import yaml
 from subprocess import call as subprocess_call
 
 import const
 import tool
-from ssh import SshClient, SshConfig
-from tool import FileUtil, DirectoryUtil, YamlLoader, timeout, COMMAND_ENV, OrderedDict
+from ssh import SshClient, SshConfig, get_root_permission_localclient
+from tool import FileUtil, DirectoryUtil, YamlLoader, timeout, COMMAND_ENV, OrderedDict, NetUtil, get_port_socket_inode, ConfigUtil, get_system_memory, get_sys_cpu, get_sys_log_disk_size
 from _stdio import MsgLevel, FormatText
 from _rpm import Version
 from _mirror import MirrorRepositoryManager, PackageInfo, RemotePackageInfo
@@ -142,6 +144,14 @@ class ObdHome(object):
             self._encrypted_passkey = COMMAND_ENV.get(const.ENCRYPT_PASSKEY)
         return self._encrypted_passkey
 
+    def get_ob_repository(self):
+        if not self.repositories:
+            return None
+        for repository in self.repositories:
+            if repository.name in const.COMPS_OB:
+                return repository
+        else:
+            return None
 
     def _global_ex_lock(self):
         self.lock_manager.global_ex_lock()
@@ -297,6 +307,7 @@ class ObdHome(object):
             'deploy_status': None,
             'cluster_config': None,
             'repositories': self.repositories,
+            'ob_repository': self.get_ob_repository(),
             'repository': repository,
             'components': None,
             'cmd': self.cmds,
@@ -1647,7 +1658,6 @@ class ObdHome(object):
         return False
 
     def demo(self, name='demo'):
-        name = 'demo'
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
         if deploy:
@@ -1713,7 +1723,9 @@ class ObdHome(object):
             if not self.genconfig(name):
                 return False
             setattr(self.options, 'config', '')
-            return self.deploy_cluster(name) and self.start_cluster(name)
+            rv = self.deploy_cluster(name) and self.start_cluster(name)
+            rv and name != 'pref' and self._call_stdio('print', 'This is a basic setup with minimal resources, good for testing and learning. For full OceanBase performance, please destroy this cluster and redeploy by using `obd pref` command.')
+            return rv
 
     def deploy_cluster(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
@@ -1864,7 +1876,7 @@ class ObdHome(object):
             return True
         return False
 
-    def install_repository_to_servers(self, components, cluster_config, repository, ssh_clients, unuse_lib_repository=False):
+    def install_repository_to_servers(self, repository, unuse_lib_repository=False):
         install_repo_plugin = self.plugin_manager.get_best_py_script_plugin('install_repo', 'general', '0.1')
         install_plugins = self.search_plugins([repository], PluginType.INSTALL)
         need_libs = []
@@ -2481,7 +2493,7 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+
         tenant_name = getattr(self.options, 'tenant_name')
         if not tenant_name:
             self._call_stdio('error', 'Additional tenant-name is required.')
@@ -2489,7 +2501,7 @@ class ObdHome(object):
         if tenant_name == 'sys':
             self._call_stdio('error', 'Prohibit deleting sys tenant.')
             return False
-        
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Deploy status judge')
         if deploy_info.status != DeployStatus.STATUS_RUNNING:
@@ -4751,7 +4763,7 @@ class ObdHome(object):
         else:
             self._call_stdio('error', err.EC_OBDIAG_FUNCTION_FAILED.format(function=fuction_type))
             return False
-    
+
     def obdiag_func(self, args, deploy_name):
         tool_name = COMP_OCEANBASE_DIAGNOSTIC_TOOL
         deploy_config = DeployConfig('', config_parser_manager=object())
@@ -5080,7 +5092,17 @@ class ObdHome(object):
         if not self._install_tool(tool_name, version, force, install_path):
             self.tool_manager.remove_tool_config(tool_name)
             return False
-        
+
+        if tool_name == COMP_OBCLIENT:
+            local_client = get_root_permission_localclient(self.stdio)
+            tool_path = '/'.join([install_path, 'bin'])
+            if local_client:
+                ret = self.tool_manager.ln_to_global(local_client, '/'.join([tool_path, 'obclient']), tool_name, self.stdio)
+                if not ret:
+                    self._call_stdio('error', 'Install the tool %s to global failed' % tool_name)
+            else:
+                self.tool_manager.add_path_to_bash_profile(tool_path, self.stdio)
+
         tool = self.tool_manager.get_tool_config_by_name(tool_name)
         self.print_tools([tool], 'Installed Tool')
         self._call_stdio('print', 'Install tool %s completely.', tool_name)
@@ -5109,6 +5131,19 @@ class ObdHome(object):
         if not self.tool_manager.uninstall_tool(tool):
             self._call_stdio('error', 'Uninstall the tool %s failed' % tool_name)
             return False
+
+        if tool_name == COMP_OBCLIENT:
+            link_path = '/usr/local/bin/obclient'
+            if os.path.islink(link_path):
+                local_client = get_root_permission_localclient(self.stdio)
+                if local_client:
+                    ret = self.tool_manager.unln_to_global(local_client, tool_name, self.stdio)
+                    if not ret:
+                        self._call_stdio('error', 'Uninstall the tool %s from global failed' % tool_name)
+                        return False
+            else:
+                self.tool_manager.remove_path_from_bash_profile('/'.join([tool.config.path, 'bin']))
+
         self.tool_manager.remove_tool_config(tool_name)
         self._call_stdio('print', 'Uninstall tool %s completely' % tool_name)
         return True
@@ -6015,27 +6050,31 @@ class ObdHome(object):
         return epk
 
     def encrypt_manager(self, enable):
-        if enable:
-            self._call_stdio('verbose', 'Get encrypt passkey')
-            double_check = True
-            if self.encrypted_passkey:
-                double_check = False
-                encryption_passkey = getattr(self.options, 'encryption_passkey') or self.input_encryption_passkey(double_check=double_check)
-            else:
-                encryption_passkey = self.input_encryption_passkey(double_check=double_check)
-            if not encryption_passkey:
-                return False
-            if not double_check and not self.check_encryption_passkey(encryption_passkey):
-                self._call_stdio('error', 'Encryption passkey error.')
-                return False
+        if getattr(self.options, 'encryption_passkey'):
+            encryption_passkey = getattr(self.options, 'encryption_passkey')
+            COMMAND_ENV.set(const.ENCRYPT_PASSKEY, tool.string_to_md5_32bytes(encryption_passkey), save=True)
         else:
-            if self.encrypted_passkey:
-                encryption_passkey = getattr(self.options, 'encryption_passkey') or self.input_encryption_passkey(False)
+            if enable:
+                self._call_stdio('verbose', 'Get encrypt passkey')
+                double_check = True
+                if self.encrypted_passkey:
+                    double_check = False
+                    encryption_passkey = self.input_encryption_passkey(double_check=double_check)
+                else:
+                    encryption_passkey = self.input_encryption_passkey(double_check=double_check)
                 if not encryption_passkey:
                     return False
-                if not self.check_encryption_passkey(encryption_passkey):
+                if not double_check and not self.check_encryption_passkey(encryption_passkey):
                     self._call_stdio('error', 'Encryption passkey error.')
                     return False
+            else:
+                if self.encrypted_passkey:
+                    encryption_passkey = self.input_encryption_passkey(False)
+                    if not encryption_passkey:
+                        return False
+                    if not self.check_encryption_passkey(encryption_passkey):
+                        self._call_stdio('error', 'Encryption passkey error.')
+                        return False
         msg = 'Encrypt password'
         if not enable:
             msg = 'Decrypt password'
@@ -6162,5 +6201,111 @@ class ObdHome(object):
             else:
                 self._call_stdio('print', FormatText.warning('You must reboot the following servers to ensure the ulimit parameters take effect: （{servers}）.'.format(servers=','.join(list(need_reboot_ips)))))
         return True
+
+    def interactive_deploy(self, name):
+
+        def signal_handler(sig, frame):
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        if deploy:
+            self._call_stdio('verbose', 'Get deploy info')
+            deploy_info = deploy.deploy_info
+            self._call_stdio('verbose', 'judge deploy status')
+            if deploy_info.status == DeployStatus.STATUS_DEPLOYED:
+                if not self._call_stdio('confirm', 'Deploy "%s" is deployed. Do you want to destroy the deploy to continue.', default_option=False):
+                    return False
+                else:
+                    self.set_options(Values({'force_kill': True}))
+                    if not self.destroy_cluster(name):
+                        return False
+            elif deploy_info.status not in [DeployStatus.STATUS_CONFIGURED, DeployStatus.STATUS_DESTROYED]:
+                self._call_stdio('error', 'Deploy "%s" is %s. You could not deploy an %s cluster.' % (name, deploy_info.status.value, deploy_info.status.value))
+                return False
+            if deploy_info.config_status != DeployConfigStatus.UNCHNAGE:
+                self._call_stdio('error', 'Deploy "%s" config status is not %s. You could not deploy cluster.' % (name, DeployConfigStatus.UNCHNAGE))
+                return False
+
+        ip = NetUtil.get_host_ip()
+        while True:
+            input_ip = self._call_stdio('read', f'Enter the IP (Default: {ip}): ', blocked=True).strip() or ip
+            if not re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', input_ip):
+                self._call_stdio('print', FormatText.error('Invalid IP address format. Please enter a valid IP address.'))
+                continue
+            ip = input_ip
+            break
+        user = getpass.getuser()
+        if user == 'root':
+            self._call_stdio('print', FormatText.warning('The current user is root. It is not recommended to use root user for deployment in production environment'))
+        while True:
+            user_password = getpass.getpass("Enter the current user password: ")
+            client = SshClient(SshConfig(ip, user, user_password), self.stdio)
+            if client.connect(stdio=self.stdio, exit=False):
+                break
+
+        setattr(self.options, 'password', user_password)
+        if self.precheck_host(user, ip, dev=True) == 100:
+            while True:
+                if self._call_stdio('confirm', 'Do you want to modify the parameters above?', default_option=True):
+                    if self.init_host(user, ip, dev=True) == 101:
+                        if self._call_stdio('confirm',
+                                            'Do you want to quit the script and manually restart the machine to apply the optimizations?',
+                                            default_option=False):
+                            return False
+                break
+
+        if not name:
+            while True:
+                cluster_name = self._call_stdio('read', 'Enter the cluster name (Default: myoceanbase; allowed characters: letters, numbers, and underscores): ', blocked=True).strip() or 'myoceanbase'
+                if not re.match(r'^[a-zA-Z0-9_]+$', cluster_name):
+                    self._call_stdio('print', FormatText.error('Invalid cluster name. Only letters, numbers, and underscores are allowed.'))
+                    continue
+                deploy = self.deploy_manager.get_deploy_config(cluster_name)
+                if deploy and deploy.deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_DEPLOYED]:
+                    self._call_stdio('print', FormatText.error('The cluster name already exists and is in a deployed state. Please choose a different name.'))
+                    continue
+                break
+        else:
+            cluster_name = name
+
+        interactive_repository = self.repository_manager.get_repository_allow_shadow('interactive', '1.0')
+        self.set_repositories([interactive_repository])
+
+        workflows = self.get_workflows('input_cluster_config')
+        if not self.run_workflow(workflows, **{'interactive': {'client': client, 'cluster_name': cluster_name}}):
+            return False
+
+        encrypt = False
+        if not self.enable_encrypt and self._call_stdio('confirm', 'Do you want to enable encryption for password security (default_encryption_passkey: 123456)?', default_option=False):
+            encrypt = True
+
+        tenant_opt = self.get_namespace('interactive').get_return('tenant_config_input').get_return('tenant_opt')
+        tenant_config = self.get_namespace('interactive').get_return('tenant_config_input').get_return('tenant_config')
+        oceanbase_config = self.get_namespace('interactive').get_return('oceanbase_config_input').get_return('oceanbase_config')
+        cluster_config_yaml_path = self.get_namespace('interactive').get_return('confirm_config').get_return('cluster_config_yaml_path')
+
+        opt = Values()
+        setattr(opt, "config", cluster_config_yaml_path)
+        setattr(opt, "force", True)
+        self.set_options(opt)
+        if not self.genconfig(cluster_name):
+            return False
+        if not (self.deploy_cluster(cluster_name) and self.start_cluster(cluster_name)):
+            return False
+        if tenant_opt:
+            self.set_options(tenant_opt)
+            if not self.create_tenant(cluster_name):
+                self._call_stdio('warn', "Failed to create tenant. Please check the log for details. You can try run ` obd cluster tenant create -h ` to create tenant again.")
+        if encrypt:
+            obd = self.fork()
+            setattr(obd.options, 'encryption_passkey', '123456')
+            obd.encrypt_manager(True)
+        oceanbase_name = oceanbase_config['name']
+        if oceanbase_name == const.COMP_OB_STANDALONE:
+            self._call_stdio('print', FormatText.warning("If this cluster is for production use, please import a commercial license in time."))
 
 

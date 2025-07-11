@@ -170,8 +170,8 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
                 return plugin_context.return_false()
 
             # cpu options
-            max_cpu = get_option('max_cpu', cpu_available)
-            min_cpu = get_option('min_cpu', max_cpu)
+            max_cpu = int(get_option('max_cpu', cpu_available))
+            min_cpu = int(get_option('min_cpu', max_cpu))
             if cpu_available < max_cpu:
                 error('{zone} not enough cpu. (Available: {available}, Need: {need})'.format(zone=zone_list, available=cpu_available, need=max_cpu))
                 return plugin_context.return_false()

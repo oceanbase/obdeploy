@@ -19,6 +19,7 @@ from subprocess import call, Popen, PIPE
 
 from ssh import LocalClient
 from tool import ConfigUtil
+from const import COMPS_OB
 
 
 def db_connect(plugin_context, *args, **kwargs):
@@ -84,7 +85,7 @@ def db_connect(plugin_context, *args, **kwargs):
     if not database and user == 'root' and tenant == 'sys':
         database = 'oceanbase'
 
-    if component in ["oceanbase", "oceanbase-ce"]:
+    if component in COMPS_OB:
         port = server_config.get("mysql_port")
     else:
         port = server_config.get("listen_port")
@@ -99,7 +100,7 @@ def db_connect(plugin_context, *args, **kwargs):
         connected = test_connect()
         if not connected:
             if user == "root" and tenant == "sys":
-                if component in ["oceanbase", "oceanbase-ce"]:
+                if component in COMPS_OB:
                     password = global_conf.get('root_password')
                 elif component in ["obproxy", "obproxy-ce"]:
                     password = global_conf.get('observer_root_password')
@@ -107,7 +108,7 @@ def db_connect(plugin_context, *args, **kwargs):
                 if component in ["obproxy", "obproxy-ce"]:
                     password = global_conf.get("obproxy_sys_password")
             elif user == "proxyro" and tenant == 'sys':
-                if component in ["oceanbase", "oceanbase-ce"]:
+                if component in COMPS_OB:
                     password = global_conf.get("proxyro_password")
                 elif component in ["obproxy", "obproxy-ce"]:
                     password = global_conf.get("observer_sys_password")

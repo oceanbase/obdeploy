@@ -57,6 +57,19 @@ class DeploymentHandler(BaseHandler):
         deployment_info.name = deployment.name
         deployment_info.config_path = deployment.config_dir
         deployment_info.status = deployment.deploy_info.status.value.upper()
+        repositories = self.obd.load_local_repositories(deployment.deploy_info)
+        if len(repositories) == 1 and repositories[0].name in COMPS_OB:
+            origin_deploy = self.obd.deploy
+            origin_repositories = self.obd.repositories
+            self.obd.set_deploy(deployment)
+            self.obd.set_repositories(repositories)
+            ob_status_workflow = self.obd.get_workflows('get_oceanbase_status', repositories=repositories)
+            if self.obd.run_workflow(ob_status_workflow, repositories=repositories):
+                deployment_info.status = 'RUNNING'
+            elif deployment_info.status == 'RUNNING':
+                deployment_info.status = 'STOPPED'
+            self.obd.set_deploy(origin_deploy)
+            self.obd.set_repositories(origin_repositories)
         deployment_info.config = self.context['deployment'][deployment.name] if self.context[
                                                                                     'deployment'] is not None else None
         deployment_info_copy = deepcopy(deployment_info)
@@ -1076,7 +1089,7 @@ class DeploymentHandler(BaseHandler):
     def get_scenario_by_version(self, version, language='zh-CN'):
         version = version.split('-')[0]
         if language == 'zh-CN':
-            scenario_4_3_0_0 = [
+            scenario_4_2_5_0 = [
                 {
                     'type': 'Express OLTP',
                     'desc': '适用于贸易、支付核心系统、互联网高吞吐量应用程序等工作负载。没有外键等限制、没有存储过程、没有长交易、没有大交易、没有复杂的连接、没有复杂的子查询。',
@@ -1104,7 +1117,7 @@ class DeploymentHandler(BaseHandler):
                 },
             ]
         else:
-            scenario_4_3_0_0 = [
+            scenario_4_2_5_0 = [
                 {
                     'type': 'Express OLTP',
                     'desc': 'This is suitable for trading, core payment systems, high-throughput Internet applications, and other workloads. There are no limitations such as foreign keys, stored procedures, long transactions, large transactions, complex joins, or complex subqueries.',
@@ -1132,8 +1145,8 @@ class DeploymentHandler(BaseHandler):
                 },
             ]
         data = []
-        if Version(version) >= Version('4.3.0.0'):
-            for scenario in scenario_4_3_0_0:
+        if Version(version) >= Version('4.2.5.0'):
+            for scenario in scenario_4_2_5_0:
                 data.append(ScenarioType(type=scenario['type'], desc=scenario['desc'], value=scenario['value']))
         return data
 
@@ -1186,6 +1199,7 @@ class DeploymentHandler(BaseHandler):
         options['variables'] = config.variables
         options['time_zone'] = config.time_zone
         options['optimize'] = config.optimize
+        options['collate'] = config.collate
         options[config.tenant_name+'_root_password'] = RSAHandler().decrypt_private_key(config.password)
         task_info = self.context['task_info'][self.context['create_tenant'][task_id]]
         trace_id = str(uuid())
@@ -1229,10 +1243,8 @@ class DeploymentHandler(BaseHandler):
             if repository.name in COMPS_OB:
                 ob_repository = repository
                 break
-        scenarios_set = None
-        if ob_repository.version >= Version('4.3.0.0'):
-            scenarios_set = self.obd.get_namespace(ob_repository.name).get_return('tenant_scenario').get_return('scenarios')
-        scenario_4_3_0_0 = [
+        scenarios_set = self.obd.get_namespace(ob_repository.name).get_return('tenant_scenario').get_return('scenarios')
+        scenario_4_2_5_0 = [
             {
                 'type': 'Express OLTP',
                 'desc': '适用于贸易、支付核心系统、互联网高吞吐量应用程序等工作负载。没有外键等限制、没有存储过程、没有长交易、没有大交易、没有复杂的连接、没有复杂的子查询。',
@@ -1260,7 +1272,7 @@ class DeploymentHandler(BaseHandler):
             },
         ]
         scenario_info = []
-        for scenario in scenario_4_3_0_0:
+        for scenario in scenario_4_2_5_0:
             if scenarios_set and scenario['value'] in scenarios_set:
                 scenario_info.append(ScenarioType(type=scenario['type'], desc=scenario['desc'], value=scenario['value']))
         return scenario_info

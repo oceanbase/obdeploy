@@ -41,9 +41,9 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from ruamel.yaml import YAML, YAMLContextManager, representer
-
+import _environ as ENV
 from _errno import EC_SQL_EXECUTE_FAILED
-from _stdio import SafeStdio
+from _stdio import SafeStdio, FormatText
 
 _open = open
 if sys.version_info.major == 2:
@@ -77,6 +77,7 @@ __all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil
 
 _WINDOWS = os.name == 'nt'
 
+init_cx_oracle = False
 
 class Timeout(object):
 
@@ -298,6 +299,8 @@ class DirectoryUtil(object):
             else:
                 FileUtil.copy(src_name, dst_name, stdio)
         for link_dest, dst_name in links:
+            directory = os.path.dirname(dst_name)
+            os.makedirs(directory, exist_ok=True)
             FileUtil.symlink(link_dest, dst_name, stdio)
         return ret
 
@@ -771,11 +774,12 @@ class TimeUtils(SafeStdio):
 
 class Cursor(SafeStdio):
 
-    def __init__(self, ip, port, user='root', tenant='sys', password='', stdio=None):
+    def __init__(self, ip, port, user='root', tenant='sys', password='', mode='mysql', stdio=None):
         self.stdio = stdio
+        self.mode = mode
         self.ip = ip
         self.port = port
-        self._user = user
+        self._user = user if mode == 'mysql' else 'SYS@' + tenant
         self.tenant = tenant
         self.password = password
         self.cursor = None
@@ -804,15 +808,36 @@ class Cursor(SafeStdio):
 
     if sys.version_info.major == 2:
         def _connect(self):
+            if self.mode != 'mysql':
+                self.stdio.error('python2 only support mysql mode')
+                return False
             self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
             self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), passwd=str(self.password))
             self.cursor = self.db.cursor(cursorclass=mysql.cursors.DictCursor)
     else:
         def _connect(self):
-            self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
-            self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password),
-                                    cursorclass=mysql.cursors.DictCursor)
-            self.cursor = self.db.cursor()
+            if self.mode == 'mysql':
+                self.stdio.verbose('mysql connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+                self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password),
+                                        cursorclass=mysql.cursors.DictCursor)
+                self.cursor = self.db.cursor()
+            elif self.mode == 'oracle':
+                try:
+                    import cx_Oracle
+                    global init_cx_oracle
+                    if not init_cx_oracle:
+                        OBD_INSTALL_PATH = COMMAND_ENV.get(ENV.ENV_OBD_INSTALL_PATH, os.path.join(COMMAND_ENV.get(ENV.ENV_OBD_INSTALL_PRE, '/'), 'usr/obd/'))
+                        cx_Oracle.init_oracle_client(os.path.join(OBD_INSTALL_PATH, 'lib/site-packages'))
+                        init_cx_oracle = True
+                    self.stdio.verbose(
+                        'oracle connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+                    self.db = cx_Oracle.connect(self.user, self.password, "%s:%s" % (self.ip, self.port))
+                    self.cursor = self.db.cursor()
+                except Exception as e:
+                    self.stdio.verbose('connect %s -P%s -u%s -p%s failed, error:\n%s' % (self.ip, self.port, self.user, self.password, e))
+            else:
+                self.stdio.error('only support mysql and oracle mode')
+                return False
 
     @property
     def usable_cursor(self):
@@ -830,20 +855,26 @@ class Cursor(SafeStdio):
         self.stdio.stop_loading('fail')
         raise Exception('get usable cursor failed')
 
-    def new_cursor(self, tenant='sys', user='root', password='', ip='', port='', print_exception=True):
+    def new_cursor(self, tenant='sys', user='root', password='', ip='', port='', mode='mysql', print_exception=True):
         try:
             ip = ip if ip else self.ip
             port = port if port else self.port
-            return Cursor(ip=ip, port=port, user=user, tenant=tenant, password=password, stdio=self.stdio)
+            return Cursor(ip=ip, port=port, user=user, tenant=tenant, password=password, mode=mode, stdio=self.stdio)
         except:
             print_exception and self.stdio.exception('')
             self.stdio.verbose('fail to connect %s -P%s -u%s@%s  -p%s' % (ip, port, user, tenant, password))
             return None
 
     def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):
+        if self.mode == 'oracle' and args:
+            stdio.error('oracle mode not support args')
+            return False
         try:
-            stdio.verbose('execute sql: %s. args: %s' % (sql, args))
-            self.cursor.execute(sql, args)
+            stdio.verbose('%s execute sql: %s. args: %s' % (self.mode, sql, args))
+            if not args:
+                self.cursor.execute(sql)
+            else:
+                self.cursor.execute(sql, args)
             if not execute_func:
                 return self.cursor
             return getattr(self.cursor, execute_func)()
@@ -1095,6 +1126,49 @@ def aes_decrypt(ciphertext, key):
     plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
     return plaintext.decode('utf-8')
 
+
+def get_system_memory(memory_limit):
+    if memory_limit < 12 << 30:
+        system_memory = 1 << 30
+    elif memory_limit < 20 << 30:
+        system_memory = 5 << 30
+    elif memory_limit < 40 << 30:
+        system_memory = 6 << 30
+    elif memory_limit < 60 << 30:
+        system_memory = 7 << 30
+    elif memory_limit < 80 << 30:
+        system_memory = 8 << 30
+    elif memory_limit < 100 << 30:
+        system_memory = 9 << 30
+    elif memory_limit < 130 << 30:
+        system_memory = 10 << 30
+    else:
+        system_memory = int(memory_limit * 0.08)
+    return system_memory
+
+
+def get_sys_cpu(cpu_count):
+    if cpu_count < 8:
+        sys_cpu = 1
+    elif cpu_count < 16:
+        sys_cpu = 2
+    elif cpu_count < 32:
+        sys_cpu = 3
+    else:
+        sys_cpu = 4
+    return sys_cpu
+
+def get_sys_log_disk_size(memory_limit):
+    if memory_limit < 12 << 30:
+        sys_log_disk_size = 2 << 30
+    elif memory_limit < 40 << 30:
+        sys_log_disk_size = 3 << 30
+    elif memory_limit < 80 << 30:
+        sys_log_disk_size = 4 << 30
+    else:
+        sys_log_disk_size = 5 << 30
+    return sys_log_disk_size
+
 def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
@@ -1113,6 +1187,51 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
         return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
     return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
 
-            
-                
+
+def port_check(port, client, ports, stdio):
+    if get_port_socket_inode(client, port):
+        stdio.print(FormatText.error(f'The port {port} is already in use. Please enter a different port.'))
+        return False, ports
+    if port in ports:
+        stdio.print(FormatText.error(f'The port {port} has already been specified above.'))
+        return False, ports
+    else:
+        ports.append(port)
+        return True, ports
+
+
+def is_all_digits(input_str, stdio):
+    DIGIT_PATTERN = re.compile(r'^\d+$')
+    if not bool(DIGIT_PATTERN.fullmatch(str(input_str))):
+        stdio.error(f"Invalid input: {input_str}. Only digits are allowed. Please try again.")
+        return False
+    return True
+
+
+def input_int_value(name, min_value, max_value, unit='G', default_value=None, stdio=None):
+    if unit and unit not in ["B", "K", "M", "G", "T", "P"]:
+        stdio.error(f"Invalid unit: {unit}.")
+        return False
+    if int(min_value) > int(max_value):
+        stdio.error(f"{name}: min_value cannot exceed max_value.")
+        return False
+    default_value = default_value or min_value
+    while True:
+        input_value = stdio.read(f'Enter the {name} (Configurable Range[{min_value}, {max_value}], Default: {default_value} {f", unit: {unit}" if unit else ""}): ', blocked=True).strip() or default_value
+        if not is_all_digits(input_value, stdio):
+            continue
+        if int(input_value) < int(min_value):
+            stdio.print(FormatText.error(f"Cannot be less than the min_value ({min_value}). Please try again."))
+            continue
+        if int(input_value) > int(max_value):
+            stdio.print(FormatText.error(f"Cannot exceed the max_value ({max_value}). Please try again."))
+            continue
+        break
+    return input_value
+
+
+def byte_to_GB(byte):
+    return int(byte // (1024 * 1024 * 1024))
+
+
 

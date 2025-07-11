@@ -49,6 +49,10 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=Non
         return False
 
 def create_standbyro(plugin_context, cursors={}, cluster_configs={}, *args, **kwargs):
+    def error(*arg, **kwargs):
+        stdio.error(*arg, **kwargs)
+        stdio.stop_loading('fail')
+        
     options = plugin_context.options
     stdio = plugin_context.stdio
     cmds = plugin_context.cmds
@@ -63,7 +67,6 @@ def create_standbyro(plugin_context, cursors={}, cluster_configs={}, *args, **kw
         primary_tenant = cmds[2]
     primary_cursor = cursors.get(primary_deploy_name)
     primary_cluster_config = cluster_configs.get(primary_deploy_name)
-    error = plugin_context.get_variable('error')
     mode = get_option(options, 'mode', 'mysql').lower()
 
     stdio.start_loading('Create standbyro user')

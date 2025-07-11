@@ -346,6 +346,10 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
                 if auto_set_datafile_size:
                     datafile_next = max(MINI_DATA_FILE_NEXT, DATA_NEXT * datafile_maxsize)
                     datafile_size = min(datafile_maxsize, datafile_size)
+                    if datafile_size < MINI_DATA_FILE_SIZE:
+                        stdio.error("%s %s not enough disk space." % (ip, data_dir_mount))
+                        success = False
+                        continue
                     update_server_conf(server, 'datafile_size', str(Capacity(datafile_size, 0)))
                     if 'datafile_maxsize' not in user_server_config:
                         update_server_conf(server, 'datafile_maxsize', str(Capacity(datafile_maxsize, 0)))
@@ -405,6 +409,10 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
 
                 if auto_set_datafile_size:
                     update_server_conf(server, 'datafile_size', str(Capacity(datafile_size, 0)))
+                    if datafile_size < MINI_DATA_FILE_SIZE:
+                        stdio.error("%s %s not enough disk space." % (ip, data_dir_mount))
+                        success = False
+                        continue
                     if datafile_maxsize > datafile_size:
                         if 'datafile_maxsize' not in user_server_config:
                             update_server_conf(server, 'datafile_maxsize', str(Capacity(datafile_maxsize, 0)))

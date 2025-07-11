@@ -65,10 +65,12 @@ def check_opt(plugin_context, name, context, *args, **kwargs):
     servers = get_option("servers", None)
 
     interactive = False
+    allow_components = []
     command_config = CommandConfig()
     for command in command_config.all_commands:
         command_name = ConfigUtil.get_value_from_dict(command, 'name', transform_func=str)
         if command_name == name:
+            allow_components.extend(command.get('components'))
             interactive = ConfigUtil.get_value_from_dict(command, 'interactive', False, transform_func=bool)
 
     if components is None:
@@ -111,10 +113,10 @@ def check_opt(plugin_context, name, context, *args, **kwargs):
 
     failed_components = []
     for component in components:
-        if component not in deployed_components:
+        if component not in allow_components:
             failed_components.append(component)
     if failed_components:
-        stdio.error('{} not support. {} is allowed'.format(','.join(failed_components), deployed_components))
+        stdio.error('{} not support. {} is allowed'.format(','.join(failed_components), allow_components))
         return plugin_context.return_false()
     context.update(components=components, servers=list(servers), command_config=command_config)
     plugin_context.set_variable('context', context)

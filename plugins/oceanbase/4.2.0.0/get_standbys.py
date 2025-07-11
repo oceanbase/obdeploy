@@ -137,8 +137,13 @@ def get_standbys(plugin_context, primary_tenant='', relation_tenants=[], all_ten
                 res = cursor.fetchone(sql, raise_exception=False)
                 standby_tenants.append([relation_deploy_name, relation_tenant_name, res['version']])
                 if cluster_version >= '4.2.1.9':
-                    primary_info = {relation_tenant_name: [[primary_deploy_name, primary_tenant]]}
-                    tenant_cluster_info.update_component_attr('primary_tenant', primary_info, save=True)
+                    primary_dict = tenant_cluster_info.get_component_attr('primary_tenant')
+                    if primary_dict:
+                        primary_dict[relation_tenant_name] = [[primary_deploy_name, primary_tenant]]
+                        tenant_cluster_info.update_component_attr('primary_tenant', primary_dict, save=True)
+                    else:
+                        primary_dict = {relation_tenant_name: [[primary_deploy_name, primary_tenant]]}
+                        tenant_cluster_info.update_component_attr('primary_tenant', primary_dict, save=True)
     plugin_context.set_variable('standby_tenants', standby_tenants)
     stdio.stop_loading('succeed')
     return plugin_context.return_true(standby_tenants=standby_tenants)

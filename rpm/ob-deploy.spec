@@ -82,6 +82,76 @@ fi
 pip install -r plugins-requirements3.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 pip install -r service/service-requirements.txt --target=$BUILD_DIR/SOURCES/site-packages  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 
+if [ "$BUILD_CX_ORACLE" == "TRUE" ]; then
+    ARCH=$(uname -m)
+    OS_VERSION=$(grep -o '[0-9]\+' /etc/redhat-release | head -1)
+    if [ -z "$OS_VERSION" ]; then
+        OS_VERSION="7"
+    fi
+    
+    # Build RPM download URL
+    OBCI_VERSION=${OBCI_VERSION:-"2.1.1-342025070917"}
+    if [ -z "$OBCI_BASE_URL" ]; then
+        echo "Error: OBCI_BASE_URL environment variable is required but not set"
+        exit 1
+    fi
+    # Determine OS prefix based on version
+    if [ "$OS_VERSION" = "3" ]; then
+        OS_PREFIX="al"
+        OS_VERSION="8"
+    else
+        OS_PREFIX="el"
+    fi
+    OBCI_RPM_URL="${OBCI_BASE_URL}/${OS_VERSION}/${ARCH}/test/obci/obci-${OBCI_VERSION}.${OS_PREFIX}${OS_VERSION}.${ARCH}.rpm"
+    
+    echo "Downloading OBCI RPM for architecture $ARCH, OS version $OS_VERSION: $OBCI_RPM_URL"
+    
+    # Create temporary directory
+    TEMP_DIR=$(mktemp -d)
+    cd $TEMP_DIR
+    
+    # Download RPM package
+    if wget -q "$OBCI_RPM_URL" -O obci.rpm; then
+        echo "Successfully downloaded OBCI RPM"
+        
+        # Extract RPM package contents
+        rpm2cpio obci.rpm | cpio -idmv
+        
+        # Copy libobci_obclnt.so file
+        if [ -f "u01/obclient/lib/libobci_obclnt.so" ]; then
+            cp u01/obclient/lib/libobci_obclnt.so $BUILD_DIR/SOURCES/site-packages/
+            echo "Successfully copied libobci_obclnt.so"
+        else
+            echo "Error: libobci_obclnt.so not found in RPM package"
+            exit 1
+        fi
+        
+        # Process cx_Oracle source package
+        if [ -f "u01/obclient/python/cx_Oracle-8.3.0.tar.gz" ]; then
+            echo "Extracting and compiling cx_Oracle from source"
+            
+            # Extract cx_Oracle source
+            tar -xzf u01/obclient/python/cx_Oracle-8.3.0.tar.gz
+            cd cx_Oracle-8.3.0
+            
+            # Install build dependencies
+            pip3 install setuptools wheel
+            pip3 install .  --target=$BUILD_DIR/SOURCES/site-packages
+        else
+            echo "Error: cx_Oracle-8.3.0.tar.gz not found in RPM package"
+            exit 1
+        fi
+        
+    else
+        echo "Error: Failed to download OBCI RPM from $OBCI_RPM_URL"
+        exit 1
+    fi
+    
+    # Clean up temporary directory
+    cd $SRC_DIR
+    rm -rf $TEMP_DIR
+fi
+
 # pyinstaller -y --clean -n obd-web -p $BUILD_DIR/SOURCES/site-packages -F service/app.py
 pyinstaller --hidden-import=decimal -p $BUILD_DIR/SOURCES/site-packages --hidden-import service.app --hidden-import=configparser --hidden-import=Crypto.Hash.SHA --hidden-import=Crypto.PublicKey.RSA --hidden-import=Crypto.Signature.PKCS1_v1_5 --hidden-import=Crypto.Cipher.PKCS1_OAEP -F obd.py
 rm -f obd.py obd.spec

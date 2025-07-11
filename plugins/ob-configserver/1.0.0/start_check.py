@@ -284,6 +284,7 @@ def start_check(plugin_context, init_check_status=False,  work_dir_check=False, 
 
     if not success:
         stdio.stop_loading('fail')
+        return plugin_context.return_false()
     else:
         stdio.stop_loading('succeed')
-        return plugin_context.return_true()
+        return plugin_context.return_true(start_check_status=check_status)

@@ -172,6 +172,10 @@ def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *ar
             if not switch_ret:
                 return
 
+    ip_list = get_ip_list(cursors.get(primary_cluster), primary_cluster, primary_tenant, stdio)
+    if not ip_list:
+        stdio.stop_loading('fail')
+        return
     for tenant_info in standby_standby_tenants:
         deploy_name = tenant_info[0]
         tenant_name = tenant_info[1]

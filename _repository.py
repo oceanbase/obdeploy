@@ -424,6 +424,8 @@ class Repository(PackageInfo):
                 ParallerExtractor(pkg, need_extract_files, stdio=self.stdio).extract()
 
                 for link in links:
+                    directory = os.path.dirname(link)
+                    os.makedirs(directory, exist_ok=True)
                     self.stdio and getattr(self.stdio, 'verbose', print)('link %s to %s' % (links[link], link))
                     os.symlink(links[link], link)
                 for n_dir in need_dirs:

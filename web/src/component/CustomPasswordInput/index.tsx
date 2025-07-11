@@ -22,7 +22,6 @@ interface CustomPasswordInputProps {
   form: FormInstance<any>;
   msgInfo: MsgInfoType;
   useOldRuler?: boolean;
-  disabled?: boolean;
   useFor: 'ob' | 'ocp';
   style?: React.CSSProperties;
   innerInputStyle?: React.CSSProperties;
@@ -50,7 +49,7 @@ export default function CustomPasswordInput({
   useOldRuler = false,
   useFor,
   showTip = true,
-  disabled,
+
   placeholder,
   innerInputStyle = { width: 328 },
   ...props
@@ -153,27 +152,25 @@ export default function CustomPasswordInput({
           showTip && <Help />
         )
       }
-      rules={
-        !disabled && [
-          {
-            required: true,
-            message: intl.formatMessage({
-              id: 'OBD.component.CustomPasswordInput.EnterAPassword',
-              defaultMessage: '请输入密码',
-            }),
+      rules={[
+        {
+          required: true,
+          message: intl.formatMessage({
+            id: 'OBD.component.CustomPasswordInput.EnterAPassword',
+            defaultMessage: '请输入密码',
+          }),
+        },
+        {
+          validator: (_, value) => {
+            let validateRes = validateInput(value);
+            if (validateRes.validateStatus === 'success') {
+              return Promise.resolve();
+            } else {
+              return Promise.reject(new Error(validateRes.errorMsg!));
+            }
           },
-          {
-            validator: (_, value) => {
-              let validateRes = validateInput(value);
-              if (validateRes.validateStatus === 'success') {
-                return Promise.resolve();
-              } else {
-                return Promise.reject(new Error(validateRes.errorMsg!));
-              }
-            },
-          },
-        ]
-      }
+        },
+      ]}
       name={name}
       {...props}
     >
@@ -182,26 +179,17 @@ export default function CustomPasswordInput({
           onChange={(e) => handleChange(e.target.value)}
           value={value}
           style={innerInputStyle}
-          disabled={disabled}
           placeholder={placeholder}
         />
 
-        <Button
-          onClick={handleRandomGenerate}
-          disabled={disabled}
-          style={{ marginLeft: 12 }}
-        >
+        <Button onClick={handleRandomGenerate} style={{ marginLeft: 12 }}>
           {intl.formatMessage({
             id: 'OBD.component.CustomPasswordInput.RandomlyGenerated',
             defaultMessage: '随机生成',
           })}
         </Button>
         {showCopyBtn && (
-          <Button
-            style={{ marginLeft: 12 }}
-            onClick={passwordCopy}
-            disabled={disabled}
-          >
+          <Button style={{ marginLeft: 12 }} onClick={passwordCopy}>
             {intl.formatMessage({
               id: 'OBD.component.CustomPasswordInput.CopyPassword',
               defaultMessage: '复制密码',

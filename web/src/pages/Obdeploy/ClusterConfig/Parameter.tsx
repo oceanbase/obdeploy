@@ -243,20 +243,22 @@ const AdaptiveInput = ({
   );
 };
 //参数来由：当Parameter在form.item下时自带有onchange，value
-export default function Parameter(props) {
+export default function Parameter(props: ParameterProps) {
   const { value: itemValue, onChange, onBlur, defaultValue } = props;
 
-  const abc = {
+  const real = {
     value: defaultValue,
     adaptive: props.adaptive,
+    defaultValue: props.defaultValue,
+    require: props.require,
     type: props.type,
     auto: props.auto,
     unitDisable: props.unitDisable,
     isChanged: props.isChanged,
   };
-  const [parameterValue, setParameterValue] = useState<API.ParameterValue>(
-    itemValue || abc,
-  );
+  const init = itemValue || real;
+  const [parameterValue, setParameterValue] =
+    useState<API.ParameterValue>(init);
   const { type } = parameterValue;
   const defaultUnit = useRef<string>(
     type === PARAMETER_TYPE.capacity || type === PARAMETER_TYPE.capacityMB
@@ -267,9 +269,9 @@ export default function Parameter(props) {
   useEffect(() => {
     if (onChange) {
       if (
-        itemValue?.adaptive !== parameterValue?.adaptive ||
-        itemValue?.value !== parameterValue?.value ||
-        itemValue?.type !== parameterValue?.type
+        init?.adaptive !== parameterValue?.adaptive ||
+        init?.value !== parameterValue?.value ||
+        init?.type !== parameterValue?.type
       ) {
         onChange(parameterValue);
       }

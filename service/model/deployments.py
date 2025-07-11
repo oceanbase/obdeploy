@@ -378,5 +378,6 @@ class CreateTenantConfig(BaseModel):
     charset: str = Body(..., description='database charset')
     variables: str = Body(..., description="Set the variables for the system tenant. [ob_tcp_invited_nodes='%'].")
     time_zone: str = Body(..., description='Tenant time zone. The default tenant time_zone is [+08:00].')
+    collate: str = Body(..., description='Tenant collate.')
     optimize: str = Body('', description='Specify scenario optimization when creating a tenant, the default is consistent with the cluster dimension.\n{express_oltp, complex_oltp, olap, htap, kv}')
     password: str = Body(..., description='When creating a tenant, set password for user.')

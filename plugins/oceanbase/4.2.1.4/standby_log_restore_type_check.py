@@ -119,6 +119,7 @@ def standby_log_restore_type_check(plugin_context, cluster_configs, cursors={}, 
                 
                 error(f"The {cluster_name}:{tenant_name} log stream {sync_status} status is unexpected")
                 return
+            primary_deploy, primary_tenant = get_primary_tenant(cursor, cluster_name, tenant_name)
         else:
             primary_deploy, primary_tenant = get_primary_tenant(cursor, cluster_name, tenant_name)
             if not primary_deploy or not primary_tenant:
@@ -142,11 +143,13 @@ def standby_log_restore_type_check(plugin_context, cluster_configs, cursors={}, 
                     stdio.verbose('Select {} log restore source is failed.'.format(relation_deploy_name))
                     continue
                 relation_primary_cluster, relation_primary_tenant = get_primary_tenant(cursor, relation_deploy_name, relation_tenant_name)
+
                 if res['TYPE'] == LOCATION_MODE:
                     if relation_primary_cluster == primary_deploy and relation_primary_tenant == primary_tenant:
                         plugin_context.set_variable("check_tenant_id", tenant_id)
                         plugin_context.set_variable("check_uri", True)
-                        plugin_context.set_variable("check_tenant_cursor", cursor)
+                        standby_cursor = cursors.get(cluster_name)
+                        plugin_context.set_variable("check_tenant_cursor", standby_cursor)
                         plugin_context.set_variable('check_tenant', tenant_name)
                         break
                     elif relation_primary_cluster == cluster_name and relation_primary_tenant == tenant_name:
@@ -157,6 +160,11 @@ def standby_log_restore_type_check(plugin_context, cluster_configs, cursors={}, 
                         plugin_context.set_variable("check_tenant_cursor", primary_cursor)
                         plugin_context.set_variable('check_tenant', primary_tenant)
                         break
+        primary_cursor = cursors.get(primary_deploy)
+        res = primary_cursor.fetchone('select TENANT_ID from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s', (primary_tenant,), raise_exception=False)
+        plugin_context.set_variable("primary_tenant_id", res['TENANT_ID'])
+        plugin_context.set_variable("primary_tenant_cursor", primary_cursor)
+        plugin_context.set_variable('primary_tenant', primary_tenant)
 
 
     stdio.stop_loading("succeed")

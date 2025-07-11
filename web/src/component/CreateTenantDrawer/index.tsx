@@ -37,8 +37,9 @@ const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 const { Text } = Typography;
 
+import { insertPwd } from '@/utils/helper';
 import { intl } from '@/utils/intl';
-import { isGte4_2_5, isGte4_3_0 } from '@/utils/package';
+import { isGte4_2_5 } from '@/utils/package';
 import { ProForm } from '@ant-design/pro-components';
 import NP from 'number-precision';
 import CustomPasswordInput from '../CustomPasswordInput';
@@ -314,6 +315,24 @@ const modeList = [
   },
 ];
 
+const COLLATE_CONFIG = {
+  utf8: {
+    collateList: [
+      'utf8mb4_general_ci',
+      'utf8mb4_bin',
+      'utf8mb4_unicode_ci',
+      'utf8mb4_unicode_520_ci',
+      'utf8mb4_croatian_ci',
+      'utf8mb4_czech_ci',
+      'utf8mb4_0900_ai_ci',
+    ],
+  },
+  utf16: { collateList: ['utf16_general_ci', 'utf16_unicode_ci', 'utf16_bin'] },
+  gbk: { collateList: ['gbk_chinese_ci', 'gbk_bin'] },
+  gb18030: { collateList: ['gb18030_chinese_ci', 'gb18030_bin'] },
+  binary: { collateList: ['binary'] },
+};
+
 export default function CreatTenantDrawer({
   open,
   setOpen,
@@ -436,14 +455,13 @@ export default function CreatTenantDrawer({
               paramsData?.mode === 'oracle' &&
               data?.result === 'SUCCESSFUL'
             ) {
-              setObConnectInfo(
-                `obclient -h${ip} -uSYS@${paramsData?.tenant_name} -P${port}`,
-              );
+              const info = `obclient -h${ip} -uSYS@${paramsData?.tenant_name} -P${port}`;
+              setObConnectInfo(insertPwd(info, paramsData?.password));
             } else if (
               paramsData?.mode === 'mysql' &&
               data?.result === 'SUCCESSFUL'
             ) {
-              setObConnectInfo(data?.message);
+              setObConnectInfo(insertPwd(data?.message, paramsData?.password));
             }
           }
         } else {
@@ -689,7 +707,6 @@ export default function CreatTenantDrawer({
           <Select
             style={{ width: 300 }}
             options={[
-              // “MySQL”时支持填写“租户 root 密码”，“Oracle”不支持
               { value: 'mysql', label: 'MySQL' },
               {
                 value: 'oracle',
@@ -703,11 +720,6 @@ export default function CreatTenantDrawer({
               id: 'OBD.Obdeploy.CreateTenantDrawer.6551A76B',
               defaultMessage: '请选择',
             })}
-            onChange={(value) => {
-              if (value === 'oracle') {
-                settenantPwd('');
-              }
-            }}
           />
         </Form.Item>
         <Form.Item noStyle shouldUpdate>
@@ -725,20 +737,12 @@ export default function CreatTenantDrawer({
                   id: 'OBD.Obdeploy.CreateTenantDrawer.4B27F284',
                   defaultMessage: '租户 root 密码',
                 })}
-                disabled={form.getFieldValue('mode') === 'oracle'}
                 innerInputStyle={{ width: 408 }}
                 showTip={false}
-                placeholder={
-                  form.getFieldValue('mode') === 'oracle'
-                    ? intl.formatMessage({
-                        id: 'OBD.Obdeploy.CreateTenantDrawer.263F8120',
-                        defaultMessage: '暂不支持填写，请创建后自行修改',
-                      })
-                    : intl.formatMessage({
-                        id: 'OBD.Obdeploy.CreateTenantDrawer.2C2FA075',
-                        defaultMessage: '请输入',
-                      })
-                }
+                placeholder={intl.formatMessage({
+                  id: 'OBD.Obdeploy.CreateTenantDrawer.2C2FA075',
+                  defaultMessage: '请输入',
+                })}
               />
             );
           }}
@@ -887,60 +891,60 @@ export default function CreatTenantDrawer({
             );
           }}
         </Form.Item>
-        {/* 
-          小于425、430版本的不展示此配置项。 
-          */}
-        {(isGte4_2_5(version) || isGte4_3_0(version)) &&
-          modeValue == 'mysql' &&
-          optimizeList.length > 0 && (
-            <Form.Item noStyle shouldUpdate>
-              {() => {
-                const optimizeValue = form.getFieldValue('optimize');
-                const dec = optimizeList?.find(
-                  (item) => item.value === optimizeValue,
-                )?.desc;
-                return (
-                  <Form.Item
-                    label={intl.formatMessage({
-                      id: 'OBD.Obdeploy.CreateTenantDrawer.76BFF66C',
-                      defaultMessage: '业务负载类型',
-                    })}
-                    name="optimize"
-                    rules={[
-                      {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.Obdeploy.CreateTenantDrawer.D310A07A',
-                          defaultMessage: '请输入业务负载类型',
-                        }),
-                      },
-                    ]}
-                    extra={
-                      <Tooltip title={dec}>
-                        <p
-                          style={{
-                            overflow: 'hidden',
-                            whiteSpace: 'nowrap',
-                            textOverflow: 'ellipsis',
-                            wordBreak: 'keep-all',
-                            width: '550px',
-                          }}
-                        >
-                          {dec}
-                        </p>
-                      </Tooltip>
-                    }
-                  >
-                    <Select style={{ width: 300 }} options={optimizeList} />
-                  </Form.Item>
-                );
-              }}
-            </Form.Item>
-          )}
+        {/* 小于425版本的不展示此配置项 */}
+        {isGte4_2_5(version) && optimizeList.length > 0 && (
+          <Form.Item noStyle shouldUpdate>
+            {() => {
+              const optimizeValue = form.getFieldValue('optimize');
+              const dec = optimizeList?.find(
+                (item) => item.value === optimizeValue,
+              )?.desc;
+              return (
+                <Form.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.Obdeploy.CreateTenantDrawer.76BFF66C',
+                    defaultMessage: '业务负载类型',
+                  })}
+                  name="optimize"
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.Obdeploy.CreateTenantDrawer.D310A07A',
+                        defaultMessage: '请输入业务负载类型',
+                      }),
+                    },
+                  ]}
+                  extra={
+                    <Tooltip title={dec}>
+                      <p
+                        style={{
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          wordBreak: 'keep-all',
+                          width: '550px',
+                        }}
+                      >
+                        {dec}
+                      </p>
+                    </Tooltip>
+                  }
+                >
+                  <Select style={{ width: 300 }} options={optimizeList} />
+                </Form.Item>
+              );
+            }}
+          </Form.Item>
+        )}
 
         <Form.Item noStyle shouldUpdate>
           {() => {
             const ipV = form.getFieldValue('ip');
+            const charsetValue = form.getFieldValue('charset');
+            const real = charsetValue === 'utf8mb4' ? 'utf8' : charsetValue;
+            const getCharsetList = COLLATE_CONFIG[real]?.collateList || [];
+
             return (
               <>
                 <Form.Item
@@ -964,6 +968,37 @@ export default function CreatTenantDrawer({
                     options={
                       modeValue !== 'mysql' ? oracleCharset : mysqlCharset
                     }
+                    onChange={() => {
+                      form.setFieldsValue({
+                        collate: undefined,
+                      });
+                    }}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.Obdeploy.CreateTenantDrawer.955306E3',
+                    defaultMessage: '字符序',
+                  })}
+                  name="collate"
+                  initialValue={'utf8mb4_general_ci'}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.Obdeploy.CreateTenantDrawer.9A3F36F0',
+                        defaultMessage: '请输入字符序',
+                      }),
+                    },
+                  ]}
+                >
+                  <Select
+                    style={{ width: 300 }}
+                    options={getCharsetList?.map((item) => ({
+                      label: item,
+                      value: item,
+                    }))}
                   />
                 </Form.Item>
 
@@ -1290,21 +1325,19 @@ export default function CreatTenantDrawer({
                 >
                   {paramsData?.mode || '-'}
                 </Descriptions.Item>
-                {paramsData?.mode !== 'oracle' && (
-                  <Descriptions.Item
-                    label={intl.formatMessage({
-                      id: 'OBD.Obdeploy.CreateTenantDrawer.C9129FF1',
-                      defaultMessage: '租户 root 密码',
-                    })}
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.Obdeploy.CreateTenantDrawer.C9129FF1',
+                    defaultMessage: '租户 root 密码',
+                  })}
+                >
+                  <Text
+                    copyable={{ text: paramsData?.password || '-' }}
+                    style={{ color: '#006aff' }}
                   >
-                    <Text
-                      copyable={{ text: paramsData?.password || '-' }}
-                      style={{ color: '#006aff' }}
-                    >
-                      {paramsData?.password}
-                    </Text>
-                  </Descriptions.Item>
-                )}
+                    {paramsData?.password}
+                  </Text>
+                </Descriptions.Item>
                 <Descriptions.Item
                   label={intl.formatMessage({
                     id: 'OBD.Obdeploy.CreateTenantDrawer.CDA6AF99',
@@ -1315,13 +1348,15 @@ export default function CreatTenantDrawer({
                     copyable={{
                       text:
                         paramsData?.mode !== 'oracle'
-                          ? statusData?.message
+                          ? statusData?.message &&
+                            insertPwd(statusData?.message, paramsData?.password)
                           : obConnectInfo,
                     }}
                     style={{ color: '#006aff' }}
                   >
                     {paramsData?.mode !== 'oracle'
-                      ? statusData?.message
+                      ? statusData?.message &&
+                        insertPwd(statusData?.message, paramsData?.password)
                       : obConnectInfo}
                   </Text>
                 </Descriptions.Item>
@@ -1357,6 +1392,14 @@ export default function CreatTenantDrawer({
                   })}
                 >
                   {paramsData?.charset || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.Obdeploy.CreateTenantDrawer.A17440B',
+                    defaultMessage: '字符序',
+                  })}
+                >
+                  {paramsData?.collate || '-'}
                 </Descriptions.Item>
                 {paramsData?.mode !== 'oracle' && (
                   <Descriptions.Item
@@ -1456,7 +1499,7 @@ export default function CreatTenantDrawer({
                   const invited_nodes =
                     ob_tcp_invited_nodes === undefined
                       ? "'%'"
-                      : `'${ob_tcp_invited_nodes}'`;
+                      : `'127.0.0.1,${ob_tcp_invited_nodes},'`;
 
                   const params = {
                     ...values,
@@ -1473,10 +1516,7 @@ export default function CreatTenantDrawer({
                       modeValue === 'mysql'
                         ? `ob_tcp_invited_nodes=${invited_nodes},lower_case_table_names=${lower_case_table_names}`
                         : `ob_tcp_invited_nodes=${invited_nodes}`,
-                    password:
-                      modeValue === 'mysql'
-                        ? encrypt(password, publicKey)
-                        : encrypt('', publicKey),
+                    password: encrypt(password, publicKey),
                   };
                   createTenants({ name }, params);
                 });

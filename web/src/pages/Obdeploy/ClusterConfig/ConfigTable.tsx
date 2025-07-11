@@ -95,7 +95,7 @@ const getMoreColumns = (
             },
           }));
         }
-
+        
         return (
           <Form.Item
             validateFirst={true}
@@ -103,7 +103,7 @@ const getMoreColumns = (
             name={[componentKey, 'parameters', record.name || '', 'params']}
             rules={rules}
           >
-            <Parameter {...record.parameterValue} />
+            <Parameter {...parameterValue} />
           </Form.Item>
         );
       },

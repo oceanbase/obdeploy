@@ -836,6 +836,21 @@ class SshClient(SafeStdio):
             stdio.exception("")
             stdio.verbose('Failed to get %s' % remote_dir)
 
+def create_sudo_privileges_client(stdio, level, host, msg, port=22):
+    retry_count = 2
+    while retry_count > 0:
+        username = stdio.read('Please input username with sudo privileges. (default: root): ', blocked=True).strip() or 'root'
+        root_password = getpass.getpass('Please input %s password: ' % username)
+        user_config = SshConfig(host=host, port=port, username=username, password=root_password)
+        user_client = SshClient(user_config, stdio=stdio)
+        ret = user_client.execute_command('echo %s | sudo -S whoami' % root_password)
+        if not ret:
+            retry_count -= 1
+        else:
+            return user_client
+    if retry_count == 0:
+        getattr(stdio, level)(msg)
+        return None
 
 def get_root_permission_client(client4plugin, server, stdio):
     client = client4plugin.client
@@ -854,18 +869,12 @@ def get_root_permission_client(client4plugin, server, stdio):
                 stdio.error(ret.stderr)
                 return None
             else:
-                retry_count = 2
-                while retry_count > 0:
-                    username = stdio.read('%s: please input username with sudo privileges. (default: root): ' % server, blocked=True).strip() or 'root'
-                    root_password = getpass.getpass('%s: please input %s password: ' % (server, username))
-                    config = SshConfig(host=client.config.host, port=client.config.port, username=username, password=root_password)
-                    client = SshClient(config, stdio=stdio)
-                    ret = client.execute_command('echo %s | sudo -S whoami' % root_password)
-                    if not ret:
-                        retry_count -= 1
-                    else:
-                        return client
-                if retry_count == 0:
-                    stdio.error('Incorrect password')
-                    return None
+                msg = 'Incorrect password'
+                return create_sudo_privileges_client(stdio, level='error', host=client.config.host, msg=msg, port=client.config.port)
     return client
+
+def get_root_permission_localclient(stdio):
+    if not stdio.confirm('Do you want to install/uninstall obclient globally?'):
+        return None
+    msg = 'Incorrect password. obclient will be installed under the current user'
+    return create_sudo_privileges_client(stdio, level='warn', host='127.0.0.1', msg=msg)

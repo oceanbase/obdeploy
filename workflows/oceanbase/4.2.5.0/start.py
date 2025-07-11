@@ -30,8 +30,8 @@ def start(plugin_context, workflow, *args, **kwargs):
     if not client:
         return plugin_context.return_false()
     component_name = cluster_config.name
-    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'user_pre', 'create_user')
-    if component_name in [const.COMP_OB_CE]:
+    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'user_pre', 'create_user', 'alter_sys_unit')
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
         workflow.add(const.STAGE_FIRST, 'obshell_start', 'obshell_bootstrap')
     install_utils = cluster_config.get_global_conf().get('install_utils', False)
     utils_flag = os.path.join(server_config['home_path'], 'bin', 'ob_admin')

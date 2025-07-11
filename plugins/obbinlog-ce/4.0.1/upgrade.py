@@ -50,7 +50,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
     if not run_workflow(stop_workflows, repositories=[cur_repository], **kwargs):
         return
 
-    install_repository_to_servers(cluster_config.name, cluster_config, dest_repository, clients)
+    install_repository_to_servers(dest_repository)
     apply_param_plugin(dest_repository)
     start_kwargs = copy(kwargs)
     if not run_workflow(start_workflows, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):

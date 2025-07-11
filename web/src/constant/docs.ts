@@ -38,6 +38,14 @@ export function getDocs(getLocale) {
   const OBD_DOCS_EN = 'https://en.oceanbase.com/docs/oceanbase-database';
   const OBD_DOCS = getLocale() === 'zh-CN' ? OBD_DOCS_CN : OBD_DOCS_EN;
 
+  // OBD STANDALONE
+  const OBD_STANDALONE_DOCS_CN =
+    'https://www.oceanbase.com/docs/common-oceanbase-database-standalone-1000000002701677';
+  const OBD_STANDALONE_DOCS_EN =
+    'https://www.oceanbase.com/docs/common-oceanbase-database-standalone-1000000002701677';
+  const OBD_STANDALONE_DOCS =
+    getLocale() === 'zh-CN' ? OBD_STANDALONE_DOCS_CN : OBD_STANDALONE_DOCS_EN;
+
   //OCP Express
   const OCP_EXPRESS_CN =
     'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000001050397';
@@ -120,5 +128,6 @@ export function getDocs(getLocale) {
     OBCONFIGSERVER_DOCS,
     DOCS_GRAFANA,
     DOCS_PROMETHEUS,
+    OBD_STANDALONE_DOCS,
   };
 }

@@ -19,7 +19,8 @@ import hashlib
 
 
 def start_pre(plugin_context, need_bootstrap=False, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = plugin_context.get_variable('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     options = plugin_context.options
     clusters_cmd = {}
