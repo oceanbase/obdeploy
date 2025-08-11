@@ -4788,16 +4788,13 @@ class ObdHome(object):
                 return False
             cluster_config = deploy_config.components[component_name]
             deploy_config.components[tool_name] = cluster_config
-
         workflow_name='diag'
-        pkg = self.mirror_manager.get_best_pkg(name=tool_name)
-        if not pkg:
-            self._call_stdio('critical', '%s package not found' % tool_name)
-            return False
-        repository = self.repository_manager.create_instance_repository(pkg.name, pkg.version, pkg.md5)
         deployed = self.obdiag_deploy(workflow_name)
         tool = self.tool_manager.get_tool_config_by_name(tool_name)
         if deployed and tool:
+            obdiag_tools = [tool for tool in self.tool_manager.get_tool_list() if tool.name == tool_name]
+            max_version_tool = max(t.config.version for t in obdiag_tools)
+            repository = self.repository_manager.get_repository(tool_name, max_version_tool)
             self.repositories = [repository]
             workflows = self.get_workflows(workflow_name, [repository])
             return self.run_workflow(workflows, deploy_config.components, [repository], **{const.COMP_OCEANBASE_DIAGNOSTIC_TOOL: {"full_cmd": args, "deploy_config": deploy_config}})
