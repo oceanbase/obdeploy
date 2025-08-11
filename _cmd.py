@@ -2017,6 +2017,9 @@ class ObdiagCommand(ObdCommand):
 
     def _do_command(self, obd):
         args = copy.copy(self.args)
+        if args[0]=="deploy":
+            ROOT_IO.print("Use 'obd tool install %s' instead" % COMP_OCEANBASE_DIAGNOSTIC_TOOL)
+            return obd.install_tool(COMP_OCEANBASE_DIAGNOSTIC_TOOL)
         for i in range(len(self.args)):
             if isinstance(self.args[i], str) and (self.args[i].startswith('--') or self.args[i].startswith('-')):
                 if self.args[i] == "--help" or self.args[i] == "-h":
