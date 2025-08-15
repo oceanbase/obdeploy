@@ -18,12 +18,7 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def tenant_optimize(plugin_context, workflow, *args, **kwargs):
-    options = plugin_context.options
-    if not getattr(options, 'skip_cluster_status_check', False):
-        workflow.add(const.STAGE_FIRST, 'status')
-        workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
-    tenant_root_password = getattr(options, 'tenant_root_password', None)
-    workflow.add(const.STAGE_SECOND, 'scenario_check', 'connect')
-    workflow.add_with_kwargs(const.STAGE_SECOND, {'root_password': tenant_root_password}, 'tenant_optimize')
+def init_user(plugin_context, workflow, *args, **kwargs):
+    workflow.add(const.STAGE_FIRST, 'get_client', 'init_user')
     return plugin_context.return_true()
+

@@ -46,7 +46,7 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
     stdio.print(f'cluster name: {cluster_name}')
     stdio.print(f'mysql port: {mysql_port}')
     stdio.print(f'rpc port: {rpc_port}')
-    stdio.print(f'obshell port: {obshell_port}')
+    obshell_port and stdio.print(f'obshell port: {obshell_port}')
     stdio.print(f'cpu count: {cpu_count}')
     stdio.print(f'memory limit: {Capacity(memory_limit)}')
     stdio.print(f'home path: {home_path}' + '/' + 'oceanbase_name')
@@ -107,7 +107,6 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
                     'cluster_name': cluster_name,
                     'mysql_port': mysql_port,
                     'rpc_port': rpc_port,
-                    'obshell_port': obshell_port,
                     'root_password': root_password,
                     'cpu_count': cpu_count,
                     'memory_limit': str(Capacity(memory_limit)),
@@ -125,6 +124,8 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
     }
     if scenario:
         cluster_config[oceanbase_name]['global']['scenario'] = scenario
+    if obshell_port:
+        cluster_config[oceanbase_name]['global']['obshell_port'] = obshell_port
     if component_config:
         cluster_config['obagent'] = {
             'depends': [oceanbase_name],

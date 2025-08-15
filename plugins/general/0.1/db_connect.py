@@ -111,7 +111,14 @@ def db_connect(plugin_context, *args, **kwargs):
                 if component in COMPS_OB:
                     password = global_conf.get("proxyro_password")
                 elif component in ["obproxy", "obproxy-ce"]:
-                    password = global_conf.get("observer_sys_password")
+                    for comp in COMPS_OB:
+                        if comp in cluster_config.depends:
+                            ob_servers = cluster_config.get_depend_servers(comp)
+                            ob_config = cluster_config.get_depend_config(comp, ob_servers[0])
+                            password = ob_config.get("proxyro_password")
+                            break
+                        else:
+                            password = global_conf.get("observer_sys_password")
             if password:
                 connected = test_connect()
         need_password = not connected

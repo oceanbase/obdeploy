@@ -553,9 +553,15 @@ class DeploymentHandler(BaseHandler):
         self.obd.deploy.deploy_config.dump()
 
         ## get obd namespace data
-        data = {}
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
         for component, _ in self.obd.namespaces.items():
-            data[component] = _.get_variable('run_result')
+            comp_data[component] = _.get_variable('run_result')
+        error = self.obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
         COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT_OB, save=True)
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
         self.obd.set_deploy(None)
@@ -580,9 +586,15 @@ class DeploymentHandler(BaseHandler):
         log.get_logger().info("finish do start %s", name)
         
         ## get obd namespace data
-        data = {}
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
         for component, _ in self.obd.namespaces.items():
-            data[component] = _.get_variable('run_result')
+            comp_data[component] = _.get_variable('run_result')
+        error = self.obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
     def get_start_task_info(self, name):
@@ -611,9 +623,15 @@ class DeploymentHandler(BaseHandler):
         log.get_logger().info("finish do stop %s", name)
         
         ## get obd namespace data
-        data = {}
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
         for component, _ in self.obd.namespaces.items():
-            data[component] = _.get_variable('run_result')
+            comp_data[component] = _.get_variable('run_result')
+        error = self.obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
     def get_task_info_log_by_type(self, name, task_type):

@@ -139,20 +139,45 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
                 stdio.error(EC_OBSERVER_CAN_NOT_MIGRATE_IN)
                 return
 
+            # memory options
+            memory_size = get_parsed_option('memory_size', None)
+            log_disk_size = get_parsed_option('log_disk_size', None)
+
             sql = "SELECT * FROM oceanbase.GV$OB_SERVERS where zone in %s" % zone_list
-            servers_stats = cursor.fetchall(sql)
-            if servers_stats is False:
-                error()
-                return
-            cpu_available = servers_stats[0]['CPU_CAPACITY_MAX'] - servers_stats[0]['CPU_ASSIGNED_MAX']
-            mem_available = servers_stats[0]['MEM_CAPACITY'] - servers_stats[0]['MEM_ASSIGNED']
-            disk_available = servers_stats[0]['DATA_DISK_CAPACITY'] - servers_stats[0]['DATA_DISK_IN_USE']
-            log_disk_available = servers_stats[0]['LOG_DISK_CAPACITY'] - servers_stats[0]['LOG_DISK_ASSIGNED']
-            for servers_stat in servers_stats[1:]:
-                cpu_available = min(servers_stat['CPU_CAPACITY_MAX'] - servers_stat['CPU_ASSIGNED_MAX'], cpu_available)
-                mem_available = min(servers_stat['MEM_CAPACITY'] - servers_stat['MEM_ASSIGNED'], mem_available)
-                disk_available = min(servers_stat['DATA_DISK_CAPACITY'] - servers_stat['DATA_DISK_IN_USE'], disk_available)
-                log_disk_available = min(servers_stat['LOG_DISK_CAPACITY'] - servers_stat['LOG_DISK_ASSIGNED'], log_disk_available)
+            try_time = 10
+            while try_time > -1:
+                try_time -= 1
+                servers_stats = cursor.fetchall(sql)
+                if servers_stats is False:
+                    error()
+                    return
+                cpu_available = servers_stats[0]['CPU_CAPACITY_MAX'] - servers_stats[0]['CPU_ASSIGNED_MAX']
+                mem_available = servers_stats[0]['MEM_CAPACITY'] - servers_stats[0]['MEM_ASSIGNED']
+                disk_available = servers_stats[0]['DATA_DISK_CAPACITY'] - servers_stats[0]['DATA_DISK_IN_USE']
+                log_disk_available = servers_stats[0]['LOG_DISK_CAPACITY'] - servers_stats[0]['LOG_DISK_ASSIGNED']
+                for servers_stat in servers_stats[1:]:
+                    cpu_available = min(servers_stat['CPU_CAPACITY_MAX'] - servers_stat['CPU_ASSIGNED_MAX'], cpu_available)
+                    mem_available = min(servers_stat['MEM_CAPACITY'] - servers_stat['MEM_ASSIGNED'], mem_available)
+                    disk_available = min(servers_stat['DATA_DISK_CAPACITY'] - servers_stat['DATA_DISK_IN_USE'], disk_available)
+                    log_disk_available = min(servers_stat['LOG_DISK_CAPACITY'] - servers_stat['LOG_DISK_ASSIGNED'], log_disk_available)
+
+                if memory_size is None:
+                    memory_size = mem_available
+                    if log_disk_size is None:
+                        log_disk_size = log_disk_available
+                if mem_available >= memory_size and (log_disk_size is None or log_disk_available >= log_disk_size):
+                    break
+                if try_time:
+                    time.sleep(1)
+                    continue
+                if mem_available < memory_size:
+                    error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list,available=Capacity(mem_available),need=Capacity(memory_size)))
+                    return plugin_context.return_false()
+
+                # log disk size options
+                if log_disk_size is not None and log_disk_available < log_disk_size:
+                    error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list,available=Capacity(log_disk_available),need=Capacity(log_disk_size)))
+                    return plugin_context.return_false()
 
             MIN_CPU = 1
             MIN_MEMORY = 1073741824
@@ -177,24 +202,6 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
                 return plugin_context.return_false()
             if max_cpu < min_cpu:
                 error('min_cpu must less then max_cpu')
-                return plugin_context.return_false()
-
-            # memory options
-            memory_size = get_parsed_option('memory_size', None)
-            log_disk_size = get_parsed_option('log_disk_size', None)
-
-            if memory_size is None:
-                memory_size = mem_available
-                if log_disk_size is None:
-                    log_disk_size = log_disk_available
-
-            if mem_available < memory_size:
-                error('{zone} not enough memory. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(mem_available), need=Capacity(memory_size)))
-                return plugin_context.return_false()
-
-            # log disk size options
-            if log_disk_size is not None and log_disk_available < log_disk_size:
-                error('{zone} not enough log_disk. (Available: {available}, Need: {need})'.format(zone=zone_list, available=Capacity(log_disk_available), need=Capacity(log_disk_size)))
                 return plugin_context.return_false()
 
             # iops options

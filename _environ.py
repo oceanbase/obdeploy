@@ -59,7 +59,7 @@ ENV_OBD_INSTALL_PRE = "OBD_INSTALL_PRE"
 # obdeploy install path. default /usr/obd/
 ENV_OBD_INSTALL_PATH = "OBD_INSTALL_PATH"
 
-# obd web idle minite time before shutdown. default 30
+# obd web idle minite time before shutdown. default 120
 # if you do not want to set idle time, you can set it to "infinity"
 ENV_IDLE_TIME_BEFORE_SHUTDOWN_MINITES = "IDLE_TIME_BEFORE_SHUTDOWN_MINITES"
 

@@ -145,7 +145,6 @@ def connect(plugin_context, target_server=None, connect_proxysys=True, *args, **
                 continue
             odp_config = cluster_config.get_global_conf()
             config_map = {
-                'observer_sys_password': 'proxyro_password',
                 'cluster_name': 'appname',
                 'observer_root_password': 'root_password'
             }

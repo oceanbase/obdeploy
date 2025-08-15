@@ -91,42 +91,44 @@ def import_time_zone(plugin_context, config_encrypted, create_tenant_options=[],
             plugin_context.set_variable('root_password', root_password)
             plugin_context.set_variable('mode', mode)
 
-        time_zone = getattr(options, 'time_zone', '')
-        if not time_zone:
-            time_zone = client.execute_command('date +%:z').stdout.strip()
-        exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
+        for repository in repositories:
+            if repository.name in const.COMPS_OB:
+                if is_support_sdk_import_timezone(repository.version):
+                    cursor.execute('set session ob_query_timeout=1000000000')
+                    sql = "ALTER SYSTEM LOAD MODULE DATA module = timezone tenant = '%s' infile = 'etc/'" % name
+                    res = cursor.execute(sql, stdio=stdio)
+                    if not res:
+                        stdio.warn("execute timezone sql failed")
+                    sql = "ALTER SYSTEM LOAD MODULE DATA module = gis tenant = '%s' infile = 'etc/';" % name
+                    res = cursor.execute(sql, stdio=stdio)
+                    if not res:
+                        stdio.warn("execute gis sql failed")
+                else:
+                    time_zone = getattr(options, 'time_zone', '')
+                    if not time_zone:
+                        time_zone = client.execute_command('date +%:z').stdout.strip()
+                    exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
+                    exector_path = getattr(options, 'exector_path', '/usr/obd/lib/executer')
+                    exector = Exector(tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user, tenant_cursor.password, exector_path, stdio)
+                    time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
+                    srs_data_param = os.path.join(repository.repository_dir, 'etc', 'default_srs_data_mysql.sql')
+                    if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
+                        stdio.warn('execute import_time_zone_info.py failed')
+                    if not exector.exec_script('import_srs_data.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), srs_data_param)):
+                        stdio.warn('execute import_srs_data.py failed')
+                    break
 
-        exector_path = getattr(options, 'exector_path', '/usr/obd/lib/executer')
-        if tenant_cursor:
-            exector = Exector(tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user, tenant_cursor.password, exector_path, stdio)
-            for repository in repositories:
-                if repository.name in const.COMPS_OB:
-                    if is_support_sdk_import_timezone(repository.version):
-                        sql = "ALTER SYSTEM LOAD MODULE DATA module = timezone tenant = '%s' infile = 'etc/'" % name
-                        res = cursor.execute(sql, stdio=stdio)
-                        if not res:
-                            stdio.warn("execute timezone sql failed")
-                        sql = "ALTER SYSTEM LOAD MODULE DATA module = gis tenant = '%s' infile = 'etc/';" % name
-                        res = cursor.execute(sql, stdio=stdio)
-                        if not res:
-                            stdio.warn("execute gis sql failed")
-                    else:
-                        time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
-                        srs_data_param = os.path.join(repository.repository_dir, 'etc', 'default_srs_data_mysql.sql')
-                        if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
-                            stdio.warn('execute import_time_zone_info.py failed')
-                        if not exector.exec_script('import_srs_data.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), srs_data_param)):
-                            stdio.warn('execute import_srs_data.py failed')
-                        break
-            cursors.append(tenant_cursor)
-            if mode == 'mysql':
-                cmd_str = "obclient -h%s -P\'%s\' %s -u%s -Doceanbase -A\n"
-                no_password_cmd = "obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n"
-            else:
-                cmd_str = "obclient -h%s -P\'%s\' %s -u%s -A\n"
-                no_password_cmd = "obclient -h%s -P\'%s\' -u%s -A\n"
-            cmd_str = cmd_str % (tenant_cursor.ip, tenant_cursor.port, f"-p'{root_password}'" if not config_encrypted else '', tenant_cursor.user)
-            no_password_cmd = no_password_cmd % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
-            cmd = FormatText.success(cmd_str)
-            stdio.print(cmd)
+        if mode == 'mysql':
+            cmd_str = "obclient -h%s -P\'%s\' %s -u%s -Doceanbase -A\n"
+            no_password_cmd = "obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n"
+        else:
+            cmd_str = "obclient -h%s -P\'%s\' %s -u%s -A\n"
+            no_password_cmd = "obclient -h%s -P\'%s\' -u%s -A\n"
+        if not tenant_cursor:
+            exec_sql_in_tenant(sql="select 1;", cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
+        cmd_str = cmd_str % (tenant_cursor.ip, tenant_cursor.port, f"-p'{root_password}'" if not config_encrypted else '', tenant_cursor.user)
+        no_password_cmd = no_password_cmd % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
+        cursors.append(tenant_cursor)
+        cmd = FormatText.success(cmd_str)
+        stdio.print(cmd)
     return plugin_context.return_true(tenant_cursor=cursors, cmd=no_password_cmd)

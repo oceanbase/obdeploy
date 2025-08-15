@@ -865,9 +865,15 @@ class OcpHandler(BaseHandler):
         self.context['process_installed'][task_id] = 'done'
 
         ## get obd namespace data and report telemetry
-        data = {}
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
         for component, _ in self.obd.namespaces.items():
-            data[component] = _.get_variable('run_result')
+            comp_data[component] = _.get_variable('run_result')
+        error = self.obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
         COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT_OCP, save=True)
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 
@@ -1054,9 +1060,15 @@ class OcpHandler(BaseHandler):
         self.context['process_installed'][task_id] = 'done'
 
         ## get obd namespace data and report telemetry
-        data = {}
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
         for component, _ in self.obd.namespaces.items():
-            data[component] = _.get_variable('run_result')
+            comp_data[component] = _.get_variable('run_result')
+        error = self.obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
         COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, TELEMETRY_COMPONENT_OCP, save=True)
         LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' > /dev/null &" % (name, json.dumps(data)))
 

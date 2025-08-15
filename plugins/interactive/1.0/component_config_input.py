@@ -26,6 +26,7 @@ def component_config_input(plugin_context, client, *args, **kwargs):
     ports = plugin_context.get_variable('ports')
     while True:
         monagent_http_port = stdio.read('Enter the OBAgent monitoring service port (Default: 8088):', blocked=True).strip() or 8088
+        monagent_http_port = int(monagent_http_port)
         rv, ports = port_check(monagent_http_port, client, ports, stdio)
         if rv:
             break
@@ -33,6 +34,7 @@ def component_config_input(plugin_context, client, *args, **kwargs):
             continue
     while True:
         mgragent_http_port = stdio.read('Enter the OBAgent management service port (Default: 8089):', blocked=True).strip() or 8089
+        mgragent_http_port = int(mgragent_http_port)
         rv, ports = port_check(mgragent_http_port, client, ports, stdio)
         if rv:
             break
@@ -40,6 +42,7 @@ def component_config_input(plugin_context, client, *args, **kwargs):
             continue
     while True:
         prometheus_port = stdio.read('Enter the Prometheus port (Default: 9090):', blocked=True).strip() or 9090
+        prometheus_port = int(prometheus_port)
         rv, ports = port_check(prometheus_port, client, ports, stdio)
         if rv:
             break
@@ -47,6 +50,7 @@ def component_config_input(plugin_context, client, *args, **kwargs):
             continue
     while True:
         grafana_port = stdio.read('Enter the Grafana port (Default: 3000):', blocked=True).strip() or 3000
+        grafana_port = int(grafana_port)
         rv, ports = port_check(grafana_port, client, ports, stdio)
         if rv:
             break

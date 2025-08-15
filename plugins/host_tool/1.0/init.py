@@ -15,39 +15,56 @@
 
 from __future__ import absolute_import, division, print_function
 
-import re
-import _errno as err
 from _stdio import FormatText
-from ssh import get_root_permission_client
+from tool import set_system_conf, get_option, get_sudo_prefix
 
 
-def set_system_conf(client, ip, var, value, stdio, var_type='ulimits'):
-    if var_type == 'ulimits':
-        if not client.execute_command('echo -e "{username} soft {name} {value}\\n{username} hard {name} {value}" | sudo tee -a /etc/security/limits.d/{name}.conf'.format(username=client.config.username,name=var, value=value)):
-            return False
-    else:
-        ret = client.execute_command('echo "{0}={1}" | sudo tee -a /etc/sysctl.conf; sudo sysctl -p'.format(var, value))
-        if not ret:
-            if ret.stdout and "%s = %s" % (var, value) == ret.stdout.strip().split('\n')[-1]:
-                return True
-            else:
-                stdio.error(err.WC_CHANGE_SYSTEM_PARAMETER_FAILED.format(server=ip, key=var))
-                return False
-    return True
-
-
-def init(plugin_context, host_clients, need_change_servers_vars, ulimit_check=None,*args, **kwargs):
+def init(plugin_context, host_clients, need_change_servers_vars, machine_check_items, ulimit_check=None, *args, **kwargs):
     stdio = plugin_context.stdio
+    options = plugin_context.options
     changed_vars = []
     success = True
     for ip, client in host_clients.items():
+        sudo_prefix = get_sudo_prefix(client)
+        if not machine_check_items[ip]['firewalld']:
+            firewalld_disable = True
+            stdio.start_loading("disabling firewalld")
+            if client.execute_command('cat /etc/redhat-release'):
+                firewalld_name = 'firewalld'
+            else:
+                firewalld_name = 'ufw'
+            if client.execute_command('systemctl is-active %s ' % firewalld_name).stdout.strip() == 'active':
+                if not client.execute_command(sudo_prefix + 'systemctl stop %s' % firewalld_name):
+                    firewalld_disable = False
+            if client.execute_command('systemctl is-enabled %s' % firewalld_name).stdout.strip() == 'enabled':
+                if not client.execute_command(sudo_prefix + 'systemctl disable %s' % firewalld_name):
+                    firewalld_disable = False
+            stdio.stop_loading('succeed' if firewalld_disable else 'fail')
+        if not machine_check_items[ip]['selinux']:
+            selinux_disable = False
+            stdio.start_loading("disabling selinux")
+            if client.execute_command(f"{sudo_prefix}sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config; {sudo_prefix}setenforce 0"):
+                selinux_disable = True
+            stdio.stop_loading('succeed' if selinux_disable else 'fail')
+
+        if not machine_check_items[ip]['dir_check']:
+            chown_dir = True
+            stdio.start_loading("chown dir")
+            username = get_option(options, 'username', client.config.username)
+            for dir_path in ["/data/1", "/data/log1"]:
+                if not client.execute_command(sudo_prefix + 'chown -R %s %s' % (username, dir_path)):
+                    chown_dir = False
+            stdio.stop_loading('succeed' if chown_dir else 'fail')
+
         need_change_vars = need_change_servers_vars[ip]
+        need_change_vars and stdio.print("modify system parameters")
         for item in need_change_vars:
-            if not set_system_conf(client, ip, item['var'], item['value'], stdio, item['var_type']):
+            if not set_system_conf(client, ip, item['var'], item['value'], stdio, item['var_type'], username=get_option(options, 'username')):
                 success = False
                 break
             changed_vars.append(item['var'])
-        changed_vars and stdio.print(FormatText.success('%s: ( %s ) have been successfully modified!' % (ip, ','.join(changed_vars))))
+        changed_vars and stdio.verbose(FormatText.success('%s: ( %s ) have been successfully modified!' % (ip, ','.join(changed_vars))))
+        changed_vars and stdio.print(FormatText.success('%s: ( %s ) have been successfully modified!' % (ip, (','.join(changed_vars[:5])) + '...')))
     need_reboot_ips = ulimit_check(host_clients, only_check=True)
     if not success:
         return plugin_context.return_false()

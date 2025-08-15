@@ -403,6 +403,7 @@ class IO(object):
         self._output_is_tty = False
         self._input_is_tty = False
         self._exit_buffer = SetBufferIO()
+        self._error_buffer = SetBufferIO()
         self.set_input_stream(input_stream)
         self.set_output_stream(output_stream)
 
@@ -550,6 +551,11 @@ class IO(object):
         if self._root_io:
             return self._root_io.get_exit_buffer()
         return self._exit_buffer
+
+    def get_error_buffer(self):
+        if self._root_io:
+            return self._root_io.get_error_buffer()
+        return self._error_buffer
 
     def _start_buffer_io(self):
         if self._root_io:
@@ -811,6 +817,9 @@ class IO(object):
         self._print(MsgLevel.WARN, msg, prev_msg=self.WARNING_PREV.format(self.isatty()), *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
+        error_buffer = self.get_error_buffer()
+        error_msg = self.log_masking(str(msg), ip_masking=True)
+        error_buffer.write(error_msg)
         self._print(MsgLevel.ERROR, msg, prev_msg=self.ERROR_PREV.format(self.isatty()), *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
@@ -824,18 +833,18 @@ class IO(object):
             self.exit(code)
 
     def contains_keys(self, msg):
-        keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT", "PASSWD", "_PASSKEY", "SUDO", "ACCESS_"]
+        keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT", "PASSWD", "_PASSKEY", "SUDO", "ACCESS_", "HOST INIT", "CHPASSWD"]
         return any(keyword in msg.upper() for keyword in keywords)
     
     def table_log_masking(self, msg):
-        regex = r'(\|\s*(http://[^\s]+)\s*\|\s*admin\s*\|\s*)(\S+)(\s*\|\s*active\s*\|)'
+        regex = r"(\|\s*http://[^\s]+\s*\|\s*\S+\s*\|\s*')([^']*)('\s*\|\s*active\s*\|)"
         pattern = re.compile(regex)
         str_msg = str(msg)
         if 'active' in str_msg:
             match = re.search(pattern, str_msg)
             if match:
-                masked_password = "*"*len(match.group(3))
-                str_msg = pattern.sub(rf"\1{masked_password}\4", str_msg)
+                masked_password = "*"*len(match.group(2))
+                str_msg = pattern.sub(rf"\1{masked_password}\3", str_msg)
         elif 'access_' in str_msg:
             access_regex = r"(access_id=)[^&]*|(access_key=)[^&,| ]*"
             access_pattern = re.compile(access_regex)
@@ -853,7 +862,7 @@ class IO(object):
     def log_masking_static(msg):
         def contains_keys(msg):
             keywords = ["IDENTIFIED", "PASSWORD", "CONNECT", "EXECUTER", "CLIENT", "PASSWD", "_PASSKEY", "SUDO",
-                        "ACCESS_"]
+                        "ACCESS_", "HOST INIT", "CHPASSWD"]
             return any(keyword in msg.upper() for keyword in keywords)
 
         log_regex = [
@@ -891,6 +900,18 @@ class IO(object):
             if "IDENTIFIED BY" in msg:
                 return desensitize_sql_pwd(msg)
 
+            if "host init" in msg:
+                host_reg = r'(obd host init\s+.*?)(-p\s+)([^\s\'\"\`]+)'
+                host_pattern = re.compile(host_reg)
+                if host_pattern.search(msg):
+                    return host_pattern.sub(r'\1\2******', msg)
+
+            if "chpasswd" in msg:
+                chpasswd_reg = r'(echo\s*"[^:]+:)([^"]+)(".*chpasswd)'
+                chpasswd_pattern = re.compile(chpasswd_reg)
+                if chpasswd_pattern.search(msg):
+                    return chpasswd_pattern.sub(r'\1******\3', msg)
+
             pwd_args_regex = r"(_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
             arg_pattern = re.compile(pwd_args_regex)
             if arg_pattern.search(msg):
@@ -910,9 +931,15 @@ class IO(object):
             pwd_pattern = re.compile(echo_pwd_regex)
             if pwd_pattern.search(msg):
                 return pwd_pattern.sub(r"\1******\3", msg)
+
+            opts_regex = r'(\'password\':\s*\')([^\']+)(\')'
+            opts_pattern = re.compile(opts_regex)
+            if opts_pattern.search(msg):
+                return opts_pattern.sub(r"\1******\3", msg)
+
         return msg
 
-    def log_masking(self, msg):
+    def log_masking(self, msg, ip_masking=False):
         log_regex = [
             r"((-P\s*\S+\s+.*?)-p\s*['\"]?)([^\s'\"']+)(['\"]*)",
             r"(_PASSWORD\s*(=|to)\s*['\"]*)([^\s'\"']+)(['\"]*)",
@@ -947,7 +974,20 @@ class IO(object):
 
             if "IDENTIFIED BY" in msg:
                 return desensitize_sql_pwd(msg)
-            
+
+            if "host init" in msg:
+                host_reg = r'(obd host init\s+.*?)(-p\s+)([^\s\'\"\`]+)'
+                host_pattern = re.compile(host_reg)
+                if host_pattern.search(msg):
+                    return host_pattern.sub(r'\1\2******', msg)
+
+            if "chpasswd" in msg:
+                chpasswd_reg = r'(echo\s*"[^:]+:)([^"]+)(".*chpasswd)'
+                chpasswd_pattern = re.compile(chpasswd_reg)
+                if chpasswd_pattern.search(msg):
+                    return chpasswd_pattern.sub(r'\1******\3', msg)
+
+
             pwd_args_regex = r"(_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"
             arg_pattern = re.compile(pwd_args_regex)
             if arg_pattern.search(msg):
@@ -967,6 +1007,16 @@ class IO(object):
             pwd_pattern = re.compile(echo_pwd_regex)
             if pwd_pattern.search(msg):
                 return pwd_pattern.sub(r"\1******\3", msg)
+
+            opts_regex = r'(\'password\':\s*\')([^\']+)(\')'
+            opts_pattern = re.compile(opts_regex)
+            if opts_pattern.search(msg):
+                return opts_pattern.sub(r"\1******\3", msg)
+
+        if ip_masking:
+            ipv4_pattern = r'\b(?:\d{1,3}\.){2}\d{1,3}\.\d{1,3}\b'
+            msg = re.sub(ipv4_pattern, "***.***.***.***", msg)
+
         return msg
 
     def verbose(self, msg, *args, **kwargs):

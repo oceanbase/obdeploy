@@ -79,16 +79,15 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
                 stdio.print(FormatText.error(f"Failed to create directory {dir_path}"))
                 flag = True
 
-            if memory_limit is not None:
+            if memory_limit is not None and client.execute_command("ls %s" % dir_path):
                 client.execute_command(f'mkdir -p {dir_path}')
                 df_cmd = (
-                        "df -k '" + dir_path + "' | "
-                                               "tail -1 | "
-                                               "awk '{print $4}'"
+                        "df -k '" + dir_path + "' | tail -1 | awk '{print $4}'"
                 )
 
                 try:
                     avail_bytes = client.execute_command(df_cmd)
+                    stdio.verbose(f"Available disk space: {avail_bytes.stdout.strip()}")
                     disk_available = int(avail_bytes.stdout.strip()) * 1024
 
                     if disk_available < 3 * memory_limit:
@@ -212,14 +211,16 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
             break
         else:
             continue
-    while True:
-        obshell_port = stdio.read('Enter the obshell port (Default: 2886): ', blocked=True).strip() or 2886
-        obshell_port = int(obshell_port)
-        rv, ports = port_check(obshell_port, client, ports, stdio)
-        if rv:
-            break
-        else:
-            continue
+    obshell_port = None
+    if oceanbase_pkg.name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
+        while True:
+            obshell_port = stdio.read('Enter the obshell port (Default: 2886): ', blocked=True).strip() or 2886
+            obshell_port = int(obshell_port)
+            rv, ports = port_check(obshell_port, client, ports, stdio)
+            if rv:
+                break
+            else:
+                continue
     while True:
         default_root_password = ConfigUtil.get_random_pwd_by_total_length(20)
         root_password = getpass.getpass("Enter the OB root password (Default: %s): " % default_root_password).strip() or default_root_password
@@ -231,7 +232,7 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
         else:
             stdio.print(FormatText.error('The two passwords do not match. Please try again.'))
     while True:
-        default_cpu_count = client.execute_command("""lscpu | grep -E "Core"| awk -F':'  '{print $2}'""").stdout.strip()
+        default_cpu_count = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l").stdout.strip()
         cpu_count = stdio.read(f'Enter the OB cpu count (Default: {default_cpu_count}): ', blocked=True).strip() or default_cpu_count
         if not cpu_count.isdigit():
             stdio.print(FormatText.error('Invalid cpu count. Please try again.'))

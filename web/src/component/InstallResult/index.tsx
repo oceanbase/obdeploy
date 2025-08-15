@@ -164,7 +164,7 @@ const InstallResult: React.FC<InstallResultProps> = ({
       const data = res?.data;
 
       if (!isEmpty(res?.data)) {
-        telemetryReport({ component: 'obd', content: data });
+        telemetryReport({ component: 'obd', content: data?.data });
       }
     },
   });
@@ -593,13 +593,13 @@ const InstallResult: React.FC<InstallResultProps> = ({
             <Space>
               {type === 'update'
                 ? intl.formatMessage({
-                    id: 'OBD.component.InstallResult.UpgradeLogs',
-                    defaultMessage: '升级日志',
-                  })
+                  id: 'OBD.component.InstallResult.UpgradeLogs',
+                  defaultMessage: '升级日志',
+                })
                 : intl.formatMessage({
-                    id: 'OBD.component.InstallResult.DeploymentLogs',
-                    defaultMessage: '部署日志',
-                  })}
+                  id: 'OBD.component.InstallResult.DeploymentLogs',
+                  defaultMessage: '部署日志',
+                })}
               <span
                 style={{
                   cursor: 'pointer',
