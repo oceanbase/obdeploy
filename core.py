@@ -2435,6 +2435,7 @@ class ObdHome(object):
             return False
 
         self.set_repositories(standby_repositories)
+        self.search_param_plugin_and_apply(standby_repositories, standby_deploy.deploy_config)
         standby_type = getattr(self.options, 'type')
         if standby_type not in [SERVICE_MODE, LOCATION_MODE]:
             self._call_stdio('error', "The value of type must be 'SERVICE' or 'LOCATION' and cannot be other values")
@@ -6140,6 +6141,7 @@ class ObdHome(object):
                 host,
                 username,
                 password,
+                key_filename=getattr(self.options, 'ssh_key_file', None)
             ),
             self.stdio
         )
@@ -6154,17 +6156,6 @@ class ObdHome(object):
         workflows = self.get_workflows('precheck')
         if not self.run_workflow(workflows, **{'host_tool': {'host_clients': clients}}):
             return False
-
-        need_change_servers_vars = self.get_namespace('host_tool').get_return('precheck').get_return('need_change_servers_vars')
-        print_data = []
-        for v in need_change_servers_vars.values():
-            print_data.extend(v)
-        if not print_data:
-            self._call_stdio('print', FormatText.success('No need to change system parameters'))
-            return True
-        self._call_stdio('print_list', print_data, ['ip', 'need_change_var', 'current_value', 'target_value'],
-                         lambda x: [x['server'], x['var'], x['current_value'], x['value']],
-                         title='System Parameter Change List')
         if dev:
             return 100
         return True
@@ -6179,6 +6170,7 @@ class ObdHome(object):
                 host,
                 username,
                 password,
+                key_filename=getattr(self.options, 'ssh_key_file', None)
             ),
             self.stdio
         )
@@ -6191,7 +6183,7 @@ class ObdHome(object):
         self.set_repositories([host_tool_repository])
 
         workflows = self.get_workflows('init')
-        if not self.run_workflow(workflows, **{'host_tool': {'host_clients': clients}}):
+        if not self.run_workflow(workflows, **{'host_tool': {'host_clients': clients, 'print_recommend_cmd': False}}):
             return False
 
         need_reboot_ips = self.get_namespace('host_tool').get_return('init').get_return('need_reboot_ips')
@@ -6200,6 +6192,19 @@ class ObdHome(object):
                 return 101
             else:
                 self._call_stdio('print', FormatText.warning('You must reboot the following servers to ensure the ulimit parameters take effect: （{servers}）.'.format(servers=','.join(list(need_reboot_ips)))))
+        return True
+
+    def host_user_init(self):
+        host_tool_repository = self.repository_manager.get_repository_allow_shadow('host_tool', '1.0')
+        self.set_repositories([host_tool_repository])
+
+        workflows = self.get_workflows('init_user')
+        if not self.run_workflow(workflows):
+            return False
+
+        need_reboot_ips = self.get_namespace('host_tool').get_return('init').get_return('need_reboot_ips')
+        if need_reboot_ips:
+            self._call_stdio('print', FormatText.warning('You must reboot the following servers to ensure the ulimit parameters take effect: （{servers}）.'.format(servers=','.join(list(need_reboot_ips)))))
         return True
 
     def interactive_deploy(self, name):

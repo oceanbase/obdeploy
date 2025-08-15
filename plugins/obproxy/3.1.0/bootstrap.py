@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+from const import COMPS_OB
 
 def bootstrap(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
@@ -28,7 +29,14 @@ def bootstrap(plugin_context, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         for key in ['observer_sys_password']:
             sql = 'alter proxyconfig set %s = %%s' % key
-            value = server_config.get(key, '')
+            for comp in COMPS_OB:
+                if comp in cluster_config.depends:
+                    ob_servers = cluster_config.get_depend_servers(comp)
+                    ob_config = cluster_config.get_depend_config(comp, ob_servers[0])
+                    value = ob_config.get('proxyro_password', '')
+                    break
+                else:
+                    value = server_config.get(key, '')
             value = '' if value is None else str(value)
             ret = cursor[server].execute(sql, [value], exc_level="verbose")
             if ret is False:

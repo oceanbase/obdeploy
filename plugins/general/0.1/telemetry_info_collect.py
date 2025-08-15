@@ -188,14 +188,20 @@ class ObdInfo:
 
 def init_telemetry_data(opt_data):
     data = telemetry_base_data()
-    for component, _ in json.loads(opt_data).items():
-        for plugin_name, _ in _.items():
-            plugin_data = {}
-            plugin_data['component'] = component
-            plugin_data['name'] = plugin_name
-            plugin_data['runTime'] = _['time']
-            plugin_data['runResult'] = _['result']
-            data['plugins'].append(plugin_data)
+    for key, value in json.loads(opt_data).items():
+        if key == 'error_messages':
+            data['error_messages'] = value
+            continue
+        if key == 'component':
+            comp_data = value
+            for component, _ in comp_data.items():
+                for plugin_name, _ in _.items():
+                    plugin_data = {}
+                    plugin_data['component'] = component
+                    plugin_data['name'] = plugin_name
+                    plugin_data['runTime'] = _['time']
+                    plugin_data['runResult'] = _['result']
+                    data['plugins'].append(plugin_data)
 
     return data
 
@@ -216,6 +222,7 @@ def telemetry_base_data():
     data['instances'] = []
 
     data['plugins'] = []
+    data['error_messages'] = ''
     return data
 
 

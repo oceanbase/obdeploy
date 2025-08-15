@@ -80,7 +80,7 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
       const data = res?.data;
 
       if (!isEmpty(res?.data)) {
-        telemetryReport({ component: 'obd', content: data });
+        telemetryReport({ component: 'obd', content: data?.data });
       }
     },
   });
@@ -141,8 +141,8 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                   ? '/assets/install/successful.png'
                   : '/assets/install/metadbSuccessful.png'
                 : installType === 'OCP'
-                ? '/assets/install/failed.png'
-                : '/assets/install/metadbFailed.png'
+                  ? '/assets/install/failed.png'
+                  : '/assets/install/metadbFailed.png'
             }
             alt="resultLogo"
             style={{

@@ -400,7 +400,7 @@ class SshClient(SafeStdio):
     def is_localhost(self, stdio=None):
         return self.config.host in self.LOCAL_HOST
 
-    def _login(self, stdio=None, exit=True):
+    def _login(self, stdio=None, exit=True, stdio_func=None):
         if self.is_connected:
             return True
         err = None
@@ -429,9 +429,15 @@ class SshClient(SafeStdio):
             err = EC_SSH_CONNECT.format(user=self.config.username, ip=self.config.host, message=e)
         if err is not None:
             if exit:
-                stdio.critical(err)
+                if stdio_func:
+                    getattr(stdio, stdio_func)(err)
+                else:
+                    stdio.critical(err)
                 return err
-            stdio.error(err)
+            if stdio_func:
+                getattr(stdio, stdio_func)(err)
+            else:
+                stdio.error(err)
             return err
         return self.is_connected
 
@@ -448,10 +454,10 @@ class SshClient(SafeStdio):
         return self.is_localhost() and self.config.username == getpass.getuser() or \
             (COMMAND_ENV.get(ENV_HOST_IP_MODE, '0') == '1' and self.config.host in NetUtil.get_all_ips())
 
-    def connect(self, stdio=None, exit=True):
+    def connect(self, stdio=None, exit=True, stdio_func=None):
         if self._is_local:
             return True
-        return self._login(stdio=stdio, exit=exit)
+        return self._login(stdio=stdio, exit=exit, stdio_func=stdio_func)
 
     def reconnect(self, stdio=None):
         self.close(stdio=stdio)

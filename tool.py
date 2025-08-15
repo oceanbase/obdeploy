@@ -42,6 +42,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from ruamel.yaml import YAML, YAMLContextManager, representer
 import _environ as ENV
+import _errno
 from _errno import EC_SQL_EXECUTE_FAILED
 from _stdio import SafeStdio, FormatText
 
@@ -1234,4 +1235,25 @@ def byte_to_GB(byte):
     return int(byte // (1024 * 1024 * 1024))
 
 
+def set_system_conf(client, ip, var, value, stdio, var_type='ulimits', username=None):
+    sudo_prefix = get_sudo_prefix(client)
+    if var_type == 'ulimits':
+        if not client.execute_command('echo -e "{username} soft {name} {value}\\n{username} hard {name} {value}" | {sudo_prefix}tee -a /etc/security/limits.d/{name}.conf'.format(username=username or client.config.username, name=var, value=value, sudo_prefix=sudo_prefix)):
+            return False
+    else:
+        ret = client.execute_command('echo "{0}={1}" | {2}tee -a /etc/sysctl.conf; sudo sysctl -p'.format(var, value, sudo_prefix))
+        if not ret:
+            if ret.stdout and "%s = %s" % (var, value) == ret.stdout.strip().split('\n')[-1]:
+                return True
+            else:
+                stdio.error(_errno.WC_CHANGE_SYSTEM_PARAMETER_FAILED.format(server=ip, key=var))
+                return False
+    return True
+
+
+def get_sudo_prefix(client):
+    prefix = 'sudo '
+    if client.config.username == 'root':
+        prefix = ''
+    return prefix
 

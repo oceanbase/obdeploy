@@ -749,9 +749,15 @@ class ClusterMirrorCommand(ObdCommand):
         return self
 
     def get_obd_namespaces_data(self, obd):
-        data = {}
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
         for component, _ in obd.namespaces.items():
-            data[component] = _.get_variable('run_result')
+            comp_data[component] = _.get_variable('run_result')
+        error = obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
         return data
 
 
@@ -1378,6 +1384,7 @@ class ClusterTenantOptimizeCommand(ClusterMirrorCommand):
     def __init__(self):
         super(ClusterTenantOptimizeCommand, self).__init__('optimize','Optimizing existing tenant scenarios')
         self.parser.add_option('-o', '--optimize', type='string', help='Optimize scenarios,the default is consistent with the cluster dimension.\n{express_oltp, complex_oltp, olap, htap, kv}\nSupported since version 4.3.')
+        self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password.")
 
     def init(self, cmd, args):
         super(ClusterTenantOptimizeCommand, self).init(cmd, args)
@@ -2602,6 +2609,14 @@ class HostCommand(MajorCommand):
         super(HostCommand, self).__init__('host', 'Host tools')
         self.register_command(HostPrecheckCommand())
         self.register_command(HostInitCommand())
+        self.register_command(HostUserCommand())
+
+
+class HostUserCommand(MajorCommand):
+
+    def __init__(self):
+        super(HostUserCommand, self).__init__('user', 'Host user tools')
+        self.register_command(HostUserInitCommand())
 
 
 class HostPrecheckCommand(ObdCommand):
@@ -2609,9 +2624,12 @@ class HostPrecheckCommand(ObdCommand):
     def __init__(self):
         super(HostPrecheckCommand, self).__init__('precheck', 'Pre check host system parameters')
         self.parser.add_option('-p', '--password', type='str', help="Password of username, default is empty.")
+        self.parser.add_option('-u', '--username', type='str', help="Users to be checked (default: ssh user).")
+        self.parser.add_option('--ssh-key-file', type='string', help="ssh key file")
+
     def init(self, cmd, args):
         super(HostPrecheckCommand, self).init(cmd, args)
-        self.parser.set_usage('%s <username>  <server ip>' % self.prev_cmd)
+        self.parser.set_usage('%s <ssh username>  <server ip>' % self.prev_cmd)
         return self
 
     def _do_command(self, obd):
@@ -2632,10 +2650,12 @@ class HostInitCommand(ObdCommand):
     def __init__(self):
         super(HostInitCommand, self).__init__('init', 'Init server environment.')
         self.parser.add_option('-p', '--password', type='str', help="Password of username, default is empty.")
+        self.parser.add_option('-u', '--username', type='str', help="Users to be checked (default: ssh user).")
+        self.parser.add_option('--ssh-key-file', type='string', help="ssh key file")
 
     def init(self, cmd, args):
         super(HostInitCommand, self).init(cmd, args)
-        self.parser.set_usage('%s <username>  <server ip>' % self.prev_cmd)
+        self.parser.set_usage('%s <ssh username>  <server ip>' % self.prev_cmd)
         return self
 
     def _do_command(self, obd):
@@ -2649,6 +2669,18 @@ class HostInitCommand(ObdCommand):
                 return CmdReturn(cmd_ret, cmd_ret)
         else:
             return self._show_help()
+
+
+class HostUserInitCommand(ObdCommand):
+
+    def __init__(self):
+        super(HostUserInitCommand, self).__init__('init', 'Init host user.')
+        self.parser.add_option('-u', '--username', type='str', help="username, default is admin.")
+        self.parser.add_option('-p', '--password', type='str', help="Password of username.")
+        self.parser.add_option('--host', type='str', help="host ip, default is 127.0.0.1.")
+
+    def _do_command(self, obd):
+        return obd.host_user_init()
 
 
 class DevHostInitCommand(ObdCommand):

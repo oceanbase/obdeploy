@@ -181,7 +181,7 @@ export default function InstallResultComp({
       const data = res?.data;
 
       if (!isEmpty(res?.data)) {
-        telemetryReport({ component: 'obd', content: data });
+        telemetryReport({ component: 'obd', content: data?.data });
       }
     },
   });
@@ -221,13 +221,13 @@ export default function InstallResultComp({
             >
               {type === ResultType.OBInstall
                 ? intl.formatMessage({
-                    id: 'OBD.pages.components.InstallFinished.OceanbaseSuccessfullyDeployed',
-                    defaultMessage: 'OceanBase 部署成功!',
-                  })
+                  id: 'OBD.pages.components.InstallFinished.OceanbaseSuccessfullyDeployed',
+                  defaultMessage: 'OceanBase 部署成功!',
+                })
                 : intl.formatMessage({
-                    id: 'OBD.component.InstallResultComp.ComponentDeploymentSucceeded',
-                    defaultMessage: '组件部署成功',
-                  })}
+                  id: 'OBD.component.InstallResultComp.ComponentDeploymentSucceeded',
+                  defaultMessage: '组件部署成功',
+                })}
             </div>
           ) : (
             <div
@@ -241,13 +241,13 @@ export default function InstallResultComp({
             >
               {type === ResultType.OBInstall
                 ? intl.formatMessage({
-                    id: 'OBD.pages.components.InstallFinished.OceanbaseDeploymentFailed',
-                    defaultMessage: 'OceanBase 部署失败',
-                  })
+                  id: 'OBD.pages.components.InstallFinished.OceanbaseDeploymentFailed',
+                  defaultMessage: 'OceanBase 部署失败',
+                })
                 : intl.formatMessage({
-                    id: 'OBD.component.InstallResultComp.ComponentDeploymentFailed',
-                    defaultMessage: '组件部署失败',
-                  })}
+                  id: 'OBD.component.InstallResultComp.ComponentDeploymentFailed',
+                  defaultMessage: '组件部署失败',
+                })}
             </div>
           )
         }

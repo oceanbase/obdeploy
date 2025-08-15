@@ -31,7 +31,7 @@ def exec_sql_in_tenant(cursor, tenant, mode='mysql', user='', password='', print
         tenant_ip = tenant_server_port['SVR_IP']
         tenant_port = tenant_server_port['SQL_PORT']
         cursor_tenant = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip,
-                                          port=tenant_port, mode=mode,print_exception=print_exception)
+                                          port=tenant_port, mode=mode, print_exception=print_exception)
         if cursor_tenant:
             tenant_cursor.append(cursor_tenant)
             return tenant_cursor
@@ -53,25 +53,31 @@ def tenant_check(tenant):
     return True
 
 
-def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, tenant_name=None, root_password=None, mode=None, *args, **kwargs):
+def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, tenant_name=None, root_password=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     options = plugin_context.options
     repositories = plugin_context.repositories
     tenant_name = tenant_name or getattr(options, 'tenant_name', 'test')
-    mode = mode or getattr(options, 'mode', 'mysql')
     if tenant_name:
         check_result = tenant_check(tenant_name)
         if not check_result:
             stdio.error('Sys tenant is not supported, please use ordinary tenants')
             return plugin_context.return_false()
 
+    cursor = plugin_context.get_return('connect').get_return('cursor')
+    cursor.execute('use oceanbase;')
+    mode = cursor.fetchone(f"select COMPATIBILITY_MODE from DBA_OB_TENANTS where tenant_name = '{tenant_name}';")
+    if not mode:
+        stdio.error('No such Tenant %s' % tenant_name)
+        return plugin_context.return_false()
+    mode = mode['COMPATIBILITY_MODE'].lower()
+
     create_tenant = plugin_context.get_return('create_tenant')
     if create_tenant:
         tenant_cursor = create_tenant.get_return('tenant_cursor') if not tenant_cursor else tenant_cursor
 
     if not tenant_cursor:
-        cursor = plugin_context.get_return('connect').get_return('cursor')
         sql = "select * from oceanbase.DBA_OB_TENANTS where tenant_name = '%s'" % tenant_name
         try:
             tenant = cursor.fetchone(sql, raise_exception=True)
@@ -82,7 +88,7 @@ def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, tenant_na
             stdio.error('No such Tenant %s' % tenant_name)
             return plugin_context.return_false()
 
-        root_password = root_password or getattr(options, tenant_name+'_root_password', "")
+        root_password = root_password or getattr(options, tenant_name + '_root_password', "")
         tenant_cursor = exec_sql_in_tenant(cursor=cursor, tenant=tenant_name, mode=mode, password=root_password if root_password else '')
 
     def _optimize(json_files):
@@ -99,7 +105,8 @@ def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, tenant_na
                                         cursor.execute(sql)
                             if 'parameters' in _:
                                 for tenant_default_parameter in _['parameters']['tenant']:
-                                    sql = f"ALTER SYSTEM SET {tenant_default_parameter['name']} = '{tenant_default_parameter['value']}';"
+                                    separator = '"' if mode == 'oracle' and tenant_default_parameter['name'].startswith('_') else ''
+                                    sql = f"ALTER SYSTEM SET {separator}{tenant_default_parameter['name']}{separator} = '{tenant_default_parameter['value']}';"
                                     for cursor in tenant_cursor:
                                         cursor.execute(sql)
         return True
@@ -123,7 +130,7 @@ def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, tenant_na
     else:
         stdio.verbose("Tenant optimization scenario not specified, use the cluster scenario: %s." % global_config['scenario'])
         scenario = global_config['scenario']
-            
+
     system_variable_json = f'{path}/etc/default_system_variable.json'
     default_parameters_json = f'{path}/etc/default_parameter.json'
     stdio.start_loading(f'optimize tenant with scenario: {scenario}')

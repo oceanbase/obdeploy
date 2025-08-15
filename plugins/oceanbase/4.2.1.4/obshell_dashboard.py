@@ -16,6 +16,8 @@
 from __future__ import absolute_import, division, print_function
 
 from _rpm import Version
+from _stdio import FormatText
+from tool import NetUtil
 
 
 def compare(obshell_version, version, op):
@@ -34,12 +36,16 @@ def compare(obshell_version, version, op):
     else:
         return False
 
+def passwd_format(passwd):
+    return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
-def obshell_dashboard(plugin_context, obshell_clients, *args, **kwargs):
+def obshell_dashboard(plugin_context, obshell_clients, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
 
-    stdio.start_loading(f"display obshell dashboard")
+    if not config_encrypted:
+        display_encrypt_password = None
+    stdio.start_loading(f"display ob-dashboard")
     ip = cluster_config.servers[0].ip
     client = obshell_clients[ip]
     try:
@@ -53,7 +59,16 @@ def obshell_dashboard(plugin_context, obshell_clients, *args, **kwargs):
     if compare(obshell_version, Version('4.3.0.0'), '>='):
         global_config = cluster_config.get_global_conf_with_default()
         obshell_port = global_config.get('obshell_port')
+        if ip == '127.0.0.1':
+            ip = NetUtil.get_host_ip()
         dashboard_info = f"http://{ip}:{str(obshell_port)}"
+        dashboard_info_list = [{
+            "url": dashboard_info,
+            "user": "root",
+            "password":  passwd_format(cluster_config.get_global_conf().get('root_password', '') if not display_encrypt_password else display_encrypt_password)
+        }]
+        stdio.print_list(dashboard_info_list, ['url', 'user', 'password', 'status'],
+                         lambda x: [x['url'], x['user'], x['password'], 'active'], title="ob-dashboard")
 
     stdio.stop_loading('succeed')
     return plugin_context.return_true(obshell_dashboard=dashboard_info)

@@ -18,12 +18,12 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def tenant_optimize(plugin_context, workflow, *args, **kwargs):
-    options = plugin_context.options
-    if not getattr(options, 'skip_cluster_status_check', False):
-        workflow.add(const.STAGE_FIRST, 'status')
-        workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
-    tenant_root_password = getattr(options, 'tenant_root_password', None)
-    workflow.add(const.STAGE_SECOND, 'scenario_check', 'connect')
-    workflow.add_with_kwargs(const.STAGE_SECOND, {'root_password': tenant_root_password}, 'tenant_optimize')
-    return plugin_context.return_true()
+def display(plugin_context, workflow, *args, **kwargs):
+    workflow.add(const.STAGE_FIRST, 'status')
+    workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
+    workflow.add(const.STAGE_SECOND, 'connect', 'display')
+    cluster_config = plugin_context.cluster_config
+    component_name = cluster_config.name
+    if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
+        workflow.add_workflow(const.STAGE_THIRD, 'obshell_dashboard')
+    plugin_context.return_true()

@@ -43,9 +43,15 @@ class TelemetryHandler(BaseHandler):
             return TelemetryData(data={}, msg=msg)
         clients = self.obd.get_clients(deploy.deploy_config, repositories)
         cluster_config = deploy.deploy_config.components[const.COMP_OB_CE]
-        data = {}
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
         for component, _ in self.obd.namespaces.items():
-            data[component] = _.get_variable('run_result')
+            comp_data[component] = _.get_variable('run_result')
+        error = self.obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
         COMMAND_ENV.set(ENV_TELEMETRY_REPORTER, const.TELEMETRY_COMPONENT_FRONTEND, save=True)
         self.obd.set_options(Values({'data': json.dumps(data)}))
         workflows = self.obd.get_workflows('get_telemetry_data')

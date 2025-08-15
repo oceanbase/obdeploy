@@ -127,7 +127,8 @@ function _obd_complete_func
   all_cmds["obd binlog stop *"]="_obd_reply_deploy_names"
   all_cmds["obd binlog drop *"]="_obd_reply_deploy_names"
   all_cmds["obd tool"]="list install uninstall update"
-  all_cmds["obd host"]="precheck init"
+  all_cmds["obd host"]="precheck init user"
+  all_cmds["obd host user"]="init"
   all_cmds["obd pwd"]="encrypt set-epk"
 
   # if [ -f "$env_file" ] && [ "$(grep '"OBD_DEV_MODE": "1"' "$env_file")" != "" ]; then

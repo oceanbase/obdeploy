@@ -40,7 +40,6 @@ def parameter_pre(plugin_context, *args, **kwargs):
             cluster_config.update_global_conf('rs_list', depend_rs_list, save=False)
 
             config_map = {
-                'observer_sys_password': 'proxyro_password',
                 'cluster_name': 'appname'
             }
             for key in config_map:
