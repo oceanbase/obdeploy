@@ -23,6 +23,11 @@ from _deploy import InnerConfigKeywords
 from tool import YamlLoader
 from _rpm import Version
 
+version_compatibility = {
+    "1.8": ("1.8.0_161", "1.8.1"),
+    "17": ("17", "18")
+}
+
 
 def install_repo(plugin_context, obd_home, install_repository, install_plugin, check_repository, check_file_map,
                  requirement_map, msg_lv, *args, **kwargs):
@@ -34,8 +39,10 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
             home_path = os.path.join(remote_home_path, 'lib')
         elif is_jre_repo:
             home_path = os.path.join(remote_home_path, 'jre')
+            client.execute_command(f"rm -rf {home_path}")
         else:
             home_path = remote_home_path
+
         client.add_env("_repo_dir", repo_dir, True)
         client.add_env("_home_path", home_path, True)
         mkdir_bash = "mkdir -p ${_home_path} && cd ${_repo_dir} && find -type d | xargs -i mkdir -p ${_home_path}/{}"
@@ -166,9 +173,17 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
                         match = re.search(pattern, ret.stderr)
                         if not match:
                             need_libs.add(requirement_map[file_item.require])
-                        else:
-                            if Version(match.group(1)) < Version(requirement_map[file_item.require].min_version) or \
-                                Version(match.group(1)) > Version(requirement_map[file_item.require].max_version):
+                        else:              
+                            if requirement_map[file_item.require].version:
+                                for version_key, (special_min, special_max) in version_compatibility.items():
+                                    if version_key in requirement_map[file_item.require].version:
+                                        min_version = special_min
+                                        max_version = special_max
+                                        break
+                            else:
+                                min_version = requirement_map[file_item.require].min_version
+                                max_version = requirement_map[file_item.require].max_version
+                            if Version(match.group(1)) < Version(min_version) or Version(match.group(1)) > Version(max_version):
                                     need_libs.add(requirement_map[file_item.require])
         if need_libs:
             for lib in need_libs:

@@ -378,6 +378,9 @@ class OcpHandler(BaseHandler):
         deploy = self.obd.deploy
         if not deploy:
             raise Exception("no such deploy for name:{0}".format(app_name))
+        deploy_info = deploy.deploy_info
+        if deploy_info.status == DeployStatus.STATUS_DEPLOYED:
+            self.obd.deploy_cluster(app_name)
         deploy_config = deploy.deploy_config
         pkgs, repositories, errors = self.obd.search_components_from_mirrors(deploy_config, only_info=True)
         if errors:

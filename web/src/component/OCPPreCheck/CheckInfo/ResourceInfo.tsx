@@ -1,5 +1,5 @@
 import { intl } from '@/utils/intl';
-import { Row, Col, Typography } from 'antd';
+import { Row, Col, Typography, Tooltip, Input } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import type { ResourceInfoPropType } from './type';
 import styles from './index.less';
@@ -124,12 +124,31 @@ export default function ResourceInfo({
                         : `${serviceConfig[key]}`;
                     return (
                       <ProCard key={idx} colSpan={6} title={serviceMap[key]}>
-                        <Text
-                          style={{ width: 200 }}
-                          ellipsis={{ tooltip: path }}
-                        >
-                          {path}
-                        </Text>
+
+                        {
+                          key === 'admin_password' ? (
+                            <Tooltip
+                              title={path}
+                              placement="topLeft"
+                            >
+                              <Input.Password
+                                value={path}
+                                visibilityToggle={true}
+                                readOnly
+                                bordered={false}
+                                style={{ padding: 0 }}
+                              />
+                            </Tooltip>
+                          ) : (
+                            <Text
+                              style={{ width: 200 }}
+                              ellipsis={{ tooltip: path }}
+                            >
+                              {path}
+                            </Text>
+                          )
+                        }
+
                       </ProCard>
                     );
                   })}
@@ -210,7 +229,18 @@ export default function ResourceInfo({
                     defaultMessage: '密码',
                   })}
                 >
-                  {tenantConfig.info.password}
+                  <Tooltip
+                    title={tenantConfig.info.password}
+                    placement="topLeft"
+                  >
+                    <Input.Password
+                      value={tenantConfig.info.password}
+                      visibilityToggle={true}
+                      readOnly
+                      bordered={false}
+                      style={{ padding: 0 }}
+                    />
+                  </Tooltip>
                 </ProCard>
               </ProCard>
             </Col>
@@ -259,7 +289,18 @@ export default function ResourceInfo({
                     defaultMessage: '密码',
                   })}
                 >
-                  {monitorConfig.info.password}
+                  <Tooltip
+                    title={monitorConfig.info.password}
+                    placement="topLeft"
+                  >
+                    <Input.Password
+                      value={monitorConfig.info.password}
+                      visibilityToggle={true}
+                      readOnly
+                      bordered={false}
+                      style={{ padding: 0 }}
+                    />
+                  </Tooltip>
                 </ProCard>
               </ProCard>
             </Col>

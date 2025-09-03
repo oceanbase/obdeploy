@@ -151,10 +151,15 @@ export default function InstallProcessComp({
       <ProCard>
         <div className={styles.progressEffectContainer}>
           <div className={styles.deployTitle}>
-            {intl.formatMessage({
+            {tenantType ? intl.formatMessage({
+                id: 'OBD.pages.components.InstallProces.87DB05E2',
+                defaultMessage: '租户创建中',
+              }) :
+            intl.formatMessage({
               id: 'OBD.pages.components.InstallProcess.Deploying',
               defaultMessage: '部署中...',
-            })}
+            }) 
+}
           </div>
           <div className={tenantType ? styles.tenantComputer : styles.computer}>
             <div
@@ -212,10 +217,7 @@ export default function InstallProcessComp({
           data-aspm-expo
         >
           {tenantType
-            ? intl.formatMessage({
-                id: 'OBD.pages.components.InstallProces.87DB05E2',
-                defaultMessage: '租户创建中',
-              })
+            ? null
             : getText(statusData?.current)}
         </span>
       </ProCard>

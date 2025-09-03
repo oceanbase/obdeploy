@@ -30,6 +30,7 @@ from enum import Enum
 from copy import deepcopy
 from xml.etree import cElementTree
 
+import const
 from _stdio import SafeStdio
 from ssh import LocalClient
 try:
@@ -37,15 +38,16 @@ try:
 except:
     from configparser import ConfigParser
 
-from _arch import getArchList, getBaseArch
+from _arch import getBaseArch, getArchList
 from _rpm import Version, Package, PackageInfo
 from tool import ConfigUtil, FileUtil, var_replace
 from _manager import Manager
 from tool import timeout
 
-
 _ARCH = getArchList()
-_NO_LSE = 'amd64' in _ARCH and LocalClient.execute_command("grep atomics /proc/cpuinfo").stdout.strip() == ''
+basearch = getBaseArch()
+arch = 'arm' if basearch.startswith('arm') or basearch.startswith('aarch') else basearch
+_NO_LSE = (arch=='arm') and (LocalClient.execute_command("lscpu | grep atomics").stdout.strip() == '')
 
 def get_use_centos_release(stdio=None):
     _RELEASE = None
@@ -541,7 +543,17 @@ class RemoteMirrorRepository(MirrorRepository):
                 continue
             if info.arch not in arch:
                 continue
-            if release and info.release != release:
+           
+            if const.COMP_OB in info.name:
+                if _NO_LSE:
+                    if 'nonlse' not in info.release:
+                        continue
+                    if release and release not in info.release:
+                        continue
+                else:
+                    if 'nonlse' in info.release:
+                        continue
+            if not (const.COMP_OB in info.name and _NO_LSE) and release and info.release != release:
                 continue
             if version and version != info.version:
                 continue
@@ -815,7 +827,16 @@ class LocalMirrorRepository(MirrorRepository):
                 continue
             if info.arch not in arch:
                 continue
-            if release and info.release != release:
+            if const.COMP_OB in info.name:
+                if _NO_LSE:
+                    if 'nonlse' not in info.release:
+                        continue
+                    if release and release not in info.release:
+                        continue
+                else:
+                    if 'nonlse' in info.release:
+                        continue
+            if not (const.COMP_OB in info.name and _NO_LSE) and release and info.release != release:
                 continue
             if version and version != info.version:
                 continue

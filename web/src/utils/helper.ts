@@ -542,11 +542,11 @@ export const connectInfoForPwd = (
       item.user = 'root';
       item.connect_url = item.access_url;
     }
-    if (item.component === 'oceanbase-standalone') {
+    if (item.component === 'oceanbase-standalone' || item.component === 'oceanbase') {
       item.password = components.oceanbase?.root_password;
       item.connect_url = insertPwd(item.connect_url, item.password);
     }
-    if (item.component === 'obproxy-ce') {
+    if (item.component === 'obproxy-ce'|| item.component === 'obproxy') {
       if (components.obproxy.obproxy_sys_password) {
         item.password = components.obproxy.obproxy_sys_password;
       } else {
@@ -562,9 +562,21 @@ export const connectInfoForPwd = (
     if (item.component === 'prometheus') {
       item.password = components.prometheus?.basic_auth_users?.admin;
     }
+   
+    if (item.component === 'alertmanager') {
+      
+      item.password = components.alertmanager?.basic_auth_users?.admin;
+      item.user = 'admin'; 
+      
+      if (item.access_url && !item.connect_url) {
+        item.connect_url = item.access_url;
+      }
+    
+    }
     if (item.component === 'grafana') {
       item.password = components.grafana?.login_password;
     }
   });
+  
   return connectInfo;
 };

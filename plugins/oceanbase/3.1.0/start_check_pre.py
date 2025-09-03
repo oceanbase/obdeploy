@@ -109,6 +109,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     global production_mode
+    global_config = cluster_config.get_original_global_conf()
 
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf_with_default(server)
@@ -126,6 +127,8 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
         check_status[server].update(kernel_check_status)
         if work_dir_check:
              check_status[server]['dir'] = err.CheckStatus()
+        if global_config.get('enable_auto_start', False):
+            check_status[server]['auto start'] = err.CheckStatus()
 
     plugin_context.set_variable('start_check_status', check_status)
     if init_check_status:

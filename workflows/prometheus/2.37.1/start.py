@@ -18,5 +18,5 @@ from __future__ import absolute_import, division, print_function
 import const
 
 def start(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'start_pre', 'start', 'health_check')
+    workflow.add(const.STAGE_FIRST, 'start_pre', 'start', 'health_check', 'bootstrap')
     plugin_context.return_true()

@@ -190,8 +190,35 @@ export default function PreCheckStatus() {
               });
             if (nameSuccess) {
               const { config } = nameData;
-              setComponentConfig(config);
-              handleRetryCheck(config);
+              // 后端不会返回密码，需要从原配置中获取并保留
+              const newConfig = {
+                ...config,
+                // 保留组件密码和必需字段
+                oceanbase: {
+                  ...config?.oceanbase,
+                  root_password: componentConfig?.oceanbase?.root_password,
+                },
+                grafana: {
+                  ...config?.grafana,
+                  login_password: componentConfig?.grafana?.login_password,
+                },
+                prometheus: {
+                  ...config?.prometheus,
+                  basic_auth_users: {
+                    ...config?.prometheus?.basic_auth_users,
+                    admin: componentConfig?.prometheus?.basic_auth_users?.admin,
+                  },
+                },
+                alertmanager: {
+                  ...config?.alertmanager,
+                  basic_auth_users: {
+                    ...config?.alertmanager?.basic_auth_users,
+                    admin: componentConfig?.alertmanager?.basic_auth_users?.admin,
+                  },
+                },
+              };
+              setComponentConfig(newConfig);
+              handleRetryCheck(newConfig);
             } else {
               message.error(
                 intl.formatMessage({

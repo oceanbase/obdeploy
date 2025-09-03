@@ -45,7 +45,6 @@ class GrafanaAPICursor(object):
 
     def _request(self, method, api, data=None, stdio=None):
         url = self.url_prefix + api
-        stdio.verbose('send http request method: {}, url: {}, data: {}'.format(method, url, data))
         try:
             if data is not None:
                 data = json.dumps(data)

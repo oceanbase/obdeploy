@@ -45,6 +45,7 @@ import _environ as ENV
 import _errno
 from _errno import EC_SQL_EXECUTE_FAILED
 from _stdio import SafeStdio, FormatText
+from collections import Counter
 
 _open = open
 if sys.version_info.major == 2:
@@ -1256,4 +1257,10 @@ def get_sudo_prefix(client):
     if client.config.username == 'root':
         prefix = ''
     return prefix
+
+def contains_duplicate_nodes(servers):
+    ips = [server.ip for server in servers]
+    ip_counter = Counter(ips)
+    duplicates = {ip: count for ip, count in ip_counter.items() if count > 1}
+    return duplicates
 

@@ -44,6 +44,9 @@ ENV = 'env'
 class ParserError(Exception):
     pass
 
+class ReceiversConfigError(Exception):
+    pass
+
 
 class UserConfig(object):
 
@@ -373,9 +376,24 @@ class DefaultConfigParser(ConfigParser):
         )
         if added_servers:
             cluster_config.added_servers = added_servers
+
+
+        receivers = set()
         if 'global' in conf:
             cluster_config.set_global_conf(conf['global'])
-
+            if conf['global'].get('receivers'):
+                receivers_data = conf['global'].get('receivers')
+                if isinstance(receivers_data, list):
+                    for item in receivers_data:
+                        if not isinstance(item, str):
+                            raise ReceiversConfigError(
+                                f"Expected all elements in 'receivers' list to be strings, but found {type(item).__name__}: {item}"
+                            )
+                    receivers = set(receivers_data)
+                else:
+                    raise ReceiversConfigError(
+                        f"Expected 'receivers' in global config to be a list, but got {type(receivers_data).__name__}. "
+                    )
         if RsyncConfig.RSYNC in conf:
             cluster_config.set_rsync_list(conf[RsyncConfig.RSYNC])
 
@@ -385,6 +403,13 @@ class DefaultConfigParser(ConfigParser):
         for server in servers:
             if server.name in conf:
                 cluster_config.add_server_conf(server, conf[server.name])
+                if 'receivers' in conf[server.name]:
+                    for receiver in conf[server.name].get('receivers'):
+                        receivers.add(receiver)
+        
+        for receiver in receivers:
+            if conf.get(receiver):
+                cluster_config.update_receivers_conf(receiver, conf[receiver])
         return cluster_config
 
     @classmethod
@@ -444,6 +469,10 @@ class DefaultConfigParser(ConfigParser):
             server_config = cluster_config.get_original_server_conf(server)
             if server_config:
                 conf[server.name] = server_config
+
+        if cluster_config.get_receivers_conf():
+            for key, value in cluster_config.get_receivers_conf().items():
+                conf[key] = value
         return conf
 
 
@@ -491,6 +520,7 @@ class ClusterConfig(object):
         self._has_package_pattern = None
         self._object_hash = None
         self.added_servers = []
+        self._receivers_conf = {}
 
     if sys.version_info.major == 2:
         def __hash__(self):
@@ -525,6 +555,9 @@ class ClusterConfig(object):
             return False
         for server in self.servers:
             if self.get_server_conf(server) != other.get_server_conf(server):
+                return False
+        for key in self.get_receivers_conf():
+            if self.get_receivers_conf_detail(key) != other.get_receivers_conf_detail(key):
                 return False
         return True
 
@@ -837,6 +870,9 @@ class ClusterConfig(object):
     def set_rsync_list(self, configs):
         self._origin_rsync_list = configs
 
+    def update_receivers_conf(self, key, conf):
+        self._receivers_conf[key] = conf
+
     def set_include_file(self, path):
         if path != self._origin_include_file:
             self._origin_include_file = path
@@ -867,6 +903,12 @@ class ClusterConfig(object):
         if self._global_conf is None:
             self._global_conf = self._apply_temp_conf(self._get_unprocessed_global_conf())
         return self._global_conf
+    
+    def get_receivers_conf(self):
+        return self._receivers_conf
+    
+    def get_receivers_conf_detail(self, key):
+        return self._receivers_conf.get(key)
 
     def get_global_conf_with_default(self):
         config = deepcopy(self._all_default_conf)
@@ -1254,6 +1296,9 @@ class DeployConfig(SafeStdio):
                             continue
                         if name in self.components:
                             conf.add_depend(name, self.components[name]) 
+        except ReceiversConfigError as e:
+            self.stdio.error(str(e))
+            sys.exit()
         except:
             self.stdio.exception()
         if not self.user:
@@ -1550,6 +1595,12 @@ class DeployConfig(SafeStdio):
             self.components[component_name].set_deploy_config(None)
         cluster_config = deepcopy(cluster_config)
         cluster_config.apply_inner_config(conf['inner_config'])
+        global_conf = cluster_config.get_global_conf()
+        if component_name == const.COMP_ALERTMANAGER:
+            for receiver in global_conf.get('receivers'):
+                receiver_conf = conf['config'].get(receiver)
+                if receiver_conf:
+                    cluster_config.update_receivers_conf(receiver, receiver_conf)
         if self.inner_config:
             self.inner_config.update_component_config(component_name, conf['inner_config'])
         self._src_data[component_name] = conf['config']
@@ -1623,7 +1674,7 @@ class DeployConfig(SafeStdio):
                 if isinstance(key, str) and isinstance(value, str) and (re.findall(pattern, key, re.IGNORECASE) or re.findall(pattern1, key, re.IGNORECASE)):
                     self.stdio.verbose(f"find pwd key: {current_key}")
                     password_paths.append(current_key)
-                if component == const.COMP_PROMETHEUS and parent_key == 'basic_auth_users':
+                if component in [const.COMP_PROMETHEUS, const.COMP_ALERTMANAGER] and parent_key == 'basic_auth_users':
                     self.stdio.verbose(f"find pwd key: {key}")
                     password_paths.append(current_key)
         return password_paths

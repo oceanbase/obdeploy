@@ -34,7 +34,7 @@ def telemetry_post(plugin_context, telemetry_post_data={}, *args, **kwargs):
                     headers={'sig': TELEMETRY_SIG, 'Content-Type': 'application/json'})
             return plugin_context.return_true()
         except:
-            stdio.exception('post data failed')
+            stdio.warn('post data failed')
             return plugin_context.return_false()
     else:
         stdio.verbose('noting to post')

@@ -21,9 +21,6 @@ import const
 def add_component(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'start_check_pre', 'parameter_pre', 'sudo_check', 'password_check', 'tenant_check', 'java_check', 'clockdiff_check', 'tenant_check')
 
-    workflow.add(const.STAGE_SECOND, 'parameter_pre', 'ocp_const', 'cursor_check', 'start', 'health_check', 'stop_pre')
-    workflow.add_with_component(const.STAGE_SECOND, 'general', 'stop')
-    workflow.add_with_kwargs(const.STAGE_SECOND, {'multi_process_flag': True}, 'start')
-    workflow.add(const.STAGE_SECOND, 'health_check', 'bootstrap')
+    workflow.add(const.STAGE_SECOND, 'parameter_pre', 'ocp_const', 'cursor_check', 'start', 'health_check', 'bootstrap')
 
     plugin_context.return_true()

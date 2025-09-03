@@ -47,7 +47,7 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
             'port': api_cursor.port,
             'url': url,
             'user': user if user else '',
-            'password': passwd_format(password) if password else '',
+            'password': passwd_format(str(password)) if password else '',
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })
     stdio.print_list(results, ['url', 'user', 'password', 'status'], lambda x: [x['url'], x['user'], x['password'], x['status']], title=cluster_config.name)

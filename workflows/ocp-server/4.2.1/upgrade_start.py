@@ -22,6 +22,5 @@ def upgrade_start(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'parameter_pre', 'ocp_const')
     if not plugin_context.cluster_config.depends:
         workflow.add_with_kwargs(const.STAGE_FIRST, {'need_connect': False}, 'cursor_check')
-    workflow.add_with_kwargs(const.STAGE_FIRST, {'multi_process_flag': True}, 'start')
-    workflow.add(const.STAGE_FIRST, 'health_check', 'bootstrap', 'connect', 'display')
+    workflow.add(const.STAGE_FIRST, 'start', 'health_check', 'bootstrap', 'connect', 'display')
     plugin_context.return_true()

@@ -23,6 +23,13 @@ import time
 from _types import Capacity, CapacityWithB
 from tool import get_option
 
+def append_format_parameters(original, kv):
+    stripped = original.strip("'")
+    if stripped:
+        updated = stripped + f"\n{kv}"
+    else:
+        updated = kv
+    return f"'{updated}'"
 
 def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwargs):
 
@@ -71,7 +78,6 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
         server_config = start_env[server]
         home_path = server_config['home_path']
         launch_user = server_config.get('launch_user', None)
-        system_password = server_config["system_password"]
         pid_path = os.path.join(home_path, 'run/ocp-server.pid')
         pids = client.execute_command("cat %s" % pid_path).stdout.strip()
         if pids and all([client.execute_command('ls /proc/%s' % pid) for pid in pids.split('\n')]):
@@ -85,13 +91,9 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
         else:
             memory_size = server_config.get('memory_size', '1G')
             jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(memory_size)).lower())
-        extra_options = {
-            "ocp.iam.encrypted-system-password": system_password
-        }
-        extra_options_str = ' '.join(["-D{}={}".format(k, v) for k, v in extra_options.items()])
         java_bin = server_config['java_bin']
         client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
-        cmd = f'{java_bin} -Dfile.encoding=UTF-8 -jar {jvm_memory_option} {extra_options_str} {home_path}/lib/ocp-server.jar --bootstrap'
+        cmd = f'{java_bin} -Dfile.encoding=UTF-8 -jar {jvm_memory_option} {home_path}/lib/ocp-server.jar --bootstrap'
         jar_cmd = copy.deepcopy(cmd)
         if "log_dir" not in server_config:
             log_dir = os.path.join(home_path, 'log')
@@ -107,30 +109,43 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
         if server_config['admin_password'] != '********':
             admin_password = server_config['admin_password'].replace("'", """'"'"'""")
             environ_variable += "export OCP_INITIAL_ADMIN_PASSWORD=\'%s\'; \n" % admin_password
+        OCP_BOOTSTRAP_WITH_PROPERTY = ''
         if not without_parameter and not get_option(options, 'without_parameter', ''):
             for key in server_config:
                 if key == 'jdbc_url' and monitor_user:
                     monitor_password = monitor_password.replace("'", """'"'"'""")
-                    cmd += f' --with-property=ocp.monitordb.host:{jdbc_host}' \
-                           f' --with-property=ocp.monitordb.username:{monitor_user + "@" + monitor_tenant + cluster_name}' \
-                           f' --with-property=ocp.monitordb.port:{jdbc_port}' \
-                           f' --with-property=ocp.monitordb.password:\'{monitor_password}\'' \
-                           f' --with-property=ocp.monitordb.database:{monitor_db}'
+                    username = monitor_user + "@" + monitor_tenant + cluster_name
+                    connection_properties = [
+                        f"ocp.monitordb.database:{monitor_db}",
+                        f"ocp.monitordb.host:{jdbc_host}",
+                        f"ocp.monitordb.password:{monitor_password}",
+                        f"ocp.monitordb.port:{jdbc_port}",
+                        f"ocp.monitordb.username:{username}"
+                    ]
+                    OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "\n".join(connection_properties))
                 if key not in EXCLUDE_KEYS and key in CONFIG_MAPPER:
                     if key == 'logging_file_total_size_cap':
-                        cmd += ' --with-property=ocp.logging.file.total.size.cap:{}'.format(CapacityWithB(server_config[key]))
+                        OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.logging.file.total.size.cap:{}".format(CapacityWithB(server_config[key])))
                         continue
-                    cmd += ' --with-property={}:{}'.format(CONFIG_MAPPER[key], server_config[key])
+                    OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "{}:{}".format(CONFIG_MAPPER[key], server_config[key]))
             if site_url:
-                cmd += ' --with-property=ocp.site.url:{}'.format(site_url)
+                OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.site.url:{}".format(site_url))
+                pass
             cmd += ' --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
-            # set connection mode to direct to avoid obclient issue
-            cmd += ' --with-property=obsdk.ob.connection.mode:direct'
-            cmd += ' --with-property=ocp.iam.login.client.max-attempts:60'
-            cmd += ' --with-property=ocp.iam.login.client.lockout-minutes:1'
-            cmd += f' --with-property=ocp.file.local.built-in.dir:{home_path}/ocp-server/lib'
-            cmd += f' --with-property=ocp.log.download.tmp.dir:{home_path}/logs/ocp'
-            cmd += ' --with-property=ocp.file.local.dir:{}'.format(soft_dir) if soft_dir else f' --with-property=ocp.file.local.dir:{home_path}/data/files'
+            connection_properties = [
+                "obsdk.ob.connection.mode:direct",
+                "ocp.iam.login.client.max-attempts:60",
+                "ocp.iam.login.client.lockout-minutes:1",
+                f"ocp.file.local.built-in.dir:{home_path}/ocp-server/lib",
+                f"ocp.log.download.tmp.dir:{home_path}/logs/ocp"
+            ]
+            OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "\n".join(connection_properties))
+            if soft_dir:
+                OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.file.local.dir:{}".format(soft_dir))
+            else:
+                OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.file.local.dir:{}".format(f"{home_path}/data/files"))
+
+        environ_variable += "export OCP_BOOTSTRAP_WITH_PROPERTY=%s;" % OCP_BOOTSTRAP_WITH_PROPERTY
         real_cmd = environ_variable + cmd
         execute_cmd = "cd {}; {} > /dev/null 2>&1 &".format(home_path, real_cmd)
         if launch_user:
@@ -147,8 +162,6 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
                 success = False
                 continue
             client.write_file(server_pid[server], os.path.join(home_path, 'run/ocp-server.pid'))
-            if not multi_process_flag and len(cluster_config.servers) > 1:
-                break
             if len(cluster_config.servers) > 1 and node_num == 1:
                 time.sleep(60)
                 node_num += 1

@@ -146,7 +146,7 @@ export default ({
         className={`server-${name}`}
         mode="tags"
         value={currentValues}
-        placeholder={intl.formatMessage({
+        placeholder={standAlone ? '请输入节点 IP' : intl.formatMessage({
           id: 'OBD.pages.components.ServerTags.ClickEnterToEnterMultiple',
           defaultMessage: '点击回车可以输入多个节点',
         })}

@@ -1,5 +1,6 @@
 import InputPort from '@/component/InputPort';
 import {
+  alertManagerComponent,
   commonStyle,
   configServerComponent,
   grafanaComponent,
@@ -37,53 +38,53 @@ export default function ComponentsPort({
     <Row>
       {(selectedConfig?.includes(obproxyComponent) ||
         selectedConfig?.includes('obproxy-ce')) && (
-        <>
-          <Col span={6}>
-            <InputPort
-              name={['obproxy', 'listen_port']}
-              label={intl.formatMessage({
-                id: 'OBD.Obdeploy.ClusterConfig.PortObproxySql',
-                defaultMessage: 'OBProxy SQL 端口',
-              })}
-              fieldProps={{ style: commonStyle }}
-            />
-          </Col>
-          <Col span={6}>
-            <InputPort
-              name={['obproxy', 'prometheus_listen_port']}
-              label={
-                <>
-                  {intl.formatMessage({
-                    id: 'OBD.pages.components.ClusterConfig.PortObproxyExporter',
-                    defaultMessage: 'OBProxy Exporter 端口',
-                  })}
-
-                  <Tooltip
-                    title={intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs',
-                      defaultMessage:
-                        'OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。',
+          <>
+            <Col span={6}>
+              <InputPort
+                name={['obproxy', 'listen_port']}
+                label={intl.formatMessage({
+                  id: 'OBD.Obdeploy.ClusterConfig.PortObproxySql',
+                  defaultMessage: 'OBProxy SQL 端口',
+                })}
+                fieldProps={{ style: commonStyle }}
+              />
+            </Col>
+            <Col span={6}>
+              <InputPort
+                name={['obproxy', 'prometheus_listen_port']}
+                label={
+                  <>
+                    {intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.PortObproxyExporter',
+                      defaultMessage: 'OBProxy Exporter 端口',
                     })}
-                  >
-                    <QuestionCircleOutlined style={{ marginLeft: 4 }} />
-                  </Tooltip>
-                </>
-              }
-              fieldProps={{ style: commonStyle }}
-            />
-          </Col>
-          <Col span={6}>
-            <InputPort
-              name={['obproxy', 'rpc_listen_port']}
-              label={intl.formatMessage({
-                id: 'OBD.Obdeploy.ClusterConfig.PortObproxyRpc',
-                defaultMessage: 'OBProxy RPC 端口',
-              })}
-              fieldProps={{ style: commonStyle }}
-            />
-          </Col>
-        </>
-      )}
+
+                    <Tooltip
+                      title={intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.PortObproxyOfExporterIs',
+                        defaultMessage:
+                          'OBProxy 的 Exporter 端口，用于 Prometheus 拉取 OBProxy 监控数据。',
+                      })}
+                    >
+                      <QuestionCircleOutlined style={{ marginLeft: 4 }} />
+                    </Tooltip>
+                  </>
+                }
+                fieldProps={{ style: commonStyle }}
+              />
+            </Col>
+            <Col span={6}>
+              <InputPort
+                name={['obproxy', 'rpc_listen_port']}
+                label={intl.formatMessage({
+                  id: 'OBD.Obdeploy.ClusterConfig.PortObproxyRpc',
+                  defaultMessage: 'OBProxy RPC 端口',
+                })}
+                fieldProps={{ style: commonStyle }}
+              />
+            </Col>
+          </>
+        )}
 
       {selectedConfig?.includes(obagentComponent) && (
         <>
@@ -145,6 +146,7 @@ export default function ComponentsPort({
               defaultMessage: 'Prometheus 服务端口',
             })}
             fieldProps={{ style: commonStyle }}
+            initialValue={9090}
           />
         </Col>
       )}
@@ -157,6 +159,17 @@ export default function ComponentsPort({
               defaultMessage: 'Grafana 服务端口',
             })}
             fieldProps={{ style: commonStyle }}
+            initialValue={3000}
+          />
+        </Col>
+      )}
+      {selectedConfig.includes(alertManagerComponent) && (
+        <Col span={6}>
+          <InputPort
+            name={['alertmanager', 'port']}
+            label={'AlertManager 服务端口'}
+            fieldProps={{ style: commonStyle }}
+            initialValue={9093}
           />
         </Col>
       )}

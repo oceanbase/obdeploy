@@ -69,10 +69,4 @@ export default defineConfig({
     return config;
   },
   jsMinifier: 'terser',
-  proxy: {
-    '/api/v1': {
-      target: 'http://11.161.204.51:8680', //自己的环境
-      // target: 'http://11.161.205.92:8680/', //谢凯的环境
-    },
-  },
 });

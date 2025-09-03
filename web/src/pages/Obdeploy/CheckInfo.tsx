@@ -21,6 +21,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useEffect } from 'react';
 import { getLocale, useModel } from 'umi';
 import {
+  alertManagerComponent,
   allComponentsKeys,
   componentsConfig,
   componentVersionTypeToComponent,
@@ -57,24 +58,27 @@ export const formatConfigData = (
   const _configData = formatedConfigData.components || formatedConfigData;
   if (formatedConfigData.components) isOBConfig = true;
   Object.keys(_configData).forEach((key) => {
-    if (typeof _configData[key] === 'object') {
-      for (let i = 0; i < _configData[key]?.parameters.length; i++) {
-        const parameter = _configData[key]?.parameters[i];
-        // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
-        if (
-          (!parameter.adaptive && !isExist(parameter.value)) ||
-          parameter.adaptive ||
-          !parameter.isChanged
-        ) {
-          _configData[key]?.parameters?.splice(i--, 1);
+    if (typeof _configData[key] === 'object' && _configData[key] !== null) {
+      // 安全检查：确保 parameters 存在且是数组
+      if (Array.isArray(_configData[key]?.parameters)) {
+        for (let i = 0; i < _configData[key].parameters.length; i++) {
+          const parameter = _configData[key].parameters[i];
+          // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
+          if (
+            (!parameter.adaptive && !isExist(parameter.value)) ||
+            parameter.adaptive ||
+            !parameter.isChanged
+          ) {
+            _configData[key].parameters.splice(i--, 1);
+          }
+          if (parameter.key === 'ocp_meta_tenant_memory_size') {
+            parameter.value = changeParameterUnit(parameter).value;
+          }
+          delete parameter.isChanged;
         }
-        if (parameter.key === 'ocp_meta_tenant_memory_size') {
-          parameter.value = changeParameterUnit(parameter).value;
-        }
-        delete parameter.isChanged;
       }
-      if (key === configServerComponentKey) {
-        _configData[key]?.parameters?.forEach((parameter) => {
+      if (key === configServerComponentKey && Array.isArray(_configData[key]?.parameters)) {
+        _configData[key].parameters.forEach((parameter) => {
           if (parameter.key === 'log_maxsize') {
             parameter.type = 'Integer';
             parameter.value = Number(parameter.value.split('MB')[0]);
@@ -84,9 +88,16 @@ export const formatConfigData = (
     }
   });
   if (scenarioParam) {
+    // 安全检查：确保 oceanbase 存在
+    if (!_configData.oceanbase) {
+      _configData.oceanbase = {};
+    }
+    if (!_configData.oceanbase.parameters) {
+      _configData.oceanbase.parameters = [];
+    }
     _configData.oceanbase.parameters = [
       scenarioParam,
-      ...(_configData.oceanbase.parameters || []),
+      ..._configData.oceanbase.parameters,
     ];
   }
   if (isOBConfig) {
@@ -121,6 +132,7 @@ export default function CheckInfo() {
     obconfigserver = {},
     grafana = {},
     prometheus = {},
+    alertmanager = {},
   } = components;
 
   const { run: handleCreateConfig, loading } = useRequest(
@@ -220,16 +232,16 @@ export default function CheckInfo() {
     },
     ...(!standAlone
       ? [
-          {
-            title: intl.formatMessage({
-              id: 'OBD.pages.components.CheckInfo.RootServerNodes',
-              defaultMessage: 'Root Server 节点',
-            }),
-            dataIndex: 'rootservice',
-            width: 200,
-            render: (text) => text || '-',
-          },
-        ]
+        {
+          title: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.RootServerNodes',
+            defaultMessage: 'Root Server 节点',
+          }),
+          dataIndex: 'rootservice',
+          width: 200,
+          render: (text) => text || '-',
+        },
+      ]
       : []),
   ];
 
@@ -317,13 +329,13 @@ export default function CheckInfo() {
 
       more: oceanbase?.parameters?.length
         ? [
-            {
-              label:
-                componentsConfig[oceanbaseComponent].labelName ||
-                componentsConfig[oceanbaseStandaloneComponent].labelName,
-              parameters: oceanbase?.parameters,
-            },
-          ]
+          {
+            label:
+              componentsConfig[oceanbaseComponent].labelName ||
+              componentsConfig[oceanbaseStandaloneComponent].labelName,
+            parameters: oceanbase?.parameters,
+          },
+        ]
         : [],
     },
   ];
@@ -381,6 +393,17 @@ export default function CheckInfo() {
         more.push({
           label: componentsConfig[prometheusComponent].labelName,
           parameters: prometheus?.parameters,
+        });
+    }
+    if (selectedConfig.includes(alertManagerComponent)) {
+      content = content.concat({
+        label: 'AlertManager 服务端口',
+        value: alertmanager?.port,
+      });
+      alertmanager?.parameters?.length &&
+        more.push({
+          label: componentsConfig[alertManagerComponent].labelName,
+          parameters: alertmanager?.parameters,
         });
     }
 
@@ -458,6 +481,30 @@ export default function CheckInfo() {
           };
           item.content.splice(2, 0, prometheusPasswordItem);
         }
+        if (selectedConfig.includes(alertManagerComponent)) {
+          const alertManagerPasswordItem = {
+            label: intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.AlertManagerPassword',
+              defaultMessage: 'AlertManager 密码',
+            }),
+            colSpan: 5,
+            value: (
+              <Tooltip
+                title={alertmanager?.basic_auth_users?.admin}
+                placement="topLeft"
+              >
+                <Input.Password
+                  value={alertmanager?.basic_auth_users?.admin}
+                  visibilityToggle={true}
+                  readOnly
+                  bordered={false}
+                  style={{ padding: 0 }}
+                />
+              </Tooltip>
+            ),
+          };
+          item.content.splice(2, 0, alertManagerPasswordItem);
+        }
         if (selectedConfig.includes(grafanaComponent)) {
           const grafanaPasswordItem = {
             label: intl.formatMessage({
@@ -479,12 +526,15 @@ export default function CheckInfo() {
           };
           item.content.splice(2, 0, grafanaPasswordItem);
         }
+
       }
     });
   }
 
   useEffect(() => {
-    const { obproxy = {} } = configData.components;
+    const { obproxy = {}, alertmanager = {} } = configData.components;
+
+    // 处理 OBProxy 密码
     if (obproxy?.parameters) {
       // 如果没有密码，前端来随机生成一个
       const targetParam = obproxy?.parameters?.find(
@@ -509,6 +559,46 @@ export default function CheckInfo() {
           components: {
             ...configData.components,
             obproxy,
+          },
+        });
+      }
+    }
+
+    // 处理 AlertManager 密码
+    if (selectedConfig.includes(alertManagerComponent) && alertmanager) {
+      if (!alertmanager.basic_auth_users?.admin) {
+        const newAlertmanager = {
+          ...alertmanager,
+          basic_auth_users: {
+            ...alertmanager.basic_auth_users,
+            admin: generateRandomPassword('am'),
+          },
+        };
+        setConfigData({
+          ...configData,
+          components: {
+            ...configData.components,
+            alertmanager: newAlertmanager,
+          },
+        });
+      }
+    }
+
+    // 处理 Prometheus 密码
+    if (selectedConfig.includes(prometheusComponent) && prometheus) {
+      if (!prometheus.basic_auth_users?.admin) {
+        const newPrometheus = {
+          ...prometheus,
+          basic_auth_users: {
+            ...prometheus.basic_auth_users,
+            admin: generateRandomPassword('pm'),
+          },
+        };
+        setConfigData({
+          ...configData,
+          components: {
+            ...configData.components,
+            prometheus: newPrometheus,
           },
         });
       }

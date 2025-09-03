@@ -158,6 +158,16 @@ class Prometheus(BaseModel):
     port: int = Body(..., description='server port')
     basic_auth_users: dict = Body(..., description='auth user and password')
 
+class Alertmanager(BaseModel):
+    component: str = Body('', description='alertmanager component name,ex:alertmanager')
+    version: str = Body(..., description='version')
+    release: str = Body(..., description='alertmanager release no')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    home_path: str = Body('', description='install alertmanager home path')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1']")
+    port: int = Body(..., description='server port')
+    basic_auth_users: dict = Body(..., description='auth user and password')
+
 class Grafana(BaseModel):
     component: str = Body('', description='grafana component name,ex:prometheus')
     version: str = Body(..., description='version')
@@ -177,6 +187,7 @@ class ComponentConfig(BaseModel):
     obconfigserver: Optional[ObConfigserver]
     prometheus: Optional[Prometheus]
     grafana: Optional[Grafana]
+    alertmanager: Optional[Alertmanager]
 
 
 class DeploymentConfig(BaseModel):

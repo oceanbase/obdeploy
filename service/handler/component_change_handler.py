@@ -25,7 +25,7 @@ from _rpm import Version
 from _plugin import PluginType
 from _errno import CheckStatus, FixEval
 from collections import defaultdict
-from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMPS_ODP, COMP_OB_CONFIGSERVER
+from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMPS_ODP, COMP_ODP_CE, COMP_OB_CONFIGSERVER, COMP_PROMETHEUS, COMP_ALERTMANAGER, COMP_OB_CONFIGSERVER
 from ssh import LocalClient
 from _mirror import MirrorRepositoryType
 from _deploy import DeployStatus, DeployConfigStatus
@@ -110,8 +110,6 @@ class ComponentChangeHandler(BaseHandler):
             if deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and deploy.deploy_info.config_status == DeployConfigStatus.UNCHNAGE:
                 create_data = deploy_info.create_date if deploy_info.create_date else ''
                 for oceanbase in const.COMPS_OCEANBASE:
-                    if oceanbase == const.OCEANBASE_STANDALONE:
-                        continue
                     if oceanbase in deploy_config.components.keys():
                         cluster_config = deploy_config.components[oceanbase]
                         deploy_name = DeployName(name=deploy.name, deploy_user=deploy_config.user.username, ob_servers=[server.ip for server in cluster_config.servers], ob_version=deploy_info.components[oceanbase]['version'], create_date=create_data)
@@ -141,6 +139,11 @@ class ComponentChangeHandler(BaseHandler):
 
         component_dict = self.get_components()
         undeployed_components = set(list(const.CHANGED_COMPONENTS)) - set(components)
+        if const.OCEANBASE_STANDALONE in components:
+            components_to_remove = set(COMPS_ODP + [COMP_OB_CONFIGSERVER])
+            undeployed_components -= components_to_remove
+        elif const.OCEANBASE in components:
+            undeployed_components.discard(COMP_ODP_CE)
         for component in undeployed_components:
             component_change_info.component_list.append(BestComponentInfo(component_name=component, deployed=0, component_info=component_dict[component]))
         self.context['component_change_info'][name] = component_change_info
@@ -176,17 +179,21 @@ class ComponentChangeHandler(BaseHandler):
         if 'global' not in comp_config.keys():
             comp_config['global'] = dict()
 
+        
+        if component_name == const.ALERTMANAGER:
+            comp_config['global'] = const.ALERTMANAGER_DEFAULT_RECEIVER
+            comp_config.update(const.ALERTMANAGER_DEFAULT_RECEIVER_CONF)
+
         comp_config['global']['home_path'] = config.home_path + '/' + component_name
         for key in ext_keys:
             if config_dict[key]:
-                if key == 'admin_passwd':
+                if key.endswith('passwd') or key.endswith('password'):
                     passwd = RSAHandler().decrypt_private_key(config_dict[key])
                     comp_config['global'][key] = passwd
                     continue
-                if key == 'obproxy_sys_password':
-                    passwd = RSAHandler().decrypt_private_key(config_dict[key])
-                    comp_config['global'][key] = passwd
-                    continue
+                if key == 'basic_auth_users':
+                    for users in config_dict[key].keys():
+                        config_dict[key][users] = RSAHandler().decrypt_private_key(config_dict[key][users])
                 comp_config['global'][key] = config_dict[key]
 
         if depend_component:
@@ -226,6 +233,12 @@ class ComponentChangeHandler(BaseHandler):
             if config.obagent or const.OBAGENT in self.obd.deploy.deploy_config.components:
                 depend_component.append(const.OBAGENT)
             cluster_config[config.ocpexpress.component] = self.generate_component_config(config, 'ocpexpress', ['port', 'admin_passwd'], depend_component)
+        if config.alertmanager:
+            cluster_config[config.alertmanager.component] = self.generate_component_config(config, const.ALERTMANAGER, ['port', 'basic_auth_users'])
+        if config.grafana:
+            cluster_config[config.grafana.component] = self.generate_component_config(config, const.GRAFANA, ['port', 'login_password'])
+        if config.prometheus:
+            cluster_config[config.prometheus.component] = self.generate_component_config(config, const.PROMETHEUS, ['port', 'basic_auth_users'])
 
         with tempfile.NamedTemporaryFile(delete=False, prefix="component_change", suffix=".yaml", mode="w", encoding="utf-8") as f:
             f.write(yaml.dump(cluster_config, sort_keys=False))
@@ -407,7 +420,7 @@ class ComponentChangeHandler(BaseHandler):
             deploy = self.obd.deploy_manager.get_deploy_config(name)
             self.obd.set_deploy(deploy)
 
-        task_info = task.get_task_manager().get_task_info(name, task_type="precheck")
+        task_info = task.get_task_manager().get_task_info(name, task_type="component_change_precheck")
         if task_info is not None:
             if task_info.status == TaskStatus.FINISHED:
                 precheck_result.status = task_info.result
@@ -638,7 +651,7 @@ class ComponentChangeHandler(BaseHandler):
         self.obd._call_stdio('verbose', 'Start to start additional servers')
         error_repositories = []
         succeed_repositories = []
-        for repository in self.context['new_obd'][name].repositories:
+        for repository in self.obd.sort_repositories_by_depends(deploy_config, self.context['new_obd'][name].repositories):
             opt = Values()
             self.obd.set_options(opt)
             trace_id = str(uuid())
@@ -798,6 +811,34 @@ class ComponentChangeHandler(BaseHandler):
                 component_change_display.password = ''
                 component_change_display.access_string = 'http://' + config.ocpexpress.servers[0] + ':' + str(config.ocpexpress.port)
                 data.components_change_info.append(component_change_display)
+        if config.alertmanager:
+            component_change_display = ComponentChangeInfoDisplay(component_name=config.alertmanager.component)
+            server = config.alertmanager.servers[0]
+            port = str(config.alertmanager.port)
+            component_change_display.address = 'http://' + server + ':' + port
+            component_change_display.username = 'admin'
+            component_change_display.password = ''
+            component_change_display.access_string = 'http://' + server + ':' + port
+            data.components_change_info.append(component_change_display)
+        if config.prometheus:
+            component_change_display = ComponentChangeInfoDisplay(component_name=config.prometheus.component)
+            server = config.prometheus.servers[0]
+            port = str(config.prometheus.port)
+            component_change_display.address = 'http://' + server + ':' + port
+            component_change_display.username = 'admin'
+            component_change_display.password = ''
+            component_change_display.access_string = 'http://' + server + ':' + port
+            data.components_change_info.append(component_change_display)
+        if config.grafana:
+            component_change_display = ComponentChangeInfoDisplay(component_name=config.grafana.component)
+            server = config.grafana.servers[0]
+            port = str(config.grafana.port)
+            component_change_display.address = 'http://' + server + ':' + port
+            component_change_display.username = 'admin'
+            component_change_display.password = ''
+            component_change_display.access_string = 'http://' + server + ':' + port
+            data.components_change_info.append(component_change_display)
+
         return data
 
     def node_check(self, name, components):
@@ -878,7 +919,8 @@ class ComponentChangeHandler(BaseHandler):
             return False
 
         error_component = []
-        for repository in repositories:
+        sort_repositories = self.obd.sort_repositories_by_depends(deploy_config, repositories)[::-1]
+        for repository in sort_repositories:
             opt = Values()
             setattr(opt, 'force', force)
             self.obd.set_options(opt)
@@ -889,8 +931,14 @@ class ComponentChangeHandler(BaseHandler):
                 log.get_logger().warn("component: {}, start log init error".format(repository.name))
 
             self.obd._call_stdio('verbose', 'Start to stop target components')
-            self.obd.set_repositories([repository])
-            workflows = self.obd.get_workflows('delete_component', no_found_act='ignore')
+            component_repositories = [repository]
+            if repository.name in [COMP_ALERTMANAGER]:
+                for repo in all_repositories:
+                    if repo.name == COMP_PROMETHEUS:
+                        component_repositories.append(repo)
+
+            self.obd.set_repositories(component_repositories)
+            workflows = self.obd.get_workflows('delete_component', repositories=[repository], no_found_act='ignore')
             if not self.obd.run_workflow(workflows):
                 self.obd._call_stdio('warn', f'failed to delete component {repository.name}')
                 error_component.append(repository.name)

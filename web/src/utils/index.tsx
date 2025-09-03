@@ -343,38 +343,17 @@ export const dnsValidator = (_: any, value: string[]) => {
   return Promise.resolve();
 };
 export const serversValidator = (_: any, value: string[], type: string) => {
-  if (value.length > 0 && value?.some((item) => !validator.isIP(item))) {
-    if (type === 'OBServer') {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.EnterTheCorrectIpAddress',
-            defaultMessage: '请输入正确的 IP 地址',
-          }),
-        ),
-      );
-    } else if (type === 'obconfigserver') {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.src.utils.SelectTheCorrectObconfigserverNode',
-            defaultMessage: '请选择正确的 obconfigserver 节点',
-          }),
-        ),
-      );
-    } else {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectObproxyNode',
-            defaultMessage: '请选择正确的 OBProxy 节点',
-          }),
-        ),
-      );
-    }
-  } else {
-    return Promise.resolve();
+  // 检查是否为空
+  if (!value || value.length === 0) {
+    return Promise.reject(new Error(`请选择或输入 ${type} 节点`));
   }
+
+  // 检查 IP 地址格式
+  if (value.some((item) => !validator.isIP(item))) {
+    return Promise.reject(new Error(`请选择或输入正确的${type}节点`));
+  }
+
+  return Promise.resolve();
 };
 
 export function generateRandomPassword() {

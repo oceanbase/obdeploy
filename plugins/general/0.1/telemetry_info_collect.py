@@ -195,6 +195,8 @@ def init_telemetry_data(opt_data):
         if key == 'component':
             comp_data = value
             for component, _ in comp_data.items():
+                if not isinstance(_, dict):
+                    continue
                 for plugin_name, _ in _.items():
                     plugin_data = {}
                     plugin_data['component'] = component
@@ -261,34 +263,37 @@ def telemetry_info_collect(plugin_context, telemetry_post_data={}, *args, **kwar
     repositories = plugin_context.repositories
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-    if not telemetry_post_data:
-        options = plugin_context.options
-        telemetry_post_data = init_telemetry_data(getattr(options, 'data', '{}'))
-
-    for server in cluster_config.servers:
-        current_client = clients[server]
-        telemetry_post_data = telemetry_machine_data(telemetry_post_data)
-
-    for repository in repositories:
-        if repository.name != cluster_config.name:
-            continue
-        is_ob = cluster_config.name in ['oceanbase', 'oceanbase-ce']
+    stdio = plugin_context.stdio
+    try:
+        if not telemetry_post_data:
+            options = plugin_context.options
+            telemetry_post_data = init_telemetry_data(getattr(options, 'data', '{}'))
 
         for server in cluster_config.servers:
-            data = {}
-            data['type'] = repository.name
-            data['version'] = repository.version
-            data['revision'] = repository.release
-            config = cluster_config.get_server_conf(server)
-            data['hostHash'] = HostInfo.host_ip_hash(server.ip)
-            if is_ob:
-                data['memoryLimit'] = config.get('memory_limit', '0')
-                data['dataFileSize'] = config.get('datafile_size', '0')
-                data['logDiskSize'] = config.get('log_disk_size', '0')
-                data['cpuCount'] = config.get('cpu_count', '0')
-                cluster_id = COMMAND_ENV.get(ENV_CUSTOM_CLUSTER_ID, default=config.get('cluster_id', '0'))
-                data['clusterId'] = cluster_id
-            telemetry_post_data['instances'].append(data)
+            current_client = clients[server]
+            telemetry_post_data = telemetry_machine_data(telemetry_post_data)
 
+        for repository in repositories:
+            if repository.name != cluster_config.name:
+                continue
+            is_ob = cluster_config.name in ['oceanbase', 'oceanbase-ce']
+
+            for server in cluster_config.servers:
+                data = {}
+                data['type'] = repository.name
+                data['version'] = repository.version
+                data['revision'] = repository.release
+                config = cluster_config.get_server_conf(server)
+                data['hostHash'] = HostInfo.host_ip_hash(server.ip)
+                if is_ob:
+                    data['memoryLimit'] = config.get('memory_limit', '0')
+                    data['dataFileSize'] = config.get('datafile_size', '0')
+                    data['logDiskSize'] = config.get('log_disk_size', '0')
+                    data['cpuCount'] = config.get('cpu_count', '0')
+                    cluster_id = COMMAND_ENV.get(ENV_CUSTOM_CLUSTER_ID, default=config.get('cluster_id', '0'))
+                    data['clusterId'] = cluster_id
+                telemetry_post_data['instances'].append(data)
+    except:
+        stdio.verbose('collect failed')
     plugin_context.set_variable('telemetry_post_data', telemetry_post_data)
     return plugin_context.return_true(telemetry_post_data=telemetry_post_data)

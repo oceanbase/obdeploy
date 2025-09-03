@@ -62,7 +62,7 @@ export default function NodeConfig({ form }: { form: FormInstance<any> }) {
               required: true,
               message: intl.formatMessage({
                 id: 'OBD.component.MetaDBConfig.NodeConfig.PleaseEnter',
-                defaultMessage: '请输入',
+                defaultMessage: '请输入正确的 OCP 节点',
               }),
             },
             {

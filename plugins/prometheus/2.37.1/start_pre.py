@@ -34,8 +34,9 @@ def load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server
     obagent_servers = cluster_config.get_depend_servers('obagent')
     prometheus_conf_dir = os.path.join(obagent_repo.repository_dir, 'conf/prometheus_config')
     prometheus_conf_path = os.path.join(prometheus_conf_dir, 'prometheus.yaml')
-    rules_dir = os.path.join(prometheus_conf_dir, 'rules')
-    remote_rules_dir = os.path.join(server_home_path, 'rules')
+    local_dir, _ = os.path.split(__file__)
+    rules_path = os.path.join(local_dir, 'prometheus_rules.yaml')
+    remote_rules_path = os.path.join(server_home_path, 'rules', 'prometheus_rules.yaml')
 
     obagent_targets = []
     http_basic_auth_user = None
@@ -64,8 +65,8 @@ def load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server
             http_basic_auth_password=http_basic_auth_password,
             target=targets
         )
-        if not client.put_dir(rules_dir, remote_rules_dir):
-            raise Exception('failed to put {} to {} {}'.format(rules_dir, client, remote_rules_dir))
+        if not client.put_file(rules_path, remote_rules_path):
+            raise Exception('failed to put {} to {} {}'.format(rules_path, client, remote_rules_path))
         prometheus_conf_from_obagent = yaml.loads(content)
         scrape_configs = []
         if 'scrape_configs' in prometheus_conf_from_obagent and prometheus_conf_from_obagent['scrape_configs']:

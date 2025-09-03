@@ -278,12 +278,21 @@ export async function componentChangeDeploymentsInfo(
     const prometheus = componentsList?.find(
       (item) => item.component_name === 'prometheus',
     );
+    const alertmanager = componentsList?.find(
+      (item) => item.component_name === 'alertmanager',
+    );
     const grafana = componentsList?.find(
       (item) => item.component_name === 'grafana',
     );
-    if (!prometheus?.deployed) {
+      if (!prometheus?.deployed) {
+        const index = componentsList?.findIndex(
+          (item) => item.component_name === 'prometheus',
+        );
+        componentsList.splice(index, 1);
+      }
+    if (!alertmanager?.deployed) {
       const index = componentsList?.findIndex(
-        (item) => item.component_name === 'prometheus',
+        (item) => item.component_name === 'alertmanager',
       );
       componentsList.splice(index, 1);
     }
@@ -304,9 +313,9 @@ export async function componentChangeDeploymentsInfo(
       ...(options || {}),
     },
   );
-  if (res.success) {
-    formatComp(res.data?.component_list);
-  }
+  // if (res.success) {
+  //   formatComp(res.data?.component_list);
+  // }
   return res;
 }
 

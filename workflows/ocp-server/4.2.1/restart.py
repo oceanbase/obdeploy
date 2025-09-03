@@ -33,7 +33,7 @@ def restart(plugin_context, workflow, *args, **kwargs):
     if not plugin_context.cluster_config.depends:
         workflow.add_with_kwargs(const.STAGE_FIRST, {'need_connect': False}, 'cursor_check')
     workflow.add_with_kwargs(const.STAGE_FIRST, {'cursor': cursor if cursor else None, 'need_bootstrap': need_bootstrap,
-                                                 'clients': new_clients if new_clients else clients, 'new_cluster_config': new_cluster_config, 'multi_process_flag': True,
+                                                 'clients': new_clients if new_clients else clients, 'new_cluster_config': new_cluster_config,
                                                  'cluster_config': new_cluster_config if new_cluster_config else cluster_config}, 'parameter_pre', 'ocp_const', 'start', 'health_check')
 
     finally_plugins = plugin_context.get_variable('finally_plugins')

@@ -43,6 +43,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getLocale, useModel } from 'umi';
 import validator from 'validator';
 import {
+  alertManagerComponent,
   commonServerStyle,
   commonStyle,
   configServerComponent,
@@ -91,22 +92,30 @@ export default function NodeConfig() {
     prometheus = {},
     grafana = {},
     obconfigserver = {},
+    alertmanager = {},
   } = components;
   const [form] = ProForm.useForm();
   const [editableForm] = ProForm.useForm();
   const finalValidate = useRef<boolean>(false);
   const tableFormRef = useRef<EditableFormInstance<API.DBConfig>>();
   const [show, setShow] = useState<boolean>(false);
+  const [alertmanagerValues, setAlertmanagerValues] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (alertmanager?.servers && Array.isArray(alertmanager.servers) && alertmanager.servers.length > 0) {
+      setAlertmanagerValues(alertmanager.servers);
+    }
+  }, [alertmanager?.servers]);
 
   // 当前 OB 环境是否为单机版
   const standAlone = oceanbase?.component === 'oceanbase-standalone';
 
   const initDBConfigData = oceanbase?.topology?.length
     ? oceanbase?.topology?.map((item: API.Zone, index: number) => ({
-        id: (Date.now() + index).toString(),
-        ...item,
-        servers: item?.servers?.map((server) => server?.ip),
-      }))
+      id: (Date.now() + index).toString(),
+      ...item,
+      servers: item?.servers?.map((server) => server?.ip),
+    }))
     : [];
 
   const homePathSuffix = `/${oceanbase.appname}`;
@@ -198,7 +207,53 @@ export default function NodeConfig() {
   });
 
   const handleDelete = (id: string) => {
-    setDBConfigData(dbConfigData.filter((item) => item.id !== id));
+    // 获取要删除的zone中的服务器
+    const deletedZone = dbConfigData.find(item => item.id === id);
+    const deletedServers = deletedZone?.servers || [];
+
+    // 删除数据库节点配置
+    const newDBConfigData = dbConfigData.filter((item) => item.id !== id);
+    setDBConfigData(newDBConfigData);
+
+    // 立即计算新的allOBServer
+    const newAllServers = getAllServers(newDBConfigData);
+
+    // 优化AlertManager清理逻辑
+    if (deletedServers.length > 0 && alertmanagerValues.length > 0) {
+      const hasDeletedServer = alertmanagerValues.some(server => deletedServers.includes(server));
+      if (hasDeletedServer) {
+        if (newAllServers.length > 0) {
+          // 如果还有可用的服务器，自动选择第一个作为新的AlertManager节点
+          const newAlertmanagerServer = [newAllServers[0]];
+          setAlertmanagerValues(newAlertmanagerServer);
+          form.setFieldValue(['alertmanager', 'servers'], newAlertmanagerServer);
+          if (tableFormRef.current) {
+            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], newAlertmanagerServer);
+          }
+        } else {
+          setAlertmanagerValues([]);
+          form.setFieldValue(['alertmanager', 'servers'], []);
+          if (tableFormRef.current) {
+            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], []);
+          }
+        }
+      }
+    }
+
+    // 设置lastDeleteServer为删除的服务器之一，确保清理逻辑能够正确工作
+    if (deletedServers.length > 0) {
+      setLastDeleteServer(deletedServers[0]);
+    }
+
+    // 立即更新allOBServer状态，避免异步更新导致的问题
+    setAllOBServer(newAllServers);
+
+    // 更新allZoneOBServer
+    const newAllZoneServers: any = {};
+    newDBConfigData.forEach((item) => {
+      newAllZoneServers[`${item.id}`] = item.servers || [];
+    });
+    setAllZoneOBServer(newAllZoneServers);
   };
 
   const setData = (dataSource: FormValues) => {
@@ -240,6 +295,12 @@ export default function NodeConfig() {
         ...dataSource.prometheus,
       };
     }
+    if (selectedConfig.includes(alertManagerComponent)) {
+      newComponents.alertmanager = {
+        ...(components?.alertmanager || {}),
+        ...dataSource.alertmanager,
+      };
+    }
 
     newComponents.oceanbase = {
       ...(components.oceanbase || {}),
@@ -252,11 +313,10 @@ export default function NodeConfig() {
       ...configData,
       components: newComponents,
       auth: dataSource.auth,
-      home_path: `${
-        dataSource.home_path
-          ? `${dataSource.home_path}${homePathSuffix}`
-          : undefined
-      }`,
+      home_path: `${dataSource.home_path
+        ? `${dataSource.home_path}${homePathSuffix}`
+        : undefined
+        }`,
     });
   };
 
@@ -270,6 +330,39 @@ export default function NodeConfig() {
   };
 
   const nextStep = () => {
+    // 在验证前，确保 alertmanager 的值是有效的
+    if (alertmanagerValues.length > 0) {
+      // 检查当前配置的Alertmanager节点是否仍然有效
+      const validServers = alertmanagerValues.filter(server => allOBServer.includes(server));
+      if (validServers.length > 0) {
+        // 使用有效的服务器
+        form.setFieldValue(['alertmanager', 'servers'], validServers);
+        if (tableFormRef.current) {
+          tableFormRef.current.setFieldValue(['alertmanager', 'servers'], validServers);
+        }
+      } else {
+        // 如果没有有效的服务器，但有可用的OBServer，使用第一个
+        if (allOBServer.length > 0) {
+          const defaultValue = [allOBServer[0]];
+          form.setFieldValue(['alertmanager', 'servers'], defaultValue);
+          if (tableFormRef.current) {
+            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], defaultValue);
+          }
+          // 更新状态
+          setAlertmanagerValues(defaultValue);
+        }
+      }
+    } else if (allOBServer.length > 0) {
+      // 如果没有 alertmanagerValues，但有 allOBServer，则使用第一个
+      const defaultValue = [allOBServer[0]];
+      form.setFieldValue(['alertmanager', 'servers'], defaultValue);
+      if (tableFormRef.current) {
+        tableFormRef.current.setFieldValue(['alertmanager', 'servers'], defaultValue);
+      }
+      // 更新状态
+      setAlertmanagerValues(defaultValue);
+    }
+
     const tableFormRefValidate = () => {
       finalValidate.current = true;
       return tableFormRef?.current?.validateFields().then((values) => {
@@ -316,7 +409,8 @@ export default function NodeConfig() {
       | 'ocpexpress'
       | 'obconfigserver'
       | 'grafana'
-      | 'prometheus',
+      | 'prometheus'
+      | 'alertmanager',
   ): string[] => {
     const allServers = getAllServers(dbConfigData);
     const compoentServers = form.getFieldValue([component, 'servers']);
@@ -326,7 +420,37 @@ export default function NodeConfig() {
       obconfigserver: 'obconfigserver',
       prometheus: 'prometheus',
       grafana: 'grafana',
+      alertmanager: 'alertmanager',
     };
+
+    // 为 alertmanager 组件添加特殊逻辑，确保始终只返回一个值
+    if (component === 'alertmanager') {
+      // 如果有删除操作且alertmanagerValues为空，说明应该保持清理状态
+      if (lastDeleteServer && alertmanagerValues.length === 0) {
+        return [];
+      }
+
+      // 获取当前表单中的值（现在是数组）
+      const currentValue = form.getFieldValue([component, 'servers']);
+
+      if (currentValue && Array.isArray(currentValue) && currentValue.length > 0) {
+        // 如果表单中有值且有效，返回第一个有效值
+        const validValue = currentValue.find(server => allServers.includes(server));
+        if (validValue) {
+          return [validValue];
+        }
+      }
+
+      if (alertmanagerValues?.length > 0 && allServers.includes(alertmanagerValues[0])) {
+        // 如果alertmanagerValues有值且有效，使用它
+        return [alertmanagerValues[0]];
+      } else if (allServers?.length > 0 && !lastDeleteServer) {
+        // 只有在没有删除操作的情况下，才自动分配第一个可用的服务器
+        return [allServers[0]];
+      }
+      return [];
+    }
+
     const customComponentServers = compoentServers?.filter(
       (item: string) =>
         !(allServers?.includes(item) || item === lastDeleteServer),
@@ -397,10 +521,55 @@ export default function NodeConfig() {
       prometheus: {
         servers: getComponentServers('prometheus'),
       },
+      alertmanager: {
+        servers: getComponentServers('alertmanager'),
+      },
     });
 
     setAllOBServer(allServers);
     setAllZoneOBServer(allZoneServers);
+
+    // 优化Alertmanager自动填入逻辑
+    if (allServers.length > 0) {
+      // 如果Alertmanager还没有配置，且有可用的服务器，自动填入第一个
+      if (alertmanagerValues.length === 0 && !lastDeleteServer) {
+        const defaultValue = [allServers[0]];
+        setAlertmanagerValues(defaultValue);
+        // 同步更新表单字段（保持数组格式）
+        form.setFieldValue(['alertmanager', 'servers'], defaultValue);
+        if (tableFormRef.current) {
+          tableFormRef.current.setFieldValue(['alertmanager', 'servers'], defaultValue);
+        }
+      } else if (alertmanagerValues.length > 0) {
+        // 如果Alertmanager已有配置，检查是否仍然有效
+        const validServers = alertmanagerValues.filter(server => allServers.includes(server));
+        if (validServers.length === 0) {
+          // 所有配置的服务器都无效，自动填入第一个可用的服务器
+          const defaultValue = [allServers[0]];
+          setAlertmanagerValues(defaultValue);
+          form.setFieldValue(['alertmanager', 'servers'], defaultValue);
+          if (tableFormRef.current) {
+            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], defaultValue);
+          }
+        } else if (validServers.length !== alertmanagerValues.length) {
+          // 部分服务器无效，保留有效的服务器
+          setAlertmanagerValues(validServers);
+          form.setFieldValue(['alertmanager', 'servers'], validServers);
+          if (tableFormRef.current) {
+            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], validServers);
+          }
+        }
+      }
+    } else {
+      // 如果没有可用的OBServer节点，清空Alertmanager配置
+      if (alertmanagerValues.length > 0) {
+        setAlertmanagerValues([]);
+        form.setFieldValue(['alertmanager', 'servers'], []);
+        if (tableFormRef.current) {
+          tableFormRef.current.setFieldValue(['alertmanager', 'servers'], []);
+        }
+      }
+    }
   }, [dbConfigData, lastDeleteServer]);
 
   useEffect(() => {
@@ -586,68 +755,68 @@ export default function NodeConfig() {
     },
     ...(!standAlone
       ? [
-          {
-            title: (
-              <>
-                {intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.RootserverNodes',
-                  defaultMessage: 'RootServer 节点',
+        {
+          title: (
+            <>
+              {intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.RootserverNodes',
+                defaultMessage: 'RootServer 节点',
+              })}
+
+              <Tooltip
+                title={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.TheNodeWhereTheMaster',
+                  defaultMessage:
+                    '总控服务（RootService）所在节点，用于执行集群管理、服务器管理、自动负载均衡等操作。',
                 })}
+              >
+                <QuestionCircleOutlined className="ml-10" />
+              </Tooltip>
+            </>
+          ),
 
-                <Tooltip
-                  title={intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.TheNodeWhereTheMaster',
-                    defaultMessage:
-                      '总控服务（RootService）所在节点，用于执行集群管理、服务器管理、自动负载均衡等操作。',
-                  })}
-                >
-                  <QuestionCircleOutlined className="ml-10" />
-                </Tooltip>
-              </>
-            ),
-
-            dataIndex: 'rootservice',
-            formItemProps: {
-              rules: [
-                {
-                  required: true,
-                  message: intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.ThisOptionIsRequired',
-                    defaultMessage: '此项是必选项',
-                  }),
-                },
-                {
-                  pattern: serverReg,
-                  message: intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.SelectTheCorrectRootserverNode',
-                    defaultMessage: '请选择正确的 RootServer 节点',
-                  }),
-                },
-              ],
-            },
-            width: 224,
-            renderFormItem: (_: any, { isEditable, record }: any) => {
-              // rootservice options are items entered by the OBServer
-              const options = record?.servers
-                ? formatOptions(record?.servers)
-                : [];
-              return isEditable ? (
-                <Select
-                  options={options}
-                  placeholder={intl.formatMessage({
-                    id: 'OBD.pages.components.NodeConfig.PleaseSelect',
-                    defaultMessage: '请选择',
-                  })}
-                />
-              ) : null;
-            },
+          dataIndex: 'rootservice',
+          formItemProps: {
+            rules: [
+              {
+                required: true,
+                message: intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.ThisOptionIsRequired',
+                  defaultMessage: '此项是必选项',
+                }),
+              },
+              {
+                pattern: serverReg,
+                message: intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.SelectTheCorrectRootserverNode',
+                  defaultMessage: '请选择正确的 RootServer 节点',
+                }),
+              },
+            ],
           },
-          {
-            title: '',
-            valueType: 'option',
-            width: 20,
+          width: 224,
+          renderFormItem: (_: any, { isEditable, record }: any) => {
+            // rootservice options are items entered by the OBServer
+            const options = record?.servers
+              ? formatOptions(record?.servers)
+              : [];
+            return isEditable ? (
+              <Select
+                options={options}
+                placeholder={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                  defaultMessage: '请选择',
+                })}
+              />
+            ) : null;
           },
-        ]
+        },
+        {
+          title: '',
+          valueType: 'option',
+          width: 20,
+        },
+      ]
       : []),
   ];
 
@@ -661,6 +830,9 @@ export default function NodeConfig() {
     },
     prometheus: {
       servers: prometheus?.servers?.length ? prometheus?.servers : undefined,
+    },
+    alertmanager: {
+      servers: alertmanager?.servers?.length ? [alertmanager?.servers[0]] : undefined,
     },
     grafana: {
       servers: grafana?.servers?.length ? grafana?.servers : undefined,
@@ -690,6 +862,7 @@ export default function NodeConfig() {
     configServerComponent,
     prometheusComponent,
     grafanaComponent,
+    alertManagerComponent,
   ];
   const shouldIncludeComponent = componentsToCheck.some((component) =>
     selectedConfig.includes(component),
@@ -725,17 +898,17 @@ export default function NodeConfig() {
               // 单机版，关闭默认的新建按钮
               !standAlone
                 ? {
-                    newRecordType: 'dataSource',
-                    record: () => ({
-                      id: Date.now().toString(),
-                      name: `zone${nameIndex}`,
-                    }),
-                    onClick: () => setNameIndex(nameIndex + 1),
-                    creatorButtonText: intl.formatMessage({
-                      id: 'OBD.pages.components.NodeConfig.AddZone',
-                      defaultMessage: '新增 Zone',
-                    }),
-                  }
+                  newRecordType: 'dataSource',
+                  record: () => ({
+                    id: Date.now().toString(),
+                    name: `zone${nameIndex}`,
+                  }),
+                  onClick: () => setNameIndex(nameIndex + 1),
+                  creatorButtonText: intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.AddZone',
+                    defaultMessage: '新增 Zone',
+                  }),
+                }
                 : false
             }
             editable={{
@@ -1020,22 +1193,22 @@ export default function NodeConfig() {
                                   ...[
                                     dns === 'vip'
                                       ? {
-                                          validator: (
-                                            _: any,
-                                            value: string[],
-                                          ) =>
-                                            serversValidator(
-                                              _,
-                                              [value],
-                                              'OBServer',
-                                            ),
-                                        }
+                                        validator: (
+                                          _: any,
+                                          value: string[],
+                                        ) =>
+                                          serversValidator(
+                                            _,
+                                            [value],
+                                            'OBServer',
+                                          ),
+                                      }
                                       : {
-                                          validator: (
-                                            _: any,
-                                            value: string[],
-                                          ) => dnsValidator(_, [value]),
-                                        },
+                                        validator: (
+                                          _: any,
+                                          value: string[],
+                                        ) => dnsValidator(_, [value]),
+                                      },
                                   ],
                                 ],
                               }}
@@ -1079,10 +1252,6 @@ export default function NodeConfig() {
                     validateFirst
                     rules={[
                       {
-                        required: true,
-                        message: '请选择或输入 Prometheus 节点',
-                      },
-                      {
                         validator: (_: any, value: string[]) =>
                           serversValidator(_, value, 'OBServer'),
                       },
@@ -1106,10 +1275,6 @@ export default function NodeConfig() {
                     validateFirst
                     rules={[
                       {
-                        required: true,
-                        message: '请选择或输入 grafana 节点',
-                      },
-                      {
                         validator: (_: any, value: string[]) =>
                           serversValidator(_, value, 'OBServer'),
                       },
@@ -1118,6 +1283,65 @@ export default function NodeConfig() {
                   />
                 </Col>
               )}
+
+              {selectedConfig.includes(alertManagerComponent) && (
+                <Col span={8}>
+                  <ProFormSelect
+                    name={['alertmanager', 'servers']}
+                    label={'AlertManager 节点'}
+                    mode="tags"
+                    fieldProps={{
+                      style: commonServerStyle,
+                      maxTagCount: 1,
+                      maxTagTextLength: 15,
+                    }}
+                    onChange={(value: string[]) => {
+                      // 严格限制只能有一个值
+                      if (value && value.length > 0) {
+                        // 如果用户尝试输入多个值，只保留最后一个
+                        if (value.length > 1) {
+                          const lastValue = value[value.length - 1];
+                          const newValue = [lastValue];
+                          setAlertmanagerValues(newValue);
+                          form.setFieldValue(['alertmanager', 'servers'], newValue);
+                          if (tableFormRef.current) {
+                            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], newValue);
+                          }
+                          return;
+                        }
+
+                        // 检查输入的值是否有效
+                        const inputValue = value[0];
+                        if (allOBServer.includes(inputValue)) {
+                          // 如果输入的值有效，正常设置
+                          setAlertmanagerValues(value);
+                        } else {
+                          // 如果输入的值无效，暂时保持用户输入，不自动替换
+                          // 这样可以避免触发不必要的验证
+                          setAlertmanagerValues(value);
+                        }
+                      } else {
+                        // 如果没有值，清空
+                        setAlertmanagerValues([]);
+                        form.setFieldValue(['alertmanager', 'servers'], []);
+                        if (tableFormRef.current) {
+                          tableFormRef.current.setFieldValue(['alertmanager', 'servers'], []);
+                        }
+                      }
+                    }}
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.components.NodeConfig.PleaseSelect',
+                      defaultMessage: '请选择',
+                    })}
+                    rules={[{
+                      validator: (_: any, value: string[]) =>
+                        serversValidator(_, value, 'AlertManager'),
+                    },]}
+                    options={formatOptions(allOBServer)}
+                  />
+                </Col>
+              )}
+
 
               {selectedConfig.includes(configServerComponent) && (
                 <Col span={6}>
@@ -1138,15 +1362,8 @@ export default function NodeConfig() {
                     })}
                     rules={[
                       {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.pages.Obdeploy.NodeConfig.SelectOrEnterObConfigserver',
-                          defaultMessage: '请选择或输入 OB ConfigServer 节点',
-                        }),
-                      },
-                      {
                         validator: (_: any, value: string[]) =>
-                          serversValidator(_, value, 'obconfigserver'),
+                          serversValidator(_, value, 'OBConfigServer'),
                       },
                     ]}
                     options={formatOptions(allOBServer)}

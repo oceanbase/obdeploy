@@ -6,7 +6,7 @@ import {
 import { componentsConfig } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { ProCard } from '@ant-design/pro-components';
-import { Col, Row, Space, Table, Tooltip, Typography } from 'antd';
+import { Col, Input, Row, Space, Table, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { leftCardStyle } from '.';
 import styles from './index.less';
@@ -54,6 +54,7 @@ export default function ConfigInfo({
             id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.RootSysPassword',
             defaultMessage: 'root@sys 密码',
           }),
+          key: 'root_password',
           colSpan: 5,
           value: (
             <Tooltip title={obConfigInfo?.root_password} placement="topLeft">
@@ -66,6 +67,7 @@ export default function ConfigInfo({
             id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.SoftwarePath',
             defaultMessage: '软件路径',
           }),
+          key: 'home_path',
           value: (
             <Tooltip
               title={obConfigInfo?.home_path + oceanbaseAddonAfter}
@@ -83,6 +85,7 @@ export default function ConfigInfo({
             id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.DataPath',
             defaultMessage: '数据路径',
           }),
+          key: 'data_dir',
           value: (
             <Tooltip title={obConfigInfo?.data_dir} placement="topLeft">
               <div className="ellipsis">{obConfigInfo?.data_dir}</div>
@@ -94,6 +97,7 @@ export default function ConfigInfo({
             id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.LogPath',
             defaultMessage: '日志路径',
           }),
+          key: 'redo_dir',
           value: (
             <Tooltip title={obConfigInfo?.redo_dir} placement="topLeft">
               <div className="ellipsis">{obConfigInfo?.redo_dir}</div>
@@ -105,6 +109,7 @@ export default function ConfigInfo({
             id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.MysqlPort',
             defaultMessage: 'mysql 端口',
           }),
+          key: 'mysql_port',
           colSpan: 3,
           value: obConfigInfo?.mysql_port,
         },
@@ -113,11 +118,13 @@ export default function ConfigInfo({
             id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.RpcPort',
             defaultMessage: 'rpc 端口',
           }),
+          key: 'rpc_port',
           colSpan: 3,
           value: obConfigInfo?.rpc_port,
         },
         {
           label: 'OBShell 端口',
+          key: 'obshell_port',
           colSpan: 4,
           value: obConfigInfo?.rpc_port,
         },
@@ -125,11 +132,11 @@ export default function ConfigInfo({
 
       more: oceanbase?.parameters?.length
         ? [
-            {
-              label: componentsConfig['oceanbase'].labelName,
-              parameters: oceanbase?.parameters,
-            },
-          ]
+          {
+            label: componentsConfig['oceanbase'].labelName,
+            parameters: oceanbase?.parameters,
+          },
+        ]
         : [],
     },
     {
@@ -204,11 +211,11 @@ export default function ConfigInfo({
 
       more: obproxy?.parameters?.length
         ? [
-            {
-              label: componentsConfig['obproxy'].labelName,
-              parameters: obproxy?.parameters,
-            },
-          ]
+          {
+            label: componentsConfig['obproxy'].labelName,
+            parameters: obproxy?.parameters,
+          },
+        ]
         : [],
     },
   ];
@@ -229,9 +236,9 @@ export default function ConfigInfo({
         render: (text, record) =>
           record.adaptive
             ? intl.formatMessage({
-                id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.AutomaticAllocation',
-                defaultMessage: '自动分配',
-              })
+              id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.AutomaticAllocation',
+              defaultMessage: '自动分配',
+            })
             : text || '-',
       },
       {
@@ -368,23 +375,41 @@ export default function ConfigInfo({
                 <ProCard
                   title={item.group}
                   key={item.key}
-                  className={`${
-                    index === configInfo?.length - 1
-                      ? 'card-header-padding-top-0 card-padding-bottom-24'
-                      : 'card-padding-bottom-24'
-                  }`}
+                  className={`${index === configInfo?.length - 1
+                    ? 'card-header-padding-top-0 card-padding-bottom-24'
+                    : 'card-padding-bottom-24'
+                    }`}
                 >
                   <Col span={24}>
                     <ProCard className={styles.infoSubCard} split="vertical">
-                      {item.content.map((subItem) => (
-                        <ProCard
-                          title={subItem.label}
-                          key={subItem.label}
-                          colSpan={subItem.colSpan}
-                        >
-                          {subItem.value}
-                        </ProCard>
-                      ))}
+                      {item.content.map((subItem) => {
+                        return (
+                          <ProCard
+                            title={subItem.label}
+                            key={subItem.label}
+                            colSpan={subItem.colSpan}
+                          >
+                            {
+                              subItem.key === 'root_password' ? (
+                                <Tooltip
+                                  title={subItem.value}
+                                  placement="topLeft"
+                                >
+                                  <Input.Password
+                                    value={subItem.value.props.title}
+                                    visibilityToggle={true}
+                                    readOnly
+                                    bordered={false}
+                                    style={{ padding: 0 }}
+                                  />
+                                </Tooltip>
+                              ) : (
+                                <span>{subItem.value}</span>
+                              )
+                            }
+                          </ProCard>
+                        )
+                      })}
                     </ProCard>
                   </Col>
                   {item?.more?.length ? (

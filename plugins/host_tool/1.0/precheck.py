@@ -137,9 +137,9 @@ def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kw
         if 'x86' in basearch:
             if len(re.findall(r'(^avx\s+)|(\s+avx\s+)|(\s+avx$)', client.execute_command('lscpu | grep avx').stdout)) == 0:
                 error_msgs.append("The machine's cpu cannot support avx. This error can be ignored for the following oceanbase versions:\n[4.2.5.6, 4.3.0.0)\n[4.3.5.4, 4.4.0.0)\n[4.4.1.0, +∞)")
-        elif 'arm' in basearch:
+        elif 'arm' in basearch or 'aarch' in basearch:
             if len(re.findall(r'(^atomics\s+)|(\s+atomics\s+)|(\s+atomics$)', client.execute_command('lscpu | grep atomics').stdout)) == 0:
-                error_msgs.append("The machine's cpu cannot support LSE.")
+                error_msgs.append("The machine's cpu cannot support LSE.This error can be safely ignored when using OceanBase with non-LSE RPM packages.")
 
         if client.execute_command("uname -r | cut -d'-' -f1").stdout.strip() < '3.1':
             error_msgs.append("The machine's kernel cannot be lower than 3.1")

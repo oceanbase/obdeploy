@@ -15,9 +15,10 @@ import { ExclamationCircleFilled } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
 import { getLocale, useModel } from '@umijs/max';
 import { useRequest } from 'ahooks';
-import { Alert, Button, Row, Space } from 'antd';
+import { Alert, Button, Input, Row, Space, Tooltip } from 'antd';
 import { useEffect } from 'react';
 import {
+  alertManagerComponent,
   allComponentsKeys,
   componentsConfig,
   componentVersionTypeToComponent,
@@ -69,6 +70,7 @@ export default function PreCheckInfo() {
     obagent = {},
     grafana = {},
     prometheus = {},
+    alertmanager = {},
     obconfigserver = {},
     home_path,
     deployUser,
@@ -78,6 +80,9 @@ export default function PreCheckInfo() {
     ocpexpress,
     obagent,
     obconfigserver,
+    grafana,
+    prometheus,
+    alertmanager,
   };
 
   const { run: handleCreateConfig, loading } = useRequest(
@@ -102,9 +107,16 @@ export default function PreCheckInfo() {
     allComponentsKeys.forEach((key) => {
       if (components?.[key]) {
         const component = componentsConfig?.[key] || {};
+        // 直接从 componentConfig 中获取版本信息
+        const version = componentConfig?.[key]?.version ||
+          componentConfig?.[key]?.component_info?.[0]?.version ||
+          // 尝试从原始组件名称获取版本信息
+          (key === 'grafana' ? componentConfig?.grafana?.version :
+            key === 'prometheus' ? componentConfig?.prometheus?.version :
+              key === 'alertmanager' ? componentConfig?.alertmanager?.version : undefined);
         componentsList.push({
           ...component,
-          version: components?.[key].version,
+          version: version,
           key,
         });
       }
@@ -195,6 +207,8 @@ export default function PreCheckInfo() {
           parameters: obproxy?.parameters,
         });
     }
+
+
     if (selectedConfig.includes(obagentComponent)) {
       content = content.concat(
         {
@@ -241,6 +255,17 @@ export default function PreCheckInfo() {
           parameters: prometheus?.parameters,
         });
     }
+    if (selectedConfig.includes(alertManagerComponent)) {
+      content = content.concat({
+        label: 'AlertManager 服务端口',
+        value: alertmanager?.port,
+      });
+      alertmanager?.parameters?.length &&
+        more.push({
+          label: componentsConfig[alertManagerComponent].labelName,
+          parameters: alertmanager?.parameters,
+        });
+    }
 
     if (selectedConfig.includes(configServerComponent)) {
       content = content.concat({
@@ -265,6 +290,79 @@ export default function PreCheckInfo() {
       content,
       more,
     });
+
+    clusterConfigInfo.map((item) => {
+      if (selectedConfig.includes(prometheusComponent)) {
+        const prometheusPasswordItem = {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.PrometheusPassword',
+            defaultMessage: 'Prometheus 密码',
+          }),
+          colSpan: 5,
+          value: (
+            <Tooltip
+              title={prometheus?.basic_auth_users?.admin}
+              placement="topLeft"
+            >
+              <Input.Password
+                value={prometheus?.basic_auth_users?.admin}
+                visibilityToggle={true}
+                readOnly
+                bordered={false}
+                style={{ padding: 0 }}
+              />
+            </Tooltip>
+          ),
+        };
+        item.content.splice(0, 0, prometheusPasswordItem);
+      }
+      if (selectedConfig.includes(alertManagerComponent)) {
+        const alertManagerPasswordItem = {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.AlertManagerPassword',
+            defaultMessage: 'AlertManager 密码',
+          }),
+          colSpan: 5,
+          value: (
+            <Tooltip
+              title={alertmanager?.basic_auth_users?.admin}
+              placement="topLeft"
+            >
+              <Input.Password
+                value={alertmanager?.basic_auth_users?.admin}
+                visibilityToggle={true}
+                readOnly
+                bordered={false}
+                style={{ padding: 0 }}
+              />
+            </Tooltip>
+          ),
+        };
+        item.content.splice(0, 0, alertManagerPasswordItem);
+      }
+      if (selectedConfig.includes(grafanaComponent)) {
+        const grafanaPasswordItem = {
+          label: intl.formatMessage({
+            id: 'OBD.pages.components.CheckInfo.GrafanaPassword',
+            defaultMessage: 'Grafana 密码',
+          }),
+          colSpan: 5,
+          value: (
+            <Tooltip title={grafana?.login_password} placement="topLeft">
+              <Input.Password
+                value={grafana?.login_password}
+                visibilityToggle={true}
+                readOnly
+                bordered={false}
+                style={{ padding: 0 }}
+              />
+            </Tooltip>
+          ),
+        };
+        item.content.splice(0, 0, grafanaPasswordItem);
+      }
+    });
+
   }
 
   useEffect(() => {
@@ -277,7 +375,6 @@ export default function PreCheckInfo() {
     }
     setComponentConfig(newConfig);
   }, []);
-
   return (
     <Space
       className={`${styles.spaceWidth} ${styles.checkInfoSpace}`}
@@ -302,9 +399,7 @@ export default function PreCheckInfo() {
       </ProCard>
 
       {/* 组件节点配置 */}
-      {selectedConfig.includes('obproxy-ce') ||
-      selectedConfig.includes(ocpexpressComponent) ||
-      selectedConfig.includes(configServerComponent) ? (
+      {selectedConfig.length ? (
         <ProCard className={styles.pageCard} split="horizontal">
           <Row gutter={16}>
             {selectedConfig.length ? (

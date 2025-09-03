@@ -84,11 +84,43 @@ class OcpExpress(BaseModel):
     parameters: List[Parameter] = Body(None, description='config parameter')
     servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
 
+class Alertmanager(BaseModel):
+    component: str = Body(..., description='component name')
+    version: str = Body(..., description='version')
+    package_hash: str = Body('', description='package md5')
+    release: str = Body(..., description='release no')
+    port: int = Body(..., description='server port')
+    basic_auth_users: dict = Body('', description='user and password')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
+
+class Prometheus(BaseModel):
+    component: str = Body(..., description='component name')
+    version: str = Body(..., description='version')
+    package_hash: str = Body('', description='package md5')
+    release: str = Body(..., description='release no')
+    port: int = Body(..., description='server port')
+    basic_auth_users: dict = Body('', description='user and password')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
+
+class Grafana(BaseModel):
+    component: str = Body(..., description='component name')
+    version: str = Body(..., description='version')
+    package_hash: str = Body('', description='package md5')
+    release: str = Body(..., description='release no')
+    port: int = Body(..., description='server port')
+    login_password: str = Body('', description='user and password')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+    servers: List[str] = Body(..., description="server ip, ex:[ '1.1.1.1','2.2.2.2']")
 
 class ComponentChangeConfig(ComponentChangeMode):
     obproxy: Optional[Obproxy]
     obagent: Optional[Obagent]
     obconfigserver: Optional[Obconfigserver]
+    alertmanager: Optional[Alertmanager]
+    grafana: Optional[Grafana]
+    prometheus: Optional[Prometheus]
     ocpexpress: Optional[OcpExpress]
     home_path: str = Field(..., description="component change config path")
 

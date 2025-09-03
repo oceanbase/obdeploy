@@ -189,7 +189,7 @@ export default function PreCheckStatus() {
     },
   );
 
-  const { run: handleInstallConfirm, loading:installLoading } = useRequest(deployAndStartADeployment, {
+  const { run: handleInstallConfirm, loading: installLoading } = useRequest(deployAndStartADeployment, {
     onError: (e: any) => {
       const errorInfo = getErrorInfo(e);
       setErrorVisible(true);
@@ -227,7 +227,7 @@ export default function PreCheckStatus() {
     },
   );
 
-  const handleRetryCheck = async(newConfigData?: any) => {
+  const handleRetryCheck = async (newConfigData?: any) => {
     setStatusData({});
     setFailedList([]);
     setShowFailedList([]);
@@ -261,15 +261,70 @@ export default function PreCheckStatus() {
           });
           if (nameSuccess) {
             const { config } = nameData;
-            //后端不会返回密码 需要从原配置中获取
+            // 后端不会返回密码，需要从原配置中获取
+            // 采用更可靠的方式：优先使用原配置中的密码，如果原配置中没有则使用当前配置
+            // 特别处理 OBProxy 密码，确保不丢失
             let newConfigData = config
               ? {
-                  ...config,
-                  auth: {
-                    ...config?.auth,
-                    password: configData.auth?.password,
+                ...config,
+                auth: {
+                  ...config?.auth,
+                  // 优先使用原配置中的密码，确保密码不丢失
+                  password: configData.auth?.password || config?.auth?.password,
+                },
+                components: {
+                  ...config?.components,
+                  // 保留组件密码和必需字段，采用更可靠的密码恢复策略
+                  oceanbase: {
+                    ...config?.components?.oceanbase,
+                    // 优先使用原配置中的密码
+                    root_password: configData?.components?.oceanbase?.root_password ||
+                      config?.components?.oceanbase?.root_password,
                   },
-                }
+                  grafana: config?.components?.grafana ? {
+                    ...config?.components?.grafana,
+                    // 优先使用原配置中的密码
+                    login_password: configData.components?.grafana?.login_password ||
+                      config?.components?.grafana?.login_password,
+                  } : null,
+                  prometheus: config?.components?.prometheus ? {
+                    ...config?.components?.prometheus,
+                    basic_auth_users: {
+                      ...config?.components?.prometheus?.basic_auth_users,
+                      // 优先使用原配置中的密码
+                      admin: configData.components?.prometheus?.basic_auth_users?.admin ||
+                        config?.components?.prometheus?.basic_auth_users?.admin,
+                    },
+                  } : null,
+                  alertmanager: config?.components?.alertmanager ? {
+                    ...config?.components?.alertmanager,
+                    basic_auth_users: {
+                      ...config?.components?.alertmanager?.basic_auth_users,
+                      // 优先使用原配置中的密码
+                      admin: configData.components?.alertmanager?.basic_auth_users?.admin ||
+                        config?.components?.alertmanager?.basic_auth_users?.admin,
+                    },
+                  } : null,
+                  obproxy: config?.components?.obproxy ? {
+                    ...config?.components?.obproxy,
+                    // 优先使用原配置中的密码，确保 OBProxy 密码不丢失
+                    // OBProxy 密码存储在 parameters 数组中，需要特殊处理
+                    obproxy_sys_password: configData?.components?.obproxy?.parameters?.[0]?.value ||
+                      configData.components?.obproxy?.obproxy_sys_password ||
+                      config?.components?.obproxy?.parameters?.[0]?.value,
+                    // 同时更新 parameters 数组中的密码值
+                    parameters: config?.components?.obproxy?.parameters?.map((param: any, index: number) => {
+                      if (param.key === 'obproxy_sys_password') {
+                        return {
+                          ...param,
+                          value: configData?.components?.obproxy?.parameters?.[0]?.value || param.value
+                        };
+                      }
+                      return param;
+                    })
+                  } : null,
+                },
+              }
               : {};
             setConfigData(newConfigData);
             handleRetryCheck(newConfigData);

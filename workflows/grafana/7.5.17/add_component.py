@@ -19,5 +19,7 @@ import const
 
 
 def add_component(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'start_check_pre', 'general_check', 'start', 'health_check')
+    workflow.add(const.STAGE_FIRST, 'start_check_pre', 'general_check')
+    workflow.add(const.STAGE_SECOND, 'start', 'health_check')
+    workflow.add(const.STAGE_THIRD, 'connect', 'modify_password', 'display')
     plugin_context.return_true()

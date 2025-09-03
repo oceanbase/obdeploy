@@ -38,7 +38,10 @@ def cursor_check(plugin_context, need_connect=True, *args, **kwargs):
     if jdbc_url:
         cluster_name = ''
         if server_config.get('jdbc_username', ''):
-            jdbc_username = server_config['jdbc_username']
+            if not plugin_context.cluster_config.depends:
+                jdbc_username = server_config['jdbc_username']
+            else:
+                jdbc_username = "{0}@{1}{2}".format(server_config['ocp_meta_username'], server_config['ocp_meta_tenant']['tenant_name'], cluster_name)
             if '#' in jdbc_username:
                 cluster_name = '#' + jdbc_username.split('#')[1]
         matched = re.match(r"^jdbc:\S+://(\S+?)(|:\d+)/(\S+)", jdbc_url)
@@ -48,7 +51,7 @@ def cursor_check(plugin_context, need_connect=True, *args, **kwargs):
         host = matched.group(1)
         port = matched.group(2)[1:]
         database = matched.group(3)
-        user = server_config['jdbc_username']
+        user = jdbc_username
         password = server_config['jdbc_password']
         meta_user = server_config['ocp_meta_username']
         meta_tenant = server_config['ocp_meta_tenant']['tenant_name'] + cluster_name

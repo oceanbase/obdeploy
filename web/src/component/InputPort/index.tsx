@@ -11,6 +11,7 @@ interface InputPortProps {
   message?: string;
   portError?: string;
   limit?: boolean; //是否需要限制端口号范围
+  initialValue?: number;
 }
 
 /**
@@ -23,6 +24,7 @@ export default function InputPort({
   message,
   limit = true,
   portError,
+  initialValue,
 }: InputPortProps) {
   const rules: any = [
     {
@@ -70,6 +72,7 @@ export default function InputPort({
         id: 'OBD.component.InputPort.PleaseEnter',
         defaultMessage: '请输入',
       })}
+      initialValue={initialValue}
       rules={rules}
     />
   );

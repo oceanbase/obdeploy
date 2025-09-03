@@ -1,4 +1,5 @@
 import {
+  alertManagerComponent,
   configServerComponent,
   grafanaComponent,
   obagentComponent,
@@ -132,6 +133,24 @@ export const useComponents = (extra?: boolean, standAlone?: boolean) => {
                 '是一款采用 go 语言编写的开源应用，主要用于大规模指标数据的可视化展现，是网络架构和应用分析中最流行的时序数据展示工具。',
             }),
             doc: DOCS_GRAFANA,
+          },
+        ],
+      },
+      {
+        group: '工具',
+        key: 'alertManagerTool',
+        onlyAll: true,
+        content: [
+          {
+            key: alertManagerComponent,
+            name: 'AlertManager',
+            onlyAll: true,
+            desc: intl.formatMessage({
+              id: 'OBD.pages.Obdeploy.InstallConfig.AlertManagerDescription',
+              defaultMessage:
+                '是一个开源的告警管理器，用于处理来自 Prometheus 等监控系统的告警，并提供告警的去重、分组、路由和静默等功能。',
+            }),
+            doc: DOCS_PROMETHEUS,
           },
         ],
       },

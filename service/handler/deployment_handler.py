@@ -43,7 +43,7 @@ from service.common.task import AutoRegister as auto_register
 from service.model.task import TaskInfo as Task_info
 from ssh import LocalClient
 from tool import COMMAND_ENV
-from const import TELEMETRY_COMPONENT_OB
+from const import TELEMETRY_COMPONENT_OB, ALERTMANAGER_DEFAULT_RECEIVER, ALERTMANAGER_DEFAULT_RECEIVER_CONF
 from _environ import ENV_TELEMETRY_REPORTER
 
 
@@ -250,6 +250,8 @@ class DeploymentHandler(BaseHandler):
             cluster_config[config.components.prometheus.component] = self.generate_component_config(config, const.PROMETHEUS, ['port', 'basic_auth_users'])
         if config.components.grafana is not None:
             cluster_config[config.components.grafana.component] = self.generate_component_config(config, const.GRAFANA, ['port', 'login_password'])
+        if config.components.alertmanager is not None:
+            cluster_config[config.components.alertmanager.component] = self.generate_component_config(config, const.ALERTMANAGER, ['port', 'basic_auth_users'])
         cluster_config_yaml_path = ''
         log.get_logger().info('dump config from path: %s' % cluster_config_yaml_path)
         with tempfile.NamedTemporaryFile(delete=False, prefix="obd", suffix="yaml", mode="w", encoding="utf-8") as f:
@@ -268,6 +270,10 @@ class DeploymentHandler(BaseHandler):
 
         if 'global' not in comp_config.keys():
             comp_config['global'] = dict()
+
+        if component_name == const.ALERTMANAGER:
+            comp_config['global'] = ALERTMANAGER_DEFAULT_RECEIVER
+            comp_config.update(ALERTMANAGER_DEFAULT_RECEIVER_CONF)
 
         ext_keys.insert(0, 'home_path')
         for key in ext_keys:
@@ -526,7 +532,7 @@ class DeploymentHandler(BaseHandler):
             if ret is False:
                 log.get_logger().warn("component: {}, start log init error".format(repository.name))
             self.obd.set_repositories([repository])
-            if repository.name == COMP_OCP_EXPRESS:
+            if repository.name in [COMP_OCP_EXPRESS, const.ALERTMANAGER]:
                 self.obd.set_repositories(repositories)
             component_kwargs = {}
             if repository.name == const.PROMETHEUS:
