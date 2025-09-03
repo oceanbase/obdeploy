@@ -40,7 +40,7 @@
   need_restart: true
   description_en: How long to keep data for
   description_local: 数据保存时长
-- name: altermanager_config
+- name: alertmanager_config
   require: false
   type: DICT
   need_reload: true
