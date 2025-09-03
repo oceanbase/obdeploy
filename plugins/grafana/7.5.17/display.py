@@ -50,7 +50,7 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
             'ip': ip,
             'port': server_config['port'],
             'user': user,
-            'password': passwd_format(password) if password else '',
+            'password': passwd_format(str(password)) if password else '',
             'url': url,
             'status': 'active' if api_cursor and api_cursor.connect(stdio) else 'inactive'
         })

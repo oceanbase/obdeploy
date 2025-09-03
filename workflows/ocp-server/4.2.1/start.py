@@ -35,9 +35,5 @@ def start(plugin_context, workflow, *args, **kwargs):
     source_option = getattr(plugin_context.options, 'source_option', None)
     if not(source_option == 'upgrade' or client.execute_command(cmd)):
         workflow.add_with_component_version_kwargs(const.STAGE_FIRST, const.COMP_OB_CE if const.COMP_OB_CE in repository_name else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OCP_SERVER_CE if const.COMP_OCP_SERVER_CE in repository_name else const.COMP_OCP_SERVER}, 'connect', 'create_tenant', 'create_user', 'import_time_zone')
-    workflow.add(const.STAGE_FIRST, 'start', 'health_check')
-    workflow.add(const.STAGE_FIRST, 'stop_pre')
-    workflow.add_with_component(const.STAGE_FIRST, 'general', 'stop')
-    workflow.add_with_kwargs(const.STAGE_FIRST, {'multi_process_flag': True}, 'start')
-    workflow.add(const.STAGE_FIRST, 'health_check', 'bootstrap', 'connect', 'upload_packages')
+    workflow.add(const.STAGE_FIRST, 'start', 'health_check', 'bootstrap', 'connect', 'upload_packages')
     plugin_context.return_true()

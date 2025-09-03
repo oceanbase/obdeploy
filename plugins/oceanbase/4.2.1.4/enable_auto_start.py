@@ -18,14 +18,8 @@ from __future__ import absolute_import, division, print_function
 
 import os
 from ssh import get_root_permission_client
-from tool import is_root_user
-from collections import Counter
+from tool import is_root_user, contains_duplicate_nodes
 
-def contains_duplicate_nodes(servers):
-    ips = [server.ip for server in servers]
-    ip_counter = Counter(ips)
-    duplicates = {ip: count for ip, count in ip_counter.items() if count > 1}
-    return duplicates
 
 def enable_auto_start(plugin_context, *args, **kwargs):
     new_cluster_config = kwargs.get('new_cluster_config')
@@ -45,7 +39,7 @@ def enable_auto_start(plugin_context, *args, **kwargs):
 
     auto_start_clients = {}
     if contains_duplicate_nodes(cluster_config.servers):
-        stdio.error("the auto start of multiple nodes is not supported. Please modify the node configuration.")
+        stdio.error("Multiple observer nodes on the same server are not supported by the auto start feature. Please modify the node configuration.")
         return plugin_context.return_false()
 
     for server in cluster_config.servers:

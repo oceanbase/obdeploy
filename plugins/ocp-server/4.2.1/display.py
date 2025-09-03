@@ -19,6 +19,8 @@ from const import ENCRYPT_PASSWORD
 from tool import NetUtil
 from copy import deepcopy
 
+def passwd_format(passwd):
+    return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 def display(plugin_context, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     cluster_config = plugin_context.cluster_config
@@ -37,15 +39,16 @@ def display(plugin_context, config_encrypted, display_encrypt_password='******',
         if ip == '127.0.0.1':
             ip = NetUtil.get_host_ip()
         url = 'http://{}:{}'.format(ip, api_cursor.port)
+        password = (server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password']) if not display_encrypt_password else display_encrypt_password
         results.append({
             'ip': ip,
             'port': api_cursor.port,
             'user': "admin",
-            'password': (server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password']),
+            'password': passwd_format(password) if password else '',
             'url': url,
             'status': 'active' if api_cursor and api_cursor.status(stdio) else 'inactive'
         })
-    stdio.print_list(results, ['url', 'username', 'password', 'status'], lambda x: [x['url'], 'admin', (server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password']) if not display_encrypt_password else display_encrypt_password, x['status']], title='%s' % cluster_config.name)
+    stdio.print_list(results, ['url', 'username', 'password', 'status'], lambda x: [x['url'], 'admin',x['password'] , x['status']], title='%s' % cluster_config.name)
     active_result = [r for r in results if r['status'] == 'active']
     info_dict = active_result[0] if len(active_result) > 0 else None
     if info_dict is not None:

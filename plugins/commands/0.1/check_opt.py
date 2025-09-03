@@ -84,6 +84,10 @@ def check_opt(plugin_context, name, context, *args, **kwargs):
         components = deployed_components
     else:
         components = components.split(',')
+        for component in components:
+            if component not in deployed_components:
+                stdio.error("%s does not exist in %s" % (component, cluster_config.deploy_name))
+                return
 
     if not clients:
         stdio.error("{} server list is empty".format(','.join(components)))

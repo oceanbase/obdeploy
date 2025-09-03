@@ -23,7 +23,6 @@ import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import {
   dnsValidator,
   getErrorInfo,
-  ocpServersValidator,
   serversValidator,
 } from '@/utils';
 import { formatMoreConfig } from '@/utils/helper';
@@ -183,15 +182,8 @@ export default function OBProxyConfig({
         fieldProps={{ style: commonInputStyle }}
         rules={[
           {
-            required: true,
-            message: intl.formatMessage({
-              id: 'OBD.component.MetaDBConfig.OBProxyConfig.PleaseEnter',
-              defaultMessage: '请输入',
-            }),
-          },
-          {
-            validator: ocpServersValidator,
-            validateTrigger: 'onBlur',
+            validator: (_: any, value: string[]) =>
+              serversValidator(_, value, 'OBProxy'),
           },
         ]}
         label={intl.formatMessage({
@@ -308,13 +300,13 @@ export default function OBProxyConfig({
                         ...[
                           dns === 'vip'
                             ? {
-                                validator: (_: any, value: string[]) =>
-                                  serversValidator(_, [value], 'OBServer'),
-                              }
+                              validator: (_: any, value: string[]) =>
+                                serversValidator(_, [value], 'OBServer'),
+                            }
                             : {
-                                validator: (_: any, value: string[]) =>
-                                  dnsValidator(_, [value]),
-                              },
+                              validator: (_: any, value: string[]) =>
+                                dnsValidator(_, [value]),
+                            },
                         ],
                       ],
                     }}

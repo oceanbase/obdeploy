@@ -43,6 +43,17 @@ OBAGENT = 'obagent'
 OB_CONFIGSERVER = 'obconfigserver'
 PROMETHEUS = 'prometheus'
 GRAFANA = 'grafana'
+ALERTMANAGER = 'alertmanager'
+
+ALERTMANAGER_DEFAULT_RECEIVER = {
+    "receivers": ["mock_webhook"]
+}
+ALERTMANAGER_DEFAULT_RECEIVER_CONF = {
+    "mock_webhook":{
+        "receiver_type": "webhook",
+        "url": 'http://127.0.0.1:5001/',
+    }
+}
 
 no_generate_comps = ['ob-configserver']
 
@@ -51,7 +62,7 @@ INIT_PLUGINS = ("init",)
 START_PLUGINS = ("start_check_pre", "start", "connect", "health_check", "display")
 STOP_PLUGINS = ("stop",)
 DEL_COMPONENT_PLUGINS = ("stop", "destroy")
-CHANGED_COMPONENTS = ('obproxy-ce', 'obagent', 'ob-configserver', 'prometheus', 'grafana')
+CHANGED_COMPONENTS = ('obproxy-ce', 'obagent', 'ob-configserver', 'prometheus', 'grafana', 'alertmanager')
 UPGRADE_PLUGINS = ("upgrade")
 # filter component of oceanbase and obproxy version above 4.0
 VERSION_FILTER = {

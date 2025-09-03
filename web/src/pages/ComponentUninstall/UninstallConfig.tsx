@@ -60,7 +60,7 @@ export default function UninstallConfig() {
       comp.content.some(
         (item) =>
           item.key ===
-            componentVersionTypeToComponent[component.component_name] ||
+          (componentVersionTypeToComponent as any)[component.component_name] ||
           item.key === component.component_name,
       ),
     );
@@ -161,34 +161,133 @@ export default function UninstallConfig() {
 
   /**
    * @description
-   * 选中某个组件后，如果该组件是另一个组件的依赖项，那这个组件也要被勾选上
-   * 取消选中某个组件之后，则该组件依赖项也取消勾选
-   * （比如： ocpexpress 依赖 obagent都处于勾选状态，现在不卸载 ocpexpress了，这样也不能卸载 obagent，因为 ocpexpress 还依赖 obagent）
+   * 组件选择逻辑：
+   * 如果选择grafana/prometheus，则 OBAgent 则自动选择
+   * 如果选择 grafana，则 OBAgent&&prometheus 则自动选择
+   * 勾选alertManager，prometheus、 OBAgent 则自动选择
+   * 取消勾选obagent，grafana、prometheus和alertmanager也取消掉
+   * 取消勾选prometheus，grafana和alertmanager也取消掉
+   * 取消勾选alertmanager，只取消掉自己
+   * 取消勾选grafana，只取消掉自己
    */
   const handleSelect = (record: API.BestComponentInfo, selected: boolean) => {
     if (selected) {
-      const needSelectComps = getNeedSelectComps([record.component_name]);
-      const comps = componentsList
-        ?.filter(
-          (comp) =>
-            needSelectComps.includes(comp.component_name) &&
-            // 选择的组件里不能包含已经选择了的组件
-            !selectedComponents.some(
-              (item) => item.component_name === comp.component_name,
-            ),
-        )
-        .map((item) => pick(item, ['component_name', 'version', 'node']));
-      setSelectedComponents([...selectedComponents, ...comps]);
-    } else {
-      const unneedSelectComps = getUnneedselectComps([record.component_name]);
+      // 选择逻辑
+      let newSelectedComponents = [...selectedComponents];
 
-      setSelectedComponents((curState) => {
-        return [
-          ...curState.filter(
-            (item) => !unneedSelectComps.includes(item.component_name),
-          ),
-        ];
-      });
+      if (record.component_name === 'prometheus') {
+        // 如果选择prometheus，则OBAgent自动选择
+        const obagentComp = componentsList?.find(comp => comp.component_name === 'obagent');
+        if (obagentComp && !newSelectedComponents.some(comp => comp.component_name === 'obagent')) {
+          newSelectedComponents.push({
+            component_name: obagentComp.component_name,
+            version: obagentComp.version || '',
+            node: obagentComp.node || ''
+          });
+        }
+        if (!newSelectedComponents.some(comp => comp.component_name === record.component_name)) {
+          newSelectedComponents.push({
+            component_name: record.component_name,
+            version: record.version || '',
+            node: record.node || ''
+          });
+        }
+      } else if (record.component_name === 'grafana') {
+        // 如果选择grafana，则OBAgent和prometheus自动选择
+        const obagentComp = componentsList?.find(comp => comp.component_name === 'obagent');
+        const prometheusComp = componentsList?.find(comp => comp.component_name === 'prometheus');
+
+        if (obagentComp && !newSelectedComponents.some(comp => comp.component_name === 'obagent')) {
+          newSelectedComponents.push({
+            component_name: obagentComp.component_name,
+            version: obagentComp.version || '',
+            node: obagentComp.node || ''
+          });
+        }
+        if (prometheusComp && !newSelectedComponents.some(comp => comp.component_name === 'prometheus')) {
+          newSelectedComponents.push({
+            component_name: prometheusComp.component_name,
+            version: prometheusComp.version || '',
+            node: prometheusComp.node || ''
+          });
+        }
+        if (!newSelectedComponents.some(comp => comp.component_name === record.component_name)) {
+          newSelectedComponents.push({
+            component_name: record.component_name,
+            version: record.version || '',
+            node: record.node || ''
+          });
+        }
+      } else if (record.component_name === 'alertmanager') {
+        // 如果选择alertmanager，则prometheus和OBAgent自动选择
+        const obagentComp = componentsList?.find(comp => comp.component_name === 'obagent');
+        const prometheusComp = componentsList?.find(comp => comp.component_name === 'prometheus');
+
+        if (prometheusComp && !newSelectedComponents.some(comp => comp.component_name === 'prometheus')) {
+          newSelectedComponents.push({
+            component_name: prometheusComp.component_name,
+            version: prometheusComp.version || '',
+            node: prometheusComp.node || ''
+          });
+        }
+        if (obagentComp && !newSelectedComponents.some(comp => comp.component_name === 'obagent')) {
+          newSelectedComponents.push({
+            component_name: obagentComp.component_name,
+            version: obagentComp.version || '',
+            node: obagentComp.node || ''
+          });
+        }
+        if (!newSelectedComponents.some(comp => comp.component_name === record.component_name)) {
+          newSelectedComponents.push({
+            component_name: record.component_name,
+            version: record.version || '',
+            node: record.node || ''
+          });
+        }
+      } else {
+        // 其他组件只添加自己
+        if (!newSelectedComponents.some(comp => comp.component_name === record.component_name)) {
+          newSelectedComponents.push({
+            component_name: record.component_name,
+            version: record.version || '',
+            node: record.node || ''
+          });
+        }
+      }
+
+      setSelectedComponents(newSelectedComponents);
+    } else {
+      // 取消选择逻辑
+      let newSelectedComponents = [...selectedComponents];
+
+      if (record.component_name === 'obagent') {
+        // 取消勾选obagent，grafana、prometheus和alertmanager也取消掉
+        newSelectedComponents = newSelectedComponents.filter(
+          (comp) => !['obagent', 'grafana', 'prometheus', 'alertmanager'].includes(comp.component_name)
+        );
+      } else if (record.component_name === 'prometheus') {
+        // 取消勾选prometheus，grafana和alertmanager也取消掉
+        newSelectedComponents = newSelectedComponents.filter(
+          (comp) => !['prometheus', 'grafana', 'alertmanager'].includes(comp.component_name)
+        );
+      } else if (record.component_name === 'alertmanager') {
+        // 取消勾选alertmanager，只取消掉自己
+        newSelectedComponents = newSelectedComponents.filter(
+          (comp) => comp.component_name !== 'alertmanager'
+        );
+      } else if (record.component_name === 'grafana') {
+        // 取消勾选grafana，只取消掉自己
+        newSelectedComponents = newSelectedComponents.filter(
+          (comp) => comp.component_name !== 'grafana'
+        );
+      } else {
+        // 其他组件只取消自己
+        newSelectedComponents = newSelectedComponents.filter(
+          (comp) => comp.component_name !== record.component_name
+        );
+      }
+
+      setSelectedComponents(newSelectedComponents);
     }
   };
 
@@ -278,54 +377,56 @@ export default function UninstallConfig() {
             {componentsList ? (
               componentsList.filter((item) => item.deployed).length ? (
                 componentsList
-                  .filter((item) => item.deployed)
-                  .map((component, index) => (
-                    <Space key={index} className={styles.spaceWidth}>
-                      <ProCard type="inner" className={styles.componentCard}>
-                        <Table
-                          rowSelection={{
-                            hideSelectAll: true,
-                            selectedRowKeys: selectedComponents.map(
-                              (comp) => comp.component_name,
-                            ),
-                            onSelect: handleSelect,
-                            getCheckboxProps: (record) => ({
-                              disabled:
-                                record.component_name === configServerComponent,
-                            }),
-                            renderCell: (
-                              checked,
-                              record,
-                              index,
-                              originNode,
-                            ) => {
-                              if (
-                                record.component_name === configServerComponent
-                              ) {
-                                return (
-                                  <Tooltip
-                                    title={intl.formatMessage({
-                                      id: 'OBD.pages.ComponentUninstall.UninstallConfig.CurrentlyConfigserverCannotBeUninstalled',
-                                      defaultMessage:
-                                        '暂不支持卸载 configserver',
-                                    })}
-                                  >
-                                    {originNode}
-                                  </Tooltip>
-                                );
-                              }
-                              return originNode;
-                            },
-                          }}
-                          rowKey="component_name"
-                          columns={getColumns(component)}
-                          className={styles.componentTable}
-                          dataSource={[component]}
-                          pagination={false}
-                        />
-                      </ProCard>
-                    </Space>
-                  ))
+                  .filter((item) => item.deployed && !item.component_name.includes('oceanbase'))
+                  .map((component, index) => {
+                    return (
+                      <Space key={index} className={styles.spaceWidth}>
+                        <ProCard type="inner" className={styles.componentCard}>
+                          <Table
+                            rowSelection={{
+                              hideSelectAll: true,
+                              selectedRowKeys: selectedComponents.map(
+                                (comp) => comp.component_name,
+                              ),
+                              onSelect: handleSelect,
+                              getCheckboxProps: (record) => ({
+                                disabled:
+                                  record.component_name === configServerComponent,
+                              }),
+                              renderCell: (
+                                checked,
+                                record,
+                                index,
+                                originNode,
+                              ) => {
+                                if (
+                                  record.component_name === configServerComponent
+                                ) {
+                                  return (
+                                    <Tooltip
+                                      title={intl.formatMessage({
+                                        id: 'OBD.pages.ComponentUninstall.UninstallConfig.CurrentlyConfigserverCannotBeUninstalled',
+                                        defaultMessage:
+                                          '暂不支持卸载 configserver',
+                                      })}
+                                    >
+                                      {originNode}
+                                    </Tooltip>
+                                  );
+                                }
+                                return originNode;
+                              },
+                            }}
+                            rowKey="component_name"
+                            columns={getColumns(component)}
+                            className={styles.componentTable}
+                            dataSource={[component]}
+                            pagination={false}
+                          />
+                        </ProCard>
+                      </Space>
+                    )
+                  })
               ) : (
                 <div className={styles.emptyContent}>
                   <Empty

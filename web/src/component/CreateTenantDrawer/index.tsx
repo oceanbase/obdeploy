@@ -1204,8 +1204,12 @@ export default function CreatTenantDrawer({
                         }),
                       },
                       {
-                        validator: (_: any, value: string[]) =>
-                          IPValidator(_, value),
+                        validator: (_: any, value: string[]) => {
+                          if (!value || value.length === 0) {
+                            return Promise.resolve();
+                          }
+                          return IPValidator(_, value);
+                        },
                       },
                     ]}
                     extra={intl.formatMessage({
@@ -1499,7 +1503,7 @@ export default function CreatTenantDrawer({
                   const invited_nodes =
                     ob_tcp_invited_nodes === undefined
                       ? "'%'"
-                      : `'127.0.0.1,${ob_tcp_invited_nodes},'`;
+                      : `'127.0.0.1,${ob_tcp_invited_nodes.join(',')},'`;
 
                   const params = {
                     ...values,

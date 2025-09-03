@@ -855,6 +855,7 @@ class DemoCommand(ClusterMirrorCommand):
         setattr(self.opts, 'clean', True)
         setattr(self.opts, 'force', True)
         setattr(self.opts, 'force_delete', True)
+        setattr(self.opts, 'force_kill', True)
         obd.set_options(self.opts)
 
         res = obd.demo()
@@ -968,6 +969,7 @@ class ClusterDeployCommand(ClusterMirrorCommand):
                 if getattr(self.opts, 'force', False) or getattr(self.opts, 'clean', False):
                     setattr(self.opts, 'skip_cluster_status_check', True)
                     obd.set_options(self.opts)
+                setattr(self.opts, 'check_root_user', True)
                 res = obd.deploy_cluster(self.cmds[0])
                 self.background_telemetry_task(obd)
                 if res and COMMAND_ENV.get(const.INTERACTIVE_INSTALL, '0') == '0':
@@ -2742,6 +2744,8 @@ class ToolInstallCommand(ObdCommand):
         if self.cmds:
             if self.opts.assumeyes:
                 ROOT_IO.default_confirm = True
+            setattr(self.opts, 'tool_install_flag', True)
+            obd.set_options(self.opts)
             res = obd.install_tool(self.cmds[0])
             return res
         else:

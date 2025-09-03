@@ -1,3 +1,4 @@
+import { alertManagerComponent } from '@/pages/constants';
 import JSEncrypt from 'jsencrypt';
 import { cloneDeep } from 'lodash';
 
@@ -16,7 +17,7 @@ export const encryptPwdForConfig = (
 ) => {
   const newConfigData = cloneDeep(configData);
 
-  const { obagent, obproxy, oceanbase, ocpserver, prometheus, grafana } =
+  const { obagent, obproxy, oceanbase, ocpserver, prometheus, grafana, alertmanager} =
     newConfigData.components || newConfigData;
 
   if (newConfigData.auth?.password)
@@ -41,6 +42,11 @@ export const encryptPwdForConfig = (
     prometheus.basic_auth_users.admin =
       encrypt(prometheus.basic_auth_users.admin, publicKey) ||
       prometheus.basic_auth_users.admin;
+  }
+  if (alertmanager?.basic_auth_users?.admin) {
+    alertmanager.basic_auth_users.admin =
+      encrypt(alertmanager.basic_auth_users.admin, publicKey) ||
+      alertmanager.basic_auth_users.admin;
   }
   if (grafana?.login_password) {
     grafana.login_password =

@@ -1,0 +1,638 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: PATH
+  need_redeploy: true
+  description_en: the directory for the work data file
+  description_local: Alertmanager工作目录
+- name: data_dir
+  name_local: 数据存储目录
+  require: false
+  type: PATH
+  essential: true
+  need_redeploy: true
+  description_en: Base path for data storage
+  description_local: Alertmanager数据存储路径
+- name: log_dir
+  type: PATH
+  need_redeploy: true
+  description_en: Directory where alertmanager can store logs
+  description_local: alertmanager可以存放日志的目录
+- name: port
+  require: true
+  name_local: 监听端口
+  default: 9093
+  type: INT
+  need_restart: true
+  description_en: the listen port for alertmanager
+  description_local: Alertmanager监听端口
+- name: address
+  require: true
+  default: 0.0.0.0
+  type: SAFE_STRING
+  need_restart: true
+  description_en: the listen address for alertmanager
+  description_local: Alertmanager监听地址
+- name: data_retention
+  type: TIME
+  default: 120h
+  need_restart: true
+  description_en: How long to keep data for
+  description_local: 数据保存时长
+- name: altermanager_config
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: the configuration for alertmanager
+  description_local: Alertmanager配置文件
+- name: additional_parameters
+  require: false
+  type: PARAM_LIST
+  need_restart: ture
+  description_en: the boot parameters for alertmanager
+  description_local: Alertmanager启动参数
+- name: receivers
+  type: PARAM_LIST
+  need_reload: true
+  description_en: Alarm receiving object
+  description_local: 告警接收对象
+- name: web_config
+  require: false
+  type: DICT
+  need_restart: true
+  description_en: The web configuration that can enable TLS.
+  description_local: Alertmanager的web服务配置
+- name: basic_auth_users
+  require: false
+  type: DICT
+  need_restart: true
+  description_en: The authentication info for alertmanager web server.
+  description_local: Alertmanager web服务的认证信息,键名为用户名,值为密码
+- name: send_resolved
+  require: false
+  type: BOOL
+  need_reload: true
+  description_en: Whether to notify about resolved alerts
+  description_local: Alertmanager 是否通知已解决的警报
+- name: webhook_url
+  require: false
+  type: WEB_URL
+  need_reload: true
+  description_en: webhook_url and webhook_url_file are mutually exclusive.
+  description_local: webhook_url 和 webhook_url_file 是互斥的
+- name: webhook_url_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: webhook_url and webhook_url_file are mutually exclusive.
+  description_local: webhook_url 和 webhook_url_file 是互斥的
+- name: title
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Message title template
+- name: message
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Message body template.
+- name: content
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Message content template. Limited to 2000 characters.
+- name: username
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Message username.
+- name: avatar_url
+  require: false
+  type: WEB_URL
+  need_reload: true
+  description_en: Message avatar URL.
+- name: http_config
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: The HTTP client's configuration
+- name: to
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The email address to send notifications to.
+- name: from
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The sender's address.
+- name: smarthost
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The SMTP host through which emails are sent.
+- name: hello
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The hostname to identify to the SMTP server.
+- name: auth_username
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Username of SMTP authentication information.
+- name: auth_password
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Password of SMTP authentication information. auth_password and auth_password_file are mutually exclusive.
+- name: auth_password_file
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Password_file of SMTP authentication information. auth_password and auth_password_file are mutually exclusive.
+- name: auth_secret
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Secret of SMTP authentication information
+- name: auth_identity
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Identity of SMTP authentication information
+- name: require_tls
+  require: false
+  type: BOOL
+  need_reload: true
+  description_en: The SMTP TLS requirement
+- name: tls_config
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: TLS configuration.
+- name: html
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The HTML body of the email notification.
+- name: text
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The text body of the email notification.
+- name: headers
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: Further headers email header key/value pairs.
+- name: summary
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Message summary template.
+- name: api_url
+  require: false
+  type: WEB_URL
+  need_reload: true
+  description_en: The URL to send API requests to. The full API path must be included.
+- name: project
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The project key where issues are created.
+- name: description
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Issue description template.
+- name: labels
+  require: false
+  type: STRING_LIST
+  need_reload: true
+  description_en: Labels to be added to the issue.
+- name: priority
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Priority of the issue.
+- name: issue_type
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Type of the issue (e.g. Bug).
+- name: resolve_transition
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Name of the workflow transition to resolve an issue. The target status must have the category "done".
+- name: reopen_transition
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Name of the workflow transition to reopen an issue. The target status should not have the category "done".
+- name: wont_fix_resolution
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: If reopen_transition is defined, ignore issues with that resolution.
+- name: reopen_duration
+  require: false
+  type: TIME
+  need_reload: true
+  description_en: If reopen_transition is defined, reopen the issue when it is not older than this value (rounded down to the nearest minute).The resolutiondate field is used to determine the age of the issue.
+- name: fields
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: Other issue and custom fields.
+- name: api_key
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The API key to use when talking to the OpsGenie API.
+- name: api_key_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: The filepath to API key to use when talking to the OpsGenie API. Conflicts with api_key.
+- name: api_url
+  require: false
+  type: WEB_URL
+  need_reload: true
+  description_en: The host to send OpsGenie API requests to.
+- name: source
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: A backlink to the sender of the notification.
+- name: details
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: A set of arbitrary key/value pairs that provide further detail about the alert.
+- name: responders
+  require: false
+  type: PARAM_LIST
+  need_reload: true
+  description_en: List of responders responsible for notifications.
+- name: tags
+  require: false
+  type: STRING_LIST
+  need_reload: true
+  description_en: Comma separated list of tags attached to the notifications.
+- name: note
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Additional alert note.
+- name: priority
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Priority level of alert. Possible values are P1, P2, P3, P4, and P5.
+- name: update_alerts
+  require: false
+  type: BOOL
+  need_reload: true
+  description_en: Whether to update message and description of the alert in OpsGenie if it already exists by default, the alert is never updated in OpsGenie, the new message only appears in activity log.
+- name: entity
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Optional field that can be used to specify which domain alert is related to.
+- name: actions
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Comma separated list of actions that will be available for the alert.
+- name: routing_key
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The routing and service keys are mutually exclusive. It is mutually exclusive with `routing_key_file`.
+- name: routing_key_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: Read the Pager Duty routing key from a file. It is mutually exclusive with `routing_key`.
+- name: service_key
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The PagerDuty integration key (when using PagerDuty integration type `Prometheus`). It is mutually exclusive with `service_key_file`.
+- name: service_key_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: Read the Pager Duty service key from a file. It is mutually exclusive with `service_key`.
+- name: url
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The URL to send API requests to url and url_file are mutually exclusive.
+- name: url_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: The URL to send API requests to url and url_file are mutually exclusive.
+- name: client
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The client identification of the Alertmanager.
+- name: client_url
+  require: false
+  type: WEB_URL
+  need_reload: true
+  description_en: A backlink to the sender of the notification.
+- name: severity
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Severity of the incident.
+- name: images
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: Images to attach to the incident.
+- name: links
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: Links to attach to the incident.
+- name: component
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The part or component of the affected system that is broken.
+- name: group
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: A cluster or grouping of sources.
+- name: class
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The class/type of the event.
+- name: user_key
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The recipient user's key. user_key and user_key_file are mutually exclusive.
+- name: user_key_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: The recipient user's key. user_key and user_key_file are mutually exclusive.  
+- name: token
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Your registered application's API token. token and token_file are mutually exclusive.
+- name: token_file
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Your registered application's API token. token and token_file are mutually exclusive.
+- name: device
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Optional device to send notification to
+- name: sound
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Optional sound to use for notification
+- name: retry
+  require: false
+  type: TIME
+  need_reload: true
+  description_en: How often the Pushover servers will send the same notification to the user. Must be at least 30 seconds.
+- name: expire
+  require: false
+  type: TIME
+  need_reload: true
+  description_en: How long your notification will continue to be retried for, unless the user acknowledges the notification.
+- name: ttl
+  require: false
+  type: TIME
+  need_reload: true
+  description_en: Optional time to live (TTL) to use for notification
+- name: channel
+  require: false
+  type: STRING
+  need_reload: true
+- name: token_id
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The sender token_id. token_id and token_id_file are mutually exclusive.
+- name: token_id_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: The sender token_id. token_id and token_id_file are mutually exclusive.
+- name: color
+  require: false
+  type: STRING
+  need_reload: true
+- name: emoji
+  require: false
+  type: STRING
+  need_reload: true
+- name: icon_url
+  require: false
+  type: STRING
+  need_reload: true
+- name: text
+  require: false
+  type: STRING
+  need_reload: true
+- name: titleLink
+  require: false
+  type: STRING
+  need_reload: true
+- name: image_url
+  require: false
+  type: STRING
+  need_reload: true
+- name: thumb_url
+  require: false
+  type: STRING
+  need_reload: true
+- name: link_names
+  require: false
+  type: STRING
+  need_reload: true
+- name: short_fields
+  require: false
+  type: BOOL
+  need_reload: true
+- name: api_url_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: The Slack webhook URL. Either api_url or api_url_file should be set.
+- name: icon_emoji
+  require: false
+  type: STRING
+  need_reload: true
+- name: callback_id
+  require: false
+  type: STRING
+  need_reload: true
+- name: fallback
+  require: false
+  type: STRING
+  need_reload: true
+- name: footer
+  require: false
+  type: STRING
+  need_reload: true
+- name: mrkdwn_in
+  require: false
+  type: PARAM_LIST
+  need_reload: true
+- name: pretext
+  require: false
+  type: STRING
+  need_reload: true
+- name: short_fields
+  require: false
+  type: BOOL
+  need_reload: true
+- name: title_link
+  require: false
+  type: STRING
+  need_reload: true
+- name: sigv4
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: Configures AWS's Signature Verification 4 signing process to sign requests.
+- name: topic_arn
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: SNS topic ARN, i.e. arn:aws:sns:us-east-2:698519295917:My-Topic
+- name: subject
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Subject line when the message is delivered to email endpoints.
+- name: phone_number
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Phone number if message is delivered via SMS in E.164 format.
+- name: target_arn
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The mobile platform endpoint ARN if message is delivered via mobile notifications.
+- name: attributes
+  require: false
+  type: DICT
+  need_reload: true
+  description_en: SNS message attributes.
+- name: bot_token
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Telegram bot token. It is mutually exclusive with `bot_token_file`.
+- name: bot_token_file
+  require: false
+  type: PATH
+  need_reload: true
+  description_en: Telegram bot token. It is mutually exclusive with `bot_token_file`.
+- name: chat_id
+  require: false
+  type: INT
+  need_reload: true
+  description_en: ID of the chat where to send the messages.
+- name: message_thread_id
+  require: false
+  type: INT
+  need_reload: true
+  description_en: Optional ID of the message thread where to send the messages.
+- name: disable_notifications
+  require: false
+  type: BOOL
+  need_reload: true
+  description_en: Disable telegram notifications
+- name: parse_mode
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Parse mode for telegram message, supported values are MarkdownV2, Markdown, HTML and empty string for plain text.
+- name: message_type
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Describes the behavior of the alert (CRITICAL, WARNING, INFO).
+- name: entity_display_name
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Contains summary of the alerted problem.
+- name: state_message
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: Contains long explanation of the alerted problem.
+- name: monitoring_tool
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The monitoring tool the state message is from.
+- name: max_alerts
+  require: false
+  type: INT
+  need_reload: true
+  description_en: The maximum number of alerts to include in a single webhook message.
+- name: timeout
+  require: false
+  type: TIME
+  need_reload: true
+  description_en: The maximum time to wait for a webhook request to complete, before failing the request and allowing it to be retried.
+- name: api_secret
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The API key to use when talking to the WeChat API.
+- name: corp_id
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: The corp id for authentication.
+- name: agent_id
+  require: false
+  type: STRING
+  need_reload: true
+- name: to_user
+  require: false
+  type: STRING
+  need_reload: true
+- name: to_party
+  require: false
+  type: STRING
+  need_reload: true
+- name: to_tag
+  require: false
+  type: STRING
+  need_reload: true
+- name: room_id
+  require: false
+  type: STRING
+  need_reload: true
+  description_en: ID of the Webex Teams room where to send the messages.
+
+
+
+
+
+

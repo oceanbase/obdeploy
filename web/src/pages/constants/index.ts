@@ -16,6 +16,7 @@ export const commonServerStyle = { width: 316 };
 export const configServerComponent = 'ob-configserver';
 export const prometheusComponent = 'prometheus';
 export const grafanaComponent = 'grafana';
+export const alertManagerComponent = 'alertmanager';
 
 export const ocpexpressComponentKey = 'ocpexpress';
 export const configServerComponentKey = 'obconfigserver';
@@ -28,6 +29,8 @@ export const componentVersionTypeToComponent = {
   'ocp-express': ocpexpressComponentKey,
   grafanaComponent: grafanaComponent,
   prometheusComponent: prometheusComponent,
+  alertManagerComponent: alertManagerComponent,
+  'alertmanager': alertManagerComponent,
   'ob-dashboard': dashboardComponentKey,
 };
 
@@ -38,6 +41,7 @@ export const onlyComponentsKeys = [
   configServerComponentKey,
   grafanaComponent,
   prometheusComponent,
+  alertManagerComponent,
   dashboardComponentKey,
 ];
 
@@ -49,6 +53,7 @@ export const allComponentsKeys = [
   configServerComponentKey,
   grafanaComponent,
   prometheusComponent,
+  alertManagerComponent,
   obproxyCeComponent,
   oceanbaseCeComponent,
   oceanbaseStandaloneComponent,
@@ -62,6 +67,7 @@ export const allComponentsName = [
   configServerComponent,
   grafanaComponent,
   prometheusComponent,
+  alertManagerComponent,
   obproxyCeComponent,
   oceanbaseCeComponent,
   oceanbaseStandaloneComponent,
@@ -197,6 +203,19 @@ export const componentsConfig = {
     labelName: intl.formatMessage({
       id: 'OBD.pages.constants.GrafanaParameterName',
       defaultMessage: 'Grafana 参数名称',
+    }),
+  },
+  [alertManagerComponent]: {
+    name: 'AlertManager',
+    showComponentName: 'AlertManager',
+    type: intl.formatMessage({
+      id: 'OBD.pages.constants.Tools',
+      defaultMessage: '工具',
+    }),
+    componentKey: alertManagerComponent,
+    labelName: intl.formatMessage({
+      id: 'OBD.pages.constants.AlertManagerParameterName',
+      defaultMessage: 'AlertManager 参数名称',
     }),
   },
   ['obshell_dashboard']: {

@@ -14,7 +14,7 @@ import { Button, Empty, Space, Spin, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import DataEmpty from '../../.././/public/assets/data-empty.svg';
-import { componentVersionTypeToComponent } from '../constants';
+import { alertManagerComponent, componentVersionTypeToComponent, grafanaComponent, obagentComponent, prometheusComponent } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 const locale = getLocale();
@@ -23,6 +23,15 @@ const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 interface DeployConfigProps {
   clusterList?: API.DataListDeployName_;
 }
+
+type rowDataType = {
+  key: string;
+  name: string;
+  component_name: string;
+  onlyAll: boolean;
+  desc: string;
+  doc: string;
+};
 
 export default function DeployConfig({ clusterList }: DeployConfigProps) {
   const {
@@ -95,7 +104,7 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
       comp.content.some(
         (item) =>
           item.key ===
-            componentVersionTypeToComponent[component.component_name] ||
+          componentVersionTypeToComponent[component.component_name] ||
           item.key === component.component_name,
       ),
     );
@@ -115,11 +124,11 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
               {targetComponent?.content[0].name || text}
               {deployed
                 ? intl.formatMessage({
-                    id: 'OBD.pages.ComponentDeploy.DeployConfig.Deployed',
-                    defaultMessage: '（已部署）',
-                  })
+                  id: 'OBD.pages.ComponentDeploy.DeployConfig.Deployed',
+                  defaultMessage: '（已部署）',
+                })
                 : null}
-              {!UnableToObtainTheAvailable ? (
+              {!UnableToObtainTheAvailable && !deployed ? (
                 <ErrorCompToolTip
                   title={intl.formatMessage({
                     id: 'OBD.component.DeployConfig.UnableToObtainTheAvailable',
@@ -157,13 +166,13 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
       {
         title: deployed
           ? intl.formatMessage({
-              id: 'OBD.pages.ComponentDeploy.DeployConfig.DeployNodes',
-              defaultMessage: '部署节点',
-            })
+            id: 'OBD.pages.ComponentDeploy.DeployConfig.DeployNodes',
+            defaultMessage: '部署节点',
+          })
           : intl.formatMessage({
-              id: 'OBD.pages.ComponentDeploy.DeployConfig.Description',
-              defaultMessage: '描述',
-            }),
+            id: 'OBD.pages.ComponentDeploy.DeployConfig.Description',
+            defaultMessage: '描述',
+          }),
         dataIndex: deployed ? 'node' : 'desc',
         className: styles.thirdCell,
         render: (_) => {
@@ -192,67 +201,94 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
   };
 
   /**
-   * tip:如果选择 OCPExpress，则 OBAgent 则自动选择，无需提示
-   * 如果不选择 OBAgent, 则 OCPExpress 则自动不选择，无需提示
-   */
-  const handleSelect = (
-    record: { component_name: string },
-    selected: boolean,
-  ) => {
+ * tip:
+ * 如果选择grafana/prometheus，则 OBAgent 则自动选择，无需提示
+ * 如果选择 grafana，则 OBAgent&&prometheus 则自动选择，无需提示
+ * 如果不选择 OBAgent, 则 grafana/prometheus 则自动不选择，无需提示
+ * 用户取消勾选prometheus，granfana也取消掉
+ */
+  const handleSelect = (record: rowDataType, selected: boolean) => {
     if (!selected) {
-      const newConfig = [];
-      let target = false;
-      target =
-        record.component_name === 'obagent' &&
-        selectedConfig?.includes('ocp-express');
-      for (const val of selectedConfig) {
-        if (target && val === 'ocp-express') continue;
-        if (val !== record.component_name) {
+      let newConfig = [],
+        target = false;
+      // 根据不同的组件类型，决定需要取消选择的相关组件
+      let componentsToRemove: string[] = [];
+
+      if (record.component_name === obagentComponent) {
+        // 取消勾选obagent，grafana和prometheus也取消掉
+        componentsToRemove = [obagentComponent, grafanaComponent, prometheusComponent];
+      } else if (record.component_name === prometheusComponent) {
+        // 取消勾选prometheus，grafana和alertmanager也取消掉
+        componentsToRemove = [prometheusComponent, grafanaComponent, alertManagerComponent];
+      } else if (record.component_name === alertManagerComponent) {
+        // 取消勾选alertmanager，只取消掉自己
+        componentsToRemove = [alertManagerComponent];
+      } else if (record.component_name === grafanaComponent) {
+        // 取消勾选grafana，只取消掉自己
+        componentsToRemove = [grafanaComponent];
+      }
+
+      // 保留不在取消列表中的组件
+      for (let val of selectedConfig) {
+        if (!componentsToRemove.includes(val)) {
           newConfig.push(val);
         }
       }
       setSelectedConfig(newConfig);
     } else {
-      if (
-        record.component_name === 'ocp-express' &&
-        !selectedConfig?.includes('obagent')
-      ) {
-        setSelectedConfig([
-          ...selectedConfig,
-          record.component_name,
-          'obagent',
-        ]);
-      } else {
-        setSelectedConfig([...selectedConfig, record.component_name]);
+      // 根据不同的组件类型，决定需要自动选择的相关组件
+      let componentsToAdd: string[] = [record.component_name];
+
+      if (record.component_name === prometheusComponent) {
+        // 如果选择prometheus，则OBAgent自动选择
+        if (!selectedConfig.includes(obagentComponent)) {
+          componentsToAdd.push(obagentComponent);
+        }
+      } else if (record.component_name === grafanaComponent) {
+        // 如果选择grafana，则OBAgent和prometheus自动选择
+        if (!selectedConfig.includes(obagentComponent)) {
+          componentsToAdd.push(obagentComponent);
+        }
+        if (!selectedConfig.includes(prometheusComponent)) {
+          componentsToAdd.push(prometheusComponent);
+        }
+      } else if (record.component_name === alertManagerComponent) {
+        // 如果选择alertmanager，则OBAgent和prometheus自动选择
+        if (!selectedConfig.includes(obagentComponent)) {
+          componentsToAdd.push(obagentComponent);
+        }
+        if (!selectedConfig.includes(prometheusComponent)) {
+          componentsToAdd.push(prometheusComponent);
+        }
       }
+
+      // 添加新选择的组件和依赖组件
+      setSelectedConfig([...selectedConfig, ...componentsToAdd]);
     }
   };
 
   const preStep = () => {
     history.push('/guide');
   };
-  // 排除缺少安装包
+  // 排除缺少安装包的组件
   const UnableCom = oceanbaseVersionsData
     ?.filter((i) => selectedConfig?.includes(i.name))
-    ?.map((item) => item.name);
+    ?.map((item) => item.name) || [];
 
-  useEffect(() => {
-    if (selectedConfig?.length > 0 && UnableCom?.length > 0) {
-      setSelectedConfig(UnableCom);
-    }
-  }, [selectedConfig, realComponent]);
 
   const nextStep = () => {
-    const selectedComponent = componentsList?.component_list.filter(
+    // 排除掉已部署的组件，只选择未部署的组件
+    const deployedComponentsList = componentsList?.component_list?.filter(item => item.deployed !== 1)
+    const selectedComponent = deployedComponentsList?.filter(
       (component) => selectedConfig?.includes(component.component_name),
     );
+
     if (selectedComponent) {
       let tempConfig: API.ComponentChangeConfig = {};
       for (let selector of selectedComponent) {
-        tempConfig[
-          componentVersionTypeToComponent[selector.component_name] ||
-            selector.component_name
-        ] = {
+        const key = componentVersionTypeToComponent[selector.component_name] ||
+          selector.component_name;
+        tempConfig[key] = {
           component: selector.component_name,
           version: selector.component_info?.[0]?.version,
           package_hash: selector.component_info?.[0]?.md5,
@@ -368,7 +404,7 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
             className="card-header-padding-top-0 card-padding-bottom-24  card-padding-top-0"
           >
             {componentsList?.component_list ? (
-              componentsList?.component_list.map((component, index) => (
+              [...componentsList.component_list].reverse().map((component, index) => (
                 <Space key={index} className={styles.spaceWidth}>
                   <ProCard
                     style={component.deployed ? { paddingLeft: 48 } : {}}
@@ -377,21 +413,19 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
                   >
                     <Table
                       rowSelection={
-                        component.component_name !== 'prometheus' &&
-                        component.component_name !== 'grafana' &&
                         !component.deployed
                           ? {
-                              hideSelectAll: true,
-                              // 默认勾选项，需排除掉缺少必要安装包
-                              selectedRowKeys: UnableCom,
-                              onSelect: handleSelect,
-                              getCheckboxProps: (record) => ({
-                                disabled: !oceanbaseVersionsData?.find(
-                                  (i) => i.name === record.component_name,
-                                ),
-                                name: record.component_name,
-                              }),
-                            }
+                            hideSelectAll: true,
+                            // 使用用户实际选择的组件列表
+                            selectedRowKeys: selectedConfig,
+                            onSelect: handleSelect,
+                            getCheckboxProps: (record) => ({
+                              disabled: !oceanbaseVersionsData?.find(
+                                (i) => i.name === record.component_name,
+                              ),
+                              name: record.component_name,
+                            }),
+                          }
                           : undefined
                       }
                       rowKey="component_name"

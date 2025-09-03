@@ -38,10 +38,9 @@ export default function Guide() {
 
   const guideConfigListRef = [
     {
-      disable: standAlone,
       id: 'ob',
       noTooltip: true,
-      icon: standAlone ? obUnselectedIcon : obGuideIcon,
+      icon: obGuideIcon,
       title: intl.formatMessage({
         id: 'OBD.pages.Guide.OceanbaseAndSupportingTools',
         defaultMessage: 'OceanBase 及配套工具',
@@ -49,10 +48,10 @@ export default function Guide() {
       detail: standAlone
         ? '单机以及各类工具，方便客户管理、运维和使用'
         : intl.formatMessage({
-            id: 'OBD.pages.Guide.DistributedDatabasesAndVariousTools',
-            defaultMessage:
-              '分布式数据库以及各类工具，方便客户管理、运维和使用',
-          }),
+          id: 'OBD.pages.Guide.DistributedDatabasesAndVariousTools',
+          defaultMessage:
+            '分布式数据库以及各类工具，方便客户管理、运维和使用',
+        }),
       action: (
         <Button
           onClick={() => {
@@ -159,10 +158,9 @@ export default function Guide() {
       ),
     },
     {
-      disable: standAlone,
       id: 'component-manage',
       noTooltip: true,
-      icon: standAlone ? odcDisableIcon : compManageGuideIcon,
+      icon: compManageGuideIcon,
       title: intl.formatMessage({
         id: 'OBD.pages.Guide.ComponentManagement',
         defaultMessage: '组件管理',
@@ -171,9 +169,7 @@ export default function Guide() {
         id: 'OBD.pages.Guide.YouCanInstallAndUninstall.1',
         defaultMessage: '可集群进行 OBAgent、Prometheus 等组件安装、卸载',
       }),
-      ...(standAlone ? (
-        <></>
-      ) : (
+      ...(
         {
           action: (
             <Dropdown
@@ -217,7 +213,7 @@ export default function Guide() {
             </Dropdown>
           ),
         }
-      )),
+      ),
     },
     {
       disable: true,

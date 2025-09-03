@@ -38,7 +38,7 @@ def obshell_start(plugin_context, *args, **kwargs):
         home_path = server_config['home_path']
         obshell_pid_path = '%s/run/obshell.pid' % home_path
         obshell_pid = client.execute_command('cat %s' % obshell_pid_path).stdout.strip()
-        if obshell_pid and client.execute_command('ls /proc/%s' % obshell_pid):
+        if obshell_pid and client.execute_command('cat /proc/%s/status|grep obshell' % obshell_pid):
             stdio.verbose('%s obshell[pid: %s] started', server, obshell_pid)
         else:
             # start obshell

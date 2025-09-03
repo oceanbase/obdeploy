@@ -93,6 +93,8 @@ BINLOG_INSTANCE_STATUS_OPERATORS_MAP = {
 #prometheus
 COMP_PROMETHEUS = 'prometheus'
 
+COMP_ALERTMANAGER = 'alertmanager'
+
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
 
@@ -137,3 +139,12 @@ INTERACTIVE_INSTALL = 'INTERACTIVE_INSTALL'
 SERVICE_MODE = 'SERVICE'
 LOCATION_MODE = 'LOCATION'
 
+ALERTMANAGER_DEFAULT_RECEIVER = {
+    "receivers": ["mock_webhook"]
+}
+ALERTMANAGER_DEFAULT_RECEIVER_CONF = {
+    "mock_webhook":{
+        "receiver_type": "webhook",
+        "url": 'http://127.0.0.1:5001/',
+    }
+}

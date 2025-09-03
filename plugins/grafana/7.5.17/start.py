@@ -106,7 +106,6 @@ def start(plugin_context, *args, **kwargs):
             ob_prome_conf.update({'url': url})
             if prometheus_server_config.get('basic_auth_users'):
                 for key, value in prometheus_server_config['basic_auth_users'].items():
-                    stdio.verbose('prometheus_server_config: %s ' % prometheus_server_config['basic_auth_users'])
                     ob_prome_conf.update({'basicAuth': 'true'})
                     ob_prome_conf.update({'basicAuthUser': key})
                     ob_prome_conf.update({'secureJsonData': {'basicAuthPassword': value}})

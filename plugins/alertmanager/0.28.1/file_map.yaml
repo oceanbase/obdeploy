@@ -1,0 +1,15 @@
+- src_path: ./usr/alertmanager/alertmanager
+  target_path: alertmanager
+  type: file
+- src_path: ./usr/alertmanager/amtool
+  target_path: amtool
+  type: file
+- src_path: ./usr/alertmanager/LICENSE
+  target_path: LICENSE
+  type: file
+- src_path: ./usr/alertmanager/NOTICE
+  target_path: NOTICE
+  type: file
+- src_path: ./usr/alertmanager
+  target_path: ''
+  type: dir

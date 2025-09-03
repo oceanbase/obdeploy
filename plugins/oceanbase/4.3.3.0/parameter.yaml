@@ -1991,11 +1991,12 @@
   description_local: 单个zone的机房
 - name: enable_auto_start
   require: false
+  essential: true
   type: BOOL
   default: false
   need_reload: true
   description_en: Support observer auto-start on boot
-  description_local: 支持 observer 开机自启
+  description_local: observer开机自启,需确保部署用户具有sudo权限且非容器环境
 - name: install_utils
   require: false
   type: BOOL

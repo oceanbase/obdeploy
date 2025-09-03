@@ -2,19 +2,20 @@ import ComponentsPort from '@/component/ComponentsPort';
 import CustomFooter from '@/component/CustomFooter';
 import MoreConfigTable from '@/component/MoreConfigTable';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
-import { getErrorInfo, handleQuit, serversValidator } from '@/utils';
+import { getErrorInfo, handleQuit, PASSWORD_REGEX, serversValidator, validatePassword } from '@/utils';
 import { formatMoreConfig, getInitialParameters } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
 import { InfoCircleFilled } from '@ant-design/icons';
 import {
+  EditableFormInstance,
   ProCard,
   ProForm,
   ProFormSelect,
   ProFormText,
 } from '@ant-design/pro-components';
-import { Button, Space } from 'antd';
-import { useEffect, useState } from 'react';
+import { Button, Space, Row, Col, Form } from 'antd';
+import { useEffect, useRef, useState } from 'react';
 import { getLocale, useModel } from 'umi';
 import {
   configServerComponent,
@@ -23,10 +24,12 @@ import {
   onlyComponentsKeys,
   pathRule,
   prometheusComponent,
+  alertManagerComponent,
 } from '../constants';
 import { formatParameters } from '../Obdeploy/ClusterConfig';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
+import { Password } from '@oceanbase/ui';
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
@@ -80,14 +83,27 @@ export default function ComponentConfig() {
     obconfigserver = {},
     appname,
     home_path,
+    grafana = {},
+    prometheus = {},
+    alertmanager = {},
   } = componentConfig;
-  const components = { ocpexpress, obproxy, obagent, obconfigserver };
+  const components = { prometheus, obproxy, obagent, obconfigserver, grafana, alertmanager };
   const { setErrorVisible, setErrorsList, errorsList, handleQuitProgress } =
     useModel('global');
   const homePathSuffix = `/${appname}`;
   const [componentsMoreLoading, setComponentsMoreLoading] = useState(false);
-  const [ocpServerDropdownVisible, setOcpServerDropdownVisible] =
-    useState<boolean>(false);
+  const [grafanaPassed, setGrafanaPassed] = useState<boolean>(true);
+  const [prometheusPassed, setPrometheusPassed] = useState<boolean>(true);
+  const [alertmanagerPassed, setAlertmanagerPassed] = useState<boolean>(true);
+  const [prometheusPwd, setPrometheusPwd] = useState<string>(
+    prometheus?.basic_auth_users?.admin || '',
+  );
+  const [alertmanagerPwd, setAlertmanagerPwd] = useState<string>(
+    alertmanager?.basic_auth_users?.admin || '',
+  );
+  const [grafanaPwd, setGrafanaPwd] = useState<string>(
+    grafana?.login_password || '',
+  );
 
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
   const newDeployUser =
@@ -128,8 +144,39 @@ export default function ComponentConfig() {
         componentsMoreConfig,
       ),
     },
+    grafana: {
+      port: grafana?.port || 3000,
+      servers: grafana?.servers,
+      parameters: getInitialParameters(
+        grafana?.component,
+        grafana?.parameters,
+        componentsMoreConfig,
+      ),
+    },
+    prometheus: {
+      port: prometheus?.port || 9090,
+      servers: prometheus?.servers,
+      parameters: getInitialParameters(
+        prometheus?.component,
+        prometheus?.parameters,
+        componentsMoreConfig,
+      ),
+    },
+    alertmanager: {
+      port: alertmanager?.port || 9093,
+      servers: alertmanager?.servers,
+      parameters: getInitialParameters(
+        alertmanager?.component,
+        alertmanager?.parameters,
+        componentsMoreConfig,
+      ),
+    },
     home_path: initHomePath,
   };
+
+  const tableFormRef = useRef<EditableFormInstance<API.DBConfig>>();
+  const [alertmanagerValues, setAlertmanagerValues] = useState<string[]>([]);
+
   if (!lowVersion) {
     initialValues.ocpexpress = {
       port: ocpexpress?.port || 8180,
@@ -141,6 +188,23 @@ export default function ComponentConfig() {
       ),
     };
   }
+
+  const prometheusPwdChange = (password: string) => {
+    form.setFieldValue(['prometheus', 'basic_auth_users', 'admin'], password);
+    form.validateFields([['prometheus', 'basic_auth_users', 'admin']]);
+    setPrometheusPwd(password);
+  };
+  const alertmanagerPwdChange = (password: string) => {
+    form.setFieldValue(['alertmanager', 'basic_auth_users', 'admin'], password);
+    form.validateFields([['alertmanager', 'basic_auth_users', 'admin']]);
+    setAlertmanagerPwd(password);
+  };
+  const grafanaPwdChange = (password: string) => {
+    form.setFieldValue(['grafana', 'login_password'], password);
+    form.validateFields([['grafana', 'login_password']]);
+    setGrafanaPwd(password);
+  };
+
   const getComponentsMoreParamsters = async () => {
     const filters: API.ParameterFilter[] = [];
     let currentOnlyComponentsKeys: string[] = onlyComponentsKeys;
@@ -213,7 +277,9 @@ export default function ComponentConfig() {
       getComponentsMoreParamsters();
     }
   };
+
   const setData = (dataSource: FormValues) => {
+
     let newComponents: API.Components = {};
     if (selectedConfig.includes('obproxy-ce')) {
       newComponents.obproxy = {
@@ -227,6 +293,11 @@ export default function ComponentConfig() {
         ...(components.obagent || {}),
         ...dataSource?.obagent,
         parameters: formatParameters(dataSource.obagent?.parameters),
+        component: obagentComponent,
+        // 确保版本信息被保留
+        version: components.obagent?.version || obagentComponent,
+        release: components.obagent?.release,
+        package_hash: components.obagent?.package_hash,
       };
     }
     if (selectedConfig.includes(configServerComponent)) {
@@ -241,6 +312,11 @@ export default function ComponentConfig() {
         ...(components?.grafana || {}),
         ...dataSource.grafana,
         parameters: formatParameters(dataSource.grafana?.parameters),
+        component: grafanaComponent,
+        // 确保版本信息被保留
+        version: components?.grafana?.version,
+        release: components?.grafana?.release,
+        package_hash: components?.grafana?.package_hash,
       };
     }
     if (selectedConfig.includes(prometheusComponent)) {
@@ -248,6 +324,23 @@ export default function ComponentConfig() {
         ...(components?.prometheus || {}),
         ...dataSource.prometheus,
         parameters: formatParameters(dataSource.prometheus?.parameters),
+        component: prometheusComponent,
+        // 确保版本信息被保留
+        version: components?.prometheus?.version,
+        release: components?.prometheus?.release,
+        package_hash: components?.prometheus?.package_hash,
+      };
+    }
+    if (selectedConfig.includes(alertManagerComponent)) {
+      newComponents.alertmanager = {
+        ...(components?.alertmanager || {}),
+        ...dataSource.alertmanager,
+        parameters: formatParameters(dataSource.alertmanager?.parameters),
+        component: alertManagerComponent,
+        // 确保版本信息被保留
+        version: components?.alertmanager?.version,
+        release: components?.alertmanager?.release,
+        package_hash: components?.alertmanager?.package_hash,
       };
     }
     setComponentConfig({
@@ -257,7 +350,21 @@ export default function ComponentConfig() {
       deployUser: dataSource.deployUser,
     });
   };
+
+  useEffect(() => {
+    if (alertmanager?.servers && Array.isArray(alertmanager.servers) && alertmanager.servers.length > 0) {
+      setAlertmanagerValues(alertmanager.servers);
+    }
+  }, [alertmanager?.servers]);
+
   const nextStep = () => {
+    // 在验证前，确保 alertmanager 的值只包含当前显示的那个值
+    if (alertmanagerValues.length > 0) {
+      form.setFieldValue(['alertmanager', 'servers'], alertmanagerValues);
+      if (tableFormRef.current) {
+        tableFormRef.current.setFieldValue(['alertmanager', 'servers'], alertmanagerValues);
+      }
+    }
     form.validateFields().then((values) => {
       setData(values);
       setCurrent(current + 1);
@@ -280,17 +387,33 @@ export default function ComponentConfig() {
       getComponentsMoreParamsters();
     }
   }, [componentsMore]);
+
+  // 手动设置端口初始值
+  useEffect(() => {
+    if (selectedConfig.includes(prometheusComponent)) {
+      form.setFieldValue(['prometheus', 'port'], 9090);
+    }
+    if (selectedConfig.includes(grafanaComponent)) {
+      form.setFieldValue(['grafana', 'port'], 3000);
+    }
+    if (selectedConfig.includes(alertManagerComponent)) {
+      form.setFieldValue(['alertmanager', 'port'], 9093);
+    }
+  }, [selectedConfig, form]);
+
   return (
     <ProForm
       form={form}
       submitter={false}
       initialValues={initialValues}
-      grid={true}
       validateTrigger={['onBlur', 'onChange']}
     >
       <Space className={styles.spaceWidth} direction="vertical" size="middle">
         {selectedConfig?.includes('obproxy-ce') ||
-        selectedConfig?.includes(configServerComponent) ? (
+          selectedConfig?.includes(configServerComponent) ||
+          selectedConfig?.includes(grafanaComponent) ||
+          selectedConfig?.includes(prometheusComponent) ||
+          selectedConfig?.includes(alertManagerComponent) ? (
           <ProCard
             className={styles.pageCard}
             bodyStyle={{ paddingBottom: 0 }}
@@ -299,101 +422,118 @@ export default function ComponentConfig() {
               defaultMessage: '组件节点配置',
             })}
           >
-            <Space size={24}>
+            <Row>
               {selectedConfig?.includes('obproxy-ce') ? (
-                <ProFormSelect
-                  name={['obproxy', 'servers']}
-                  label={intl.formatMessage({
-                    id: 'OBD.pages.ComponentDeploy.ComponentConfig.ObproxyNodes',
-                    defaultMessage: 'OBProxy 节点',
-                  })}
-                  mode="tags"
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.components.NodeConfig.SelectOrEnterObproxyNodes',
-                        defaultMessage: '请选择或输入 OBProxy 节点',
-                      }),
-                    },
-                    {
-                      validator: (_: any, value: string[]) =>
-                        serversValidator(_, value, 'OBProxy'),
-                    },
-                  ]}
-                  fieldProps={{
-                    style: commonWidth,
-                  }}
-                />
+                <Col span={8} >
+                  <ProFormSelect
+                    name={['obproxy', 'servers']}
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.ObproxyNodes',
+                      defaultMessage: 'OBProxy 节点',
+                    })}
+                    placeholder="请选择或输入 OBProxy 节点"
+                    mode="tags"
+                    rules={[
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'OBProxy'),
+                      },
+                    ]}
+                    fieldProps={{
+                      style: commonWidth,
+                    }}
+                  />
+                </Col>
               ) : null}
-              {/* {selectedConfig.includes(ocpexpressComponent) ? (
-                <ProFormSelect
-                  name={['ocpexpress', 'servers']}
-                  label={intl.formatMessage({
-                    id: 'OBD.pages.ComponentDeploy.ComponentConfig.OcpExpressNodes',
-                    defaultMessage: 'OCP Express 节点',
-                  })}
-                  mode="tags"
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.ComponentDeploy.ComponentConfig.SelectOrEnterOcpExpress',
-                        defaultMessage: '请选择或输入 OCP Express 节点',
-                      }),
-                    },
-                    {
-                      validator: (_: any, value: string[]) =>
-                        serversValidator(_, value, 'OBServer'),
-                    },
-                  ]}
-                  fieldProps={{
-                    style: commonWidth,
-                    open: ocpServerDropdownVisible,
-                    onChange: (value) => {
-                      if (value?.length) {
-                        form.setFieldsValue({
-                          ocpexpress: {
-                            servers: [value[value.length - 1]],
-                          },
-                        });
-                      }
-                      setOcpServerDropdownVisible(false);
-                    },
-                    onFocus: () => setOcpServerDropdownVisible(true),
-                    onClick: () =>
-                      setOcpServerDropdownVisible(!ocpServerDropdownVisible),
-                    onBlur: () => setOcpServerDropdownVisible(false),
-                  }}
-                />
-              ) : null} */}
               {selectedConfig?.includes(configServerComponent) ? (
-                <ProFormSelect
-                  name={['obconfigserver', 'servers']}
-                  label={intl.formatMessage({
-                    id: 'OBD.pages.ComponentDeploy.ComponentConfig.ObconfigserverNodes',
-                    defaultMessage: 'obconfigserver 节点',
-                  })}
-                  mode="tags"
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.Obdeploy.NodeConfig.SelectOrEnterObConfigserver',
-                        defaultMessage: '请选择或输入 OB ConfigServer 节点',
-                      }),
-                    },
-                    {
-                      validator: (_: any, value: string[]) =>
-                        serversValidator(_, value, 'obconfigserver'),
-                    },
-                  ]}
-                  fieldProps={{
-                    style: commonWidth,
-                  }}
-                />
+                <Col span={8}>
+                  <ProFormSelect
+                    name={['obconfigserver', 'servers']}
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.ObconfigserverNodes',
+                      defaultMessage: 'obconfigserver 节点',
+                    })}
+                    placeholder="请选择或输入 OBConfigServer 节点"
+                    mode="tags"
+                    rules={[
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'OBConfigServer'),
+                      },
+                    ]}
+                    fieldProps={{
+                      style: commonWidth,
+                    }}
+                  />
+                </Col>
               ) : null}
-            </Space>
+              {selectedConfig?.includes(grafanaComponent) ? (
+                <Col span={8}>
+                  <ProFormSelect
+                    name={['grafana', 'servers']}
+                    label={'Grafana 节点'}
+                    placeholder="请选择或输入 Grafana 节点"
+                    mode="tags"
+                    rules={[
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'Grafana'),
+                      },
+                    ]}
+                    fieldProps={{
+                      style: commonWidth,
+                    }}
+                  />
+                </Col>
+              ) : null}
+              {selectedConfig?.includes(prometheusComponent) ? (
+                <Col span={8}>
+                  <ProFormSelect
+                    name={['prometheus', 'servers']}
+                    label={'Prometheus 节点'}
+                    placeholder="请选择或输入 Prometheus 节点"
+                    mode="tags"
+                    rules={[
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'Prometheus'),
+                      },
+                    ]}
+                    fieldProps={{
+                      style: commonWidth,
+                    }}
+                  />
+                </Col>
+              ) : null}
+              {selectedConfig?.includes(alertManagerComponent) ? (
+                <Col span={8}>
+                  <ProFormSelect
+                    name={['alertmanager', 'servers']}
+                    label={'AlertManager 节点'}
+                    mode="tags"
+                    placeholder="请选择或输入 AlertManager 节点"
+                    rules={[
+                      {
+                        validator: (_: any, value: string[]) =>
+                          serversValidator(_, value, 'AlertManager'),
+                      },
+                    ]}
+                    fieldProps={{
+                      style: commonWidth,
+                      value: alertmanagerValues,
+                      onSelect: (value: any) => {
+                        // 强制只保留一个值
+                        setAlertmanagerValues([value]);
+                      },
+                      onDeselect: (value: any) => {
+                        // 允许删除值，清空选择
+                        setAlertmanagerValues([]);
+                      },
+                    }}
+                  />
+                </Col>
+              ) : null}
+            </Row>
           </ProCard>
         ) : null}
 
@@ -457,6 +597,97 @@ export default function ComponentConfig() {
               })}
               className="card-padding-bottom-24"
             >
+              {selectedConfig.includes(grafanaComponent) && (
+                <Form.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.DKFFMK27',
+                    defaultMessage: 'Grafana 密码',
+                  })}
+                  name={['grafana', 'login_password']}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.DKFFMK28',
+                        defaultMessage: '请输入或随机生成 Grafana 密码',
+                      }),
+                    },
+                    {
+                      validator: validatePassword(grafanaPassed),
+                    },
+                  ]}
+                  initialValue={grafanaPwd}
+                >
+                  <Password
+                    generatePasswordRegex={PASSWORD_REGEX}
+                    onValidate={(value) => {
+                      setGrafanaPassed(value);
+                    }}
+                    style={{ width: 388, borderColor: '#CDD5E4' }}
+                    onChange={grafanaPwdChange}
+                  />
+                </Form.Item>
+              )}
+              {selectedConfig.includes(prometheusComponent) && (
+                <Form.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.ClusterConfig.DKFFMK29',
+                    defaultMessage: 'Prometheus 密码',
+                  })}
+                  name={['prometheus', 'basic_auth_users', 'admin']}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.DKFFMK26',
+                        defaultMessage: '请输入或随机生成 Prometheus 密码',
+                      }),
+                    },
+                    {
+                      validator: validatePassword(prometheusPassed),
+                    },
+                  ]}
+                  initialValue={prometheusPwd}
+                >
+                  <Password
+                    generatePasswordRegex={PASSWORD_REGEX}
+                    onValidate={(value) => {
+                      setPrometheusPassed(value);
+                    }}
+                    style={{ width: 388, borderColor: '#CDD5E4' }}
+                    onChange={prometheusPwdChange}
+                  />
+                </Form.Item>
+              )}
+              {selectedConfig.includes(alertManagerComponent) && (
+                <Form.Item
+                  label={'AlertManager 密码'}
+                  name={['alertmanager', 'basic_auth_users', 'admin']}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.DKFFMK26',
+                        defaultMessage: '请输入或随机生成 AlertManager 密码',
+                      }),
+                    },
+                    {
+                      validator: validatePassword(alertmanagerPassed),
+                    },
+                  ]}
+                  initialValue={alertmanagerPwd}
+                >
+                  <Password
+                    generatePasswordRegex={PASSWORD_REGEX}
+                    onValidate={(value) => {
+                      setAlertmanagerPassed(value);
+                    }}
+                    style={{ width: 388, borderColor: '#CDD5E4' }}
+                    onChange={alertmanagerPwdChange}
+                  />
+                </Form.Item>
+              )}
+
               <ComponentsPort
                 form={form}
                 lowVersion={lowVersion}

@@ -45,6 +45,7 @@ import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
 import { getLocale, history, useModel } from 'umi';
 import {
+  alertManagerComponent,
   allComponentsName,
   commonStyle,
   configServerComponent,
@@ -199,7 +200,6 @@ export default function InstallConfig() {
               item.name,
             ),
           );
-
           const initOceanbaseVersionInfo =
             oceanbaseVersionsData[0]?.info[0] || {};
           const newSelectedOceanbaseVersionInfo =
@@ -237,8 +237,13 @@ export default function InstallConfig() {
                     }
                     return false;
                   });
+                  // 如果没有匹配到对应版本类型的 obproxy，使用第一个可用的版本
+                  if (Object.keys(currentObproxyVersionInfo).length === 0) {
+                    currentObproxyVersionInfo = item?.info?.[0] || {};
+                  }
                   newComponentsVersionInfo[item.name] = {
                     ...currentObproxyVersionInfo,
+                    // 保持与其他组件一致的数据结构，包含 dataSource
                     dataSource: item.info || [],
                   };
                 } else {
@@ -256,7 +261,6 @@ export default function InstallConfig() {
             allComponentsName.length;
 
           setComponentsVersionInfo(newComponentsVersionInfo);
-
           if (noVersion) {
             const { success: mirrorSuccess, data: mirrorData } =
               await fetchListRemoteMirrors();
@@ -387,8 +391,8 @@ export default function InstallConfig() {
               ? 'oceanbase-ce'
               : componentsVersionInfo?.[oceanbaseComponent]?.version_type ===
                 'business'
-              ? 'oceanbase'
-              : 'oceanbase-standalone',
+                ? 'oceanbase'
+                : 'oceanbase-standalone',
           appname: values?.appname,
           version: standAlone
             ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.version
@@ -439,6 +443,15 @@ export default function InstallConfig() {
           version: componentsVersionInfo?.[prometheusComponent]?.version,
           release: componentsVersionInfo?.[prometheusComponent]?.release,
           package_hash: componentsVersionInfo?.[prometheusComponent]?.md5,
+        };
+      }
+      if (selectedConfig.includes(alertManagerComponent)) {
+        newComponents.alertmanager = {
+          ...(components?.alertmanager || {}),
+          component: alertManagerComponent,
+          version: componentsVersionInfo?.[alertManagerComponent]?.version,
+          release: componentsVersionInfo?.[alertManagerComponent]?.release,
+          package_hash: componentsVersionInfo?.[alertManagerComponent]?.md5,
         };
       }
 
@@ -509,6 +522,10 @@ export default function InstallConfig() {
         return false;
       },
     );
+    // 如果没有匹配到对应版本类型的 obproxy，使用第一个可用的版本
+    if (Object.keys(currentObproxyVersionInfo).length === 0) {
+      currentObproxyVersionInfo = componentsVersionInfo?.[obproxyComponent]?.dataSource?.[0] || {};
+    }
     setComponentsVersionInfo({
       ...componentsVersionInfo,
       [oceanbaseComponent]: {
@@ -518,6 +535,8 @@ export default function InstallConfig() {
       [obproxyComponent]: {
         ...componentsVersionInfo[obproxyComponent],
         ...currentObproxyVersionInfo,
+        // 保持与其他组件一致的数据结构，包含 dataSource
+        dataSource: componentsVersionInfo[obproxyComponent]?.dataSource || [],
       },
     });
     setLowVersion(
@@ -709,9 +728,9 @@ export default function InstallConfig() {
 
   /**
    * tip:
-   * 如果选择 OCPExpress/grafana/prometheus，则 OBAgent 则自动选择，无需提示
+   * 如果选择grafana/prometheus，则 OBAgent 则自动选择，无需提示
    * 如果选择 grafana，则 OBAgent&&prometheus 则自动选择，无需提示
-   * 如果不选择 OBAgent, 则 OCPExpress/grafana/prometheus 则自动不选择，无需提示
+   * 如果不选择 OBAgent, 则 grafana/prometheus 则自动不选择，无需提示
    * 用户取消勾选prometheus，granfana也取消掉
    */
 
@@ -724,14 +743,17 @@ export default function InstallConfig() {
       );
       // 取消勾选prometheus，granfana也取消掉
       // 取消勾选obagent，grafana和prometheus也取消掉
+      // 取消勾选alertmanager，obagent和prometheus也取消掉
       target =
         record.key === obagentComponent ||
-        (record.key === prometheusComponent && shouldInclude);
+        (record.key === prometheusComponent && shouldInclude) ||
+        record.key === alertManagerComponent;
 
       for (let val of selectedConfig) {
         if (target && val === ocpexpressComponent) continue;
         if (target && val === grafanaComponent) continue;
         if (target && val === prometheusComponent) continue;
+        if (target && val === alertManagerComponent) continue;
         if (val !== record.key) {
           newConfig.push(val);
         }
@@ -761,6 +783,26 @@ export default function InstallConfig() {
         ]);
       } else if (
         record.key === grafanaComponent &&
+        !selectedConfig.includes(prometheusComponent)
+      ) {
+        setSelectedConfig([
+          ...selectedConfig,
+          record.key,
+          obagentComponent,
+          prometheusComponent,
+        ]);
+      } else if (
+        record.key === alertManagerComponent &&
+        !selectedConfig.includes(obagentComponent)
+      ) {
+        setSelectedConfig([
+          ...selectedConfig,
+          record.key,
+          obagentComponent,
+          prometheusComponent,
+        ]);
+      } else if (
+        record.key === alertManagerComponent &&
         !selectedConfig.includes(prometheusComponent)
       ) {
         setSelectedConfig([

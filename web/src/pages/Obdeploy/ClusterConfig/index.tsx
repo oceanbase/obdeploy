@@ -21,6 +21,7 @@ import { isEmpty } from 'lodash';
 import { useEffect, useState } from 'react';
 import { getLocale, useModel } from 'umi';
 import {
+  alertManagerComponent,
   commonInputStyle,
   commonPortStyle,
   configServerComponent,
@@ -96,6 +97,7 @@ export default function ClusterConfig() {
     obconfigserver = {},
     prometheus = {},
     grafana = {},
+    alertmanager = {},
   } = components;
   const [form] = ProForm.useForm();
   const [currentMode, setCurrentMode] = useState(
@@ -108,19 +110,24 @@ export default function ClusterConfig() {
   // 密码校验是否通过
   const [grafanaPassed, setGrafanaPassed] = useState<boolean>(true);
   const [prometheusPassed, setPrometheusPassed] = useState<boolean>(true);
+  const [alertmanagerPassed, setAlertmanagerPassed] = useState<boolean>(true);
+  const [prometheusPwd, setPrometheusPwd] = useState<string>(
+    prometheus?.basic_auth_users?.admin || '',
+  );
+  const [alertmanagerPwd, setAlertmanagerPwd] = useState<string>(
+    alertmanager?.basic_auth_users?.admin || '',
+  );
+  const [grafanaPwd, setGrafanaPwd] = useState<string>(
+    grafana?.login_password || '',
+  );
+
   const [show, setShow] = useState<boolean>(clusterMore);
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
   const [componentsMoreLoading, setComponentsMoreLoading] = useState(false);
   const [obRootPwd, setRootPwd] = useState<string>(
     oceanbase?.root_password || '',
   );
-  const [prometheusPwd, setPrometheusPwd] = useState<string>(
-    prometheus?.basic_auth_users?.admin || '',
-  );
-  const [grafanaPwd, setGrafanaPwd] = useState<string>(
-    grafana?.login_password || '',
-  );
-
+ 
   const [obPwdMsgInfo, setObPwdMsgInfo] = useState<MsgInfoType>();
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
 
@@ -175,6 +182,11 @@ export default function ClusterConfig() {
     form.validateFields([['prometheus', 'basic_auth_users', 'admin']]);
     setPrometheusPwd(password);
   };
+  const alertmanagerPwdChange = (password: string) => {
+    form.setFieldValue(['alertmanager', 'basic_auth_users', 'admin'], password);
+    form.validateFields([['alertmanager', 'basic_auth_users', 'admin']]);
+    setAlertmanagerPwd(password);
+  };
   const grafanaPwdChange = (password: string) => {
     form.setFieldValue(['grafana', 'login_password'], password);
     form.validateFields([['grafana', 'login_password']]);
@@ -216,6 +228,13 @@ export default function ClusterConfig() {
         ...(components?.prometheus || {}),
         ...dataSource.prometheus,
         parameters: formatParameters(dataSource.prometheus?.parameters),
+      };
+    }
+    if (selectedConfig.includes(alertManagerComponent)) {
+      newComponents.alertmanager = {
+        ...(components?.alertmanager || {}),
+        ...dataSource.alertmanager,
+        parameters: formatParameters(dataSource.alertmanager?.parameters),
       };
     }
     newComponents.oceanbase = {
@@ -355,6 +374,13 @@ export default function ClusterConfig() {
               newComponentsMoreConfig,
             ),
           },
+          alertmanager: {
+            parameters: getInitialParameters(
+              alertmanager?.component,
+              alertmanager?.parameters,
+              newComponentsMoreConfig,
+            ),
+          },
           obconfigserver: {
             parameters: getInitialParameters(
               obconfigserver?.component,
@@ -414,8 +440,8 @@ export default function ClusterConfig() {
     oceanbase: {
       mode: oceanbase?.mode || 'PRODUCTION',
       root_password: oceanbase?.root_password,
-      data_dir: oceanbase?.data_dir || undefined,
-      redo_dir: oceanbase?.redo_dir || undefined,
+      data_dir: oceanbase?.data_dir || '/data/1',
+      redo_dir: oceanbase?.redo_dir || '/data/log1',
       mysql_port: oceanbase?.mysql_port || 2881,
       rpc_port: oceanbase?.rpc_port || 2882,
       obshell_port: oceanbase?.obshell_port || 2886,
@@ -449,6 +475,14 @@ export default function ClusterConfig() {
       parameters: getInitialParameters(
         prometheus?.component,
         prometheus?.parameters,
+        componentsMoreConfig,
+      ),
+    },
+    alertmanager: {
+      port: alertmanager?.port || 9093,
+      parameters: getInitialParameters(
+        alertmanager?.component,
+        alertmanager?.parameters,
         componentsMoreConfig,
       ),
     },
@@ -546,14 +580,14 @@ export default function ClusterConfig() {
               <div className={styles.modeExtraContent}>
                 {currentMode === 'PRODUCTION'
                   ? intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.ThisModeWillMaximizeThe',
-                      defaultMessage:
-                        '此模式将最大化利用环境资源，保证集群的性能与稳定性，推荐使用此模式。',
-                    })
+                    id: 'OBD.pages.components.ClusterConfig.ThisModeWillMaximizeThe',
+                    defaultMessage:
+                      '此模式将最大化利用环境资源，保证集群的性能与稳定性，推荐使用此模式。',
+                  })
                   : intl.formatMessage({
-                      id: 'OBD.pages.components.ClusterConfig.ConfigureResourceParametersThatMeet',
-                      defaultMessage: '配置满足集群正常运行的资源参数',
-                    })}
+                    id: 'OBD.pages.components.ClusterConfig.ConfigureResourceParametersThatMeet',
+                    defaultMessage: '配置满足集群正常运行的资源参数',
+                  })}
               </div>
             </div>
             <CustomPasswordInput
@@ -580,7 +614,13 @@ export default function ClusterConfig() {
                     defaultMessage: '数据目录',
                   })}
                   name={['oceanbase', 'data_dir']}
-                  rules={[pathRule]}
+                  rules={[
+                    {
+                      required: true,
+                      message:'请输入数据目录'
+                    },
+                    pathRule
+                  ]}
                 >
                   <TooltipInput
                     fieldProps={{ style: commonInputStyle }}
@@ -594,7 +634,13 @@ export default function ClusterConfig() {
                     defaultMessage: '日志目录',
                   })}
                   name={['oceanbase', 'redo_dir']}
-                  rules={[pathRule]}
+                  rules={[
+                    {
+                      required: true,
+                      message:'请输入日志目录'
+                    },
+                    pathRule
+                  ]}
                 >
                   <TooltipInput
                     fieldProps={{ style: commonInputStyle }}
@@ -728,6 +774,34 @@ export default function ClusterConfig() {
                     }}
                     style={{ width: 388, borderColor: '#CDD5E4' }}
                     onChange={prometheusPwdChange}
+                  />
+                </Form.Item>
+              )}
+              {selectedConfig.includes(alertManagerComponent) && (
+                <Form.Item
+                  label={'AlertManager 密码'}
+                  name={['alertManager', 'basic_auth_users', 'admin']}
+                  rules={[
+                    {
+                      required: true,
+                      message: intl.formatMessage({
+                        id: 'OBD.pages.components.ClusterConfig.DKFFMK26',
+                        defaultMessage: '请输入或随机生成 AlertManager 密码',
+                      }),
+                    },
+                    {
+                      validator: validatePassword(alertmanagerPassed),
+                    },
+                  ]}
+                  initialValue={alertmanagerPwd}
+                >
+                  <Password
+                    generatePasswordRegex={PASSWORD_REGEX}
+                    onValidate={(value) => {
+                      setAlertmanagerPassed(value);
+                    }}
+                    style={{ width: 388, borderColor: '#CDD5E4' }}
+                    onChange={alertmanagerPwdChange}
                   />
                 </Form.Item>
               )}

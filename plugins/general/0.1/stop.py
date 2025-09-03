@@ -21,7 +21,6 @@ import time
 from tool import confirm_port, get_port_socket_inode
 
 
-
 def stop(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients

@@ -243,7 +243,8 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
             cpu_count = 8
         break
     while True:
-        memory_free = int(client.execute_command("free -g | grep Mem | awk '{print $7}'").stdout.strip())
+        mem_available_kb = int(client.execute_command("cat /proc/meminfo | grep -i MemAvailable | awk '{print $2}'").stdout.strip())
+        memory_free = mem_available_kb // 1024 // 1024
         if memory_free < 6:
             stdio.error("The machine's minimum memory cannot be less than min_value (6G). Please try again.")
             return plugin_context.return_false()
@@ -251,7 +252,7 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
             default_memory_limit = memory_free
         else:
             default_memory_limit = int(memory_free) - 1
-        memory_limit = stdio.read(f'Enter the OB memory limit (Configurable Range[6, {default_memory_limit}]， Default: {default_memory_limit}, Unit: G): ', blocked=True).strip() or default_memory_limit
+        memory_limit = stdio.read(f'Enter the OB memory limit (Configurable Range[6, {default_memory_limit}], Default: {default_memory_limit}, Unit: G): ', blocked=True).strip() or default_memory_limit
         memory_limit = str(memory_limit)
         if not memory_limit.isdigit():
             stdio.print(FormatText.error("Invalid memory limit. Only digits are allowed. Please try again."))
@@ -358,12 +359,12 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
 
         # datafile_maxsize
         data_disk_free = Capacity(client.execute_command(
-            f"df -BG {log_dir} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes * 0.9 - slog_size - clog_size
+            f"df -BG {data_dir} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes * 0.9 - slog_size - clog_size
         if data_disk_free < 2 * memory_limit:
-            stdio.error(f'The disk space is not enough, please check the data_dir.(need: {str(Capacity(2 * memory_limit))}, available: {str(Capacity(log_disk_free))})')
+            stdio.error(f'The disk space is not enough, please check the data_dir.(need: {str(Capacity(2 * memory_limit))}, available: {str(Capacity(data_disk_free))})')
             return plugin_context.return_false()
         datafile_maxsize = Capacity(str(input_int_value('datafile maxsize', byte_to_GB(2 * memory_limit), byte_to_GB(data_disk_free), default_value=byte_to_GB(data_disk_free), stdio=stdio)) + 'G').bytes
-    
+
     oceanbase_config = {
         "name": oceanbase_pkg.name,
         'version': str(oceanbase_pkg.version),
@@ -379,8 +380,12 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
         'log_dir': log_dir,
         'datafile_maxsize': datafile_maxsize,
         'log_disk_size': log_disk_size,
-        'scenario': scenario,
+        'scenario': scenario
     }
+    if client.execute_command("systemctl status dbus"):
+        # enable auto start
+        enable_auto_start_confirm = stdio.confirm('Do you want to enable the OceanBase service to start automatically when the system boots up?', default_option=False)
+        oceanbase_config['enable_auto_start'] = enable_auto_start_confirm
     plugin_context.set_variable('ports', ports)
     plugin_context.set_variable('oceanbase_config', oceanbase_config)
     return plugin_context.return_true(oceanbase_config=oceanbase_config)

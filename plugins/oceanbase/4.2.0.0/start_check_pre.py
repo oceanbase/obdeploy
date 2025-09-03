@@ -147,6 +147,8 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
         check_status[server].update(kernel_check_status)
         if work_dir_check:
              check_status[server]['dir'] = err.CheckStatus()
+        if global_config.get('enable_auto_start', False):
+            check_status[server]['auto start'] = err.CheckStatus()
 
     plugin_context.set_variable('start_check_status', check_status)
     if init_check_status:

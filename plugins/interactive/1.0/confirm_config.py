@@ -41,6 +41,7 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
     log_dir = oceanbase_config['log_dir']
     datafile_maxsize = oceanbase_config['datafile_maxsize']
     log_disk_size = oceanbase_config['log_disk_size']
+    enable_auto_start = oceanbase_config.get('enable_auto_start', None)
     stdio.print('')
     stdio.print('#Saved configurations:')
     stdio.print(f'cluster name: {cluster_name}')
@@ -54,6 +55,8 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
     stdio.print(f'log dir: {log_dir}')
     stdio.print(f'datafile maxsize: {Capacity(datafile_maxsize)}')
     stdio.print(f'log disk size: {Capacity(log_disk_size)}')
+    enable_auto_start != None and stdio.print(f'enable auto start: {enable_auto_start}')
+
 
     if tenant_config:
         tenant_name = tenant_config['tenant_name']
@@ -118,7 +121,9 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
                     'datafile_next': str(Capacity(0.1 * datafile_maxsize)),
                     'log_disk_size': str(Capacity(log_disk_size)),
                     'system_memory': 0,
-                    'zone': 'zone1'
+                    'zone': 'zone1',
+                    'enable_auto_start': True if enable_auto_start else False
+
                 }
             },
     }
