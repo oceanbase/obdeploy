@@ -39,7 +39,7 @@ def start_pre(plugin_context, *args, **kwargs):
         server_config = cluster_config.get_server_conf_with_default(server)
         home_path = server_config['home_path']
         runtime_alertmanager_conf = os.path.join(home_path, 'alertmanager.yaml')
-        alertmanager_customize_config = server_config.get('altermanager_config', {})
+        alertmanager_customize_config = server_config.get('alertmanager_config', {})
         port = server_config['port']
         address = server_config['address']
         data_dir = server_config.get('data_dir', os.path.join(home_path, 'data'))
@@ -85,7 +85,7 @@ def start_pre(plugin_context, *args, **kwargs):
                         return False
                 
                 if len(receivers) == 1:
-                    altermanager_config = {
+                    alertmanager_config = {
                         'route': {
                             'receiver': receivers[0]
                         },
@@ -99,7 +99,7 @@ def start_pre(plugin_context, *args, **kwargs):
                             route_item['continue'] = True
                         routes.append(route_item)
                     
-                    altermanager_config = {
+                    alertmanager_config = {
                         'route': {
                             'receiver': receivers[0],
                             'routes': routes
@@ -107,7 +107,7 @@ def start_pre(plugin_context, *args, **kwargs):
                         'receivers': receiver_list
                     }
 
-                config_tenant = yaml.dumps(altermanager_config)
+                config_tenant = yaml.dumps(alertmanager_config)
                 if not client.write_file(config_tenant, runtime_alertmanager_conf):
                     stdio.error('failed to write config file {}'.format(runtime_alertmanager_conf))
                     return False

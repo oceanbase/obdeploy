@@ -1,10 +1,10 @@
 ## Only need to configure when remote login is required
 # user:
-#   username: your username
-#   password: your password if need
-#   key_file: your ssh-key file path if need
-#   port: your ssh port, default 22
-#   timeout: ssh connection timeout (second), default 30
+  # username: your username
+  # password: your password if need
+  # key_file: your ssh-key file path if need
+  # port: your ssh port, default 22
+  # timeout: ssh connection timeout (second), default 30
 oceanbase-ce:
   servers:
     - name: server1
@@ -16,7 +16,7 @@ oceanbase-ce:
       ip: 172.19.33.4
   global:
     # The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
-    home_path: /root/observer
+    home_path:  /home/admin/observer
     # The directory for data storage. The default value is $home_path/store.
     # data_dir: /data
     # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
@@ -56,7 +56,7 @@ obproxy-ce:
   global:
     listen_port: 2883 # External port. The default value is 2883.
     prometheus_listen_port: 2884 # The Prometheus port. The default value is 2884.
-    home_path: /root/obproxy
+    home_path:  /home/admin/obproxy
     # oceanbase root server list
     # format: ip:mysql_port;ip:mysql_port. When a depends exists, OBD gets this value from the oceanbase-ce of the depends.
     # rs_list: 192.168.1.2:2881;192.168.1.3:2881;192.168.1.4:2881
@@ -83,11 +83,10 @@ obagent:
       ip: 172.19.33.4
   global:
     # The working directory for obagent. obagent is started under this directory. This is a required field.
-    home_path: /root/obagent
+    home_path: /home/admin/obagent
     # The port that pulls and manages the metrics. The default port number is 8088.
-    # server_port: 8088
-    # Debug port for pprof. The default port number is 8089.
-    # pprof_port: 8089
+    # monagent_http_port: 8088
+    # mgragent_http_port: 8089
     # Log level. The default value is INFO.
     # log_level: INFO
     # Log path. The default value is log/monagent.log.
@@ -143,11 +142,11 @@ prometheus:
     - obagent
   global:
     # The working directory for prometheus. prometheus is started under this directory. This is a required field.
-    home_path: /root/prometheus
+    home_path:  /home/admin/prometheus
     # address: 0.0.0.0  # The ip address to bind to. Along with port, corresponds to the `web.listen-address` parameter.
     # port: 9090 # The http port to use. Along with address, corresponds to the `web.listen-address` parameter.
     # enable_lifecycle: true # Enable shutdown and reload via HTTP request. Corresponds to the `web.enable-lifecycle` parameter.
-    # data_dir: /root/prometheus/data # Base path for metrics storage. Corresponds to the `storage.tsdb.path` parameter.
+    # data_dir:  /home/admin/prometheus/data # Base path for metrics storage. Corresponds to the `storage.tsdb.path` parameter.
     # basic_auth_users:  # Usernames and passwords that have full access to the web server via basic authentication. Corresponds to the `basic_auth_users` parameter.
     #   <username>: <password>  # The format of `basic_auth_users` : the key is the user name and the value is the password.
     # web_config: # Content of Prometheus web service config file. The format is consistent with the file. However, `basic_auth_users` cannot be set in it. Please set `basic_auth_users` above if needed. Corresponds to the `web.config.file` parameter.
@@ -209,45 +208,45 @@ alertmanager:
   depends:
     - prometheus
   global:
-    home_path: /root/alertmanager
-#    log_dir: home/altermanager/log # alertManager log storage directory
-#    data_retention: 120h #alertmanager how long to keep data form, corresponds to the `data.retention` parameter.
-#    address: 0.0.0.0  # The ip address to bind to. Along with port, corresponds to the `web.listen-address` parameter.
-#    port: 9093 # The http port to use. Along with address, corresponds to the `web.listen-address` parameter.
-#    data_dir: /root/alertmanager/data # Base path for data storage. Corresponds to the `storage.path` parameter.
-#     basic_auth_users:  # Usernames and passwords that have full access to the web server via basic authentication. Corresponds to the `web.config.fil` parameter.
-#       <username>: <password>  # The format of `basic_auth_users` : the key is the user name and the value is the password.
-#     web_config: # Content of alertmanager web service config file. The format is consistent with the file. However, `basic_auth_users` cannot be set in it. Please set `basic_auth_users` above if needed. Corresponds to the `web.config.file` parameter.
-#       tls_server_config:
-#         # Certificate and key files for server to use to authenticate to client.
-#         cert_file: <filename>
-#         key_file: <filename>
-#     receivers: #one or more notification list
-#      - test #User-defined notification name
-#      - test2
-#    altermanager_config: # This field is a user-defined alertmanager configuration and conflicts with receivers
-#      route:
-#        group_by: [ 'alertname' ]
-#        group_wait: 30s
-#        group_interval: 5m
-#        repeat_interval: 1h
-#        receiver: 'yourname'
-#        receivers:
-#          - name: 'yourname'
-#            webhook_configs:
-#              - url: 'http://127.0.0.1:5001/'
-#    additional_parameters: #Additional parameters for Alertmanager service, among which `web.listen-address`, `web.enable-lifecycle`, `storage.tsdb.path`, `config.file` and `web.config.file` cannot be set. Please set them in the corresponding configuration above if needed.
-#    - log.level: debug
+    home_path:  /home/admin/alertmanager
+    # log_dir: home/alertmanager/log # alertManager log storage directory
+    # data_retention: 120h #alertmanager how long to keep data form, corresponds to the `data.retention` parameter.
+    # address: 0.0.0.0  # The ip address to bind to. Along with port, corresponds to the `web.listen-address` parameter.
+    # port: 9093 # The http port to use. Along with address, corresponds to the `web.listen-address` parameter.
+    # data_dir:  /home/admin/alertmanager/data # Base path for data storage. Corresponds to the `storage.path` parameter.
+    #  basic_auth_users:  # Usernames and passwords that have full access to the web server via basic authentication. Corresponds to the `web.config.fil` parameter.
+    #    <username>: <password>  # The format of `basic_auth_users` : the key is the user name and the value is the password.
+    #  web_config: # Content of alertmanager web service config file. The format is consistent with the file. However, `basic_auth_users` cannot be set in it. Please set `basic_auth_users` above if needed. Corresponds to the `web.config.file` parameter.
+    #    tls_server_config:
+    #      # Certificate and key files for server to use to authenticate to client.
+    #      cert_file: <filename>
+    #      key_file: <filename>
+    #  receivers: #one or more notification list
+    #   - test #User-defined notification name
+    #   - test2
+    # alertmanager_config: # This field is a user-defined alertmanager configuration and conflicts with receivers
+    #   route:
+    #     group_by: [ 'alertname' ]
+    #     group_wait: 30s
+    #     group_interval: 5m
+    #     repeat_interval: 1h
+    #     receiver: 'yourname'
+    #     receivers:
+    #       - name: 'yourname'
+    #      webhook_configs:
+    #        - url: 'http://127.0.0.1:5001/'
+    # additional_parameters: #Additional parameters for Alertmanager service, among which `web.listen-address`, `web.enable-lifecycle`, `storage.tsdb.path`, `config.file` and `web.config.file` cannot be set. Please set them in the corresponding configuration above if needed.
+    # - log.level: debug
 
-#  test: # The same as the name of the receivers configured by the user
-#    receiver_type: webhook # alrtmanager notification type
-#    webhook_url: http://localhost:6766
-#  test2: # The same as the name of the receivers configured by the user
-#    receiver_type: email
-#    to: "to email"
-#    from: "from email"
-#    smarthost: "smtp.xx.com:xxx"
-#    auth_username: "email name"
-#    auth_password: xxx
-#    require_tls: true
-#    send_resolved: true
+    #  test: # The same as the name of the receivers configured by the user
+    # receiver_type: webhook # alrtmanager notification type
+    # webhook_url: http://localhost:6766
+    #  test2: # The same as the name of the receivers configured by the user
+    # receiver_type: email
+    # to: "to email"
+    # from: "from email"
+    # smarthost: "smtp.xx.com:xxx"
+    # auth_username: "email name"
+    # auth_password: xxx
+    # require_tls: true
+    # send_resolved: true

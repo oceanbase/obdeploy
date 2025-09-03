@@ -36,12 +36,12 @@ def reload(plugin_context, new_cluster_config,  *args, **kwargs):
         api_cursor = cursor.get(server)
         home_path = new_server_config['home_path']
         runtime_alertmanager_conf = os.path.join(home_path, 'alertmanager.yaml')
-        if 'receivers' in new_server_config and 'altermanager_config' in new_server_config:
-            stdio.error("'receivers' and 'altermanager_config' conflict, please delete one")
+        if 'receivers' in new_server_config and 'alertmanager_config' in new_server_config:
+            stdio.error("'receivers' and 'alertmanager_config' conflict, please delete one")
             success = False
         
-        if 'altermanager_config' in new_server_config:
-            alertmanager_config = new_server_config.get('altermanager_config')
+        if 'alertmanager_config' in new_server_config:
+            alertmanager_config = new_server_config.get('alertmanager_config')
             config_tenant = yaml.dumps(alertmanager_config).strip()
             if not client.write_file(config_tenant, runtime_alertmanager_conf):
                 stdio.error('{} failed to write config file {}'.format(server, alertmanager_config))
@@ -68,7 +68,7 @@ def reload(plugin_context, new_cluster_config,  *args, **kwargs):
                     return False
                 
             if len(receivers) == 1:
-                altermanager_config = {
+                alertmanager_config = {
                     'route': {
                         'receiver': receivers[0]
                     },
@@ -82,7 +82,7 @@ def reload(plugin_context, new_cluster_config,  *args, **kwargs):
                         route_item['continue'] = True
                     routes.append(route_item)
                 
-                altermanager_config = {
+                alertmanager_config = {
                     'route': {
                         'receiver': receivers[0],
                         'routes': routes
@@ -90,7 +90,7 @@ def reload(plugin_context, new_cluster_config,  *args, **kwargs):
                     'receivers': receiver_list
                 }
 
-            config_tenant = yaml.dumps(altermanager_config)
+            config_tenant = yaml.dumps(alertmanager_config)
             if not client.write_file(config_tenant, runtime_alertmanager_conf):
                 stdio.error('failed to write config file {}'.format(runtime_alertmanager_conf))
                 return False

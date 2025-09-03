@@ -10,22 +10,22 @@ alertmanager:
     - 192.168.1.5
   global:
     home_path: /root/alertmanager
-#    log_dir: home/altermanager/log # alertManager log storage directory
+#    log_dir: home/alertmanager/log # alertManager log storage directory
 #    data_retention: 120h #alertmanager how long to keep data form, corresponds to the `data.retention` parameter.
 #    address: 0.0.0.0  # The ip address to bind to. Along with port, corresponds to the `web.listen-address` parameter.
 #    port: 9093 # The http port to use. Along with address, corresponds to the `web.listen-address` parameter.
 #    data_dir: /root/alertmanager/data # Base path for data storage. Corresponds to the `storage.path` parameter.
-#     basic_auth_users:  # Usernames and passwords that have full access to the web server via basic authentication. Corresponds to the `web.config.fil` parameter.
-#       <username>: <password>  # The format of `basic_auth_users` : the key is the user name and the value is the password.
-#     web_config: # Content of alertmanager web service config file. The format is consistent with the file. However, `basic_auth_users` cannot be set in it. Please set `basic_auth_users` above if needed. Corresponds to the `web.config.file` parameter.
-#       tls_server_config:
-#         # Certificate and key files for server to use to authenticate to client.
-#         cert_file: <filename>
-#         key_file: <filename>
+#    basic_auth_users:  # Usernames and passwords that have full access to the web server via basic authentication. Corresponds to the `web.config.fil` parameter.
+#      <username>: <password>  # The format of `basic_auth_users` : the key is the user name and the value is the password.
+#    web_config: # Content of alertmanager web service config file. The format is consistent with the file. However, `basic_auth_users` cannot be set in it. Please set `basic_auth_users` above if needed. Corresponds to the `web.config.file` parameter.
+#      tls_server_config:
+#        # Certificate and key files for server to use to authenticate to client.
+#        cert_file: <filename>
+#        key_file: <filename>
 #     receivers: #one or more notification list
 #      - test #User-defined notification name
 #      - test2
-#    altermanager_config: # This field is a user-defined alertmanager configuration and conflicts with receivers
+#    alertmanager_config: # This field is a user-defined alertmanager configuration and conflicts with receivers
 #      route:
 #        group_by: [ 'alertname' ]
 #        group_wait: 30s

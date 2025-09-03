@@ -41,9 +41,9 @@ def general_check(plugin_context, init_check_status=False, work_dir_check=False,
         ip = server.ip
         client = clients[server]
 
-        if server_config.get('receivers') and server_config.get('altermanager_config'):
+        if server_config.get('receivers') and server_config.get('alertmanager_config'):
             critical(server, 'config', "Both 'receivers' and 'alertmanager_config' cannot exist together.")
-        elif (not server_config.get('receivers')) and (not server_config.get('altermanager_config')):
+        elif (not server_config.get('receivers')) and (not server_config.get('alertmanager_config')):
             critical(server, 'config', "Either 'receivers' or 'alertmanager_config' must exist.")
 
         if server_config.get('receivers'):
