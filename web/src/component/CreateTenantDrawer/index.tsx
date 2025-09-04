@@ -1275,13 +1275,13 @@ export default function CreatTenantDrawer({
                 <div style={{ fontSize: '14px', fontWeight: 500 }}>
                   {installStatus === 'SUCCESSFUL'
                     ? intl.formatMessage({
-                        id: 'OBD.Obdeploy.CreateTenantDrawer.4BC7690D',
-                        defaultMessage: '业务租户创建成功',
-                      })
+                      id: 'OBD.Obdeploy.CreateTenantDrawer.4BC7690D',
+                      defaultMessage: '业务租户创建成功',
+                    })
                     : intl.formatMessage({
-                        id: 'OBD.Obdeploy.CreateTenantDrawer.6C92D589',
-                        defaultMessage: '业务租户创建失败',
-                      })}
+                      id: 'OBD.Obdeploy.CreateTenantDrawer.6C92D589',
+                      defaultMessage: '业务租户创建失败',
+                    })}
                 </div>
               }
             />
@@ -1290,9 +1290,9 @@ export default function CreatTenantDrawer({
             style={
               installStatus !== 'RUNNING' && statusData?.result !== 'FAILED'
                 ? {
-                    backgroundColor: token.colorFillAlter,
-                    padding: '16px 24px',
-                  }
+                  backgroundColor: token.colorFillAlter,
+                  padding: '16px 24px',
+                }
                 : {}
             }
           >
@@ -1327,7 +1327,9 @@ export default function CreatTenantDrawer({
                     defaultMessage: '租户模式',
                   })}
                 >
-                  {paramsData?.mode || '-'}
+                  {
+                    paramsData?.mode === 'mysql' ? 'MySQL' : 'Oracle'
+                  }
                 </Descriptions.Item>
                 <Descriptions.Item
                   label={intl.formatMessage({
@@ -1353,14 +1355,14 @@ export default function CreatTenantDrawer({
                       text:
                         paramsData?.mode !== 'oracle'
                           ? statusData?.message &&
-                            insertPwd(statusData?.message, paramsData?.password)
+                          insertPwd(statusData?.message, paramsData?.password)
                           : obConnectInfo,
                     }}
                     style={{ color: '#006aff' }}
                   >
                     {paramsData?.mode !== 'oracle'
                       ? statusData?.message &&
-                        insertPwd(statusData?.message, paramsData?.password)
+                      insertPwd(statusData?.message, paramsData?.password)
                       : obConnectInfo}
                   </Text>
                 </Descriptions.Item>
@@ -1379,7 +1381,7 @@ export default function CreatTenantDrawer({
                     defaultMessage: '租户规格',
                   })}
                 >
-                  {`${paramsData?.cpu_size}vCPUs ${paramsData?.memory_size}Gi ${paramsData?.log_disk_size} GiB`}
+                  {`${paramsData?.cpu_size}vCPUs ${paramsData?.memory_size}GiB ${paramsData?.log_disk_size} GiB`}
                 </Descriptions.Item>
                 <Descriptions.Item
                   label={intl.formatMessage({
@@ -1387,7 +1389,7 @@ export default function CreatTenantDrawer({
                     defaultMessage: '业务负载类型',
                   })}
                 >
-                  {paramsData?.optimize || '-'}
+                  {paramsData?.optimize?.toUpperCase() || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item
                   label={intl.formatMessage({
@@ -1434,9 +1436,9 @@ export default function CreatTenantDrawer({
                   {paramsData?.ip !== 'all'
                     ? paramsData?.ob_tcp_invited_nodes?.join(',')
                     : intl.formatMessage({
-                        id: 'OBD.Obdeploy.CreateTenantDrawer.5E904F23',
-                        defaultMessage: '所有 IP 都可以访问',
-                      })}
+                      id: 'OBD.Obdeploy.CreateTenantDrawer.5E904F23',
+                      defaultMessage: '所有 IP 都可以访问',
+                    })}
                 </Descriptions.Item>
               </Descriptions>
             ) : (
