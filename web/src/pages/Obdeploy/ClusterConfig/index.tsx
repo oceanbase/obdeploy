@@ -127,7 +127,7 @@ export default function ClusterConfig() {
   const [obRootPwd, setRootPwd] = useState<string>(
     oceanbase?.root_password || '',
   );
- 
+
   const [obPwdMsgInfo, setObPwdMsgInfo] = useState<MsgInfoType>();
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
 
@@ -614,13 +614,13 @@ export default function ClusterConfig() {
                     defaultMessage: '数据目录',
                   })}
                   name={['oceanbase', 'data_dir']}
-                  rules={[
-                    {
-                      required: true,
-                      message:'请输入数据目录'
-                    },
-                    pathRule
-                  ]}
+                // rules={[
+                //   {
+                //     required: true,
+                //     message:'请输入数据目录'
+                //   },
+                //   pathRule
+                // ]}
                 >
                   <TooltipInput
                     fieldProps={{ style: commonInputStyle }}
@@ -634,13 +634,13 @@ export default function ClusterConfig() {
                     defaultMessage: '日志目录',
                   })}
                   name={['oceanbase', 'redo_dir']}
-                  rules={[
-                    {
-                      required: true,
-                      message:'请输入日志目录'
-                    },
-                    pathRule
-                  ]}
+                // rules={[
+                //   {
+                //     required: true,
+                //     message:'请输入日志目录'
+                //   },
+                //   pathRule
+                // ]}
                 >
                   <TooltipInput
                     fieldProps={{ style: commonInputStyle }}

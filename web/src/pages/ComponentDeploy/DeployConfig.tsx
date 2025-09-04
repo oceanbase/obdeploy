@@ -14,7 +14,7 @@ import { Button, Empty, Space, Spin, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import DataEmpty from '../../.././/public/assets/data-empty.svg';
-import { alertManagerComponent, componentVersionTypeToComponent, grafanaComponent, obagentComponent, prometheusComponent } from '../constants';
+import { alertManagerComponent, componentVersionTypeToComponent, configServerComponent, grafanaComponent, obagentComponent, prometheusComponent } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 const locale = getLocale();
@@ -67,10 +67,8 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
         const undeployedComponents = data?.component_list
           .filter((item) => !item.deployed)
           .map((item) => item.component_name);
-        // 切换集群  全选
-        // 组件挂载 如果有选择的组件就不重新选 如果没有选择的组件全选
-        if (undeployedComponents && !selectedConfig?.length)
-          setSelectedConfig(undeployedComponents);
+        // 切换集群时不清空已选择的组件，也不自动全选
+        // 让用户手动选择需要的组件
       }
     },
   });
@@ -218,14 +216,17 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
         // 取消勾选obagent，grafana和prometheus也取消掉
         componentsToRemove = [obagentComponent, grafanaComponent, prometheusComponent];
       } else if (record.component_name === prometheusComponent) {
-        // 取消勾选prometheus，grafana和alertmanager也取消掉
-        componentsToRemove = [prometheusComponent, grafanaComponent, alertManagerComponent];
+        // 取消勾选prometheus，grafana也取消掉，但alertmanager可以独立存在
+        componentsToRemove = [prometheusComponent, grafanaComponent];
       } else if (record.component_name === alertManagerComponent) {
         // 取消勾选alertmanager，只取消掉自己
         componentsToRemove = [alertManagerComponent];
       } else if (record.component_name === grafanaComponent) {
         // 取消勾选grafana，只取消掉自己
         componentsToRemove = [grafanaComponent];
+      } else if (record.component_name === configServerComponent) {
+        // 取消勾选obconfigserver，只取消掉自己
+        componentsToRemove = [configServerComponent];
       }
 
       // 保留不在取消列表中的组件
@@ -253,13 +254,9 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
           componentsToAdd.push(prometheusComponent);
         }
       } else if (record.component_name === alertManagerComponent) {
-        // 如果选择alertmanager，则OBAgent和prometheus自动选择
-        if (!selectedConfig.includes(obagentComponent)) {
-          componentsToAdd.push(obagentComponent);
-        }
-        if (!selectedConfig.includes(prometheusComponent)) {
-          componentsToAdd.push(prometheusComponent);
-        }
+        // 如果选择alertmanager，只选择自己，不自动选择其他组件
+        // 用户可以根据需要手动选择 Prometheus 和 OBAgent
+        // componentsToAdd 已经包含了 record.component_name，无需额外处理
       }
 
       // 添加新选择的组件和依赖组件
