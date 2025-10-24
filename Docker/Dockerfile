@@ -28,22 +28,22 @@ RUN conda create -n py27 -y python=2.7 \
     && rm -rf ~/.cache/pip \
     && conda clean -a -y
 
-RUN conda create -n py38 -y python=3.8 \
-    && source /opt/miniconda/bin/activate py38 \
+RUN conda create -n py311 -y python=3.11 \
+    && source /opt/miniconda/bin/activate py311 \
     && pip config set global.index-url https://mirrors.aliyun.com/pypi/simple \
     && pip config set global.trusted-host  mirrors.aliyun.com \
     && pip install -r /workspaces/obd/requirements3.txt \
     && pip install -r /workspaces/obd/service-requirements.txt \
     && pip install pyinstaller==3.6 \
     && pip cache purge \
-    && echo "source /opt/miniconda/bin/activate py38" >> ~/.bashrc \
+    && echo "source /opt/miniconda/bin/activate py11" >> ~/.bashrc \
     && /opt/miniconda/bin/conda clean -a -y \
     && rm -rf /workspaces/obd
 
 # install nodejs and yarn
-RUN wget https://rpm.nodesource.com/setup_16.x  \
+RUN wget https://rpm.nodesource.com/setup_20.x  \
     && touch /etc/redhat-release \
-    && bash  setup_16.x \
+    && bash  setup_20.x \
     && rm -f  /etc/redhat-release \
     && yum install -y nodejs \
     && yum clean all
