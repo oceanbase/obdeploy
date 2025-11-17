@@ -46,17 +46,19 @@ def check_nfs_path(paths, client):
 
 
 def set_backup_config(plugin_context, tenant_name, obshell_clients,  *args, **kwargs):
+    print_flag = False
     def check_uri(uri):
+        nonlocal print_flag
         all_path = get_all_parent_paths(uri[len('file://'):])
         for server in plugin_context.cluster_config.servers:
             client = clients[server]
             if not check_nfs_path(all_path, client):
-                stdio.stop_loading('fail')
                 if len(plugin_context.cluster_config.servers) > 1:
-                    stdio.error("data_backup_uri and archive_log_uri must in the nfs.")
+                    not print_flag and stdio.error("data_backup_uri and archive_log_uri on a remote storage medium is a must, Please change the above parameters.")
                     return False
                 else:
-                    stdio.warn("data_backup_uri and archive_log_uri must in the nfs.")
+                    not print_flag and stdio.warn("It is recommended to setup data_backup_uri and archive_log_uri on a remote storage medium.")
+                print_flag = True
             return True
 
     stdio = plugin_context.stdio
@@ -70,6 +72,7 @@ def set_backup_config(plugin_context, tenant_name, obshell_clients,  *args, **kw
     archive_log_uri = getattr(plugin_context.options, "archive_log_uri")
     clients = plugin_context.clients
     if (data_backup_uri and data_backup_uri.startswith('file://') and not check_uri(data_backup_uri)) or (archive_log_uri and archive_log_uri.startswith('file://') and not check_uri(archive_log_uri)):
+        stdio.stop_loading('fail')
         return plugin_context.return_false()
 
     stdio.start_loading(f"Set backup config")

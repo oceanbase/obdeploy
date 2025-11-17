@@ -32,7 +32,7 @@ export function validatePassword(passed) {
     if (value && !passed) {
       callback(
         intl.formatMessage({
-          id: 'ocp-express.src.util.ThePasswordDoesNotMeet',
+          id: 'src.util.ThePasswordDoesNotMeet',
           defaultMessage: '密码设置不符合要求',
         }),
       );
@@ -351,6 +351,38 @@ export const serversValidator = (_: any, value: string[], type: string) => {
   // 检查 IP 地址格式
   if (value.some((item) => !validator.isIP(item))) {
     return Promise.reject(new Error(`请选择或输入正确的${type}节点`));
+  }
+
+  return Promise.resolve();
+};
+
+// 混合验证器：支持IP地址和域名
+export const hybridAddressValidator = (_: any, value: string | string[], type: string) => {
+  // 统一处理：将字符串转换为数组
+  const values = Array.isArray(value) ? value : [value];
+
+  // 检查是否为空
+  if (!values || values.length === 0 || values.every(item => !item)) {
+    return Promise.reject(new Error(`请选择或输入 ${type} 节点`));
+  }
+
+  // 域名规则正则表达式
+  const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  for (const item of values) {
+    // 跳过空值
+    if (!item) continue;
+
+    // 检查是否为有效的IP地址
+    if (validator.isIP(item)) {
+      continue;
+    }
+    // 检查是否为有效的域名
+    if (domainRegex.test(item)) {
+      continue;
+    }
+    // 既不是IP地址也不是域名
+    return Promise.reject(new Error(`请选择或输入正确的${type}节点（支持IP地址或域名）`));
   }
 
   return Promise.resolve();

@@ -13,24 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
-import os
 import copy
 from singleton_decorator import singleton
 
 from _deploy import UserConfig, DeployStatus
 from _rpm import Version
-from tool import Cursor, NetUtil
+from tool import Cursor
 from ssh import LocalClient, SshConfig, SshClient
 from service.handler.base_handler import BaseHandler
 from service.common import log, const
 from service.model.service_info import ServiceInfo, DeployNames
-from service.model.server import OcpServerInfo, InstallerMode, ComponentInfo, MsgInfo
+from service.model.server import OcpServerInfo, ComponentInfo
 from service.model.metadb import DatabaseConnection
-from service.model.ocp import OcpDeploymentConfig
 from service.model.deployments import OCPDeploymnetConfig, OcpServer, OcpComponentConfig, Auth
-from service.model.parameter import Parameter
-from service.model.ssh import SshAuth
-from service.model.tenant import TenantConfig, TenantUser, TenantResource
+from service.model.tenant import TenantConfig, TenantUser
 from service.handler.ocp_handler import OcpHandler
 from service.handler.rsa_handler import RSAHandler
 

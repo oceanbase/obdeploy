@@ -43,6 +43,7 @@ from Crypto.Util.Padding import pad, unpad
 from ruamel.yaml import YAML, YAMLContextManager, representer
 import _environ as ENV
 import _errno
+import const
 from _errno import EC_SQL_EXECUTE_FAILED
 from _stdio import SafeStdio, FormatText
 from collections import Counter
@@ -1264,3 +1265,66 @@ def contains_duplicate_nodes(servers):
     duplicates = {ip: count for ip, count in ip_counter.items() if count > 1}
     return duplicates
 
+
+def get_tenant_connect_host_port(tenant_name, cursor):
+    query_sql = 'select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME="%s"'
+    tenant_server_ports = cursor.fetchall(query_sql % tenant_name, raise_exception=False, exc_level='verbose')
+    for tenant_server_port in tenant_server_ports:
+        return tenant_server_port['SVR_IP'], tenant_server_port['SQL_PORT']
+
+
+def get_metadb_info_from_depends_ob(cluster_config, stdio=None):
+    def get_jdbc_ip_and_port():
+        ret = {}
+        if (obproxy_server_config.get('vip_address') and obproxy_server_config.get('vip_port')) or obproxy_server_config.get('dns'):
+            if obproxy_server_config.get('dns'):
+                ret = {'ip': obproxy_server_config['dns'], 'port': obproxy_server_config['listen_port']}
+                stdio.verbose("get obproxy dns: {}".format(obproxy_server_config['dns']))
+            elif obproxy_server_config.get('vip_address') and obproxy_server_config.get('vip_port'):
+                ret = {'ip': obproxy_server_config['vip_address'], 'port': obproxy_server_config['vip_port']}
+                stdio.verbose("get obproxy vip: {} ".format(obproxy_server_config['vip_address'] + ":" + str(obproxy_server_config['vip_port'])))
+        else:
+            ret = {"ip": obproxy_server.ip, "port": obproxy_server_config['listen_port']}
+        return ret
+    meta_db_info = {}
+    for comp in const.COMPS_ODP:
+        if comp in cluster_config.depends:
+            obproxy_servers = cluster_config.get_depend_servers(comp)
+            obproxy_server = obproxy_servers[0]
+            obproxy_server_config = cluster_config.get_depend_config(comp, obproxy_server)
+            ip_ret = get_jdbc_ip_and_port()
+            if ip_ret:
+                meta_db_info['host'] = ip_ret['ip']
+                meta_db_info['port'] = ip_ret['port']
+                meta_db_info['user'] = 'root'
+                meta_db_info['password'] = obproxy_server_config['observer_root_password']
+    if not meta_db_info:
+        for ob_comp in const.COMPS_OB:
+            if ob_comp in cluster_config.depends:
+                ob_servers = cluster_config.get_depend_servers(ob_comp)
+                for ob_server in ob_servers:
+                    ob_server_conf = cluster_config.get_depend_config(ob_comp, ob_server)
+                    meta_db_info['user'] = 'root'
+                    meta_db_info['password'] = ob_server_conf['root_password']
+                    cursor = Cursor(ob_server.ip, ob_server_conf['mysql_port'], user='root', password=ob_server_conf['root_password'], stdio=stdio)
+                    host, port = get_tenant_connect_host_port('sys', cursor)
+                    meta_db_info['host'] = host
+                    meta_db_info['port'] = port
+                    return meta_db_info
+    return meta_db_info
+
+
+
+def docker_run_sudo_prefix(client):
+    if not client.execute_command('docker images'):
+        prefix = 'sudo '
+    else:
+        prefix = ''
+    return prefix
+
+
+def add_http_prefix(url):
+    if url and url.startswith('http://') or url.startswith('https://'):
+        return url
+    else:
+        return 'http://' + url

@@ -302,7 +302,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
       </Row>
       <InputPort
         name={['oceanbase', 'obshell_port']}
-        label={'OBShell 端口'}
+        label={'obshell 端口'}
         fieldProps={{ style: commonPortStyle }}
       />
       <div className={styles.moreSwitch}>

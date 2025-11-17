@@ -28,11 +28,13 @@ except:
 from collections import OrderedDict
 from ssh import LocalClient
 from tool import FileUtil, get_option
+from const import COMP_OB_SEEKDB
 
 
 def run_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
+    repository = kwargs.get("repository")
 
     pre_test_ret = plugin_context.get_return("pre_test")
 
@@ -50,7 +52,7 @@ def run_test(plugin_context, *args, **kwargs):
     db_name = get_option(options, 'database', 'test')
     user = get_option(options, 'user', 'root')
     password = get_option(options, 'password', '')
-    tenant_name = get_option(options, 'tenant', 'test')
+    tenant_name = get_option(options, 'tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
     obclient_bin = get_option(options, 'obclient_bin', 'obclient')
     run_mins = get_option(options, 'run_mins', 10)
     java_bin = get_option(options, 'java_bin', 'java')

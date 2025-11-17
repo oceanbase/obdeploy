@@ -12,9 +12,8 @@ export default () => {
   let timerProgress: NodeJS.Timer | null = null;
   const [selectedConfig, setSelectedConfig] = useState([
     'obproxy',
-    'ocp-express',
     'obagent',
-  ]); // 有ocpexpress必定有obagent
+  ]);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [configData, setConfigData] = useState<any>({});
   const [ocpConfigData, setOcpConfigData] = useState<any>({});
@@ -35,6 +34,7 @@ export default () => {
   const [token, setToken] = useState<string>('');
   const [scenarioParam, setScenarioParam] = useState<any>();
   const [selectedLoadType, setSelectedLoadType] = useState<string>('htap');
+  const [selectedOmsType, setSelectedOmsType] = useState<string>('');
   const [clusterMoreConfig, setClusterMoreConfig] = useState<
     API.NewParameterMeta[]
   >([]);
@@ -51,9 +51,10 @@ export default () => {
   const [ocpCompMoreConfig, setOcpCompMoreConfig] = useState<
     API.NewParameterMeta[]
   >([]);
-  const [componentsVersionInfo, setComponentsVersionInfo] =
-    useState<API.ComponentsVersionInfo>({});
- 
+  const [componentsVersionInfo, setComponentsVersionInfo] = useState<API.ComponentsVersionInfo>({});
+
+  const [omsDockerData, setOmsDockerData] = useState<any>({});
+
   const { run: handleQuitProgress } = useRequest(exitProcess, {
     onError: (e: any) => {
       const errorInfo = getErrorInfo(e);
@@ -127,7 +128,11 @@ export default () => {
     setLoadTypeVisible,
     selectedLoadType,
     setSelectedLoadType,
+    selectedOmsType,
+    setSelectedOmsType,
     timerProgress,
+    omsDockerData, 
+    setOmsDockerData,
     ...docs,
   };
 };

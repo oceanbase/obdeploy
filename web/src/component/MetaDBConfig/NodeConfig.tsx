@@ -1,5 +1,5 @@
 import { commonInputStyle, commonStyle } from '@/pages/constants';
-import { dnsValidator, ocpServersValidator, serversValidator } from '@/utils';
+import { dnsValidator, ocpServersValidator,  hybridAddressValidator } from '@/utils';
 import { intl } from '@/utils/intl';
 import {
   CaretDownOutlined,
@@ -159,7 +159,7 @@ export default function NodeConfig({ form }: { form: FormInstance<any> }) {
                           },
                           {
                             validator: (_: any, value: string[]) =>
-                              serversValidator(_, [value], 'OBServer'),
+                              hybridAddressValidator(_, [value], 'OBServer'),
                           },
                         ],
                       }}

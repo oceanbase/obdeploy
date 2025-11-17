@@ -965,7 +965,7 @@ class IO(object):
                 access_pattern = re.compile(access_regex)
                 if access_pattern.search(msg):
                     return access_pattern.sub(r'\1******', msg)
-                
+
             if "_passkey" in msg:
                 passkey_regex = r"([\"']?[\w]*_passkey[\w]*[\"']?\s*:\s*)(?:'([^']*)'|(None))"
                 passkey_pattern = re.compile(passkey_regex)
@@ -986,6 +986,12 @@ class IO(object):
                 chpasswd_pattern = re.compile(chpasswd_reg)
                 if chpasswd_pattern.search(msg):
                     return chpasswd_pattern.sub(r'\1******\3', msg)
+
+            if "cdcro" in msg:
+                cdcr_reg = r'(?i)(PASSWORD\s+`)([^`]+)(`)'
+                cdcr_pattern = re.compile(cdcr_reg)
+                if cdcr_pattern.search(msg):
+                    return cdcr_pattern.sub(r"\1******\3", msg)
 
 
             pwd_args_regex = r"(_password \S+.*args:\s*\[['\"]?)([^\s'\"']+)(['\"]*)"

@@ -30,6 +30,7 @@ def parameter_pre(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    binlog_repository = kwargs.get('repository')
 
     ob_sys_username = 'root'
     depend_info = {}
@@ -80,7 +81,12 @@ def parameter_pre(plugin_context, *args, **kwargs):
         home_path = custom_config['home_path']
         environments = deepcopy(cluster_config.get_environments())
         if 'LD_LIBRARY_PATH' not in environments:
-            environments['LD_LIBRARY_PATH'] = '%s/lib' % home_path
+            ld_libary_path = '%s/lib' % home_path
+            if binlog_repository.name == const.COMP_OBBINLOG:
+                jvm_path = '%s/lib/jre/lib/%s/server' % (home_path, 'amd64' if binlog_repository.arch == 'x86_64' else 'aarch64')
+                ld_libary_path = ":".join([ld_libary_path, jvm_path])
+            environments['LD_LIBRARY_PATH'] = ld_libary_path
+        
         with EnvVariables(environments, client):
             ob_sys_username = ob_sys_username if ob_sys_username is not None else custom_config.get('ob_sys_username')
             config['ob_sys_username'] = client.execute_command("{}/bin/logproxy -x {}".format(home_path, ob_sys_username)).stdout.strip() if ob_sys_username else ""
@@ -94,12 +100,22 @@ def parameter_pre(plugin_context, *args, **kwargs):
         config['password'] = depend_info.get('password') if depend_info.get('password') is not None else custom_config.get('meta_password')
         config['database_name'] = depend_info.get('database_name') if depend_info.get('database_name') is not None else custom_config.get('meta_db')
         config['enable_resource_check'] = False
-        if not custom_config.get('binlog_obcdc_ce_path_template'):
-            source_binlog_path = config['binlog_obcdc_ce_path_template']
-            config['binlog_obcdc_ce_path_template'] = os.path.join(home_path, source_binlog_path[source_binlog_path.find('/obcdc/') + 1:])
-        if not custom_config.get('oblogreader_obcdc_ce_path_template'):
-            source_oblogreader_path = config['oblogreader_obcdc_ce_path_template']
-            config['oblogreader_obcdc_ce_path_template'] = os.path.join(home_path, source_oblogreader_path[source_oblogreader_path.find('/obcdc/') + 1:])
+        if binlog_repository.name == const.COMP_OBBINLOG_CE:
+            if not custom_config.get('binlog_obcdc_ce_path_template'):
+                source_binlog_path = config['binlog_obcdc_ce_path_template']
+                config['binlog_obcdc_ce_path_template'] = os.path.join(home_path, source_binlog_path[source_binlog_path.find('/obcdc/') + 1:])
+            if not custom_config.get('oblogreader_obcdc_ce_path_template'):
+                source_oblogreader_path = config['oblogreader_obcdc_ce_path_template']
+                config['oblogreader_obcdc_ce_path_template'] = os.path.join(home_path, source_oblogreader_path[source_oblogreader_path.find('/obcdc/') + 1:])
+        else:
+            if not custom_config.get('binlog_obcdc_path_template'):
+                source_binlog_path = config['binlog_obcdc_path_template']
+                config['binlog_obcdc_path_template'] = os.path.join(home_path, source_binlog_path[source_binlog_path.find('/obcdc/') + 1:])
+            if not custom_config.get('oblogreader_obcdc_path_template'):
+                source_oblogreader_path = config['oblogreader_obcdc_path_template']
+                config['oblogreader_obcdc_path_template'] = os.path.join(home_path, source_oblogreader_path[source_oblogreader_path.find('/obcdc/') + 1:])
+            jvm_path = os.path.join(home_path, 'lib/etransfer.jar')
+            config['binlog_ddl_convert_jvm_options'] = f'-Djava.class.path={jvm_path}|-Xmx256M|-Xtrace|-XX:+CreateMinidumpOnCrash'
         if not custom_config.get('bin_path'):
             config['bin_path'] = '{}/bin'.format(home_path)
         if not custom_config.get('oblogreader_path'):

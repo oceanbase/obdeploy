@@ -89,14 +89,6 @@ export const connectColumns: ColumnsType<API.ConnectionInfo> = [
           <a
             href={text}
             target="_blank"
-            {...(record.component === 'ocp-express'
-              ? {
-                  spm: intl.formatMessage({
-                    id: 'OBD.pages.components.InstallFinished.DeploymentResultOcpExpressAccess',
-                    defaultMessage: '部署结果-OCP Express 访问地址',
-                  }),
-                }
-              : {})}
           >
             {text}
           </a>
@@ -107,13 +99,13 @@ export const connectColumns: ColumnsType<API.ConnectionInfo> = [
             {...(record.component === 'oceanbase'
               ? { spm: 'c307514.d317296' /* spm: 部署结果-直连连接串 */ }
               : record.component === 'obproxy'
-              ? {
+                ? {
                   spm: intl.formatMessage({
                     id: 'OBD.pages.components.InstallFinished.DeploymentResultObproxyConnectionString',
                     defaultMessage: '部署结果-OBProxy 连接串',
                   }),
                 }
-              : {})}
+                : {})}
           >
             {text}
           </div>
@@ -203,13 +195,13 @@ export const getReportColumns = (
         const status =
           text === 'SUCCESSFUL'
             ? intl.formatMessage({
-                id: 'OBD.pages.components.InstallFinished.Success',
-                defaultMessage: '成功',
-              })
+              id: 'OBD.pages.components.InstallFinished.Success',
+              defaultMessage: '成功',
+            })
             : intl.formatMessage({
-                id: 'OBD.pages.components.InstallFinished.Failed',
-                defaultMessage: '失败',
-              });
+              id: 'OBD.pages.components.InstallFinished.Failed',
+              defaultMessage: '失败',
+            });
 
         const getCommand = (component: string, ip: string) => {
           if (text !== 'SUCCESSFUL' && isCompChange) {

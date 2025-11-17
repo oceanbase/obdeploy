@@ -308,7 +308,8 @@ If you want to view detailed obd logs, please run: obd display-trace {trace_id}'
             obd.set_cmds(self.cmds)
             ret = self._do_command(obd)
             if not ret:
-                ROOT_IO.exit_msg = DOC_LINK_MSG + "\n" + ROOT_IO.exit_msg
+                from _errno import EXIST_ERROR_CODE
+                ROOT_IO.exit_msg = ((DOC_LINK_MSG + "\n") if EXIST_ERROR_CODE else '') + ROOT_IO.exit_msg
         except NotImplementedError:
             ROOT_IO.exception('command \'%s\' is not implemented' % self.prev_cmd)
         except LockError:
@@ -839,7 +840,7 @@ class ClusterTakeoverCommand(ClusterMirrorCommand):
 class DemoCommand(ClusterMirrorCommand):
 
     def __init__(self):
-        super(DemoCommand, self).__init__('demo', 'Quickly start')
+        super(DemoCommand, self).__init__('demo', 'Quickly start, This is a basic setup with minimal resources.')
         self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas. [oceanbase-ce,obproxy-ce,obagent,prometheus,grafana,ob-configserver]\nExample: \nstart oceanbase-ce: obd demo -c oceanbase-ce\n"
          + "start -c oceanbase-ce V3.2.3: obd demo -c oceanbase-ce --oceanbase-ce.version=3.2.3\n"
          + "start oceanbase-ce and obproxy-ce: obd demo -c oceanbase-ce,obproxy-ce", default='oceanbase-ce,obproxy-ce,obagent,prometheus,grafana')
@@ -866,10 +867,10 @@ class DemoCommand(ClusterMirrorCommand):
 class PrefCommand(ClusterMirrorCommand):
 
     def __init__(self):
-        super(PrefCommand, self).__init__('pref', 'Quickly start')
+        super(PrefCommand, self).__init__('perf', 'Quickly start, This deploys OceanBase with production-optimized configuration for enhanced performance.')
         self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas. [oceanbase-ce,obproxy-ce,obagent,prometheus,grafana,ob-configserver]\nExample: \nstart oceanbase-ce: obd demo -c oceanbase-ce\n"
-         + "start -c oceanbase-ce V3.2.3: obd pref -c oceanbase-ce --oceanbase-ce.version=3.2.3\n"
-         + "start oceanbase-ce and obproxy-ce: obd pref -c oceanbase-ce,obproxy-ce", default='oceanbase-ce,obproxy-ce,obagent,prometheus,grafana')
+         + "start -c oceanbase-ce V3.2.3: obd perf -c oceanbase-ce --oceanbase-ce.version=3.2.3\n"
+         + "start oceanbase-ce and obproxy-ce: obd perf -c oceanbase-ce,obproxy-ce", default='oceanbase-ce,obproxy-ce,obagent,prometheus,grafana')
         self.parser.allow_undefine = True
         self.parser.undefine_warn = False
 
@@ -885,8 +886,8 @@ class PrefCommand(ClusterMirrorCommand):
         setattr(self.opts, 'max', True)
         obd.set_options(self.opts)
 
-        res = obd.demo(name='pref')
-        self.background_telemetry_task(obd, 'pref')
+        res = obd.demo(name='perf')
+        self.background_telemetry_task(obd, 'perf')
         return res
 
 
@@ -1090,6 +1091,20 @@ class ClusterDestroyCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterPruneConfigCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterPruneConfigCommand, self).__init__('prune-config', 'Remove configuration files for destroyed or configured clusters.')
+        self.parser.add_option('--confirm', action='store_true', help='Confirm to prune configuration files.')
+
+    def _do_command(self, obd):
+        if self.cmds:
+            res = obd.prune_config(self.cmds[0], need_confirm=not getattr(self.opts, 'confirm', False))
+            return res
+        else:
+            return self._show_help()
+
+
 class ClusterDisplayCommand(ClusterMirrorCommand):
 
     def __init__(self):
@@ -1204,6 +1219,8 @@ class CLusterUpgradeCommand(ClusterMirrorCommand):
         super(CLusterUpgradeCommand, self).__init__('upgrade', 'Upgrade a cluster.')
         self.parser.add_option('-c', '--component', type='string', help="Component name to upgrade.")
         self.parser.add_option('-V', '--version', type='string', help="Target version.")
+        self.parser.add_option('--tag', type='string', help="Docker component tag.")
+        self.parser.add_option('-i', '--image-name', type='string', help="Docker component image name.")
         self.parser.add_option('--skip-check', action='store_true', help="Skip all the possible checks.")
         self.parser.add_option('--usable', type='string', help="Hash list for priority mirrors, separated with `,`.", default='')
         self.parser.add_option('--disable', type='string', help="Hash list for disabled mirrors, separated with `,`.", default='')
@@ -1212,8 +1229,12 @@ class CLusterUpgradeCommand(ClusterMirrorCommand):
         self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force upgrade, before upgrade standby tenant`s cluster.")
 
     def _do_command(self, obd):
+        oms_upgrade_mode = None
+        if len(self.cmds) == 2 and self.cmds[1] in ['offline', 'online']:
+            oms_upgrade_mode = self.cmds[1]
+            del self.cmds[1]
         if self.cmds:
-            res = obd.upgrade_cluster(self.cmds[0])
+            res = obd.upgrade_cluster(self.cmds[0], oms_upgrade_mode)
             self.background_telemetry_task(obd)
             return res
         else:
@@ -1632,6 +1653,7 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(ClusterStartCommand())
         self.register_command(ClusterStopCommand())
         self.register_command(ClusterDestroyCommand())
+        self.register_command(ClusterPruneConfigCommand())
         self.register_command(ClusterDisplayCommand())
         self.register_command(ClusterListCommand())
         self.register_command(ClusterRestartCommand())
@@ -2875,6 +2897,127 @@ class SetPassKeyCommand(ObdCommand):
             return self._show_help()
 
 
+class SeekdbMirrorCommand(ObdCommand):
+
+    def init(self, cmd, args, need_deploy_name=True):
+        super(SeekdbMirrorCommand, self).init(cmd, args)
+        if need_deploy_name and not self.cmds:
+            return self._show_help()
+        return self
+
+
+class SeekdbDeployCommand(SeekdbMirrorCommand):
+
+    def __init__(self):
+        super(SeekdbDeployCommand, self).__init__('deploy', 'Deploy a seekdb cluster.')
+        self.parser.add_option('-f', '--force', action='store_true', help="Force deploy, clear the working directory.")
+        self.parser.add_option('-C', '--clean', action='store_true', help="Clean deploy, clear the working directory if it belongs to the current user.")
+        self.parser.add_option('-U', '--ulp', '--unuselibrepo', action='store_true', help="Disable automatic dependency handling.")
+        self.parser.add_option('-A', '--act', '--auto-create-tenant', action='store_true', help="Auto create tenant during bootstrap.")
+
+    def _do_command(self, obd):
+        if self.cmds:
+            obd.set_options(self.opts)
+            res = obd.deploy_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
+        else:
+            return self._show_help()
+
+
+class SeekdbStartCommand(SeekdbMirrorCommand):
+
+    def __init__(self):
+        super(SeekdbStartCommand, self).__init__('start', 'Start a deployed seekdb cluster.')
+        self.parser.add_option('-s', '--servers', type='string', help="List of servers to be started. Multiple servers are separated with commas.")
+        self.parser.add_option('-S', '--strict-check', action='store_true', help="Throw errors instead of warnings when check fails.")
+        self.parser.add_option('--without-parameter', '--wop', action='store_true', help='Start without parameters.')
+
+    def _do_command(self, obd):
+        if self.cmds:
+            obd.set_cmds(self.cmds[1:])
+            res = obd.start_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
+        else:
+            return self._show_help()
+
+
+class SeekdbStopCommand(SeekdbMirrorCommand):
+
+    def __init__(self):
+        super(SeekdbStopCommand, self).__init__('stop', 'Stop a started seekdb cluster.')
+        self.parser.add_option('-s', '--servers', type='string', help="List of servers to be stopped. Multiple servers are separated with commas.")
+
+    def _do_command(self, obd):
+        if self.cmds:
+            obd.set_cmds(self.cmds[1:])
+            res = obd.stop_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
+        else:
+            return self._show_help()
+
+
+class SeekdbRestartCommand(SeekdbMirrorCommand):
+
+    def __init__(self):
+        super(SeekdbRestartCommand, self).__init__('restart', 'Restart a started seekdb cluster.')
+        self.parser.add_option('-s', '--servers', type='string', help="List of servers to be restarted. Multiple servers are separated with commas.")
+        self.parser.add_option('--with-parameter', '--wp', action='store_true', help='Restart with parameters.')
+
+    def _do_command(self, obd):
+        if self.cmds:
+            if not getattr(self.opts, 'with_parameter', False):
+                setattr(self.opts, 'without_parameter', True)
+            obd.set_options(self.opts)
+            res = obd.restart_cluster(self.cmds[0])
+            self.background_telemetry_task(obd)
+            return res
+        else:
+            return self._show_help()
+
+
+class SeekdbDestroyCommand(SeekdbMirrorCommand):
+
+    def __init__(self):
+        super(SeekdbDestroyCommand, self).__init__('destroy', 'Destroy a deployed seekdb cluster.')
+        self.parser.add_option('-f', '--force-kill', action='store_true', help="Force kill the running seekdb process in the working directory.")
+        self.parser.add_option('--confirm', action='store_true', help='Confirm to destroy.')
+
+    def _do_command(self, obd):
+        if self.cmds:
+            res = obd.destroy_cluster(self.cmds[0], need_confirm=not getattr(self.opts, 'confirm', False))
+            return res
+        else:
+            return self._show_help()
+
+
+class SeekdbDisplayCommand(SeekdbMirrorCommand):
+
+    def __init__(self):
+        super(SeekdbDisplayCommand, self).__init__('display', 'Display the information for a seekdb cluster.')
+        self.parser.add_option('--encryption-passkey', '--epk', type='string', help="Encryption passkey.")
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return obd.display_cluster(self.cmds[0])
+        else:
+            return self._show_help()
+
+
+class SeekdbMajorCommand(MajorCommand):
+
+    def __init__(self):
+        super(SeekdbMajorCommand, self).__init__('seekdb', 'Deploy and manage a seekdb cluster.')
+        self.register_command(SeekdbDeployCommand())
+        self.register_command(SeekdbStartCommand())
+        self.register_command(SeekdbStopCommand())
+        self.register_command(SeekdbRestartCommand())
+        self.register_command(SeekdbDestroyCommand())
+        self.register_command(SeekdbDisplayCommand())
+
+
 class MainCommand(MajorCommand):
 
     def __init__(self):
@@ -2885,6 +3028,7 @@ class MainCommand(MajorCommand):
         self.register_command(WebCommand())
         self.register_command(MirrorMajorCommand())
         self.register_command(ClusterMajorCommand())
+        self.register_command(SeekdbMajorCommand())
         self.register_command(RepositoryMajorCommand())
         self.register_command(TestMajorCommand())
         self.register_command(UpdateCommand())

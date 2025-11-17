@@ -17,12 +17,14 @@ from __future__ import absolute_import, division, print_function
 
 from tool import EnvVariables
 from copy import deepcopy
+from const import COMP_OBBINLOG
 
 
 def start(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    binlog_repository = kwargs.get('repository')
     server_pid = {}
     success = True
 
@@ -45,7 +47,11 @@ def start(plugin_context, *args, **kwargs):
             stdio.stop_loading('fail')
             return plugin_context.return_false()
         if 'LD_LIBRARY_PATH' not in environments:
-            environments['LD_LIBRARY_PATH'] = '%s/lib' % server_config['home_path']
+            ld_libary_path = '%s/lib' % home_path
+            if binlog_repository.name == COMP_OBBINLOG:
+                jvm_path = '%s/lib/jre/lib/%s/server' % (home_path, 'amd64' if binlog_repository.arch == 'x86_64' else 'aarch64')
+                ld_libary_path = ":".join([ld_libary_path, jvm_path])
+            environments['LD_LIBRARY_PATH'] = ld_libary_path
         with EnvVariables(environments, client):
             client.execute_command("cd {0};nohup {0}/bin/logproxy -f {0}/conf/conf.json > {0}/log/out.log &".format(home_path))
             ret = client.execute_command("ps -aux | grep '%s/bin/logproxy -f %s/conf/conf.json' | grep -v grep | awk '{print $2}'" % (home_path, home_path))

@@ -72,7 +72,7 @@ def create_user(plugin_context, create_tenant_options=[], cursor=None, scale_out
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
     if scale_out_component in const.COMPS_OCP + ['ocp-express']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
-    if scale_out_component in ['obbinlog-ce']:
+    if scale_out_component in ['obbinlog-ce', 'obbinlog']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     if not multi_options:
         multi_options = plugin_context.get_variable('create_tenant_options')

@@ -19,7 +19,8 @@ from __future__ import absolute_import, division, print_function
 import const
 
 def pre_test(plugin_context, workflow, repository, *args, **kwargs):
+    target_repository_version = '4.3.0.0' if repository.name == const.COMP_OB_SEEKDB else repository.version
     workflow.add_with_component_version(const.STAGE_FIRST, repository.name, repository.version, 'connect')
-    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'tpch', repository.version, {"repository": repository}, 'parameter_pre')
-    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'tpch', repository.version,{"repository": repository}, 'pre_test')
+    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'tpch', target_repository_version, {"repository": repository}, 'parameter_pre')
+    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'tpch', target_repository_version,{"repository": repository}, 'pre_test')
     return plugin_context.return_true()

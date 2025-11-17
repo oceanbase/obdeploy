@@ -61,6 +61,11 @@ export default [
         spmb: 'b57206',
         name: '部署向导',
       },
+      {
+        path: 'oms',
+        component: 'Oms',
+        name: 'oms部署',
+      },
     ],
   },
 ];

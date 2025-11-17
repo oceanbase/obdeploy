@@ -223,7 +223,6 @@ export default function CheckInfo({
         </Row>
       </ProCard>
       <CustomFooter>
-        <ExitBtn />
         <Button
           data-aspm-click="ca54437.da43442"
           data-aspm-desc={intl.formatMessage({
@@ -256,6 +255,7 @@ export default function CheckInfo({
             defaultMessage: '预检查',
           })}
         </Button>
+        <ExitBtn />
       </CustomFooter>
     </Space>
   );

@@ -3,7 +3,7 @@ import ConfigTable, {
   parameterValidator,
 } from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import Parameter from '@/pages/Obdeploy/ClusterConfig/Parameter';
-import { serversValidator } from '@/utils';
+import { hybridAddressValidator } from '@/utils';
 import { getPasswordRules } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
@@ -119,7 +119,7 @@ export default function MoreConfigTable({
             },
             () => ({
               validator: (_: any, param?: API.ParameterValue) => {
-                return serversValidator(_, param?.value, 'OBServer');
+                return hybridAddressValidator(_, param?.value, 'OBServer');
               },
             }),
           ],

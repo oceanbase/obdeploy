@@ -51,7 +51,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
     if scale_out_component in const.COMPS_OCP + ['ocp-express']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
-    if scale_out_component in ['obbinlog-ce']:
+    if scale_out_component in ['obbinlog-ce', 'obbinlog']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     for options in multi_options:
         create_if_not_exists = get_option('create_if_not_exists', False)
@@ -248,41 +248,45 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
                 sql += ', iops_weight %d' % iops_weight
             if log_disk_size is not None:
                 sql += ', log_disk_size %d' % log_disk_size
+            try:
+                res = cursor.execute(sql, raise_exception=True, stdio=stdio)
+                if res is False:
+                    error('create resource unit failed')
+                    return plugin_context.return_false()
 
-            res = cursor.execute(sql, stdio=stdio)
-            if res is False:
-                error('create resource unit failed')
-                return plugin_context.return_false()
+                # create resource pool
+                sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
+                res = cursor.execute(sql, raise_exception=True, stdio=stdio)
+                if res is False:
+                    error('create resource pool failed')
+                    return plugin_context.return_false()
 
-            # create resource pool
-            sql = "create resource pool %s unit='%s', unit_num=%d, zone_list=%s" % (pool_name, unit_name, unit_num, zone_list)
-            res = cursor.execute(sql, stdio=stdio)
-            if res is False:
-                error('create resource pool failed')
-                return plugin_context.return_false()
+                # create tenant
+                sql = "create tenant %s replica_num=%d,zone_list=%s,primary_zone='%s',resource_pool_list=('%s')"
+                sql = sql % (name, replica_num, zone_list, primary_zone, pool_name)
+                if charset:
+                    sql += ", charset = '%s'" % charset
+                if collate:
+                    sql += ", collate = '%s'" % collate
+                if logonly_replica_num:
+                    sql += ", logonly_replica_num = %d" % logonly_replica_num
+                if tablegroup:
+                    sql += ", default tablegroup ='%s'" % tablegroup
+                if locality:
+                    sql += ", locality = '%s'" % locality
 
-            # create tenant
-            sql = "create tenant %s replica_num=%d,zone_list=%s,primary_zone='%s',resource_pool_list=('%s')"
-            sql = sql % (name, replica_num, zone_list, primary_zone, pool_name)
-            if charset:
-                sql += ", charset = '%s'" % charset
-            if collate:
-                sql += ", collate = '%s'" % collate
-            if logonly_replica_num:
-                sql += ", logonly_replica_num = %d" % logonly_replica_num
-            if tablegroup:
-                sql += ", default tablegroup ='%s'" % tablegroup
-            if locality:
-                sql += ", locality = '%s'" % locality
-
-            set_mode = "ob_compatibility_mode = '%s'" % mode
-            if variables:
-                sql += "set %s, %s" % (variables, set_mode)
-            else:
-                sql += "set %s" % set_mode
-            res = cursor.execute(sql, stdio=stdio)
-            if res is False:
-                error('create tenant failed')
+                set_mode = "ob_compatibility_mode = '%s'" % mode
+                if variables:
+                    sql += "set %s, %s" % (variables, set_mode)
+                else:
+                    sql += "set %s" % set_mode
+                res = cursor.execute(sql, raise_exception=True, stdio=stdio)
+                if res is False:
+                    error('create tenant failed')
+                    return plugin_context.return_false()
+            except Exception as e:
+                stdio.stop_loading('fail')
+                stdio.error(e)
                 return plugin_context.return_false()
         stdio.stop_loading('succeed')
     plugin_context.set_variable('error', error)

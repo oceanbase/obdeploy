@@ -24,7 +24,7 @@ import time
 import re
 
 from ssh import LocalClient
-from const import COMPS_ODP, COMPS_OB
+from const import COMP_OB_SEEKDB
 from tool import get_option
 
 
@@ -49,6 +49,7 @@ def build(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
     pre_test_ret = plugin_context.get_return("pre_test")
+    repository = kwargs.get("repository")
 
     server_state = plugin_context.get_variable('server_state')
     merge = plugin_context.get_variable('merge')
@@ -60,7 +61,7 @@ def build(plugin_context, *args, **kwargs):
     db_name = get_option(options, 'database', 'test')
     user = get_option(options, 'user', 'root')
     password = get_option(options, 'password', '')
-    tenant_name = get_option(options, 'tenant', 'test')
+    tenant_name = get_option(options, 'tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
     obclient_bin = get_option(options, 'obclient_bin', 'obclient')
     java_bin = get_option(options, 'java_bin', 'java')
 

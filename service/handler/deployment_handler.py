@@ -537,6 +537,8 @@ class DeploymentHandler(BaseHandler):
             component_kwargs = {}
             if repository.name == const.PROMETHEUS:
                 component_kwargs = {repository.name: {"obagent_repo": obagent_repository}}
+            elif repository.name in COMPS_OB:
+                component_kwargs[repository.name] = {"source_type": "obd_web"}
             ret = self.obd._start_cluster(self.obd.deploy, repositories=[repository], components_kwargs=component_kwargs)
             if not ret:
                 log.get_logger().warn("failed to start component: %s", repository.name)
@@ -917,6 +919,8 @@ class DeploymentHandler(BaseHandler):
                     if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
                         java_check = False
                 component_kwargs[repository.name]["java_check"] = java_check
+            if repository.name in COMPS_OB:
+                component_kwargs[repository.name] = {"source_type": "obd_web"}
         workflows = self.obd.get_workflows('start_check', repositories=repositories)
         if not self.obd.run_workflow(workflows, repositories=repositories, error_exit=False, **component_kwargs):
             for repository in repositories:

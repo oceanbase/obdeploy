@@ -7,36 +7,35 @@ export const oceanbaseCeComponent = 'oceanbase-ce';
 export const oceanbaseStandaloneComponent = 'oceanbase-standalone';
 export const obproxyComponent = 'obproxy';
 export const obproxyCeComponent = 'obproxy-ce';
-export const ocpexpressComponent = 'ocp-express';
 export const ocpComponent = 'ocpserver';
 export const obagentComponent = 'obagent';
 export const commonInputStyle = { width: 484 };
 export const commonPortStyle = { width: 230 };
 export const commonServerStyle = { width: 316 };
+export const commonSelectStyle = { width: 328 };
 export const configServerComponent = 'ob-configserver';
 export const prometheusComponent = 'prometheus';
 export const grafanaComponent = 'grafana';
 export const alertManagerComponent = 'alertmanager';
 
-export const ocpexpressComponentKey = 'ocpexpress';
 export const configServerComponentKey = 'obconfigserver';
-export const dashboardComponentKey = 'OB-Dashboard';
+export const dashboardComponentKey = 'obshell_dashboard';
 
 export const componentVersionTypeToComponent = {
   'oceanbase-ce': oceanbaseComponent,
   'obproxy-ce': obproxyComponent,
   'ob-configserver': configServerComponentKey,
-  'ocp-express': ocpexpressComponentKey,
   grafanaComponent: grafanaComponent,
   prometheusComponent: prometheusComponent,
   alertManagerComponent: alertManagerComponent,
   'alertmanager': alertManagerComponent,
-  'ob-dashboard': dashboardComponentKey,
+  'ocp-server-ce': ocpComponent,
+  'ocp-server': ocpComponent,
+  'obshell_dashboard': dashboardComponentKey,
 };
 
 export const onlyComponentsKeys = [
   obproxyComponent,
-  ocpexpressComponentKey,
   obagentComponent,
   configServerComponentKey,
   grafanaComponent,
@@ -48,7 +47,6 @@ export const onlyComponentsKeys = [
 export const allComponentsKeys = [
   oceanbaseComponent,
   obproxyComponent,
-  ocpexpressComponentKey,
   obagentComponent,
   configServerComponentKey,
   grafanaComponent,
@@ -62,7 +60,6 @@ export const allComponentsKeys = [
 export const allComponentsName = [
   oceanbaseComponent,
   obproxyComponent,
-  ocpexpressComponent,
   obagentComponent,
   configServerComponent,
   grafanaComponent,
@@ -127,32 +124,6 @@ export const componentsConfig = {
       defaultMessage: 'OBAgent 参数名称',
     }),
   },
-  [ocpexpressComponent]: {
-    name: 'OCP Express',
-    showComponentName: 'OCP Express',
-    type: intl.formatMessage({
-      id: 'OBD.pages.constants.Tools',
-      defaultMessage: '工具',
-    }),
-    componentKey: ocpexpressComponentKey,
-    labelName: intl.formatMessage({
-      id: 'OBD.pages.constants.OcpExpressParameterName',
-      defaultMessage: 'OCP Express 参数名称',
-    }),
-  },
-  [ocpexpressComponentKey]: {
-    name: 'OCP Express',
-    showComponentName: 'OCP Express',
-    type: intl.formatMessage({
-      id: 'OBD.pages.constants.Tools',
-      defaultMessage: '工具',
-    }),
-    componentKey: ocpexpressComponentKey,
-    labelName: intl.formatMessage({
-      id: 'OBD.pages.constants.OcpExpressParameterName',
-      defaultMessage: 'OCP Express 参数名称',
-    }),
-  },
   [ocpComponent]: {
     name: 'OCP',
     showComponentName: 'OCP',
@@ -160,7 +131,7 @@ export const componentsConfig = {
       id: 'OBD.pages.constants.Tools',
       defaultMessage: '工具',
     }),
-    componentKey: ocpexpressComponentKey,
+    componentKey: 'ocp',
     labelName: intl.formatMessage({
       id: 'OBD.pages.constants.OcpParameterName',
       defaultMessage: 'OCP 参数名称',
@@ -220,7 +191,7 @@ export const componentsConfig = {
   },
   ['obshell_dashboard']: {
     name: 'obshell_dashboard',
-    showComponentName: 'OB-Dashboard',
+    showComponentName: 'obshell Dashboard',
   },
 };
 

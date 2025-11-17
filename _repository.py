@@ -449,6 +449,18 @@ class Repository(PackageInfo):
             self.clear()
         return False
 
+    def load_image(self, version, md5=None):
+        self.set_version(version)
+        if md5:
+            self.md5 = md5
+        parent_dir = os.path.split(self.repository_dir)[0]
+        dst_dir = os.path.join(parent_dir, self.name)
+        if os.path.exists(dst_dir) and os.path.islink(dst_dir):
+            DirectoryUtil.rm(dst_dir)
+        os.symlink(self.repository_dir, dst_dir)
+        self.install_time = time.time()
+        self._dump()
+
     def clear(self):
         if os.path.exists(self.repository_dir):
             return DirectoryUtil.rm(self.repository_dir, self.stdio) and DirectoryUtil.mkdir(self.repository_dir, stdio=self.stdio)

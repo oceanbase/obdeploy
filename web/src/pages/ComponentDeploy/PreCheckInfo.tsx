@@ -27,7 +27,6 @@ import {
   grafanaComponent,
   obagentComponent,
   obproxyComponent,
-  ocpexpressComponent,
   onlyComponentsKeys,
   prometheusComponent,
 } from '../constants';
@@ -66,7 +65,6 @@ export default function PreCheckInfo() {
     useModel('global');
   const {
     obproxy = {},
-    ocpexpress = {},
     obagent = {},
     grafana = {},
     prometheus = {},
@@ -77,7 +75,6 @@ export default function PreCheckInfo() {
   } = componentConfig;
   const components = {
     obproxy,
-    ocpexpress,
     obagent,
     obconfigserver,
     grafana,
@@ -141,7 +138,6 @@ export default function PreCheckInfo() {
 
     if (lowVersion) {
       currentOnlyComponentsKeys = currentOnlyComponentsKeys.filter(
-        (key) => key !== 'ocpexpress',
       );
     }
 
@@ -367,9 +363,6 @@ export default function PreCheckInfo() {
 
   useEffect(() => {
     const newConfig = { ...componentConfig };
-    if (Object.keys(ocpexpress).length !== 0) {
-      newConfig.ocpexpress.admin_passwd = generateComplexPwd();
-    }
     if (Object.keys(obproxy).length !== 0) {
       newConfig.obproxy.obproxy_sys_password = generatePwd();
     }
@@ -425,14 +418,6 @@ export default function PreCheckInfo() {
       {/* 组件配置 */}
       <CompDetailCheckInfo clusterConfigInfo={clusterConfigInfo} />
       <CustomFooter>
-        <Button
-          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
-        >
-          {intl.formatMessage({
-            id: 'OBD.pages.ComponentDeploy.PreCheckInfo.Exit',
-            defaultMessage: '退出',
-          })}
-        </Button>
         <Button onClick={preStep}>
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.PreCheckInfo.PreviousStep',
@@ -443,6 +428,14 @@ export default function PreCheckInfo() {
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.PreCheckInfo.PreCheck',
             defaultMessage: '预检查',
+          })}
+        </Button>
+        <Button
+          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
+        >
+          {intl.formatMessage({
+            id: 'OBD.pages.ComponentDeploy.PreCheckInfo.Exit',
+            defaultMessage: '退出',
           })}
         </Button>
       </CustomFooter>

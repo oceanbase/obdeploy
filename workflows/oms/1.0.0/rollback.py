@@ -1,0 +1,31 @@
+# coding: utf-8
+# Copyright (c) 2025 OceanBase.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import absolute_import, division, print_function
+
+import const
+
+
+def rollback(plugin_context, workflow, *args, **kwargs):
+    new_clients = plugin_context.get_variable('new_clients')
+    new_deploy_config = plugin_context.get_variable('new_deploy_config')
+    new_cluster_config = new_deploy_config.components[kwargs['repository'].name] if new_deploy_config else {}
+    workflow.add_with_kwargs(const.STAGE_FIRST, {"cluster_config": new_cluster_config, "clients": new_clients}, "stop")
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {"cluster_config": new_cluster_config, "clients": new_clients}, 'rollback')
+    return plugin_context.return_true()
+
+
+
+

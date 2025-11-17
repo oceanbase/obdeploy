@@ -26,7 +26,7 @@ def display(plugin_context, *args, **kwargs):
     results = []
     repo = None
     for repository in repositories:
-        if repository.name == const.COMP_OBBINLOG_CE:
+        if repository.name in [const.COMP_OBBINLOG_CE, const.COMP_OBBINLOG]:
             repo = repository
 
     for server in servers:

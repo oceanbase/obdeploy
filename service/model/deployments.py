@@ -330,6 +330,12 @@ class OCPDeploymentStatus(StrEnum):
     FINISHED = auto()
 
 
+class OMSDeploymentStatus(StrEnum):
+    INIT = auto()
+    DEPLOYING = auto()
+    FINISHED = auto()
+
+
 class ClusterManageInfo(BaseModel):
     machine: Optional[int] = Body(None, description='manage machine num')
 

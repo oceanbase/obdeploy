@@ -29,7 +29,7 @@ def generate_random_password(cluster_config, auto_depend):
     }
     be_depends = {
         component: (auto_depend or component in be_depend)
-        for component in const.COMPS_ODP + const.COMPS_OCP + [const.COMP_OCP_EXPRESS, const.COMP_OBAGENT, const.COMP_OBLOGPROXY, const.COMP_OBBINLOG_CE]
+        for component in const.COMPS_ODP + const.COMPS_OCP + [const.COMP_OCP_EXPRESS, const.COMP_OBAGENT, const.COMP_OBLOGPROXY, const.COMP_OBBINLOG_CE, const.COMP_OBBINLOG_CE]
     }
 
     if added_components[cluster_config.name] and 'root_password' not in global_config:

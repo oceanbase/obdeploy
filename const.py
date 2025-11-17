@@ -66,6 +66,7 @@ COMPS_OCP_CE_AND_EXPRESS = [COMP_OCP_SERVER_CE, COMP_OCP_EXPRESS]
 COMP_OB = "oceanbase"
 COMP_OB_CE = "oceanbase-ce"
 COMP_OB_STANDALONE = "oceanbase-standalone"
+COMP_OB_SEEKDB = 'seekdb'
 COMPS_OB = [COMP_OB, COMP_OB_CE, COMP_OB_STANDALONE]
 
 # obproxy
@@ -84,6 +85,7 @@ COMP_OBLOGPROXY = 'oblogproxy'
 
 # obbinlog
 COMP_OBBINLOG_CE = 'obbinlog-ce'
+COMP_OBBINLOG = 'obbinlog'
 BINLOG_INSTANCE_OPERATORS = ['start', 'stop', 'drop']
 BINLOG_INSTANCE_STATUS_OPERATORS_MAP = {
     'start': 'Running',
@@ -94,6 +96,15 @@ BINLOG_INSTANCE_STATUS_OPERATORS_MAP = {
 COMP_PROMETHEUS = 'prometheus'
 
 COMP_ALERTMANAGER = 'alertmanager'
+
+# oms
+COMP_OMS = 'oms'
+COMP_OMS_CE = 'oms-ce'
+COMPS_OMS = [COMP_OMS, COMP_OMS_CE]
+
+DDFFI_SCRIPT = 'docker_dump_file_from_image.sh'
+DCDTC_SCRIPT = 'docker_copy_dumpfile_to_container.sh'
+DCDR_SCRIPT = 'docker_copy_dumpfile_rollback.sh'
 
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
@@ -148,3 +159,13 @@ ALERTMANAGER_DEFAULT_RECEIVER_CONF = {
         "url": 'http://127.0.0.1:5001/',
     }
 }
+
+# not support modify_parameter
+NOT_SUPPORT_MODIFY_SUB_PARAMETERS = [
+    {
+        "component": COMP_OMS_CE,
+        "name": "regions",
+        "type": "list",
+        "sub_keys": ["cm_nodes", "cm_location", "cm_region"]
+     }
+]

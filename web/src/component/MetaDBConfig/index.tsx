@@ -50,30 +50,30 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
   const { oceanbase = {}, ocpserver = {}, obproxy = {} } = components;
   const initDBConfigData = oceanbase?.topology?.length
     ? oceanbase?.topology?.map((item: API.Zone, index: number) => ({
-        id: (Date.now() + index).toString(),
-        ...item,
-        servers: item?.servers?.map((server) => server?.ip),
-      }))
+      id: (Date.now() + index).toString(),
+      ...item,
+      servers: item?.servers?.map((server) => server?.ip),
+    }))
     : [
-        {
-          id: (Date.now() + 1).toString(),
-          name: 'zone1',
-          servers: [],
-          rootservice: undefined,
-        },
-        {
-          id: (Date.now() + 2).toString(),
-          name: 'zone2',
-          servers: [],
-          rootservice: undefined,
-        },
-        {
-          id: (Date.now() + 3).toString(),
-          name: 'zone3',
-          servers: [],
-          rootservice: undefined,
-        },
-      ];
+      {
+        id: (Date.now() + 1).toString(),
+        name: 'zone1',
+        servers: [],
+        rootservice: undefined,
+      },
+      {
+        id: (Date.now() + 2).toString(),
+        name: 'zone2',
+        servers: [],
+        rootservice: undefined,
+      },
+      {
+        id: (Date.now() + 3).toString(),
+        name: 'zone3',
+        servers: [],
+        rootservice: undefined,
+      },
+    ];
 
   const [dbConfigData, setDBConfigData] =
     useState<API.DBConfig[]>(initDBConfigData);
@@ -317,7 +317,6 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
         <OBProxyConfig form={form} parameterRules={parameterRules} />
       </Space>
       <CustomFooter>
-        <ExitBtn />
         <Button
           spm={intl.formatMessage({
             id: 'OBD.component.MetaDBConfig.MetadbConfigurationPreviousStep',
@@ -344,6 +343,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
             defaultMessage: '下一步',
           })}
         </Button>
+        <ExitBtn />
       </CustomFooter>
     </ProForm>
   );

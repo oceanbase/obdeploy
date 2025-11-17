@@ -18,7 +18,6 @@ declare namespace API {
   type ComponentConfig = {
     oceanbase: OceanBase;
     obproxy?: ObProxy;
-    ocpexpress?: OcpExpress;
     obagent?: ObAgent;
     obclient?: ObClient;
     ocpserver?: OcpServer;
@@ -500,26 +499,6 @@ declare namespace API {
     parameters?: Record<string, any>;
   };
 
-  type OcpExpress = {
-    /** Component ocp-express component name */
-    component?: string;
-    /** Version version */
-    version: string;
-    /** Package Hash ocp-express package md5 */
-    package_hash?: string;
-    /** Release ocp-express release no */
-    release: string;
-    /** Home Path install ocp-express home path */
-    home_path?: string;
-    /** Port server port */
-    port: number;
-    /** Parameters config parameter */
-    parameters?: Parameter[];
-    /** Servers server ip, ex:[ '1.1.1.1','2.2.2.2'] */
-    servers: string[];
-    /** Admin password */
-    admin_passwd: string;
-  };
 
   type OcpServer = {
     component: string;

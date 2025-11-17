@@ -2,7 +2,47 @@
 /* eslint-disable */
 import { getQueryFromComps } from '@/utils/helper';
 import { request } from '@umijs/max';
-/** Component Change component change POST /api/v1/component_change/${param0} */
+/** Component Change component change GET /api/v1/oms/docker_images */
+export async function omsDockerImages(
+  params: {
+    oms_servers: string;
+    username: string;
+    password?: string;
+    port?: number;
+  },
+  options?: { [key: string]: any },
+) {
+ 
+  return request<API.OBResponse>(`/api/v1/oms/docker_images`, {
+    method: 'GET',
+    params: {
+      oms_servers: params.oms_servers,
+      username: params.username,
+      password: params.password || '',
+      port: params.port || 22,
+    },
+    ...(options || {}),
+  });
+}
+
+export async function omsConnectInfluxdb(
+  params: {
+    influxdb_servers: string;
+    influxdb_username: string;
+    influxdb_password: string;
+    influxdb_port: number;
+  }, body: API.ComponentChangeMode,
+  options?: { [key: string]: any },
+) {
+  const { ...queryParams } = params;
+  return request<API.OBResponse>(`/api/v1/connect/influxdb`, {
+    method: 'POST',
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
+
 export async function componentChange(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: API.ComponentChangeParams,

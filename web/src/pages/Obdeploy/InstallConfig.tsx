@@ -1,5 +1,4 @@
 import ErrorCompToolTip from '@/component/ErrorCompToolTip';
-import { selectOcpexpressConfig } from '@/constant/configuration';
 import { useComponents } from '@/hooks/useComponents';
 import {
   queryAllComponentVersions,
@@ -54,7 +53,6 @@ import {
   obproxyComponent,
   oceanbaseComponent,
   oceanbaseStandaloneComponent,
-  ocpexpressComponent,
   prometheusComponent,
 } from '../constants';
 import { getParamstersHandler } from './ClusterConfig/helper';
@@ -101,7 +99,6 @@ export default function InstallConfig() {
     setClusterMoreConfig,
     OBD_DOCS,
     OBD_STANDALONE_DOCS,
-    OCP_EXPRESS,
     OBAGENT_DOCS,
     OBPROXY_DOCS,
     OBCONFIGSERVER_DOCS,
@@ -571,16 +568,7 @@ export default function InstallConfig() {
           return (
             <>
               {text}
-              {record.key === ocpexpressComponent && lowVersion ? (
-                <ErrorCompToolTip
-                  title={intl.formatMessage({
-                    id: 'OBD.pages.Obdeploy.InstallConfig.OcpExpressOnlySupportsAnd',
-                    defaultMessage:
-                      'OCP Express 仅支持 4.0 及以上版本 OceanBase Database。',
-                  })}
-                  status="warning"
-                />
-              ) : !componentsVersionInfo[record.key]?.version ? (
+              {!componentsVersionInfo[record.key]?.version ? (
                 <ErrorCompToolTip
                   title={intl.formatMessage({
                     id: 'OBD.pages.Obdeploy.InstallConfig.UnableToObtainTheInstallation',
@@ -687,9 +675,6 @@ export default function InstallConfig() {
         className: styles.thirdCell,
         render: (text, record) => {
           let disabled = false;
-          if (record.key === ocpexpressComponent && lowVersion) {
-            disabled = true;
-          }
           return (
             <div className={styles.descContent}>
               <p style={{ marginRight: 24, maxWidth: 556, marginTop: 0 }}>
@@ -750,7 +735,6 @@ export default function InstallConfig() {
         record.key === alertManagerComponent;
 
       for (let val of selectedConfig) {
-        if (target && val === ocpexpressComponent) continue;
         if (target && val === grafanaComponent) continue;
         if (target && val === prometheusComponent) continue;
         if (target && val === alertManagerComponent) continue;
@@ -761,11 +745,6 @@ export default function InstallConfig() {
       setSelectedConfig(newConfig);
     } else {
       if (
-        record.key === ocpexpressComponent &&
-        !selectedConfig.includes(obagentComponent)
-      ) {
-        setSelectedConfig([...selectedConfig, record.key, obagentComponent]);
-      } else if (
         record.key === prometheusComponent &&
         !selectedConfig.includes(obagentComponent)
       ) {
@@ -839,11 +818,10 @@ export default function InstallConfig() {
       errorCommonHandle,
     );
     if (res?.success) {
-      const { data } = res,
-        isSelectOcpexpress = selectedConfig.includes(ocpexpressComponent);
+      const { data } = res;
       const newClusterMoreConfig = formatMoreConfig(
         data?.items,
-        isSelectOcpexpress,
+        false,
       );
 
       return newClusterMoreConfig;
@@ -964,33 +942,6 @@ export default function InstallConfig() {
     });
   }, [configData]);
 
-  /**
-   * 是否选择ocp-express组件会影响参数
-   */
-  useEffect(() => {
-    if (clusterMoreConfig.length) {
-      const haveOcpexpressParam: boolean =
-        clusterMoreConfig[0].configParameter.some((parameter) =>
-          selectOcpexpressConfig.includes(parameter.name || ''),
-        );
-      const isSelectOcpexpress = selectedConfig.includes('ocp-express');
-      //选择了ocpexpress组件 缺少ocpexpress参数 需要补充参数
-      if (isSelectOcpexpress && !haveOcpexpressParam) {
-        getNewParamsters().then((newParamsters) => {
-          if (newParamsters) setClusterMoreConfig(newParamsters);
-        });
-      }
-      //未选择ocpexpress组件 有ocpexpress参数 需要去除参数
-      if (!isSelectOcpexpress && haveOcpexpressParam) {
-        let newParamsters = [...clusterMoreConfig];
-        newParamsters[0].configParameter =
-          newParamsters[0].configParameter.filter((parameter) => {
-            return !selectOcpexpressConfig.includes(parameter.name || '');
-          });
-        setClusterMoreConfig(newParamsters);
-      }
-    }
-  }, [selectedConfig]);
 
   useEffect(() => {
     if (obVersionValue) {
@@ -1196,11 +1147,7 @@ export default function InstallConfig() {
                   rowKey="key"
                   dataSource={oceanBaseInfo.content}
                   pagination={false}
-                  rowClassName={(record) => {
-                    if (record.key === ocpexpressComponent && lowVersion) {
-                      return styles.disabledRow;
-                    }
-                  }}
+                  rowClassName={() => { }}
                 />
               </ProCard>
             </Space>
@@ -1321,11 +1268,7 @@ export default function InstallConfig() {
                     rowKey="key"
                     dataSource={componentInfo.content}
                     pagination={false}
-                    rowClassName={(record) => {
-                      if (record.key === ocpexpressComponent && lowVersion) {
-                        return styles.disabledRow;
-                      }
-                    }}
+                    rowClassName={() => { }}
                   />
                 </ProCard>
               </Space>
@@ -1335,21 +1278,6 @@ export default function InstallConfig() {
         <footer className={styles.pageFooterContainer}>
           <div className={styles.pageFooter}>
             <Space className={styles.foolterAction}>
-              <Button
-                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-                data-aspm-click="c307507.d317381"
-                data-aspm-desc={intl.formatMessage({
-                  id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationExit',
-                  defaultMessage: '部署配置-退出',
-                })}
-                data-aspm-param={``}
-                data-aspm-expo
-              >
-                {intl.formatMessage({
-                  id: 'OBD.pages.components.InstallConfig.Exit',
-                  defaultMessage: '退出',
-                })}
-              </Button>
               <Button onClick={preStep}>
                 {intl.formatMessage({
                   id: 'OBD.pages.Obdeploy.InstallConfig.PreviousStep',
@@ -1371,6 +1299,21 @@ export default function InstallConfig() {
                 {intl.formatMessage({
                   id: 'OBD.pages.components.InstallConfig.NextStep',
                   defaultMessage: '下一步',
+                })}
+              </Button>
+              <Button
+                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+                data-aspm-click="c307507.d317381"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationExit',
+                  defaultMessage: '部署配置-退出',
+                })}
+                data-aspm-param={``}
+                data-aspm-expo
+              >
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.Exit',
+                  defaultMessage: '退出',
                 })}
               </Button>
             </Space>

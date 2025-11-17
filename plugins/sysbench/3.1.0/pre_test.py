@@ -21,7 +21,7 @@ import subprocess
 
 from ssh import LocalClient
 from _types import Capacity
-from const import TOOL_SYSBENCH, COMP_OBCLIENT
+from const import TOOL_SYSBENCH, COMP_OBCLIENT, COMP_OB_SEEKDB
 
 stdio = None
 
@@ -49,6 +49,7 @@ def pre_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     options = plugin_context.options
+    repository = kwargs.get("repository")
 
     sys_namespace = kwargs.get("sys_namespace")
     get_db_and_cursor = kwargs.get("get_db_and_cursor")
@@ -58,7 +59,7 @@ def pre_test(plugin_context, *args, **kwargs):
     port = db.port if db else 2881
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
-    tenant_name = get_option('tenant', 'test')
+    tenant_name = get_option('tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
     password = get_option('password', '')
     threads = get_option('threads', 150)
     script_name = get_option('script_name', 'oltp_point_select.lua')
@@ -66,7 +67,7 @@ def pre_test(plugin_context, *args, **kwargs):
     sysbench_bin = get_option('sysbench_bin', 'sysbench')
     sysbench_script_dir = get_option('sysbench_script_dir', '/usr/sysbench/share/sysbench')
 
-    if tenant_name == 'sys':
+    if tenant_name == 'sys' and repository.name != COMP_OB_SEEKDB:
         stdio.error('DO NOT use sys tenant for testing.')
         return
 

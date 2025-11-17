@@ -18,7 +18,7 @@ import const
 
 def start(plugin_context, workflow, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
-    workflow.add(const.STAGE_FIRST, 'start_pre', 'start', 'health_check')
+    workflow.add(const.STAGE_FIRST, 'start_pre', 'start', 'health_check','register_to_obshell', 'bootstrap')
     if const.COMP_PROMETHEUS in cluster_config.depends:
         for repository in plugin_context.repositories:
             if repository.name == const.COMP_PROMETHEUS:

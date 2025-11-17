@@ -190,7 +190,7 @@ export default function CheckInfo() {
     );
 
     currentOnlyComponentsKeys.forEach((key) => {
-      if (key !== 'ocpexpress' && componentsConfig?.[key]) {
+      if (componentsConfig?.[key]) {
         componentsNodeConfigList.push({
           key,
           name: componentsConfig?.[key]?.name,
@@ -321,7 +321,7 @@ export default function CheckInfo() {
           value: oceanbase?.rpc_port,
         },
         {
-          label: 'OBShell 端口',
+          label: 'obshell 端口',
           colSpan: 3,
           value: oceanbase?.obshell_port,
         },
@@ -649,7 +649,7 @@ export default function CheckInfo() {
                       defaultMessage: '负载类型',
                     })}
                   >
-                    {scenarioParam?.value}
+                    {scenarioParam?.value.toUpperCase()}
                   </ProCard>
                 ) : null}
               </ProCard>
@@ -718,21 +718,6 @@ export default function CheckInfo() {
         <div className={styles.pageFooter}>
           <Space className={styles.foolterAction}>
             <Button
-              onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-              data-aspm-click="c307504.d317275"
-              data-aspm-desc={intl.formatMessage({
-                id: 'OBD.pages.components.CheckInfo.PreCheckExit',
-                defaultMessage: '预检查-退出',
-              })}
-              data-aspm-param={``}
-              data-aspm-expo
-            >
-              {intl.formatMessage({
-                id: 'OBD.pages.components.CheckInfo.Exit',
-                defaultMessage: '退出',
-              })}
-            </Button>
-            <Button
               onClick={prevStep}
               data-aspm-click="c307504.d317274"
               data-aspm-desc={intl.formatMessage({
@@ -762,6 +747,21 @@ export default function CheckInfo() {
               {intl.formatMessage({
                 id: 'OBD.pages.components.CheckInfo.PreCheck.1',
                 defaultMessage: '预检查',
+              })}
+            </Button>
+            <Button
+              onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+              data-aspm-click="c307504.d317275"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.PreCheckExit',
+                defaultMessage: '预检查-退出',
+              })}
+              data-aspm-param={``}
+              data-aspm-expo
+            >
+              {intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.Exit',
+                defaultMessage: '退出',
               })}
             </Button>
           </Space>

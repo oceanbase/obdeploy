@@ -95,6 +95,9 @@ class PackageInfo(object):
     def set_release(self, release):
         self.release = Release(str(release) if release else '')
 
+    def set_hash(self, hash):
+        self.md5 = hash
+
     def __str__(self):
         return 'name: %s\nversion: %s\nrelease:%s\narch: %s\nmd5: %s' % (self.name, self.version, self.release, self.arch, self.md5)
 

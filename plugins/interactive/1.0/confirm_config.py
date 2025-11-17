@@ -63,10 +63,23 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
         tenant_cpu = tenant_config['max_cpu']
         tenant_memory = tenant_config['memory_size']
         tenant_log_disk_size = tenant_config['log_disk_size']
+        mode = tenant_config['mode']
+        time_zone = tenant_config['time_zone']
+        charset = tenant_config['charset']
+        collate = tenant_config['collate']
+        optimize = tenant_config['optimize']
+        variables = tenant_config['variables']
         stdio.print(f'tenant name: {tenant_name}')
         stdio.print(f'tenant cpu: {tenant_cpu}')
         stdio.print(f'tenant memory: {Capacity(tenant_memory)}')
         stdio.print(f'tenant log disk size: {Capacity(tenant_log_disk_size)}')
+        stdio.print(f'mode: {mode}')
+        stdio.print(f'time zone: {time_zone}')
+        stdio.print(f'charset: {charset}')
+        stdio.print(f'collate: {collate}')
+        stdio.print(f'optimize: {optimize}')
+        stdio.print(f'variables: {variables}')
+
 
     if component_config:
         monagent_http_port = component_config['monagent_http_port']

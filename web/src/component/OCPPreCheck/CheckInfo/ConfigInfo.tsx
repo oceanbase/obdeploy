@@ -123,7 +123,7 @@ export default function ConfigInfo({
           value: obConfigInfo?.rpc_port,
         },
         {
-          label: 'OBShell 端口',
+          label: 'obshell 端口',
           key: 'obshell_port',
           colSpan: 4,
           value: obConfigInfo?.rpc_port,

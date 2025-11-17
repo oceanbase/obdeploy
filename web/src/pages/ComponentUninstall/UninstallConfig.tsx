@@ -452,14 +452,6 @@ export default function UninstallConfig() {
           </ProCard>
         </ProCard>
         <CustomFooter>
-          <Button
-            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 3)}
-          >
-            {intl.formatMessage({
-              id: 'OBD.pages.ComponentUninstall.UninstallConfig.Exit',
-              defaultMessage: '退出',
-            })}
-          </Button>
           <Button onClick={preStep}>
             {intl.formatMessage({
               id: 'OBD.pages.ComponentUninstall.UninstallConfig.PreviousStep',
@@ -474,6 +466,14 @@ export default function UninstallConfig() {
             {intl.formatMessage({
               id: 'OBD.pages.ComponentUninstall.UninstallConfig.Uninstall',
               defaultMessage: '卸载',
+            })}
+          </Button>
+          <Button
+            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 3)}
+          >
+            {intl.formatMessage({
+              id: 'OBD.pages.ComponentUninstall.UninstallConfig.Exit',
+              defaultMessage: '退出',
             })}
           </Button>
         </CustomFooter>

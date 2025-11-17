@@ -97,17 +97,15 @@ export default function DeleteDeployModal({
             if (nameSuccess) {
               const { config } = nameData;
               const { components = {} } = config;
-              const newSelectedConfig:string[] = []
-              Object.keys(components).forEach((key)=>{
-                if(selectedConfig.includes(key) && components[key]){
+              const newSelectedConfig: string[] = []
+              Object.keys(components).forEach((key) => {
+                if (selectedConfig.includes(key) && components[key]) {
                   newSelectedConfig.push(key)
-                }else if(key === 'ocpexpress' && components[key]){
-                  newSelectedConfig.push('ocp-express')
-                }else if(key === 'obconfigserver' && components[key]){
+                } else if (key === 'obconfigserver' && components[key]) {
                   newSelectedConfig.push('ob-configserver')
                 }
               })
-              
+
               setSelectedConfig(newSelectedConfig)
               setConfigData(formatConfigData(config) || {});
               setLowVersion(checkLowVersion(components?.oceanbase?.version));

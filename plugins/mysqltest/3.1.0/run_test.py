@@ -26,6 +26,7 @@ from copy import deepcopy
 from ssh import LocalClient
 from tool import DirectoryUtil
 from _stdio import FormatText
+from const import COMP_OB_SEEKDB
 
 inner_dir = os.path.split(__file__)[0]
 inner_test_dir = os.path.join(inner_dir, 't')
@@ -70,7 +71,10 @@ class Arguments:
         if opt.get('user'):
             user = opt['user']
             if 'connector' not in opt or opt['connector'] == 'ob':
-                user = user + '@' + opt['case_mode']
+                if opt.get('component') != COMP_OB_SEEKDB:
+                    user = user + '@' + opt['case_mode']
+                else:
+                    user = user
             self.add('--user', user)
         if opt.get('password'):
             self.add('--password', opt['password'])

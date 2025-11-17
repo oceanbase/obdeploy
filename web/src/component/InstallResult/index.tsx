@@ -667,7 +667,6 @@ const InstallResult: React.FC<InstallResultProps> = ({
           </Button>
         ) : (
           <>
-            <ExitBtn />
             <Button
               loading={destroyOCPLoading}
               onClick={() => {
@@ -712,6 +711,7 @@ const InstallResult: React.FC<InstallResultProps> = ({
                 defaultMessage: '重新部署',
               })}
             </Button>
+            <ExitBtn />
           </>
         )}
       </CustomFooter>

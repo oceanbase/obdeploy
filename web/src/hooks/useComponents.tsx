@@ -14,7 +14,6 @@ import { useModel } from '@umijs/max';
  */
 export const useComponents = (extra?: boolean, standAlone?: boolean) => {
   const {
-    OCP_EXPRESS,
     OBAGENT_DOCS,
     OBPROXY_DOCS,
     OBCONFIGSERVER_DOCS,
@@ -24,28 +23,28 @@ export const useComponents = (extra?: boolean, standAlone?: boolean) => {
   let params = [
     ...(!standAlone
       ? [
-          {
-            group: intl.formatMessage({
-              id: 'OBD.pages.components.InstallConfig.Proxy',
-              defaultMessage: '代理',
-            }),
-            key: 'agency',
-            onlyAll: true,
-            content: [
-              {
-                key: obproxyComponent,
-                name: 'OBProxy',
-                onlyAll: true,
-                desc: intl.formatMessage({
-                  id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
-                  defaultMessage:
-                    '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
-                }),
-                doc: OBPROXY_DOCS,
-              },
-            ],
-          },
-        ]
+        {
+          group: intl.formatMessage({
+            id: 'OBD.pages.components.InstallConfig.Proxy',
+            defaultMessage: '代理',
+          }),
+          key: 'agency',
+          onlyAll: true,
+          content: [
+            {
+              key: obproxyComponent,
+              name: 'OBProxy',
+              onlyAll: true,
+              desc: intl.formatMessage({
+                id: 'OBD.pages.components.InstallConfig.ItIsAProxyServer',
+                defaultMessage:
+                  '是 OceanBase 数据库专用的代理服务器，可以将用户 SQL 请求转发至最佳目标 OBServer 。',
+              }),
+              doc: OBPROXY_DOCS,
+            },
+          ],
+        },
+      ]
       : []),
 
     {
@@ -72,28 +71,28 @@ export const useComponents = (extra?: boolean, standAlone?: boolean) => {
 
     ...(!standAlone
       ? [
-          {
-            group: intl.formatMessage({
-              id: 'OBD.pages.components.InstallConfig.Tools',
-              defaultMessage: '工具',
-            }),
-            key: 'configServerTool',
-            onlyAll: true,
-            content: [
-              {
-                key: configServerComponent,
-                name: 'OBConfigServer',
-                onlyAll: true,
-                desc: intl.formatMessage({
-                  id: 'OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration',
-                  defaultMessage:
-                    '是一个可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。',
-                }),
-                doc: OBCONFIGSERVER_DOCS,
-              },
-            ],
-          },
-        ]
+        {
+          group: intl.formatMessage({
+            id: 'OBD.pages.components.InstallConfig.Tools',
+            defaultMessage: '工具',
+          }),
+          key: 'configServerTool',
+          onlyAll: true,
+          content: [
+            {
+              key: configServerComponent,
+              name: 'OBConfigServer',
+              onlyAll: true,
+              desc: intl.formatMessage({
+                id: 'OBD.pages.Obdeploy.InstallConfig.ItIsAMetadataRegistration',
+                defaultMessage:
+                  '是一个可提供 OceanBase 的元数据注册，存储和查询服务，主要实现 OBProxy 与 OceanBase 集群之间1到多以及多到多的访问能力。',
+              }),
+              doc: OBCONFIGSERVER_DOCS,
+            },
+          ],
+        },
+      ]
       : []),
   ];
 

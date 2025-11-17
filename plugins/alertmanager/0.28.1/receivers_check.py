@@ -23,6 +23,7 @@ ALERTMANAGER_NOTICE = {
     'pagerduty': ['routing_key', 'service_key', 'url'],
     'pushover': ['user_key', 'token'],
     'rocketchat': ['token', 'token_id'],
+    'slack': ['api_url'],
     'sns': ['topic_arn', 'phone_number', 'target_arn'],
     'telegram': ['bot_token', 'chat_id'],
     'victorops': ['api_key', 'routing_key'],
@@ -30,6 +31,8 @@ ALERTMANAGER_NOTICE = {
     'wechat': ['api_secret', 'corp_id'],
     'webex': ['room_id']
 }
+
+SLACK_API_URL = 'https://slack.com/api/chat.postMessage'
 
 
 def receivers_check(plugin_context, new_cluster_config=None, *args, **kwargs):
@@ -60,6 +63,15 @@ def receivers_check(plugin_context, new_cluster_config=None, *args, **kwargs):
                 if field not in receiver_conf and field.join("_file") not in receiver_conf:
                     stdio.error("When using the %s notification method, the %s field must be passed" % (receiver_type, field))
                     return plugin_context.return_false()
+            if receiver_type == 'slack':
+                receiver_api_url = receiver_conf.get('api_url')
+                receiver_api_url = receiver_api_url.replace(" ", "").rstrip("/")
+                if receiver_api_url == SLACK_API_URL:
+                    for other_field in ['channel', 'http_config']:
+                        if other_field not in receiver_conf:
+                            stdio.error("If using Bot tokens then %s must be set." % other_field)
+                            return plugin_context.return_false()
+
                 
     return plugin_context.return_true()
     

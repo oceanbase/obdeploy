@@ -69,6 +69,23 @@ export async function getOcpDeployment(
 }
 
 /** destroy_ocp destroy ocp DELETE /api/v1/ocp/deployments/${param0} */
+export async function destroyOms(
+  params: {
+    // path
+    id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0 } = params;
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/deployments/${param0}`,
+    {
+      method: 'DELETE',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 export async function destroyOcp(
   params: {
     // path
@@ -153,6 +170,24 @@ export async function telemetryReport(params: {}): Promise<any> {
 }
 
 /** precheck_ocp_deployment precheck for ocp deployment POST /api/v1/ocp/deployments/${param0}/precheck */
+export async function preCheckOmsDeployment(
+  params: {
+    // path
+    /** deployment id */
+    id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0 } = params;
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/deployments/${param0}/precheck`,
+    {
+      method: 'POST',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 export async function precheckOcpDeployment(
   params: {
     // path
@@ -173,6 +208,26 @@ export async function precheckOcpDeployment(
 }
 
 /** precheck_ocp precheck for ocp deployment GET /api/v1/ocp/deployments/${param0}/precheck/${param1} */
+export async function preCheckOms(
+  params: {
+    // path
+    /** deployment id */
+    id?: number;
+    /** task id */
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0, task_id: param1 } = params;
+  return request<API.OBResponse_PrecheckTaskInfo_>(
+    `/api/v1/oms/deployments/${param0}/precheck/${param1}`,
+    {
+      method: 'GET',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 export async function precheckOcp(
   params: {
     // path
@@ -215,6 +270,24 @@ export async function recoverOcpDeployment(
 }
 
 /** install_ocp install ocp POST /api/v1/ocp/deployments/${param0}/install */
+export async function installOms(
+  params: {
+    // path
+    /** deployment id */
+    id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0 } = params;
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/deployments/${param0}/install`,
+    {
+      method: 'POST',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 export async function installOcp(
   params: {
     // path
@@ -235,6 +308,26 @@ export async function installOcp(
 }
 
 /** get_ocp_install_task get ocp install task GET /api/v1/ocp/deployments/${param0}/install/${param1} */
+export async function getOmsInstallTask(
+  params: {
+    // path
+    /** deployment id */
+    id?: number;
+    /** task id */
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0, task_id: param1 } = params;
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/deployments/${param0}/install/${param1}`,
+    {
+      method: 'GET',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 export async function getOcpInstallTask(
   params: {
     // path
@@ -257,6 +350,31 @@ export async function getOcpInstallTask(
 }
 
 /** get_ocp_install_task_log get ocp install task log GET /api/v1/ocp/deployments/${param0}/install/${param1}/log */
+export async function getOmsInstallTaskLog(
+  params: {
+    // query
+    /** offset to read task log */
+    offset?: number;
+    // path
+    /** deployment id */
+    id?: number;
+    /** task id */
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0, task_id: param1, ...queryParams } = params;
+  return request<API.OBResponse_TaskLog_>(
+    `/api/v1/oms/deployments/${param0}/install/${param1}/log`,
+    {
+      method: 'GET',
+      params: {
+        ...queryParams,
+      },
+      ...(options || {}),
+    },
+  );
+}
 export async function getOcpInstallTaskLog(
   params: {
     // query
@@ -311,6 +429,24 @@ export async function getOcpInstallTaskReport(
 }
 
 /** reinstall_ocp reinstall ocp POST /api/v1/ocp/deployments/${param0}/reinstall */
+export async function reinstallOms(
+  params: {
+    // path
+    /** deployment id */
+    id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0 } = params;
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/deployments/${param0}/reinstall`,
+    {
+      method: 'POST',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 export async function reinstallOcp(
   params: {
     // path
@@ -331,6 +467,26 @@ export async function reinstallOcp(
 }
 
 /** get_ocp_reinstall_task get ocp reinstall task GET /api/v1/ocp/deployments/${param0}/reinstall/${param1} */
+export async function getOmsReinstallTask(
+  params: {
+    // path
+    /** deployment id */
+    id?: number;
+    /** task id */
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0, task_id: param1 } = params;
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/deployments/${param0}/reinstall/${param1}`,
+    {
+      method: 'GET',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 export async function getOcpReinstallTask(
   params: {
     // path
@@ -369,6 +525,31 @@ export async function getOcpReinstallTaskLog(
   const { id: param0, task_id: param1, ...queryParams } = params;
   return request<API.OBResponse_TaskLog_>(
     `/api/v1/ocp/deployments/${param0}/reinstall/${param1}/log`,
+    {
+      method: 'GET',
+      params: {
+        ...queryParams,
+      },
+      ...(options || {}),
+    },
+  );
+}
+export async function getOmsReinstallTaskLog(
+  params: {
+    // query
+    /** offset to read task log */
+    offset?: number;
+    // path
+    /** deployment id */
+    id?: number;
+    /** task id */
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { id: param0, task_id: param1, ...queryParams } = params;
+  return request<API.OBResponse_TaskLog_>(
+    `/api/v1/oms/deployments/${param0}/reinstall/${param1}/log`,
     {
       method: 'GET',
       params: {

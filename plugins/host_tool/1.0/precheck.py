@@ -18,10 +18,12 @@ from __future__ import absolute_import, division, print_function
 import getpass
 import re
 import _errno as err
+import const
 from _arch import getBaseArch
+from _environ import ENV_OBD_WEB_TYPE
 from _stdio import FormatText
 from _types import Capacity
-from tool import get_option, get_sudo_prefix
+from tool import get_option, get_sudo_prefix, COMMAND_ENV
 
 
 def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kwargs):
@@ -152,7 +154,6 @@ def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kw
         {'check_item': 'net.core.wmem_default', 'recommend': 16777216, 'need': [16777216, float('inf')]},
         {'check_item': 'net.core.rmem_max', 'recommend': 16777216, 'need': [16777216, float('inf')]},
         {'check_item': 'net.core.wmem_max', 'recommend': 16777216, 'need': [16777216, float('inf')] },
-        {'check_item': 'net.ipv4.ip_forward', 'recommend': 0, 'need': 0},
         {'check_item': 'net.ipv4.conf.default.rp_filter', 'recommend': 1, 'need': 1},
         {'check_item': 'net.ipv4.conf.default.accept_source_route', 'recommend': 0, 'need': 0},
         {'check_item': 'net.ipv4.tcp_syncookies', 'recommend': 1, 'need': 1},
@@ -169,6 +170,8 @@ def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kw
         {'check_item': 'vm.max_map_count', 'recommend': 655360, 'need': [655360, float('inf')]},
         {'check_item': 'kernel.core_pattern', 'recommend': '/data/core-%e-%p-%t', 'need': '/data/core-%e-%p-%t'}
     ]
+    if COMMAND_ENV.get(ENV_OBD_WEB_TYPE, '') == const.COMP_OB_STANDALONE:
+        kernel_check_items.append({'check_item': 'net.ipv4.ip_forward', 'recommend': 0, 'need': 0})
 
     INF = float('inf')
     ulimits_min = {

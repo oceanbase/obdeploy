@@ -21,6 +21,13 @@ export const NEW_METADB_OCP_INSTALL = [
     }),
     key: 3,
   },
+  // {
+  //   title: intl.formatMessage({
+  //     id: 'OBD.src.constant.configuration.ConfigurationConfirmation',
+  //     defaultMessage: '配置确认',
+  //   }),
+  //   key: 4,
+  // },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.PreCheck',
@@ -142,6 +149,13 @@ export const METADB_OCP_UPDATE = [
     }),
     key: 2,
   },
+  // {
+  //   title: intl.formatMessage({
+  //     id: 'OBD.src.constant.configuration.ConfigurationConfirmation',
+  //     defaultMessage: '配置确认',
+  //   }),
+  //   key: 3,
+  // },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.EnvironmentPreCheck',
@@ -158,6 +172,44 @@ export const METADB_OCP_UPDATE = [
   },
 ];
 
+export const METADB_OMS_UPDATE = [
+  {
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.UpgradeConfiguration',
+      defaultMessage: '升级配置',
+    }),
+    key: 1,
+  },
+  {
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.ConfigurationConfirmation',
+      defaultMessage: '配置确认',
+    }),
+    key: 2,
+  },
+  {
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.PreCheck',
+      defaultMessage: '预检查',
+    }),
+    key: 3,
+  },
+  {
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.DataBackup',
+      defaultMessage: '数据备份',
+    }),
+    key: 4,
+  },
+  {
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.OmsUpgrade',
+      defaultMessage: 'OMS 升级',
+    }),
+    key: 5,
+  },
+];
+
 // ocp install
 export const CONFIG_KEYS = {
   oceanbase: ['cpu_count', 'memory_limit', 'data_file', 'log_file'],
@@ -165,11 +217,6 @@ export const CONFIG_KEYS = {
   // obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
 };
 
-export const selectOcpexpressConfig = [
-  'ocp_meta_tenant_max_cpu',
-  'ocp_meta_tenant_memory_size',
-  'ocp_meta_tenant_log_disk_size',
-];
 
 export const showConfigKeys = {
   oceanbase: [
@@ -182,7 +229,7 @@ export const showConfigKeys = {
     'rpc_port',
     'scenario',
   ],
- 
+
 
   obproxy: [
     'home_path',
@@ -192,7 +239,6 @@ export const showConfigKeys = {
   ],
 
   obagent: ['home_path', 'monagent_http_port', 'mgragent_http_port'],
-  ocpexpress: ['home_path', 'port'],
   obconfigserver: [
     'home_path',
     'listen_port',

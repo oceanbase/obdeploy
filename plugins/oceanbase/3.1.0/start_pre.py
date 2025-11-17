@@ -76,9 +76,9 @@ def start_pre(plugin_context, *args, **kwargs):
     else:
         scale_out = False
         need_bootstrap = True
-
     scenario = cluster_config.get_global_conf_with_default().get('scenario')
     need_bootstrap and stdio.print('cluster scenario: %s' % scenario)
+    
     for server in cluster_config.original_servers:
         config = cluster_config.get_server_conf(server)
         zone = config['zone']

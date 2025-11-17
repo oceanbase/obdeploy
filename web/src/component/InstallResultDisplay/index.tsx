@@ -25,7 +25,8 @@ import { isEmpty } from 'lodash';
 import { useModel } from 'umi';
 import styles from './index.less';
 
-const { Text } = Typography;
+const { Paragraph, Text } = Typography;
+
 
 export interface InstallResultDisplayProps extends ResultProps {
   upgradeOcpInfo?: API.connectMetaDB;
@@ -166,10 +167,7 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                   data-aspm-param={``}
                   data-aspm-expo
                 >
-                  {intl.formatMessage({
-                    id: 'OBD.component.InsstallResult.OcpUpgradedSuccessfully',
-                    defaultMessage: 'OCP 升级成功',
-                  })}
+                  {`${installType} 升级成功`}
                 </span>
               ) : (
                 <span>
@@ -238,10 +236,7 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                   data-aspm-param={``}
                   data-aspm-expo
                 >
-                  {intl.formatMessage({
-                    id: 'OBD.component.InsstallResult.OcpUpgradeFailed',
-                    defaultMessage: 'OCP 升级失败',
-                  })}
+                  {`${installType} 升级失败`}
                 </div>
               ) : (
                 <div>
@@ -338,11 +333,17 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                       marginBottom: 24,
                     }}
                     showIcon={true}
-                    description={intl.formatMessage({
-                      id: 'OBD.component.InsstallResult.TheSystemWillUpgradeOcp',
-                      defaultMessage:
-                        '系统将默认升级 OCP Agent，请前往 OCP 任务中心查看升级进度',
-                    })}
+                    // 如果选择前面做了备份数据，则有提示
+                    description={installType === 'OMS' ?
+                      <Paragraph
+                        copyable={{ text: '/abc/def/hijk ' }}>
+                        `备份文件保存地址：${'/abc/def/hijk '}    ，可根据需要对备份文件进行维护管理。`
+                      </Paragraph>
+                      : intl.formatMessage({
+                        id: 'OBD.component.InsstallResult.TheSystemWillUpgradeOcp',
+                        defaultMessage:
+                          '系统将默认升级 OCP Agent，请前往 OCP 任务中心查看升级进度',
+                      })}
                   />
                   <Row gutter={[24, 16]}>
                     <Col span={24} className={styles.versionContainer}>
@@ -406,11 +407,11 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                     })}
 
                     <a target="_blank" href={RELEASE_RECORD}>
-                      {' '}
+                      `${installType} `
                       {intl.formatMessage({
                         id: 'OBD.component.InsstallResult.OcpReleaseRecords',
-                        defaultMessage: 'OCP 发布记录',
-                      })}{' '}
+                        defaultMessage: '发布记录',
+                      })}
                     </a>
                     {intl.formatMessage({
                       id: 'OBD.component.InsstallResult.LearnMoreAboutTheNew',

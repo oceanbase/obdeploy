@@ -1,3 +1,99 @@
+- name: cpu_count
+  name_local: 系统CPU总数
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: true
+  description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be set according to sysconf; otherwise, this parameter is used.
+  description_local: 系统CPU总数，如果设置为0，将自动检测
+- name: memory_limit
+  name_local: 最大运行内存
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: NULL
+  max_value: NULL
+  modify_limit: decrease
+  section: OBSERVER
+  need_restart: false
+  description_en: the size of the memory reserved for internal use(for testing purpose). Please enter an capacity, such as 8G
+  description_local: 可用总内存大小。请输入带容量带单位的整数，如8G
+- name: datafile_size
+  name_local: 数据文件大小
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: size of the data file. Please enter an capacity, such as 20G
+  description_local: 数据文件大小。请输入带容量带单位的整数，如20G
+- name: datafile_maxsize
+  name_local: 数据文件最大空间
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend max size. Please enter an capacity, such as 20G
+  description_local: 数据文件最大空间。请输入带容量带单位的整数，如20G
+- name: datafile_next
+  name_local: 数据文件自增步长
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend step. Please enter an capacity, such as 2G
+  description_local: 数据文件自增步长。请输入带容量带单位的整数，如2G
+- name: log_disk_size
+  name_local: Redo 日志大小
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  description_en: the size of disk space used by the clog files. Please enter an capacity, such as 20G
+  description_local: Redo 日志磁盘的大小。请输入带容量带单位的整数，如24G
+- name: system_memory
+  name_local: 集群系统内存
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: the memory reserved for internal use which cannot be allocated to any outer-tenant, and should be determined to guarantee every server functions normally. Please enter an capacity, such as 2G
+  description_local: 系统预留内存大小，不能分配给普通租户使用。请输入带容量带单位的整数，如2G
+- name: max_syslog_file_count
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in. Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
+  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
 - name: home_path
   name_local: 工作目录
   require: true
@@ -233,45 +329,6 @@
   need_restart: true
   description_en: enable server supports SSL connection, takes effect only after server restart with all ca/cert/key file.
   description_local: 是否开启SSL连接功能
-- name: datafile_size
-  name_local: 数据文件大小
-  require: false
-  essential: true
-  type: CAPACITY_MB
-  default: 0
-  min_value: 0M
-  max_value: NULL
-  modify_limit: decrease
-  section: SSTABLE
-  need_restart: false
-  description_en: size of the data file. Please enter an capacity, such as 20G
-  description_local: 数据文件大小。请输入带容量带单位的整数，如20G
-- name: datafile_maxsize
-  name_local: 数据文件最大空间
-  require: false
-  essential: true
-  type: CAPACITY_MB
-  default: 0
-  min_value: 0M
-  max_value: NULL
-  modify_limit: decrease
-  section: SSTABLE
-  need_restart: false
-  description_en: the auto extend max size. Please enter an capacity, such as 20G
-  description_local: 数据文件最大空间。请输入带容量带单位的整数，如20G
-- name: datafile_next
-  name_local: 数据文件自增步长
-  require: false
-  essential: true
-  type: CAPACITY_MB
-  default: 0
-  min_value: 0M
-  max_value: NULL
-  modify_limit: decrease
-  section: SSTABLE
-  need_restart: false
-  description_en: the auto extend step. Please enter an capacity, such as 2G
-  description_local: 数据文件自增步长。请输入带容量带单位的整数，如2G
 - name: log_disk_percentage
   require: false
   type: INT
@@ -280,16 +337,6 @@
   max_value: 99
   description_en: the percentage of disk space used by the clog files.
   description_local: Redo 日志占用其所在磁盘总空间的百分比。
-- name: log_disk_size
-  name_local: Redo 日志大小
-  require: false
-  essential: true
-  type: CAPACITY_MB
-  default: 0
-  min_value: 0M
-  max_value: NULL
-  description_en: the size of disk space used by the clog files. Please enter an capacity, such as 20G
-  description_local: Redo 日志磁盘的大小。请输入带容量带单位的整数，如24G
 - name: merge_stat_sampling_ratio
   require: false
   type: INT
@@ -649,17 +696,6 @@
   need_restart: false
   description_en: specifies whether to include the log files before restarting into the recycling space
   description_local: 是否将重启前的日志文件纳入回收空间
-- name: max_syslog_file_count
-  require: false
-  essential: true
-  type: INT
-  default: 0
-  min_value: 0
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in. Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
-  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
 - name: px_task_size
   require: false
   type: CAPACITY_MB
@@ -1031,30 +1067,6 @@
   need_restart: false
   description_en: the time interval between the schedules of the partition load-balancing task.
   description_local: 负载均衡等后台任务线程空闲时的唤醒间隔时间
-- name: memory_limit
-  name_local: 最大运行内存
-  require: false
-  essential: true
-  type: CAPACITY_MB
-  default: 0
-  min_value: NULL
-  max_value: NULL
-  modify_limit: decrease
-  section: OBSERVER
-  need_restart: false
-  description_en: the size of the memory reserved for internal use(for testing purpose). Please enter an capacity, such as 8G
-  description_local: 可用总内存大小。请输入带容量带单位的整数，如8G
-- name: system_memory
-  name_local: 集群系统内存
-  essential: true
-  type: CAPACITY_MB
-  default: 0
-  min_value: 0M
-  max_value: NULL
-  section: OBSERVER
-  need_restart: false
-  description_en: the memory reserved for internal use which cannot be allocated to any outer-tenant, and should be determined to guarantee every server functions normally. Please enter an capacity, such as 2G
-  description_local: 系统预留内存大小，不能分配给普通租户使用。请输入带容量带单位的整数，如2G
 - name: __min_full_resource_pool_memory
   require: true
   type: INT
@@ -1184,18 +1196,6 @@
   need_restart: false
   description_en: the time interval between the retries in case of failure during a transactions two-phase commit phase
   description_local: 两阶段提交失败时候自动重试的间隔
-- name: cpu_count
-  name_local: 系统CPU总数
-  require: false
-  essential: true
-  type: INT
-  default: 0
-  min_value: 0
-  max_value: NULL
-  section: OBSERVER
-  need_restart: true
-  description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be set according to sysconf; otherwise, this parameter is used.
-  description_local: 系统CPU总数，如果设置为0，将自动检测
 - name: devname
   name_local: 网卡名
   essential: true

@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from typing import List, Optional
 from enum import auto
 from fastapi import Body
 from fastapi_utils.enums import StrEnum

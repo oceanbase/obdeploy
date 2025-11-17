@@ -29,6 +29,7 @@ from ruamel.yaml.comments import CommentedMap
 
 import _errno as err
 import const
+from _rpm import Version
 from tool import ConfigUtil, FileUtil, YamlLoader, OrderedDict, COMMAND_ENV, aes_encrypt, aes_decrypt, \
     string_to_md5_32bytes
 from _manager import Manager
@@ -372,7 +373,9 @@ class DefaultConfigParser(ConfigParser):
             ConfigUtil.get_value_from_dict(conf, 'version', None, str),
             ConfigUtil.get_value_from_dict(conf, 'tag', None, str),
             ConfigUtil.get_value_from_dict(conf, 'release', None, str),
-            ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str)
+            ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str),
+            ConfigUtil.get_value_from_dict(conf, 'type', 'rpm', str),
+            ConfigUtil.get_value_from_dict(conf, 'image_name', 'None', str)
         )
         if added_servers:
             cluster_config.added_servers = added_servers
@@ -478,14 +481,17 @@ class DefaultConfigParser(ConfigParser):
 
 class ClusterConfig(object):
 
-    def __init__(self, servers, name, version, tag, release, package_hash, parser=None):
+    def __init__(self, servers, name, version, tag, release, package_hash, comp_type, image_name, parser=None):
+        version = Version('1.0.0') if comp_type == 'docker' else version
         self._version = version
         self.origin_version = version
         self.tag = tag
+        self.comp_type = comp_type
         self.origin_tag = tag
         self._release = release
         self.origin_release = release
         self.name = name
+        self.image_name = image_name
         self.origin_package_hash = package_hash
         self._package_hash = package_hash
         self._temp_conf = {}
@@ -562,7 +568,7 @@ class ClusterConfig(object):
         return True
 
     def __deepcopy__(self, memo):
-        cluster_config = self.__class__(deepcopy(self.servers), self.name, self.version, self.tag, self.release, self.package_hash, self.parser)
+        cluster_config = self.__class__(deepcopy(self.servers), self.name, self.version, self.tag, self.release, self.package_hash, self.image_name, self.parser)
         copy_attrs = ['origin_tag', 'origin_version', 'origin_package_hash', 'parser', 'added_servers']
         deepcopy_attrs = ['_temp_conf', '_all_default_conf', '_default_conf', '_global_conf', '_server_conf', '_cache_server', '_original_global_conf', '_depends', '_original_servers', '_inner_config']
         for attr in copy_attrs:
@@ -584,6 +590,10 @@ class ClusterConfig(object):
             self._rsync_list = None
             self._include_config = None
             self._global_conf = None
+
+    @property
+    def docker_install(self):
+        return self.comp_type == 'docker'
 
     @property
     def deploy_name(self):
@@ -781,6 +791,16 @@ class ClusterConfig(object):
         config = self.get_server_conf(server)
         for key in config:
             if key in self._temp_conf and self._temp_conf[key].need_redeploy:
+                items[key] = config[key]
+        return items
+
+    def get_read_only_items(self, server):
+        if server not in self._server_conf:
+            return None
+        items = {}
+        config = self.get_server_conf(server)
+        for key in config:
+            if key in self._temp_conf and self._temp_conf[key].read_only:
                 items[key] = config[key]
         return items
 
@@ -1244,7 +1264,9 @@ class DeployConfig(SafeStdio):
             src_data['version'] = repository.version
         if 'release' in src_data:
             src_data['release'] = repository.release
-        if 'tag' in src_data:
+        if src_data.get('type') == 'docker':
+            src_data['tag'] = repository.version
+        elif 'tag' in src_data:
             del src_data['tag']
 
         self._src_data[component] = src_data
@@ -1693,6 +1715,11 @@ class DeployConfig(SafeStdio):
                 self.update_password_in_global_config(global_config[current_key], path[1:], key, enable_encrypt)
 
     def change_deploy_config_password(self, enable_encrypt, change_deploy_encrypt=True, first_encrypt=False):
+        class ExcludePassword:
+            def __init__(self, ob_param: str, comps: list):
+                self.ob_param = ob_param
+                self.comps = comps
+
         if COMMAND_ENV.get(const.ENCRYPT_PASSWORD) != '1' and not first_encrypt:
             return True
         deploy_encrypt_enable = self.inner_config.get_global_config(const.ENCRYPT_PASSWORD) or False
@@ -1701,12 +1728,13 @@ class DeployConfig(SafeStdio):
         if not enable_encrypt and not self._config_encrypted:
             self._need_encrypt_dump = False
         else:
-
+            ob_global_config = {}
             cluster_id = ''
             for component in const.COMPS_OB:
                 if component in self.components.keys():
                     cluster_config = self.components[component]
                     global_config = cluster_config.get_global_conf()
+                    ob_global_config = global_config
                     cluster_id = str(global_config['cluster_id']) if 'cluster_id' in global_config else ''
             key = string_to_md5_32bytes(self.name + cluster_id).encode('utf-8')
             self.stdio.verbose(f"encrypt key: {key}")
@@ -1715,6 +1743,8 @@ class DeployConfig(SafeStdio):
                     self.user.password = aes_encrypt(str(self.user.password), key)
                 else:
                     self.user.password = aes_decrypt(self.user.password, key)
+
+            exclude_pwd = {"ocp_meta_password": ExcludePassword("ocp_meta_password", const.COMPS_OCP)}
             for component, cluster_config in self.components.items():
                 self.stdio.verbose(f"change {component} pwd encrypt.")
                 password_paths = []
@@ -1722,6 +1752,10 @@ class DeployConfig(SafeStdio):
                 self.get_all_password_path(global_config, password_paths, component)
                 change_global_config = deepcopy(global_config)
                 for password_path in password_paths:
+                    if password_path in exclude_pwd and component in exclude_pwd[password_path].comps:
+                        origin_global_config = cluster_config.get_original_global_conf()
+                        if ob_global_config.get(exclude_pwd[password_path].ob_param) and not origin_global_config.get(password_path):
+                            continue
                     password_path_keys = password_path.split('.')
                     self.update_password_in_global_config(change_global_config, password_path_keys, key, enable_encrypt)
                     cluster_config.update_global_conf(password_path_keys[0], change_global_config[password_path_keys[0]], save=False)

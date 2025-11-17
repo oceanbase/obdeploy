@@ -15,18 +15,23 @@
 
 from __future__ import absolute_import, division, print_function
 
+from const import COMP_OB_SEEKDB
 
 def init_pre(plugin_context, env, *args, **kwargs):
+    repository = kwargs.get("repository")
     if 'init_sql_files' in env and env['init_sql_files']:
         init_sql = env['init_sql_files'].split(',')
     else:
         exec_init = 'init.sql'
         exec_init_ce = 'init_for_ce.sql'
-        exec_init_user = 'init_user.sql|root@mysql|test'
-        exec_init_user_for_oracle = 'init_user_oracle.sql|SYS@oracle|SYS'
+        if repository.name == COMP_OB_SEEKDB:
+            init_sql = [exec_init]
+        else:
+            exec_init_user = 'init_user.sql|root@mysql|test'
+            exec_init_user_for_oracle = 'init_user_oracle.sql|SYS@oracle|SYS'
         if env['is_business']:
             init_sql = [exec_init, exec_init_user_for_oracle, exec_init_user]
-        else:
+        elif repository.name != COMP_OB_SEEKDB:
             init_sql = [exec_init_ce, exec_init_user]
     plugin_context.set_variable('init_sql', init_sql)
     return plugin_context.return_true()

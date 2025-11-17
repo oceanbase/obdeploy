@@ -41,6 +41,7 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     options = plugin_context.options
+    ocp_repository = kwargs.get("repository")
 
     if not start_env:
         stdio.verbose('start env is not set')
@@ -93,7 +94,8 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
             jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(memory_size)).lower())
         java_bin = server_config['java_bin']
         client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
-        cmd = f'{java_bin} -Dfile.encoding=UTF-8 -jar {jvm_memory_option} {home_path}/lib/ocp-server.jar --bootstrap'
+        host_ip = f'-Docp.host.ip={server.ip}' if ocp_repository.version >= '4.3.0' else ''
+        cmd = f'{java_bin} -Dfile.encoding=UTF-8 {host_ip} -jar {jvm_memory_option} {home_path}/lib/ocp-server.jar --bootstrap'
         jar_cmd = copy.deepcopy(cmd)
         if "log_dir" not in server_config:
             log_dir = os.path.join(home_path, 'log')

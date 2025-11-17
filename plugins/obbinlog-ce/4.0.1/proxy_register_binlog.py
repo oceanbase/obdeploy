@@ -35,8 +35,8 @@ def proxy_register_binlog(plugin_context, proxy_version, *args, **kwargs):
         ip = NetUtil.get_host_ip() if client.is_localhost() else server.ip
         if not ips:
             ips += ip + ":" + str(server_config.get('service_port'))
-            if len(cluster_config.servers) > 1 and proxy_version < Version('4.3.1'):
-                stdio.warn(f"Register only one binlog server(%s) to obproxy. If you need to register all IPs, please use obproxy version greater than 4.3.1." % (str(server.ip)))
+            if len(cluster_config.servers) > 1 and proxy_version < Version('4.3.2'):
+                stdio.warn(f"Register only one binlog server(%s) to obproxy. If you need to register all IPs, please use obproxy version greater than 4.3.2." % (str(server.ip)))
                 break
         else:
             ips += ';' + ip + ":" + str(server_config.get('service_port'))

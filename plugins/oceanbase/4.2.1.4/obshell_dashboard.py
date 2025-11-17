@@ -45,7 +45,7 @@ def obshell_dashboard(plugin_context, obshell_clients, config_encrypted, display
 
     if not config_encrypted:
         display_encrypt_password = None
-    stdio.start_loading(f"display ob-dashboard")
+    stdio.start_loading(f"display obshell dashboard")
     ip = cluster_config.servers[0].ip
     client = obshell_clients[ip]
     try:
@@ -68,7 +68,7 @@ def obshell_dashboard(plugin_context, obshell_clients, config_encrypted, display
             "password":  passwd_format(cluster_config.get_global_conf().get('root_password', '') if not display_encrypt_password else display_encrypt_password)
         }]
         stdio.print_list(dashboard_info_list, ['url', 'user', 'password', 'status'],
-                         lambda x: [x['url'], x['user'], x['password'], 'active'], title="ob-dashboard")
+                         lambda x: [x['url'], x['user'], x['password'], 'active'], title="obshell Dashboard")
 
     stdio.stop_loading('succeed')
     return plugin_context.return_true(obshell_dashboard=dashboard_info)

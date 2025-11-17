@@ -23,15 +23,17 @@ import {
   Typography,
 } from 'antd';
 import NP from 'number-precision';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getLocale } from 'umi';
 import CustomFooter from '../CustomFooter';
 
 interface PreCehckComponentProps {
+  type: 'OMS' | 'OCP' | 'Component';
   checkFinished: boolean;
   checkStatus: boolean;
   createLoading?: boolean;
   preCheckLoading: boolean;
+  preCheckOmsLoading?: boolean;
   loading: boolean;
   hasManual: boolean;
   hasAuto: boolean;
@@ -70,6 +72,7 @@ const initDuration = 3;
 let durationScroll = initDuration;
 let durationFailed = initDuration;
 export default function PreCehckComponent({
+  type,
   checkFinished,
   failedList,
   statusData,
@@ -91,7 +94,9 @@ export default function PreCehckComponent({
   handleInstall,
   setIsScroll,
   setIsScrollFailed,
+  preCheckOmsLoading
 }: PreCehckComponentProps) {
+  const [isRetryChecking, setIsRetryChecking] = useState<boolean>(false);
   const handleScrollTimeline = () => {
     if (!checkFinished) {
       setIsScroll(true);
@@ -131,12 +136,31 @@ export default function PreCehckComponent({
     return advisement;
   };
 
+  const handleRetryCheckClick = () => {
+    // 防止重复点击：如果正在执行或正在加载，直接返回
+    if (isRetryChecking || createLoading || preCheckLoading) {
+      return;
+    }
+
+    // 设置执行状态
+    setIsRetryChecking(true);
+
+    try {
+      handleRetryCheck();
+    } finally {
+      // 延迟重置状态，确保操作完成
+      setTimeout(() => {
+        setIsRetryChecking(false);
+      }, 1000);
+    }
+  };
+
   useEffect(() => {
     const timelineContainer = document.getElementById('timeline-container');
     timelineContainer.onmousewheel = handleScrollTimeline; // ie , chrome
     timelineContainer?.addEventListener('DOMMouseScroll', handleScrollTimeline); // firefox
     return () => {
-      timelineContainer.onmousewheel = () => {};
+      timelineContainer.onmousewheel = () => { };
       timelineContainer?.removeEventListener(
         'DOMMouseScroll',
         handleScrollTimeline,
@@ -167,7 +191,7 @@ export default function PreCehckComponent({
     return () => {
       const failedContainer = document.getElementById('failed-container');
       if (failedContainer) {
-        failedContainer.onmousewheel = () => {};
+        failedContainer.onmousewheel = () => { };
         failedContainer?.removeEventListener(
           'DOMMouseScroll',
           handleScrollFailed,
@@ -213,17 +237,17 @@ export default function PreCehckComponent({
           checkStatus
             ? checkFinished
               ? intl.formatMessage({
-                  id: 'OBD.component.PreCheck.preCheck.CheckCompleted',
-                  defaultMessage: '检查完成',
-                })
-              : intl.formatMessage({
-                  id: 'OBD.component.PreCheck.preCheck.Checking',
-                  defaultMessage: '检查中',
-                })
-            : intl.formatMessage({
-                id: 'OBD.component.PreCheck.preCheck.CheckFailed',
-                defaultMessage: '检查失败',
+                id: 'OBD.component.PreCheck.preCheck.CheckCompleted',
+                defaultMessage: '检查完成',
               })
+              : intl.formatMessage({
+                id: 'OBD.component.PreCheck.preCheck.Checking',
+                defaultMessage: '检查中',
+              })
+            : intl.formatMessage({
+              id: 'OBD.component.PreCheck.preCheck.CheckFailed',
+              defaultMessage: '检查失败',
+            })
         }
         gutter={16}
         className="card-padding-bottom-24"
@@ -243,10 +267,14 @@ export default function PreCehckComponent({
             <Button
               className={styles.preCheckBtn}
               disabled={
-                checkStatus &&
-                (!checkFinished || createLoading || preCheckLoading)
+                isRetryChecking ||
+                createLoading ||
+                preCheckLoading ||
+                preCheckOmsLoading ||
+                (checkStatus && !checkFinished)
               }
-              onClick={() => handleRetryCheck()}
+              loading={isRetryChecking || createLoading || preCheckLoading || preCheckOmsLoading}
+              onClick={handleRetryCheckClick}
               data-aspm-click="c307513.d317293"
               data-aspm-desc={intl.formatMessage({
                 id: 'OBD.component.PreCheck.preCheck.PreCheckResultReCheck',
@@ -275,9 +303,9 @@ export default function PreCehckComponent({
                 percent={
                   statusData?.finished
                     ? NP.times(
-                        NP.divide(statusData?.finished, statusData?.total!),
-                        100,
-                      )
+                      NP.divide(statusData?.finished, statusData?.total!),
+                      100,
+                    )
                     : 0
                 }
                 status={checkStatus ? progressStatus : 'exception'}
@@ -295,9 +323,8 @@ export default function PreCehckComponent({
                     return (
                       <Timeline.Item
                         key={index}
-                        id={`${
-                          timelineData?.isRunning ? 'running-timeline-item' : ''
-                        }`}
+                        id={`${timelineData?.isRunning ? 'running-timeline-item' : ''
+                          }`}
                         color={statusColorConfig[timelineData?.result]}
                         dot={
                           timelineData?.result ? (
@@ -333,7 +360,7 @@ export default function PreCehckComponent({
           headStyle={{ paddingLeft: '16px', paddingRight: '16px' }}
           extra={
             <Space size={4}>
-              {hasManual ? (
+              {type !== 'OMS' && hasManual ? (
                 <Checkbox
                   onChange={(e) => setOnlyManual(e.target.checked)}
                   disabled={!checkFinished || statusData?.all_passed}
@@ -344,29 +371,31 @@ export default function PreCehckComponent({
                   })}
                 </Checkbox>
               ) : null}
-              <Button
-                className={
-                  !checkFinished || !hasAuto
-                    ? styles.disabledPreCheckBtn
-                    : styles.preCheckBtn
-                }
-                type="primary"
-                disabled={!checkFinished || !hasAuto}
-                onClick={handleAutoRepair}
-                loading={recoverLoading}
-                data-aspm-click="c307513.d317292"
-                data-aspm-desc={intl.formatMessage({
-                  id: 'OBD.component.PreCheck.preCheck.PreCheckResultAutomaticRepair',
-                  defaultMessage: '预检查结果-自动修复',
-                })}
-                data-aspm-param={``}
-                data-aspm-expo
-              >
-                {intl.formatMessage({
-                  id: 'OBD.component.PreCheck.preCheck.AutomaticRepair',
-                  defaultMessage: '自动修复',
-                })}
-              </Button>
+              {type !== 'OMS' && (
+                <Button
+                  className={
+                    !checkFinished || !hasAuto
+                      ? styles.disabledPreCheckBtn
+                      : styles.preCheckBtn
+                  }
+                  type="primary"
+                  disabled={!checkFinished || !hasAuto}
+                  onClick={handleAutoRepair}
+                  loading={recoverLoading}
+                  data-aspm-click="c307513.d317292"
+                  data-aspm-desc={intl.formatMessage({
+                    id: 'OBD.component.PreCheck.preCheck.PreCheckResultAutomaticRepair',
+                    defaultMessage: '预检查结果-自动修复',
+                  })}
+                  data-aspm-param={``}
+                  data-aspm-expo
+                >
+                  {intl.formatMessage({
+                    id: 'OBD.component.PreCheck.preCheck.AutomaticRepair',
+                    defaultMessage: '自动修复',
+                  })}
+                </Button>
+              )}
             </Space>
           }
         >
@@ -500,8 +529,6 @@ export default function PreCehckComponent({
         </ProCard>
       </ProCard>
       <CustomFooter>
-        {' '}
-        <ExitBtn />
         <Button onClick={prevStep} disabled={checkStatus && !checkFinished}>
           {intl.formatMessage({
             id: 'OBD.component.PreCheck.preCheck.PreviousStep',
@@ -534,6 +561,7 @@ export default function PreCehckComponent({
             })}
           </Button>
         )}
+        <ExitBtn />
       </CustomFooter>
     </Space>
   );

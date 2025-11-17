@@ -180,9 +180,9 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/
 mkdir -p ${RPM_BUILD_ROOT}/usr/obd/lib/executer
 \cp -rf ${RPM_DIR}/executer27 ${RPM_BUILD_ROOT}/usr/obd/lib/executer/
 \cp -rf $BUILD_DIR/SOURCES/example ${RPM_BUILD_ROOT}/usr/obd/
-cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone && ln -s oceanbase-libs oceanbase-standalone-libs && ln -s oceanbase-libs oceanbase-ce-libs && ln -s oceanbase-ce-utils oceanbase-standalone-utils && ln -sf ocp-server ocp-server-ce && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/
+cd ${RPM_BUILD_ROOT}/usr/obd/plugins && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone && ln -s oceanbase-libs oceanbase-standalone-libs && ln -s oceanbase-libs oceanbase-ce-libs && ln -s oceanbase-ce-utils oceanbase-standalone-utils && ln -sf ocp-server ocp-server-ce && ln -s obbinlog-ce obbinlog && \cp -rf obproxy/* obproxy-ce/ && \cp -rf $SRC_DIR/plugins/obproxy-ce/* obproxy-ce/ && ln -sf oms oms-ce
 mv obproxy/3.1.0 obproxy/3.2.1
-cd ${RPM_BUILD_ROOT}/usr/obd/workflows && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone && ln -sf ocp-server ocp-server-ce && ln -sf obproxy obproxy-ce
+cd ${RPM_BUILD_ROOT}/usr/obd/workflows && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone && ln -sf ocp-server ocp-server-ce && ln -sf obproxy obproxy-ce && ln -s obbinlog-ce obbinlog && ln -sf oms oms-ce
 mv obproxy/3.1.0 obproxy/3.2.1
 cd ${RPM_BUILD_ROOT}/usr/obd/config_parser && ln -s oceanbase oceanbase-ce && ln -s oceanbase oceanbase-standalone
 cd ${RPM_BUILD_ROOT}/usr/obd/optimize && ln -s obproxy obproxy-ce

@@ -46,12 +46,10 @@ export function getDocs(getLocale) {
   const OBD_STANDALONE_DOCS =
     getLocale() === 'zh-CN' ? OBD_STANDALONE_DOCS_CN : OBD_STANDALONE_DOCS_EN;
 
-  //OCP Express
-  const OCP_EXPRESS_CN =
-    'https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000001050397';
-  const OCP_EXPRESS_EN =
-    'https://en.oceanbase.com/docs/common-oceanbase-database-10000000001375615';
-  const OCP_EXPRESS = getLocale() === 'zh-CN' ? OCP_EXPRESS_CN : OCP_EXPRESS_EN;
+  // OMS
+  const OMS_DOCS_CN = 'https://www.oceanbase.com/docs/oms-cn';
+  const OMS_DOCS_EN = 'https://en.oceanbase.com/docs/oms-en';
+  const OMS_DOCS = getLocale() === 'zh-CN' ? OMS_DOCS_CN : OMS_DOCS_EN;
 
   //OCP
   const OCP_DOCS_CN = 'https://www.oceanbase.com/docs/ocp';
@@ -116,7 +114,6 @@ export function getDocs(getLocale) {
     FORUMS_VISITED,
     HELP_CENTER,
     OBD_DOCS,
-    OCP_EXPRESS,
     OCP_DOCS,
     OBAGENT_DOCS,
     OBPROXY_DOCS,
@@ -129,5 +126,6 @@ export function getDocs(getLocale) {
     DOCS_GRAFANA,
     DOCS_PROMETHEUS,
     OBD_STANDALONE_DOCS,
+    OMS_DOCS,
   };
 }

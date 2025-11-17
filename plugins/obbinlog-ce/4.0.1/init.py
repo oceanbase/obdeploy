@@ -14,7 +14,8 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function
 
-from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
+from _errno import EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY, EC_OBBINLOG_CE_WITH_OCENABASE_CE, EC_OBBINLOG_WITH_OCENABASE
+from const import COMP_OBBINLOG_CE, COMP_OB_CE, COMP_OBBINLOG, COMP_OB, COMP_OB_STANDALONE
 
 
 def init(plugin_context, source_option=None, *args, **kwargs):
@@ -31,6 +32,21 @@ def init(plugin_context, source_option=None, *args, **kwargs):
     force = getattr(plugin_context.options, 'force', False)
     clean = getattr(plugin_context.options, 'clean', False)
     stdio.start_loading('Initializes %s work home' % cluster_config.name)
+    depends = cluster_config.depends
+    binlog_repository = kwargs.get('repository')
+    
+    if binlog_repository.name == COMP_OBBINLOG_CE and (COMP_OB in depends or COMP_OB_STANDALONE in depends):
+        stdio.error(EC_OBBINLOG_CE_WITH_OCENABASE_CE)
+        stdio.stop_loading('fail')
+        return plugin_context.return_false()
+    elif binlog_repository.name == COMP_OBBINLOG and COMP_OB_CE in depends:
+        stdio.error(EC_OBBINLOG_WITH_OCENABASE)
+        stdio.stop_loading('fail')
+        return plugin_context.return_false()
+    if binlog_repository.name == COMP_OBBINLOG and binlog_repository.version < '4.3.2':
+        stdio.error("Currently only supports deployment of obbinlog version 4.3.2 and above")
+        stdio.stop_loading('fail')
+        return plugin_context.return_false()
 
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)

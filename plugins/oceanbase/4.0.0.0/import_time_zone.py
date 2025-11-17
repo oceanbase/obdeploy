@@ -74,7 +74,7 @@ def import_time_zone(plugin_context, config_encrypted, create_tenant_options=[],
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
     if scale_out_component in const.COMPS_OCP + ['ocp-express']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
-    if scale_out_component in ['obbinlog-ce']:
+    if scale_out_component in ['obbinlog-ce', 'obbinlog']:
         multi_options = plugin_context.get_return('parameter_pre', spacename=scale_out_component).get_return('create_tenant_options')
     cursors = []
     if plugin_context.get_variable('tenant_exists'):
