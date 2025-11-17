@@ -81,7 +81,7 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
             client = clients[server]
             if not check_nfs_path(all_path, client):
                 if len(plugin_context.cluster_config.servers) > 1:
-                    stdio.error("data_backup_uri and archive_log_uri must in the nfs.")
+                    stdio.error("data_backup_uri and archive_log_uri on a remote storage medium is a must, Please change the above parameters.")
                     return False
             return True
 

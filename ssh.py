@@ -249,7 +249,6 @@ class LocalClient(SafeStdio):
             stdio.exception('')
             return False
 
-
     @staticmethod
     def get_file(local_path, remote_path, stdio=None):
         return LocalClient.put_file(remote_path, local_path, stdio=stdio)
@@ -326,6 +325,7 @@ class SshClient(SafeStdio):
         self.result_queue = None
         self._is_local = self.is_local()
         self._disable_local = False
+        self.get_pty = False
         if self._is_local:
             self.env = {}
         else:
@@ -358,6 +358,12 @@ class SshClient(SafeStdio):
                     stdio.critical(err)
                     return err
         self._disable_local = True
+
+    def remote_client_get_tpy(self, stdio=None):
+        self.get_pty = True
+
+    def remote_client_no_tpy(self, stdio=None):
+        self.get_pty = False
 
     def enable_local(self):
         self._disable_local = False
@@ -478,7 +484,7 @@ class SshClient(SafeStdio):
         if not self._login(stdio):
             return SshReturn(255, '', 'connect failed')
         try:
-            stdin, stdout, stderr = self.ssh_client.exec_command(command, timeout=timeout)
+            stdin, stdout, stderr = self.ssh_client.exec_command(command, timeout=timeout, get_pty=self.get_pty)
             output = stdout.read().decode(errors='replace')
             error = stderr.read().decode(errors='replace')
             if output:
@@ -858,13 +864,16 @@ def create_sudo_privileges_client(stdio, level, host, msg, port=22):
         getattr(stdio, level)(msg)
         return None
 
-def get_root_permission_client(client4plugin, server, stdio):
+def get_root_permission_client(client4plugin, server, stdio, **kwargs):
     client = client4plugin.client
     if is_root_user(client):
         return client 
     ret = client.execute_command('echo %s | sudo -S whoami' % client.config.password)
     if not ret:
         if not client.config.password:
+            if kwargs.get("source_type") == "obd_web":
+                stdio.error("%s does not have sudo password-free permissions set" % server)
+                return None
             user_password = getpass.getpass('%s: please input %s password: ' % (server, client.config.username))
             user_config = SshConfig(host=client.config.host, port=client.config.port, username=client.config.username, password=user_password)
             user_client = SshClient(user_config, stdio=stdio)

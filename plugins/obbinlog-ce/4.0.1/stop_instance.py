@@ -24,7 +24,8 @@ def stop_instance(plugin_context, binlog_cursor=None, *args, **kwargs):
     stdio = plugin_context.stdio
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-    binlog_cursor = plugin_context.get_return('connect', spacename=const.COMP_OBBINLOG_CE).get_return('binlog_cursor') if not binlog_cursor else binlog_cursor
+    binlog_repository = kwargs.get('repository')
+    binlog_cursor = plugin_context.get_return('connect', spacename=binlog_repository.name).get_return('binlog_cursor') if not binlog_cursor else binlog_cursor
 
     sql = 'SHOW BINLOG INSTANCES'
     stdio.start_loading('Stop binlog instance')

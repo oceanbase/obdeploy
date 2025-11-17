@@ -21,6 +21,7 @@ import _errno as err
 from _rpm import Version
 
 from tool import get_port_socket_inode
+from const import COMP_OBBINLOG_CE, COMP_OBBINLOG, COMP_OB, COMP_OB_CE, COMP_OB_STANDALONE, COMPS_ODP, COMPS_OB
 
 
 stdio = None
@@ -73,7 +74,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
         }
         if work_dir_check:
             check_status[server]['dir'] = err.CheckStatus()
-        for comp in ["oceanbase", "oceanbase-ce"]:
+        for comp in COMPS_OB:
             if comp in cluster_config.depends:
                 check_status[server]['username'] = err.CheckStatus()
                 check_status[server]['password'] = err.CheckStatus()
@@ -85,11 +86,11 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
     stdio.verbose('oceanbase version check')
     versions_check = {
         "oceanbase version": {
-            'comps': ['oceanbase', 'oceanbase-ce'],
+            'comps': COMPS_OB,
             'min_version': Version('4.2.1')
         },
         "obproxy version": {
-            'comps': ['obproxy', 'obproxy-ce'],
+            'comps': COMPS_ODP,
             'min_version': Version('4.2.1')
         }
     }
@@ -97,6 +98,13 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
     repo_versions = {}
     for repository in plugin_context.repositories:
         repo_versions[repository.name] = repository.version
+
+    binlog_repository = kwargs.get('repository')
+    depends = cluster_config.depends
+    if binlog_repository.name == COMP_OBBINLOG_CE and (COMP_OB in depends or COMP_OB_STANDALONE in depends):
+        critical("oceanbase version", err.EC_OBBINLOG_CE_WITH_OCENABASE_CE)
+    if binlog_repository.name == COMP_OBBINLOG and COMP_OB_CE in depends:
+        critical("oceanbase version", err.EC_OBBINLOG_WITH_OCENABASE)
 
     for check_item in versions_check:
         for comp in versions_check[check_item]['comps']:
@@ -111,7 +119,7 @@ def start_check(plugin_context, init_check_status=False, strict_check=False, wor
                 critical(check_item, err.EC_OBLOGPROXY_DEPENDS_COMP_VERSION.format(oblogproxy_version=cluster_config.version, comp=comp, comp_version=min_version))
     
     global_config = cluster_config.get_original_global_conf()
-    for comp in ["oceanbase", "oceanbase-ce"]:
+    for comp in COMPS_OB:
         if comp in cluster_config.depends:
             for key in ['ob_sys_username', 'ob_sys_password']:
                 if key in global_config:

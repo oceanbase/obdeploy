@@ -1,9 +1,12 @@
 import { useRef, useEffect } from 'react';
 
 import styles from './index.less';
-import bannerImg from '../../../public/assets/welcome/banner.png';
+import updatebBanner from '../../../public/assets/welcome/updateBanner.svg';
+import installBanner from '../../../public/assets/welcome/installBanner.svg';
 
-export default function Banner({title}:{title:string}) {
+export default function Banner({ title, isUpgrade }: { title: string, isUpgrade: boolean }) {
+  const bannerImg = isUpgrade ? updatebBanner : installBanner;
+
   const bannerRef = useRef<HTMLImageElement>(null);
   const welcomeTextRef = useRef<HTMLDivElement>(null);
   const windowResize = () => {
@@ -35,7 +38,7 @@ export default function Banner({title}:{title:string}) {
         alt="banner"
       />
       <div ref={welcomeTextRef} className={styles.title}>
-       {title}
+        {title}
       </div>
     </div>
   );

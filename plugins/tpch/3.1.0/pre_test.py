@@ -26,7 +26,7 @@ except:
 from ssh import LocalClient
 from tool import DirectoryUtil
 from _types import Capacity
-from const import TOOL_TPCH, COMP_OBCLIENT
+from const import TOOL_TPCH, COMP_OBCLIENT, COMP_OB_SEEKDB
 
 def file_path_check(bin_path, tool_name, tool_path, cmd, stdio):
     result = None
@@ -62,6 +62,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
     clients = plugin_context.clients
+    repository = kwargs.get("repository")
 
     local_dir, _ = os.path.split(__file__)
     dbgen_bin = get_option('dbgen_bin', 'dbgen')
@@ -69,7 +70,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     scale_factor = get_option('scale_factor', 1)
     disable_transfer = get_option('disable_transfer', False)
     remote_tbl_dir = get_option('remote_tbl_dir')
-    tenant_name = get_option('tenant', 'test')
+    tenant_name = get_option('tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
     host = get_option('host', '127.0.0.1')
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
@@ -79,7 +80,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     cursor = connect_cursor.get_return("cursor") if not cursor else cursor
     port = cursor.db.port
 
-    if tenant_name == 'sys':
+    if tenant_name == 'sys' and repository.name != COMP_OB_SEEKDB:
         stdio.error('DO NOT use sys tenant for testing.')
         return
 

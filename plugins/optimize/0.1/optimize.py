@@ -15,6 +15,7 @@
 from __future__ import absolute_import, division, print_function
 
 from ssh import LocalClient
+from const import COMPS_OB, COMP_OB_SEEKDB, COMPS_ODP
 
 
 def optimize(plugin_context, optimize_config, stage, optimize_envs=None, *args, **kwargs):
@@ -40,7 +41,7 @@ def optimize(plugin_context, optimize_config, stage, optimize_envs=None, *args, 
     restart_components = []
     optimize_envs['optimize_entrances_done'] = optimize_envs.get('optimize_entrances_done', {})
     for component in components:
-        if component in ['oceanbase', 'oceanbase-ce', 'oceanbase-standalone', 'obproxy', 'obproxy-ce']:
+        if component in COMPS_OB + [COMP_OB_SEEKDB] + COMPS_ODP:
             connect = plugin_context.get_return('connect', spacename=component)
             if not connect:
                 continue

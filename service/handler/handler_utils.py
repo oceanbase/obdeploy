@@ -14,6 +14,7 @@
 # limitations under the License.
 from service.handler.component_handler import ComponentHandler
 from service.handler.deployment_handler import DeploymentHandler
+from service.handler.oms_handler import OmsHandler
 from service.handler.service_info_handler import ServiceInfoHandler
 from service.handler.comment_handler import CommonHandler
 from service.handler.mirror_handler import MirrorHandler
@@ -66,4 +67,12 @@ def new_rsa_handler():
 
 def new_telemetry_handler():
     return TelemetryHandler()
+
+
+def new_oms_handler():
+    return OmsHandler()
+
+
+def new_connect_handler():
+    return OmsHandler()
 

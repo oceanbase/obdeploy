@@ -22,6 +22,7 @@ from glob import glob
 
 import tool
 from mysqltest_lib import succtest
+from const import COMP_OB_SEEKDB
 
 
 def find_tag_test_with_file_pat(file_pattern, flag_pattern, tag, filelist):
@@ -131,16 +132,18 @@ def check_test(plugin_context, env, *args, **kwargs):
         if opt["component"].startswith("obproxy"):
             opt["filter"] = 'proxy'
         else:
-            test_zone = cluster_config.get_server_conf(opt['test_server'])['zone']
-            query = plugin_context.get_variable('query_sql')
-            cursor = plugin_context.get_return('connect').get_return('cursor')
-            ret = cursor.fetchone(query)
-            if ret is False:
-                return
-            if ret:
-                primary_zone = ret.get('zone', '')
-            if test_zone != primary_zone:
-                opt["filter"] = 'slave'
+            repository = kwargs.get("repository")
+            if repository.name != COMP_OB_SEEKDB:
+                test_zone = cluster_config.get_server_conf(opt['test_server'])['zone']
+                query = plugin_context.get_variable('query_sql')
+                cursor = plugin_context.get_return('connect').get_return('cursor')
+                ret = cursor.fetchone(query)
+                if ret is False:
+                    return
+                if ret:
+                    primary_zone = ret.get('zone', '')
+                if test_zone != primary_zone:
+                    opt["filter"] = 'slave'
     if regress_suites:
         suite2tags = get_variable_from_python_file(opt.get('regress_suite_map'), 'suite2tags', default_file='regress_suite_map.py', default_value={}, stdio=stdio)
         composite_suite = get_variable_from_python_file(opt.get('regress_suite_map'), 'composite_suite', default_file='regress_suite_map.py', default_value={}, stdio=stdio)

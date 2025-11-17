@@ -449,14 +449,6 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
           </ProCard>
         </ProCard>
         <CustomFooter>
-          <Button
-            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
-          >
-            {intl.formatMessage({
-              id: 'OBD.pages.ComponentDeploy.DeployConfig.Exit',
-              defaultMessage: '退出',
-            })}
-          </Button>
           <Button onClick={preStep}>
             {intl.formatMessage({
               id: 'OBD.pages.ComponentDeploy.DeployConfig.PreviousStep',
@@ -471,6 +463,14 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
             {intl.formatMessage({
               id: 'OBD.pages.ComponentDeploy.DeployConfig.NextStep',
               defaultMessage: '下一步',
+            })}
+          </Button>
+          <Button
+            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
+          >
+            {intl.formatMessage({
+              id: 'OBD.pages.ComponentDeploy.DeployConfig.Exit',
+              defaultMessage: '退出',
             })}
           </Button>
         </CustomFooter>

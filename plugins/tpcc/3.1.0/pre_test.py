@@ -23,7 +23,7 @@ from ssh import LocalClient
 from tool import DirectoryUtil
 
 from ssh import LocalClient
-from const import TOOL_TPCC, TOOL_TPCC_BENCHMARKSQL, COMP_OBCLIENT, COMP_JRE
+from const import TOOL_TPCC, TOOL_TPCC_BENCHMARKSQL, COMP_OBCLIENT, COMP_JRE, COMP_OB_SEEKDB
 from tool import get_option
 
 PROPS4OB_TEMPLATE = """
@@ -67,15 +67,16 @@ def file_path_check(bin_path, tool_name, tool_path, cmd, stdio):
 def pre_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
+    repository = kwargs.get("repository")
 
     tmp_dir = os.path.abspath(get_option(options, 'tmp_dir', './tmp'))
-    tenant_name = get_option(options, 'tenant', 'test')
+    tenant_name = get_option(options, 'tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
 
     sys_namespace = kwargs.get("sys_namespace")
     get_db_and_cursor = kwargs.get("get_db_and_cursor")
     db, cursor = get_db_and_cursor(sys_namespace)
 
-    if tenant_name == 'sys':
+    if tenant_name == 'sys' and repository.name != COMP_OB_SEEKDB:
         stdio.error('DO NOT use sys tenant for testing.')
         return
 

@@ -25,5 +25,6 @@ def run_test(plugin_context, workflow, *args, **kwargs):
             repository = tmp_repository
             break
 
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'tpcc', repository.version, {"repository": repository}, 'run_test')
+    target_repository_version = '4.0.0.0' if repository.name == const.COMP_OB_SEEKDB else repository.version
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'tpcc', target_repository_version, {"repository": repository}, 'run_test')
     return plugin_context.return_true()

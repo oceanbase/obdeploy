@@ -20,7 +20,7 @@ import re
 import _errno as err
 from _arch import getBaseArch
 from _rpm import Version
-from tool import get_port_socket_inode, contains_duplicate_nodes
+from tool import get_port_socket_inode, contains_duplicate_nodes, is_root_user
 
 
 def environment_check(plugin_context, work_dir_empty_check=True, generate_configs={}, *args, **kwargs):
@@ -146,11 +146,18 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
         elif ('arm' in basearch or 'aarch' in basearch) and len(re.findall(r'(^atomics\s+)|(\s+atomics\s+)|(\s+atomics$)', client.execute_command('lscpu | grep atomics').stdout)) == 0 and 'nonlse' not in repository.release:
             critical(server, 'cpu', err.EC_CPU_NOT_SUPPORT_INSTRUCTION_SET.format(server=server, instruction_set='atomics'), [err.SUG_CHANGE_SERVER.format()])
 
-    if server_config.get('enable_auto_start', False):
-        if not client.execute_command("systemctl status dbus"):
-            critical(server, 'auto start', err.EC_OBSERVER_AUTO_START_DBUS_ENV.format(service=server), [err.SUG_CHANGE_SERVER.format()])
-        if contains_duplicate_nodes(cluster_config.servers):
-            critical(server, 'auto start', 'Multiple observer nodes on the same server are not supported by the auto start feature', [err.SUG_CHANGE_SERVER.format()])
+        if server_config.get('enable_auto_start', False):
+            if not client.execute_command("systemctl status dbus"):
+                critical(server, 'auto start', err.EC_OBSERVER_AUTO_START_DBUS_ENV.format(service=server), [err.SUG_CHANGE_SERVER.format()])
+            if contains_duplicate_nodes(cluster_config.servers):
+                critical(server, 'auto start', err.EC_MULTIPLE_NODES_SAME, [err.SUG_CHANGE_SERVER.format()])
+            source_type = kwargs.get('source_type')
+            if source_type == "obd_web":
+                if is_root_user(client):
+                    continue
+                ret = client.execute_command('echo %s | sudo -S whoami' % client.config.password)
+                if not ret:
+                    critical(server, 'auto start', err.EC_OBSERVER_WEB_AUTO_START.format(user=client.config.username, ip=server.ip), [err.SUG_SUDO_PRIVILEGE.format(user=client.config.username, ip=server.ip)])
 
     if success:
         for ip in servers_net_interface:

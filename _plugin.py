@@ -404,6 +404,7 @@ class ParamPlugin(Plugin):
             need_reload=False,
             need_restart=False,
             need_redeploy=False,
+            read_only=False,
             modify_limit=None,
             name_local=None,
             description_en=None,
@@ -417,6 +418,7 @@ class ParamPlugin(Plugin):
             self.need_reload = need_reload
             self.need_restart = need_restart
             self.need_redeploy = need_redeploy
+            self.read_only = read_only
             self._param_type = param_type
             self.min_value = param_type(min_value) if min_value is not None else None
             self.max_value = param_type(max_value) if max_value is not None else None
@@ -521,6 +523,7 @@ class ParamPlugin(Plugin):
                                 need_reload=ConfigUtil.get_value_from_dict(conf, 'need_reload', False),
                                 need_restart=ConfigUtil.get_value_from_dict(conf, 'need_restart', False),
                                 need_redeploy=ConfigUtil.get_value_from_dict(conf, 'need_redeploy', False),
+                                read_only=ConfigUtil.get_value_from_dict(conf, 'read_only', False),
                                 description_en=ConfigUtil.get_value_from_dict(conf, 'description_en', None),
                                 description_local=ConfigUtil.get_value_from_dict(conf, 'description_local', None),
                             )

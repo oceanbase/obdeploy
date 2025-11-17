@@ -1,5 +1,6 @@
 .guideContainer {
   height: 100%;
+
   .content {
     position: relative;
     z-index: 10;
@@ -11,10 +12,12 @@
     background-color: rgba(245, 248, 254, 1);
     box-sizing: border-box;
   }
+
   .disableCustomCardContainer {
     background-color: #f5f8fe;
     // pointer-events: none;
   }
+
   .disableCustomCardContainer,
   .customCardContainer {
     box-sizing: border-box;
@@ -25,17 +28,20 @@
     border: none;
     align-items: center;
     padding: 35px 0 18px 0;
+
     .cardHeader {
       display: flex;
       justify-content: center;
       align-items: center;
       margin-bottom: 8px;
       flex-direction: column;
+
       .cardImg {
         height: 60px;
         width: 60px;
         margin-bottom: 8px;
       }
+
       .cardTitle,
       .disableCardTitle {
         margin-left: 8px;
@@ -43,10 +49,12 @@
         font-size: 18px;
         line-height: 18px;
       }
+
       .disableCardTitle {
         color: #cdd5e4;
       }
     }
+
     .cardDetail,
     .disableCardDetail {
       font-weight: 400;
@@ -55,6 +63,7 @@
       text-align: center;
       color: #8592ad;
     }
+
     .disableCardDetail {
       color: #cdd5e4;
     }
@@ -62,7 +71,9 @@
     &.customCardSelect {
       color: #006aff !important;
       border: 2px solid #006aff;
+
       :global {
+
         .ant-result-title,
         .ant-result-subtitle {
           color: #006aff !important;
@@ -70,6 +81,7 @@
       }
     }
   }
+
   .pageFooterContainer {
     position: fixed;
     right: 0;
@@ -79,15 +91,14 @@
     padding: 16px;
     background-color: #f5f8ff;
     border-top: 1px solid #dde4ed;
+
     .pageFooter {
       width: 1040px;
       margin: 0 auto;
       overflow: hidden;
-      .foolterAction {
-        float: right;
-      }
     }
   }
+
   .guideBtn {
     display: block;
     margin: auto;
@@ -96,6 +107,7 @@
     left: 0;
     right: 0;
   }
+
   .guideBtnUS {
     display: block;
     margin: auto;
@@ -104,16 +116,19 @@
     left: 0;
     right: 0;
   }
+
   :global {
     .ant-dropdown-menu {
       width: 189px !important;
     }
   }
 }
+
 .cardDetailText {
   color: #8592ad;
   margin-bottom: 0px;
 }
+
 .cardDetailTitle {
   margin-bottom: 0px;
 }

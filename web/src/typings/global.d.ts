@@ -19,7 +19,6 @@ declare namespace API {
   interface Components {
     oceanbase?: any;
     obproxy?: any;
-    ocpexpress?: any;
     obagent?: any;
     ocpserver?: any;
     obconfigserver?:any;
@@ -53,9 +52,7 @@ declare namespace API {
   interface ComponentsVersionInfo {
     oceanbase?: any;
     obproxy?: any;
-    ocpexpress?: any;
     obagent?: any;
-    ['ocp-express']?: any;
     ['ob-configserver']?: any;
   }
 

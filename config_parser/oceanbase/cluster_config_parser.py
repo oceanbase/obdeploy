@@ -86,7 +86,9 @@ class ClusterConfigParser(ConfigParser):
             ConfigUtil.get_value_from_dict(conf, 'version', None, str),
             ConfigUtil.get_value_from_dict(conf, 'tag', None, str),
             ConfigUtil.get_value_from_dict(conf, 'release', None, str),
-            ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str)
+            ConfigUtil.get_value_from_dict(conf, 'package_hash', None, str),
+            ConfigUtil.get_value_from_dict(conf, 'type', 'rpm', str),
+            ConfigUtil.get_value_from_dict(conf, 'image_name', 'None', str)
         )
         if added_servers:
             cluster_config.added_servers = added_servers

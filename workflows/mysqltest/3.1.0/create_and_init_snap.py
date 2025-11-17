@@ -22,14 +22,15 @@ import const
 def create_and_init_snap(plugin_context, workflow, repository, *args, **kwargs):
     env = plugin_context.namespace.get_variable("env")
     target_repository = repository
+    target_repository_version = '4.0.0.0' if target_repository.name == const.COMP_OB_SEEKDB else target_repository.version
     snap_configs = kwargs.get('snap_configs')
     home_path = os.path.join(os.environ.get(const.CONST_OBD_HOME, os.getenv('HOME')), '.obd')
     fast_reboot = getattr(plugin_context.options, 'fast_reboot', False)
     use_snap = kwargs.get('use_snap')
 
     workflow.add_with_component_version(const.STAGE_FIRST, target_repository.name, target_repository.version, 'connect')
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', target_repository.version, {"repository": target_repository}, 'init_pre')
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', target_repository.version, {"repository": target_repository}, 'init')
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', target_repository_version, {"repository": target_repository}, 'init_pre')
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', target_repository_version, {"repository": target_repository}, 'init')
 
     if fast_reboot and use_snap is False:
         for repository in plugin_context.repositories:
@@ -39,6 +40,6 @@ def create_and_init_snap(plugin_context, workflow, repository, *args, **kwargs):
                 workflow.add_with_component_version_kwargs(const.STAGE_SECOND, repository.name, repository.version, {"home_path": home_path}, 'start')
 
         workflow.add_with_component_version(const.STAGE_THIRD, target_repository.name, target_repository.version, 'connect')
-        workflow.add_with_component_version_kwargs(const.STAGE_THIRD, 'mysqltest', target_repository.version, {"repository": target_repository}, 'init')
+        workflow.add_with_component_version_kwargs(const.STAGE_THIRD, 'mysqltest', target_repository_version, {"repository": target_repository}, 'init')
 
     return plugin_context.return_true()

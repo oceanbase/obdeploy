@@ -14,24 +14,29 @@
   overflow: hidden;
   text-align: center;
   background-color: @welcomeBackgroundColor;
+
   :global {
     .vjs-tech {
       z-index: 1;
     }
+
     .vjs-text-track-display {
       background-color: @welcomeBackgroundColor !important;
     }
   }
+
   .videoContent {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-47%, -43%);
+
     .videoActions {
       position: absolute;
       top: 35%;
       left: 18%;
       z-index: 10;
+
       .h1 {
         margin: 0 !important;
         // font-size: 6vw !important;
@@ -44,6 +49,7 @@
         text-align: left;
         line-height: 48px;
       }
+
       .h2 {
         position: relative;
         left: -0.2vw;
@@ -57,10 +63,12 @@
         letter-spacing: 0;
         text-align: left;
         line-height: 48px;
+
         .letter {
           font-family: SourceSansPro-Semibold, SourceSansPro-Regular;
         }
       }
+
       .desc {
         color: #000000;
         font-weight: 400;
@@ -70,9 +78,11 @@
         text-align: left;
         opacity: 0.65;
       }
+
       .startButtonContainer {
         display: flex;
         text-align: center;
+
         .startButton {
           height: 2.8vw !important;
           margin-top: 2.5vw !important;
@@ -82,10 +92,12 @@
         }
       }
     }
+
     .video {
       width: 100%;
       background-color: @welcomeBackgroundColor;
     }
+
     :global {
       .vjs-poster {
         top: 1px !important;
@@ -108,11 +120,13 @@
   left: 0;
   z-index: 99;
   background-color: #f5f8ff;
+
   .stepsContent {
     position: relative;
     width: 700px;
     margin: 0 auto;
     padding-top: 30px;
+
     .stepsBackground {
       position: absolute;
       top: 40px;
@@ -122,10 +136,12 @@
       height: 12px;
       background-color: #e2e8f3;
     }
+
     .stepsBackgroundProgress {
       height: 12px;
       background-image: linear-gradient(-45deg, #006aff 0%, #5189fb 100%);
     }
+
     .stepItem {
       position: relative;
       z-index: 10;
@@ -134,14 +150,17 @@
       height: 60px;
       color: #5c6b8a;
       text-align: center;
+
       .stepTitle {
         position: absolute;
         bottom: 0;
         left: -25px;
         width: 110px;
+
         &.stepAlreadyTitle {
           color: #132039;
         }
+
         &.stepCurrentTitle {
           color: #0055ff;
           font-weight: 500;
@@ -157,12 +176,15 @@
         text-align: center;
         background-color: #fff;
         border-radius: 50%;
-        & > svg {
+
+        &>svg {
           margin-left: -1px !important;
         }
+
         &.stepWaitIcon {
           color: #cdd5e4;
         }
+
         &.stepCurrentIcon {
           width: 28px;
           margin-top: 0;
@@ -179,13 +201,16 @@
     margin-right: 16px;
     font-size: 24px;
   }
+
   .modalTitle {
     vertical-align: top;
   }
+
   :global {
     .ant-modal-content {
       padding: 32px !important;
     }
+
     .ant-modal-title {
       color: #132039 !important;
       font-weight: 500 !important;
@@ -198,10 +223,12 @@
   height: 170px;
   padding-top: 30px;
   text-align: center;
+
   .deleteDeployText {
     font-weight: 500;
     font-size: 16px;
   }
+
   .deleteDeployProgress {
     margin-top: 32px;
   }
@@ -213,9 +240,11 @@
       padding-right: 0 !important;
       padding-left: 0 !important;
     }
+
     .ant-col.ant-col-12:nth-child(2n + 1) {
       padding-right: @smallSpace !important;
     }
+
     .ant-col.ant-col-12:nth-child(2n) {
       padding-left: @smallSpace !important;
     }
@@ -225,6 +254,7 @@
 .pageCard {
   box-shadow: 0 2px 4px 0 rgba(19, 32, 57, 0.02),
     0 1px 6px -1px rgba(19, 32, 57, 0.02), 0 1px 2px 0 rgba(19, 32, 57, 0.03);
+
   :global {
     .ant-space-item {
       .ant-col {
@@ -245,15 +275,18 @@
 .deployTypeCardContailer {
   display: inline-block;
   width: 216px;
+
   :global {
     .ant-card-body {
       line-height: 22px !important;
     }
   }
+
   .deployTypeCard {
     font-size: 18px;
     text-align: center;
     cursor: pointer;
+
     &.selectedDeployTypeCard {
       font-weight: 500;
       border: 2px solid #006aff;
@@ -269,6 +302,7 @@
     margin-top: @smallSpace;
     color: @greyTextColor;
     visibility: hidden;
+
     &.selectedTypeDesc {
       visibility: visible;
     }
@@ -286,6 +320,7 @@
   line-height: 22px;
   vertical-align: middle;
   border-radius: 50%;
+
   .icon {
     position: absolute;
     top: 2px;
@@ -320,14 +355,17 @@
 .componentCard {
   margin-bottom: 16px !important;
   background-color: @cardBackgroundColor !important;
+
   :global {
     .ant-pro-card-body {
       padding: 0 !important;
     }
   }
+
   &.disabledCard {
     opacity: 0.4;
   }
+
   &:last-child {
     margin-bottom: 0 !important;
   }
@@ -348,6 +386,7 @@
   top: 143px;
   width: 100%;
   height: 22px;
+
   .modeExtraContent {
     position: absolute;
     top: -22px;
@@ -365,6 +404,7 @@
 .infoSubCard {
   overflow: hidden;
   border-radius: 8px;
+
   .pwdIcon {
     position: absolute;
     top: 2px;
@@ -372,6 +412,7 @@
     color: #8592ad;
     font-size: 17px;
   }
+
   :global {
     .ant-pro-card .ant-pro-card-body {
       padding-top: 4px !important;
@@ -381,16 +422,20 @@
     .ant-pro-card-header {
       background-color: @cardBackgroundColor !important;
     }
+
     .ant-pro-card-title {
-      color: @subTitleColor !important ;
+      color: @subTitleColor !important;
       font-weight: normal !important;
       font-size: 14px !important;
     }
+
     .ant-pro-card-body {
       color: #132039 !important;
     }
+
     .ant-pro-card-col.ant-pro-card-split-vertical {
       border-inline-end: none !important;
+
       .ant-pro-card::before {
         position: absolute;
         top: 50%;
@@ -403,8 +448,10 @@
         inset-inline-end: 0;
       }
     }
+
     .ant-col {
       border-inline-end: none !important;
+
       .ant-pro-card::before {
         position: absolute;
         top: 50%;
@@ -418,6 +465,7 @@
       }
     }
   }
+
   .targetCard::before {
     display: none !important;
   }
@@ -439,17 +487,20 @@
 .preCheckSubCard {
   height: 400px;
   background-color: @cardBackgroundColor;
+
   :global {
     .ant-pro-card-body {
       padding-top: 0 !important;
       padding-right: 0 !important;
       overflow: auto;
     }
+
     .ant-pro-card-header {
       padding-top: 12px !important;
       padding-bottom: 14px !important;
       border-bottom: 1px solid #e2e8f3 !important;
     }
+
     .ant-pro-card-header .ant-pro-card-title {
       font-weight: normal !important;
     }
@@ -460,11 +511,13 @@
     top: 42px;
     left: 0px;
     z-index: 9;
+
     :global {
       .ant-progress-inner {
         height: 1px;
         overflow: visible !important;
         background-color: #e2e8f3 !important;
+
         .ant-progress-bg {
           height: 2px !important;
           border-radius: 0 !important;
@@ -514,6 +567,7 @@
       .ant-timeline-item-last {
         height: 10px !important;
         padding-bottom: 0 !important;
+
         .ant-timeline-item-content {
           min-height: 22px !important;
         }
@@ -530,15 +584,18 @@
   .failedItem {
     padding: 12px 24px;
     border-top: 1px solid #e2e8f3;
+
     &:first-child {
       border-top: none;
     }
+
     .preCheckLearnMore {
       display: inline-block;
       margin-top: 6px;
       margin-left: 60px;
     }
   }
+
   .failedItemIcon {
     position: relative;
     top: -1px;
@@ -546,6 +603,7 @@
     height: 10px;
     margin-left: 0px;
     font-size: 6px;
+
     .icon {
       top: 2px;
       left: 2px;
@@ -585,15 +643,18 @@
 .reportLog {
   background-color: @cardBackgroundColor;
 }
+
 .installLog,
 .reportLog {
   margin: 0 !important;
   overflow: auto;
   color: #8592ad;
 }
+
 .installLog {
   height: 360px;
 }
+
 .reportLog {
   max-width: 1008px;
   min-height: 100px;
@@ -605,11 +666,13 @@
 .preLoading {
   padding-top: 130px;
   text-align: center;
+
   .shapeContainer {
     position: relative;
     left: -6px;
     display: inline-block !important;
   }
+
   .desc {
     margin-top: 16px;
     color: #8592ad;
@@ -620,6 +683,7 @@
   display: flex;
   height: 16px;
   margin: 10px 0 auto;
+
   .shape {
     position: relative;
     display: inline-block;
@@ -628,6 +692,7 @@
     margin-left: 10px;
     background-color: #b3ccff;
     border-radius: 100%;
+
     &:before {
       position: absolute;
       top: 0;
@@ -640,26 +705,34 @@
       content: '';
     }
   }
+
   .shape:nth-child(1) {
     animation-delay: -0.16s;
+
     &::before {
       animation: animate1 1.4s infinite linear;
     }
   }
+
   .shape:nth-child(2) {
     animation-delay: -0.16s;
+
     &::before {
       animation: animate2 1.4s infinite linear;
     }
   }
+
   .shape:nth-child(3) {
     animation-delay: -0.32s;
+
     &::before {
       animation: animate3 1.4s infinite linear;
     }
   }
+
   .shape:nth-child(4) {
     animation-delay: -0.16s;
+
     &::before {
       animation: animate4 1.4s infinite linear;
     }
@@ -668,11 +741,13 @@
 
 .reportTooltip {
   max-width: 520px;
+
   :global {
     .ant-tooltip-arrow {
       color: #fff;
       --antd-arrow-background-color: #fff;
     }
+
     .ant-tooltip-inner {
       width: 520px;
       max-height: 230px;
@@ -693,13 +768,11 @@
   padding: 16px;
   background-color: #f5f8ff;
   border-top: 1px solid #dde4ed;
+
   .pageFooter {
     width: 1040px;
     margin: 0 auto;
     overflow: hidden;
-    .foolterAction {
-      float: right;
-    }
   }
 }
 
@@ -714,15 +787,18 @@
 .componentTable,
 .nodeEditabletable {
   :global {
+
     .ant-table,
-    .ant-table-wrapper .ant-table-thead > tr > th,
-    .ant-table-thead > tr > th {
+    .ant-table-wrapper .ant-table-thead>tr>th,
+    .ant-table-thead>tr>th {
       background-color: rgba(0, 0, 0, 0) !important;
     }
+
     .ant-table {
       color: #132039 !important;
     }
-    .ant-table-thead > tr > th {
+
+    .ant-table-thead>tr>th {
       color: @subTitleColor !important;
       font-weight: normal !important;
     }
@@ -731,11 +807,8 @@
 
 .componentTable {
   :global {
-    .ant-table
-      .ant-table-tbody
-      tr:nth-child(2n + 1):not(.ant-table-placeholder)
-      td {
-      background-color: rgba(0, 0, 0, 0) !important ;
+    .ant-table .ant-table-tbody tr:nth-child(2n + 1):not(.ant-table-placeholder) td {
+      background-color: rgba(0, 0, 0, 0) !important;
     }
   }
 }
@@ -747,11 +820,13 @@
     .ant-table-cell::before {
       width: 0 !important;
     }
-    .ant-table-thead > tr > th {
+
+    .ant-table-thead>tr>th {
       padding-bottom: 0 !important;
       border-bottom: none !important;
     }
-    .ant-table-tbody > tr > td {
+
+    .ant-table-tbody>tr>td {
       vertical-align: top;
     }
   }
@@ -763,21 +838,22 @@
       padding-inline: 0 !important;
       padding-block: 0 !important;
     }
+
     .ant-table-cell {
       padding-left: 0 !important;
       padding-left: 0 !important;
     }
+
     .ant-btn-dashed {
       width: calc(100% - 36px) !important;
       margin-top: 4px !important;
       color: @greyTextColor !important;
     }
-    .ant-table
-      .ant-table-tbody
-      tr:nth-child(2n):not(.ant-table-placeholder)
-      td {
+
+    .ant-table .ant-table-tbody tr:nth-child(2n):not(.ant-table-placeholder) td {
       background-color: #fff !important;
     }
+
     .ant-table .ant-table-tbody tr td {
       padding-top: 11px !important;
       padding-bottom: 11px !important;
@@ -787,7 +863,7 @@
 
 .connectTable {
   :global {
-    .ant-table-thead > tr > th {
+    .ant-table-thead>tr>th {
       padding-left: 0 !important;
     }
   }
@@ -808,6 +884,7 @@
     .ant-select-selector {
       height: 28px !important;
     }
+
     .ant-select-selection-item {
       line-height: 26px !important;
     }
@@ -816,6 +893,7 @@
 
 .paramterInput {
   width: 126px !important;
+
   :global {
     .ant-input {
       height: 28px;
@@ -826,6 +904,7 @@
 .progressEffectContainer {
   position: relative;
   height: 150px;
+
   .deployTitle {
     position: absolute;
     left: 50%;
@@ -833,40 +912,49 @@
     font-size: 16px;
     transform: translateX(-50%);
   }
+
   .computer {
     position: absolute;
     top: 20px;
     left: 195px;
+
     .computerAnimate {
       width: 150px;
     }
   }
+
   .progress {
     position: absolute;
     top: 65px;
     left: 327px;
+
     .progressVedio {
       width: 285px;
       height: 11px;
       background-color: #fff;
+
       :global {
         .vjs-text-track-display {
           background-color: #fff !important;
         }
+
         .vjs-poster {
           top: 1px !important;
           left: 1px !important;
           background-position: 0 0 !important;
           background-size: 100% !important;
         }
+
         .vjs-modal-dialog {
           background: #fff !important;
         }
+
         .vjs-error-display:before {
           content: '' !important;
         }
       }
     }
+
     .progressCover {
       position: absolute;
       top: 2.5px;
@@ -881,14 +969,17 @@
     position: absolute;
     top: 25px;
     left: 310px;
+
     .spacemanAnimate {
       width: 320px;
     }
   }
+
   .database {
     position: absolute;
     top: 20px;
     right: 190px;
+
     .sqlAnimate {
       width: 150px;
     }
@@ -910,6 +1001,7 @@
   padding-top: 160px;
   text-align: center;
   border: none;
+
   .exitPageText {
     font-size: 18px !important;
   }
@@ -934,6 +1026,7 @@
 .descContent {
   display: flex;
   justify-content: space-between;
+
   .learnMore {
     margin-right: 16px;
     color: #006aff !important;

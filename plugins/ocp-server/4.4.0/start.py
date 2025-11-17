@@ -110,7 +110,7 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
                             '--add-opens=java.logging/java.util.logging=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED'
         java_bin = server_config['java_bin']
         client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
-        cmd = f'{java_bin} -Dfile.encoding=UTF-8 {extra_options_str} -jar {jvm_memory_option} {home_path}/lib/ocp-server.jar --bootstrap'
+        cmd = f'{java_bin} -Dfile.encoding=UTF-8 -Docp.host.ip={server} {extra_options_str} -jar {jvm_memory_option} {home_path}/lib/ocp-server.jar --bootstrap'
         jar_cmd = copy.deepcopy(cmd)
         if "log_dir" not in server_config:
             log_dir = os.path.join(home_path, 'log')
@@ -182,8 +182,6 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
                 success = False
                 continue
             client.write_file(server_pid[server], os.path.join(home_path, 'run/ocp-server.pid'))
-            if not multi_process_flag and len(cluster_config.servers) > 1:
-                break
             if len(cluster_config.servers) > 1 and node_num == 1:
                 time.sleep(60)
                 node_num += 1

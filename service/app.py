@@ -26,7 +26,7 @@ from asgi_correlation_id import CorrelationIdMiddleware
 
 from service.common import log
 from service.common.core import CoreManager
-from service.api.v1 import components, deployments, common, service_info, mirror
+from service.api.v1 import components, deployments, common, service_info, mirror, oms_deployments, connect
 from service.middleware.request_response_log import RequestResponseLogMiddleware
 from service.middleware.process_time import ProcessTimeMiddleware
 from service.middleware.ip_white import IPBlockMiddleware
@@ -64,6 +64,8 @@ class OBDWeb(object):
         self.app.include_router(metadb.router, prefix='/api/v1')
         self.app.include_router(installer.router, prefix='/api/v1')
         self.app.include_router(component_change.router, prefix='/api/v1')
+        self.app.include_router(oms_deployments.router, prefix='/api/v1')
+        self.app.include_router(connect.router, prefix='/api/v1')
         self.app.add_middleware(IdleShutdownMiddleware, logger=log.get_logger(), idle_time_before_shutdown=IDLE_TIME_BEFORE_SHUTDOWN)
         self.app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
         self.app.add_middleware(IPBlockMiddleware, ips=white_ip_list)

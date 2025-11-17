@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 from ssh import LocalClient
+from const import COMPS_OB, COMP_OB_SEEKDB, COMPS_ODP
 
 
 def recover(plugin_context, optimize_config, optimize_envs=None, *args, **kwargs):
@@ -28,7 +29,7 @@ def recover(plugin_context, optimize_config, optimize_envs=None, *args, **kwargs
     optimize_envs['optimize_entrances_done'] = optimize_envs.get('optimize_entrances_done', {})
     restart_components = []
     for component, entrances in optimize_envs['optimize_entrances_done'].items():
-        if component in ['oceanbase', 'oceanbase-ce', 'oceanbase-standalone', 'obproxy', 'obproxy-ce']:
+        if component in COMPS_OB + [COMP_OB_SEEKDB] + COMPS_ODP:
             cursor = plugin_context.get_return('connect', spacename=component).get_return('cursor')
         else:
             raise Exception('Invalid component {}'.format(component))

@@ -70,6 +70,7 @@ def obshell_bootstrap(plugin_context, need_bootstrap=None, *args, **kwargs):
         stdio.error('obshell bootstrap failed: %s' % e)
         return plugin_context.return_false()
 
+    plugin_context.set_variable('obshell_client', client)
     stdio.stop_loading('succeed')
 
     return plugin_context.return_true()

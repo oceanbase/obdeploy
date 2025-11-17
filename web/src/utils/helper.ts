@@ -1,6 +1,5 @@
 import {
   PARAMETER_TYPE,
-  selectOcpexpressConfig,
   showConfigKeys,
 } from '@/constant/configuration';
 import { getNoUnitValue, getUnit } from '@/constant/unit';
@@ -33,12 +32,10 @@ export function getTailPath() {
 /**
  *
  * @param dataSource 需要格式化的源数据
- * @param isSelectOcpexpress 是否选中/包含ocpexpress组件
  * 筛选需要展示到页面的参数
  */
 export const formatMoreConfig = (
   dataSource: API.ParameterMeta[],
-  isSelectOcpexpress = true,
 ) => {
   return dataSource.map((item) => {
     const component = componentVersionTypeToComponent[item.component]
@@ -48,13 +45,6 @@ export const formatMoreConfig = (
 
     let configParameter = item?.config_parameters.filter((parameter) => {
       let configKeys = { ...showConfigKeys };
-
-      if (!isSelectOcpexpress) {
-        configKeys.oceanbase = [
-          ...configKeys.oceanbase,
-          ...selectOcpexpressConfig,
-        ];
-      }
       return !configKeys?.[componentConfig.componentKey]?.includes(
         parameter.name,
       );
@@ -105,8 +95,8 @@ export const formatMoreConfig = (
 /**
  * 获取server
  */
-export const getAllServers = (dataSource: API.DBConfig[]) => {
-  const allServersList = dataSource.map((item) => item.servers);
+export const getAllServers = (dataSource: API.DBConfig[], fieldName: string = 'servers') => {
+  const allServersList = dataSource.map((item) => item[fieldName as keyof API.DBConfig] as string[]);
   let newAllOBServer: string[] = [];
   allServersList.forEach((item) => {
     if (item && item.length) {
@@ -555,9 +545,6 @@ export const connectInfoForPwd = (
         )?.value;
       }
       item.connect_url = insertPwd(item.connect_url, item.password);
-    }
-    if (item.component === 'ocp-express' && components.ocpexpress) {
-      item.password = components.ocpexpress?.admin_passwd;
     }
     if (item.component === 'prometheus') {
       item.password = components.prometheus?.basic_auth_users?.admin;

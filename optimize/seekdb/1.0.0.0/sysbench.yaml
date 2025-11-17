@@ -1,0 +1,14 @@
+test:
+  system_config:
+    - name: enable_sql_audit
+      value: 'false'
+    - name: sleep
+      value: 3
+      optimizer: sleep
+    - name: syslog_level
+      value: 'ERROR'
+    - name: enable_perf_event
+      value: false
+      value_type: BOOL
+    - name: enable_record_trace_log
+      value: 'false'

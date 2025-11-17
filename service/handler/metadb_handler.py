@@ -897,7 +897,7 @@ class MetadbHandler(BaseHandler):
         if sys and '@' in info.user and info.user.split('#')[0].split('@')[1] != 'sys':
             raise Exception('The incoming user must belong to the sys tenant.')
         self.context['meta_database'] = info.database
-        self.context['metadb_cursor'] = Cursor(ip=info.host, port=info.port, user=info.user, password=info.password, stdio=self.obd.stdio)
+        self.context['metadb_cursor'] = Cursor(ip=info.host, port=info.port, user=info.user, password=info.password, tenant=None, stdio=self.obd.stdio)
         connection_info = DatabaseConnection(id=info.cluster_name, host=info.host, port=info.port, user=info.user, password=info.password, database=info.database)
         connection_info_copy = copy.deepcopy(connection_info)
         connection_info_copy.password = ''

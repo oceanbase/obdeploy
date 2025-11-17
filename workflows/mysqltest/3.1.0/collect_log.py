@@ -19,5 +19,6 @@ from __future__ import absolute_import, division, print_function
 import const
 
 def collect_log(plugin_context, workflow, repository, *args, **kwargs):
-    workflow.add_with_component(const.STAGE_FIRST, 'mysqltest', repository.version, {"repository": repository}, 'collect_log')
+    target_repository_version = '4.0.0.0' if repository.name == const.COMP_OB_SEEKDB else repository.version
+    workflow.add_with_component(const.STAGE_FIRST, 'mysqltest', target_repository_version, {"repository": repository}, 'collect_log')
     return plugin_context.return_true()

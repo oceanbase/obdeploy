@@ -1,0 +1,211 @@
+# coding: utf-8
+# Copyright (c) 2025 OceanBase.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import absolute_import, division, print_function
+
+from math import sqrt
+
+import _errno as err
+from tool import set_plugin_context_variables
+
+success = True
+production_mode = False
+
+
+def start_check_pre(plugin_context, init_check_status=False, strict_check=False, work_dir_check=False, work_dir_empty_check=True, generate_configs={}, precheck=False, source_option='start', *args, **kwargs):
+
+    def get_system_memory(memory_limit, min_pool_memory):
+        if memory_limit <= 8 << 30:
+            system_memory = 2 << 30
+        elif memory_limit <= 16 << 30:
+            system_memory = 3 << 30
+        elif memory_limit <= 32 << 30:
+            system_memory = 5 << 30
+        elif memory_limit <= 48 << 30:
+            system_memory = 7 << 30
+        elif memory_limit <= 64 << 30:
+            system_memory = 10 << 30
+        else:
+            memory_limit_gb = memory_limit >> 30
+            system_memory = int(3 * (sqrt(memory_limit_gb) - 3)) << 30
+        return max(system_memory, min_pool_memory)
+    check_status = {}
+    cluster_config = plugin_context.cluster_config
+
+    def check_pass(server, item):
+        status = check_status[server]
+        if status[item].status == err.CheckStatus.WAIT:
+            status[item].status = err.CheckStatus.PASS
+
+    def check_fail(server, item, error, suggests=[]):
+        status = check_status[server][item]
+        if status.status == err.CheckStatus.WAIT:
+            status.error = error
+            status.suggests = suggests
+            status.status = err.CheckStatus.FAIL
+
+    def wait_2_pass(server):
+        status = check_status[server]
+        for item in status:
+            check_pass(server, item)
+
+    def alert(server, item, error, suggests=[]):
+        global success
+        if strict_check:
+            success = False
+            check_fail(server, item, error, suggests)
+            print_with_suggests(error, suggests)
+            stdio.error(error)
+        else:
+            stdio.warn(error)
+
+    def critical(server, item, error, suggests=[]):
+        global success
+        success = False
+        check_fail(server, item, error, suggests)
+        print_with_suggests(error, suggests)
+
+    def alert_strict(server, item, error, suggests=[]):
+        global success, production_mode
+        if strict_check or production_mode:
+            success = False
+            check_fail(server, item, error, suggests)
+            print_with_suggests(error, suggests)
+        else:
+            stdio.warn(error)
+
+    def error(server, item, _error, suggests=[]):
+        global success
+        if plugin_context.dev_mode:
+            stdio.warn(_error)
+        else:
+            check_fail(server, item, _error, suggests)
+            print_with_suggests(_error, suggests)
+            success = False
+
+    def get_success():
+        global success
+        return success
+
+    def change_success():
+        global success
+        success = True
+
+    def check_item_status_pass(item):
+        for server in cluster_config.servers:
+            if check_status[server][item] == err.CheckStatus.FAIL:
+                return False
+        return True
+
+    def print_with_suggests(error, suggests=[]):
+        stdio.error('{}, {}'.format(error, suggests[0].msg if suggests else ''))
+
+    kernel_check_items = [
+        {'check_item': 'vm.max_map_count', 'need': [327600, 1310720], 'recommend': 655360},
+        {'check_item': 'vm.min_free_kbytes', 'need': [32768, 2097152], 'recommend': 2097152},
+        {'check_item': 'vm.overcommit_memory', 'need': 0, 'recommend': 0},
+        {'check_item': 'fs.file-max', 'need': [6573688, float('inf')], 'recommend': 6573688},
+    ]
+
+    kernel_check_status = {}
+    for kernel_param in kernel_check_items:
+        check_item = kernel_param['check_item']
+        kernel_check_status[check_item] = err.CheckStatus()
+
+    check_status = {}
+    plugin_context.set_variable('start_check_status', check_status)
+    cluster_config = plugin_context.cluster_config
+    stdio = plugin_context.stdio
+    global production_mode
+    global_config = cluster_config.get_original_global_conf()
+
+    for server in cluster_config.servers:
+        server_config = cluster_config.get_server_conf_with_default(server)
+        production_mode = server_config.get('production_mode', False)
+        check_status[server] = {
+            'port': err.CheckStatus(),
+            'mem': err.CheckStatus(),
+            'disk': err.CheckStatus(),
+            'ulimit': err.CheckStatus(),
+            'aio': err.CheckStatus(),
+            'net': err.CheckStatus(),
+            'ntp': err.CheckStatus(),
+            'cpu': err.CheckStatus(),
+            'scenario': err.CheckStatus(),
+            'ocp tenant memory': err.CheckStatus(),
+            'ocp tenant disk': err.CheckStatus()
+        }
+        check_status[server].update(kernel_check_status)
+        if work_dir_check:
+             check_status[server]['dir'] = err.CheckStatus()
+        if global_config.get('enable_auto_start', False):
+            check_status[server]['auto start'] = err.CheckStatus()
+    plugin_context.set_variable('start_check_status', check_status)
+    if init_check_status:
+        return plugin_context.return_true(start_check_status=check_status)
+
+    clog_sub_dir = 'clog/tenant_1'
+    slog_dir_key = 'data_dir'
+    slog_size = float(4 << 30)
+    INF = float('inf')
+    ulimits_min = {
+        'open files': {
+            'need': lambda x: 20000 * x,
+            'recd': lambda x: 655350,
+            'name': 'nofile'
+        },
+        'max user processes': {
+            'need': lambda x: 4096,
+            'recd': lambda x: 4096 * x,
+            'name': 'nproc'
+        },
+        'core file size': {
+            'need': lambda x: 0,
+            'recd': lambda x: INF,
+            'below_need_error': False,
+            'below_recd_error_strict': False,
+            'name': 'core'
+        },
+        'stack size': {
+            'need': lambda x: 1024,
+            'recd': lambda x: INF,
+            'below_recd_error_strict': False,
+            'name': 'stack'
+        },
+    }
+
+    context_dict = {
+        'slog_size': slog_size,
+        'start_check_status': check_status,
+        'kernel_check_items': kernel_check_items,
+        'ulimits_min': ulimits_min,
+        'get_system_memory': get_system_memory,
+        'slog_dir_key': slog_dir_key,
+        'clog_sub_dir': clog_sub_dir,
+        'check_pass': check_pass,
+        'check_fail': check_fail,
+        'wait_2_pass': wait_2_pass,
+        'alert': alert,
+        'alert_strict': alert_strict,
+        'error': error,
+        'critical': critical,
+        'print_with_suggests': print_with_suggests,
+        'get_success': get_success,
+        'production_mode': production_mode,
+        'check_item_status_pass': check_item_status_pass
+    }
+    change_success()
+    set_plugin_context_variables(plugin_context, context_dict)
+    return plugin_context.return_true()

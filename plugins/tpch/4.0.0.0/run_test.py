@@ -24,6 +24,7 @@ except:
     import subprocess
 from ssh import LocalClient
 from tool import FileUtil
+from const import COMP_OB_SEEKDB
 
 
 stdio = None
@@ -55,6 +56,7 @@ def run_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     clients = plugin_context.clients
     options = plugin_context.options
+    repository = kwargs.get("repository")
 
     optimization = get_option('optimization') > 0
     not_test_only = not get_option('test_only')
@@ -64,7 +66,7 @@ def run_test(plugin_context, *args, **kwargs):
     port = db.port if db else 2881
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
-    tenant_name = get_option('tenant', 'test')
+    tenant_name = get_option('tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
     password = get_option('password', '')
     ddl_path = get_option('ddl_path')
     tbl_path = get_option('tbl_path')

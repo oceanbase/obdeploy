@@ -20,11 +20,11 @@ from _deploy import ClusterStatus
 
 
 def start(plugin_context, workflow, *args, **kwargs):
-    repositories = plugin_context.repositories
-    repository_name = [repository.name for repository in repositories]
     workflow.add(const.STAGE_FIRST, 'parameter_pre')
     if plugin_context.cluster_config.depends:
-        workflow.add_with_component_version_kwargs(const.STAGE_SECOND, const.COMP_OB_CE if const.COMP_OB_CE in repository_name else const.COMP_OB, '4.0.0.0', {'scale_out_component': const.COMP_OBBINLOG_CE}, 'connect', 'create_tenant', 'create_user', 'import_time_zone')
+        ob_repository = kwargs.get("ob_repository")
+        binlog_repository = kwargs.get('repository')
+        workflow.add_with_component_version_kwargs(const.STAGE_SECOND, ob_repository.name, '4.0.0.0', {'scale_out_component': binlog_repository.name}, 'connect', 'create_tenant', 'create_user', 'import_time_zone')
     else:
         workflow.add(const.STAGE_SECOND, 'cursor_check')
     workflow.add(const.STAGE_THIRD, 'init_schema', 'start', 'health_check', 'connect')

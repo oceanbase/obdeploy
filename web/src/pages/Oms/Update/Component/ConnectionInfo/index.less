@@ -1,0 +1,52 @@
+@cardBackgroundColor: #f8fafe;
+
+.componentTable {
+  :global {
+    .ant-table-thead>tr>th {
+      background-color: #f5f8fe !important;
+    }
+  }
+}
+
+.formContainer {
+  :global {
+    .ant-form-item-label {
+      text-align: left !important;
+    }
+  }
+}
+
+.componentCard {
+  margin-bottom: 16px !important;
+  background-color: @cardBackgroundColor !important;
+
+  :global {
+    .ant-pro-card-body {
+      padding: 0 !important;
+    }
+  }
+
+  &.disabledCard {
+    opacity: 0.4;
+  }
+
+  &:last-child {
+    margin-bottom: 0 !important;
+  }
+}
+
+.cardContainer {
+  :global {
+
+    .ant-pro-card-header,
+    .ant-pro-card-body {
+      padding: 0;
+    }
+  }
+}
+
+.titleInfoSubCard {
+  font-weight: normal !important;
+  font-size: 14px !important;
+  color: #5c6b8a !important;
+}

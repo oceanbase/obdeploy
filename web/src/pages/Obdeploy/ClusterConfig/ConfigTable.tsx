@@ -13,11 +13,10 @@ const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 export type RulesDetail = {
   targetTable?:
-    | 'oceanbase-ce'
-    | 'obproxy-ce'
-    | 'ocp-express'
-    | 'obagent'
-    | 'ob-configserver';
+  | 'oceanbase-ce'
+  | 'obproxy-ce'
+  | 'obagent'
+  | 'ob-configserver';
   rules: any;
   targetColumn?: string;
 };
@@ -95,7 +94,7 @@ const getMoreColumns = (
             },
           }));
         }
-        
+
         return (
           <Form.Item
             validateFirst={true}
@@ -161,7 +160,7 @@ export default function ConfigTable({
             size="middle"
             style={{ minHeight: 50, marginTop: 16 }}
           >
-            {/* moreItem表示某一个组件,如 obproxy、ocp-express */}
+            {/* moreItem表示某一个组件,如 obproxy */}
             {dataSource.map((moreItem) => {
               // 每一项表示组件中的某一个参数的rules
               let rulesList: RulesDetail[] = [];
@@ -178,8 +177,8 @@ export default function ConfigTable({
               const realDataSource =
                 isNewDB || showMetaPassword
                   ? (moreItem.configParameter || [])?.filter(
-                      (item) => item.name !== 'ocp_meta_password',
-                    )
+                    (item) => item.name !== 'ocp_meta_password',
+                  )
                   : moreItem.configParameter;
 
               return (

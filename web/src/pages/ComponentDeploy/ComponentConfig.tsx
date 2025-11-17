@@ -77,7 +77,6 @@ export default function ComponentConfig() {
     setComponentConfig,
   } = useModel('componentDeploy');
   const {
-    ocpexpress = {},
     obproxy = {},
     obagent = {},
     obconfigserver = {},
@@ -178,15 +177,6 @@ export default function ComponentConfig() {
   const [alertmanagerValues, setAlertmanagerValues] = useState<string[]>([]);
 
   if (!lowVersion) {
-    initialValues.ocpexpress = {
-      port: ocpexpress?.port || 8180,
-      servers: ocpexpress?.servers,
-      parameters: getInitialParameters(
-        ocpexpress?.component,
-        ocpexpress?.parameters,
-        componentsMoreConfig,
-      ),
-    };
   }
 
   const prometheusPwdChange = (password: string) => {
@@ -210,7 +200,6 @@ export default function ComponentConfig() {
     let currentOnlyComponentsKeys: string[] = onlyComponentsKeys;
     if (lowVersion) {
       currentOnlyComponentsKeys = onlyComponentsKeys.filter(
-        (key) => key !== 'ocpexpress',
       );
     }
     currentOnlyComponentsKeys.forEach((item) => {
@@ -252,13 +241,6 @@ export default function ComponentConfig() {
           },
         };
         if (!lowVersion) {
-          setValues.ocpexpress = {
-            parameters: getInitialParameters(
-              ocpexpress?.component,
-              ocpexpress?.parameters,
-              newComponentsMoreConfig,
-            ),
-          };
         }
         form.setFieldsValue(setValues);
       }
@@ -706,14 +688,6 @@ export default function ComponentConfig() {
         ) : null}
       </Space>
       <CustomFooter>
-        <Button
-          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
-        >
-          {intl.formatMessage({
-            id: 'OBD.pages.ComponentDeploy.ComponentConfig.Exit',
-            defaultMessage: '退出',
-          })}
-        </Button>
         <Button onClick={preStep}>
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.ComponentConfig.PreviousStep',
@@ -724,6 +698,14 @@ export default function ComponentConfig() {
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.ComponentConfig.NextStep',
             defaultMessage: '下一步',
+          })}
+        </Button>
+        <Button
+          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
+        >
+          {intl.formatMessage({
+            id: 'OBD.pages.ComponentDeploy.ComponentConfig.Exit',
+            defaultMessage: '退出',
           })}
         </Button>
       </CustomFooter>

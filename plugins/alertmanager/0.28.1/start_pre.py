@@ -111,7 +111,6 @@ def start_pre(plugin_context, *args, **kwargs):
                 if not client.write_file(config_tenant, runtime_alertmanager_conf):
                     stdio.error('failed to write config file {}'.format(runtime_alertmanager_conf))
                     return False
-            client.execute_command('touch %s' % flag_file)
         
         cmd_items = ['--config.file={}'.format(runtime_alertmanager_conf)]
         cmd_items.append('--web.listen-address={}:{}'.format(address, port))

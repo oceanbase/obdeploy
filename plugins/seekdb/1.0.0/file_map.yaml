@@ -1,0 +1,11 @@
+- src_path: ./usr/bin/observer
+  target_path: bin/observer
+  type: bin
+  mode: 755
+- src_path: ./usr/bin
+  target_path: bin
+  type: dir
+- src_path: ./usr
+  target_path: ''
+  type: dir
+  install_method: ln

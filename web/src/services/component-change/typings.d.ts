@@ -1,6 +1,6 @@
 declare namespace API {
   type BestComponentInfo = {
-    /** Component Name component name, eq obporxy, ocp-express... */
+    /** Component Name component name, eq obporxy... */
     component_name: string;
     /** Version component version */
     version?: string;
@@ -18,7 +18,6 @@ declare namespace API {
     obproxy?: Obproxy;
     obagent?: Obagent;
     obconfigserver?: Obconfigserver;
-    ocpexpress?: OcpExpress;
     /** Home Path component change config path */
     home_path: string;
   };
@@ -311,22 +310,6 @@ declare namespace API {
     success?: boolean;
   };
 
-  type OcpExpress = {
-    /** Component component name */
-    component: string;
-    /** Version version */
-    version: string;
-    /** Package Hash package md5 */
-    package_hash?: string;
-    /** Release release no */
-    release: string;
-    /** Port server port */
-    port: number;
-    /** Parameters config parameter */
-    parameters?: Parameter[];
-    /** Servers server ip, ex:[ '1.1.1.1','2.2.2.2'] */
-    servers: string[];
-  };
 
   type Parameter = {
     /** Key parameter key */

@@ -36,7 +36,7 @@ def init_schema(plugin_context, binlog_cursor=None, **kwargs):
     repositories = plugin_context.repositories
     repository = None
     for repo in repositories:
-        if repo.name == const.COMP_OBBINLOG_CE:
+        if repo.name in [const.COMP_OBBINLOG_CE, const.COMP_OBBINLOG]:
             repository = repo
 
     depend_conf = plugin_context.get_variable('binlog_config')
@@ -61,6 +61,9 @@ def init_schema(plugin_context, binlog_cursor=None, **kwargs):
         binlog_cursor.db.commit()
     binlog_cursor = binlog_cursor.usable_cursor
     sql = "UPDATE %s.config_template SET value='false' WHERE key_name='enable_resource_check';" % db
+    binlog_cursor.execute(sql)
+    binlog_cursor.db.commit()
+    sql = "DELETE FROM %s.config_template WHERE key_name='binlog_ddl_convert_jvm_options';" % db
     binlog_cursor.execute(sql)
     binlog_cursor.db.commit()
     return plugin_context.return_true()

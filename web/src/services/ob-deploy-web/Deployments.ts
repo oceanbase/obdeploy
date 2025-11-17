@@ -60,6 +60,24 @@ export async function createDeploymentConfig(
     ...(options || {}),
   });
 }
+export async function creatOmsDeploymentConfig(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.createDeploymentConfigParams,
+  body: API.DeploymentConfig,
+  options?: { [key: string]: any },
+) {
+  const { name: param0, ...queryParams } = params;
+  // /api/v1/oms/generate_config/{name}
+  return request<API.OBResponse>(`/api/v1/oms/generate_config/${param0}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
 
 /** Destroy Deployment destroy deployment DELETE /api/v1/deployments/${param0} */
 export async function destroyDeployment(
@@ -110,21 +128,36 @@ export async function getDestroyTaskInfo(
 }
 
 /** Get Install Status query install status GET /api/v1/deployments/${param0}/install */
-export async function queryInstallStatus(
-  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.queryInstallStatusParams,
-  options?: { [key: string]: any },
-) {
-  const { name: param0, ...queryParams } = params;
-  return request<API.OBResponseTaskInfo_>(
-    `/api/v1/deployments/${param0}/install`,
-    {
-      method: 'GET',
-      params: { ...queryParams },
-      ...(options || {}),
-    },
-  );
-}
+  export async function queryInstallStatus(
+    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+    params: API.queryInstallStatusParams,
+    options?: { [key: string]: any },
+  ) {
+    const { name: param0, ...queryParams } = params;
+    return request<API.OBResponseTaskInfo_>(
+      `/api/v1/deployments/${param0}/install`,
+      {
+        method: 'GET',
+        params: { ...queryParams },
+        ...(options || {}),
+      },
+    );
+  }
+  export async function queryInstallStatusOms(
+    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+    params: API.queryInstallStatusParams,
+    options?: { [key: string]: any },
+  ) {
+    const { name: param0, ...queryParams } = params;
+    return request<API.OBResponseTaskInfo_>(
+      `/api/v1/oms/deployments/${param0}/install`,
+      {
+        method: 'GET',
+        params: { ...queryParams },
+        ...(options || {}),
+      },
+    );
+  }
 
 /** Install deploy and start a deployment POST /api/v1/deployments/${param0}/install */
 export async function deployAndStartADeployment(
@@ -149,6 +182,23 @@ export async function queryInstallLog(
   const { name: param0, ...queryParams } = params;
   return request<API.OBResponseInstallLog_>(
     `/api/v1/deployments/${param0}/install/log`,
+    {
+      method: 'GET',
+      params: {
+        ...queryParams,
+      },
+      ...(options || {}),
+    },
+  );
+}
+export async function queryInstallLogOms(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.queryInstallLogParams,
+  options?: { [key: string]: any },
+) {
+  const { name: param0, ...queryParams } = params;
+  return request<API.OBResponseInstallLog_>(
+    `/api/v1/oms/deployments/${param0}/install/log`,
     {
       method: 'GET',
       params: {

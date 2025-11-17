@@ -110,7 +110,7 @@ export default function InstallProcessComp({
       Video.dispose();
     };
   }, []);
-
+  console.log('installStatus inpr', installStatus)
   useEffect(() => {
     if (toBottom) {
       toLogBottom();
@@ -152,14 +152,14 @@ export default function InstallProcessComp({
         <div className={styles.progressEffectContainer}>
           <div className={styles.deployTitle}>
             {tenantType ? intl.formatMessage({
-                id: 'OBD.pages.components.InstallProces.87DB05E2',
-                defaultMessage: '租户创建中',
-              }) :
-            intl.formatMessage({
-              id: 'OBD.pages.components.InstallProcess.Deploying',
-              defaultMessage: '部署中...',
-            }) 
-}
+              id: 'OBD.pages.components.InstallProces.87DB05E2',
+              defaultMessage: '租户创建中',
+            }) :
+              type === 'OMS' ? 'OMS 部署中' : intl.formatMessage({
+                id: 'OBD.pages.components.InstallProcess.Deploying',
+                defaultMessage: '部署中...',
+              })
+            }
           </div>
           <div className={tenantType ? styles.tenantComputer : styles.computer}>
             <div
@@ -216,7 +216,7 @@ export default function InstallProcessComp({
           data-aspm-param={``}
           data-aspm-expo
         >
-          {tenantType
+          {tenantType || type === 'OMS'
             ? null
             : getText(statusData?.current)}
         </span>

@@ -124,7 +124,7 @@ class OcpHandler(BaseHandler):
             oceanbase_config['global'] = {}
 
         for key in config_dict:
-            if config_dict[key] and key in ['mysql_port', 'rpc_port', 'home_path', 'data_dir', 'redo_dir', 'appname',
+            if config_dict[key] and key in ['mysql_port', 'rpc_port', 'obshell_port', 'home_path', 'data_dir', 'redo_dir', 'appname',
                                             'root_password']:
                 if key == 'root_password':
                     passwd = RSAHandler().decrypt_private_key(config_dict[key])

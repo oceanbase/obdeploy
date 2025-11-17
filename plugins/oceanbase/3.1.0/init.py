@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from __future__ import absolute_import, division, print_function
-import os
 
 from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
 

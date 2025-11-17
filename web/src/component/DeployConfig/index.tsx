@@ -111,15 +111,15 @@ export default function DeployConfig({
     reg: isUpdate ? updateClusterNameReg : clusterNameReg,
     msg: isUpdate
       ? intl.formatMessage({
-          id: 'OBD.component.DeployConfig.ItStartsWithALetter.1',
-          defaultMessage:
-            '以英文字母开头、英文或数字结尾，可包含英文、数字、连字符和下划线，且长度为 2 ~ 32',
-        })
+        id: 'OBD.component.DeployConfig.ItStartsWithALetter.1',
+        defaultMessage:
+          '以英文字母开头、英文或数字结尾，可包含英文、数字、连字符和下划线，且长度为 2 ~ 32',
+      })
       : intl.formatMessage({
-          id: 'OBD.component.DeployConfig.ItStartsWithALetter',
-          defaultMessage:
-            '以英文字母开头、英文或数字结尾，可包含英文、数字和下划线，且长度为 2 ~ 32',
-        }),
+        id: 'OBD.component.DeployConfig.ItStartsWithALetter',
+        defaultMessage:
+          '以英文字母开头、英文或数字结尾，可包含英文、数字和下划线，且长度为 2 ~ 32',
+      }),
   };
   const { components = {} } = ocpConfigData || {};
   const { oceanbase = {} } = components || {};
@@ -210,8 +210,8 @@ export default function DeployConfig({
                 (item) => item.version === '4.2.1.8',
               ) ||
                 !record.versionInfo.length) &&
-              name === 'OceanBase' &&
-              isNewDB ? (
+                name === 'OceanBase' &&
+                isNewDB ? (
                 <ErrorCompToolTip
                   title={intl.formatMessage({
                     id: 'OBD.component.DeployConfig.UnableToObtainTheAvailable',
@@ -245,8 +245,8 @@ export default function DeployConfig({
             record.key === OCEANBASE
               ? obVersionInfo
               : record.key === OBPROXY
-              ? obproxyVersionInfo
-              : ocpVersionInfo;
+                ? obproxyVersionInfo
+                : ocpVersionInfo;
 
           if (selectVersion && !isEmpty(selectVersion.version)) {
             selectVersion.valueInfo = {
@@ -655,7 +655,7 @@ export default function DeployConfig({
               });
             }
           }
-        } catch (err) {}
+        } catch (err) { }
       }
 
       setOcpConfigData({ ...newOcpConfigData });
@@ -856,10 +856,7 @@ export default function DeployConfig({
 
   const cluserNameProps = {
     name: 'appname',
-    label: intl.formatMessage({
-      id: 'OBD.component.DeployConfig.ClusterName',
-      defaultMessage: '集群名称',
-    }),
+    label: '部署名称',
     rules: clusterNameRules,
     placeholder: intl.formatMessage({
       id: 'OBD.component.DeployConfig.PleaseEnter',
@@ -890,13 +887,13 @@ export default function DeployConfig({
               title={
                 isNewDB
                   ? intl.formatMessage({
-                      id: 'OBD.component.DeployConfig.BasicConfiguration',
-                      defaultMessage: '基础配置',
-                    })
+                    id: 'OBD.component.DeployConfig.BasicConfiguration',
+                    defaultMessage: '基础配置',
+                  })
                   : intl.formatMessage({
-                      id: 'OBD.component.DeployConfig.DeploymentConfiguration',
-                      defaultMessage: '部署配置',
-                    })
+                    id: 'OBD.component.DeployConfig.DeploymentConfiguration',
+                    defaultMessage: '部署配置',
+                  })
               }
               className="card-padding-bottom-24"
             >
@@ -1058,7 +1055,6 @@ export default function DeployConfig({
         </Space>
       </Spin>
       <CustomFooter>
-        <ExitBtn />
         <Button
           data-aspm-click="ca54435.da43437"
           data-aspm-desc={intl.formatMessage({
@@ -1097,6 +1093,7 @@ export default function DeployConfig({
             defaultMessage: '下一步',
           })}
         </Button>
+        <ExitBtn />
       </CustomFooter>
     </>
   );

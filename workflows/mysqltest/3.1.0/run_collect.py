@@ -20,7 +20,8 @@ import os
 import const
 
 def run_collect(plugin_context, workflow, repository, *args, **kwargs):
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', repository.version, {"repository": repository}, 'run_test')
-    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'mysqltest', repository.version, {"repository": repository}, 'collect_log')
+    target_repository_version = '4.0.0.0' if repository.name == const.COMP_OB_SEEKDB else repository.version
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', target_repository_version, {"repository": repository}, 'run_test')
+    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'mysqltest', target_repository_version, {"repository": repository}, 'collect_log')
 
     return plugin_context.return_true()

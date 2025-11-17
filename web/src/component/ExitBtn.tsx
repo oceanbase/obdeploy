@@ -13,6 +13,7 @@ const defaultContentText = intl.formatMessage({
 });
 
 export default function ExitBtn() {
+
   const { setInstallStatus, setInstallResult } = useModel('ocpInstallData');
   const path: PathType = getTailPath() as PathType;
   const ocpTextMap = {
@@ -57,6 +58,15 @@ export default function ExitBtn() {
         defaultMessage: '退出后，部署工作将被终止，请谨慎操作。',
       }),
     },
+    oms: {
+      title: '退出 OMS 部署程序',
+      content: '退出后，部署工作将被终止，请谨慎操作',
+    },
+    updateOms: {
+      title: '退出 OMS 升级程序',
+      content: '退出后，升级工作将被终止，请谨慎操作',
+    },
+
     install: ocpTextMap,
     configuration: ocpTextMap,
     ocpInstaller: ocpTextMap,

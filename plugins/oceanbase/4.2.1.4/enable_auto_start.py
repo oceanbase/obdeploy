@@ -44,7 +44,7 @@ def enable_auto_start(plugin_context, *args, **kwargs):
 
     for server in cluster_config.servers:
         client = clients[server]
-        auto_start_client = get_root_permission_client(client, server, stdio)
+        auto_start_client = get_root_permission_client(client, server, stdio, source_type=kwargs.get('source_type'))
         if not auto_start_client:
             return plugin_context.return_false()
         ret = auto_start_client.execute_command("systemctl status dbus")

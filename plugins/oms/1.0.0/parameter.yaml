@@ -1,0 +1,197 @@
+- name: mount_path
+  name_local: 数据挂在点
+  essential: ture
+  type: PATH
+  read_only: true
+  description_en: data directory for oms
+  description_local: oms data 目录
+- name: logs_mount_path
+  name_local: 日志数据挂在点
+  type: PATH
+  read_only: true
+  description_en: log data directory for oms
+  description_local: oms log data 目录
+- name: run_mount_path
+  name_local: 运行数据挂在点
+  type: PATH
+  read_only: true
+  description_en: run data directory for oms
+  description_local: oms run data 目录
+- name: store_mount_path
+  name_local: 存储数据挂在点
+  type: PATH
+  read_only: true
+  description_en: store data directory for oms
+  description_local: oms store data 目录
+- name: ghana_server_port
+  name_local: GHANA端口号
+  essential: true
+  type: INT
+  default: 8090
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: the port number for ghana server.
+  description_local: GHANA 服务的端口号
+- name: nginx_server_port
+  name_local: Nginx端口号
+  essential: true
+  type: INT
+  default: 8089
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: the port number for nginx server.
+- name: sshd_server_port
+  name_local: SSHD端口号
+  essential: true
+  type: INT
+  default: 2023
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: the port number for sshd server.
+- name: supervisor_server_port
+  name_local: Supervisor端口号
+  essential: true
+  type: INT
+  default: 9000
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: the port number for supervisor server.
+- name: cm_server_port
+  name_local: CM端口号
+  essential: true
+  type: INT
+  default: 8088
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: the port number for cm server.
+- name: oms_meta_password
+  name_local: 元数据服务密码
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: oms meta service password.
+- name: oms_meta_port
+  name_local: 元数据服务端口号
+  essential: true
+  type: INT
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: oms meta service port.
+- name: oms_meta_user
+  name_local: 元数据服务用户名
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: oms meta service user.
+- name: oms_meta_host
+  name_local: 元数据服务地址
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: oms meta service url.
+- name: cm_url
+  name_local: vip地址
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: oms service vip address.
+- name: tsdb_password
+  name_local: TSDB密码
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: tsdb password.
+- name: tsdb_username
+  name_local: TSDB用户名
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: tsdb user.
+- name: tsdb_host
+  name_local: TSDB地址
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: tsdb url.
+- name: tsdb_port
+  name_local: TSDB端口号
+  essential: true
+  type: INT
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: tsdb port.
+- name: tsdb_service
+  name_local: 时序数据库
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: only support influxdb.
+- name: apsara_audit_sls_access_key
+  name_local: SLS AccessKey
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: sls access key.
+- name: apsara_audit_sls_access_secret
+  name_local: SLS AccessSecret
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: sls access secret.
+- name: apsara_audit_sls_endpoint
+  name_local: SLS Endpoint
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: sls endpoint.
+- name: apsara_audit_sls_ops_site_topic
+  name_local: SLS OPS站点Topic
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: sls ops site topic.
+- name: apsara_audit_sls_user_site_topic
+  name_local: SLS USER站点Topic
+  essential: true
+  type: STRING
+  need_reload: true
+  description_en: sls user site topic.
+- name: drc_cm_db
+  name_local: cm 数据库库名
+  essential: true
+  type: STRING
+  read_only: true
+  description_en: cm database name.
+- name: drc_rm_db
+  name_local: rm 数据库库名
+  essential: true
+  type: STRING
+  read_only: true
+  description_en: rm database name.
+- name: drc_cm_heartbeat_db
+  name_local: cm 心跳数据库库名
+  essential: true
+  type: STRING
+  read_only: true
+  description_en: cm heartbeat database name.
+- name: container_name
+  name_local: 容器名称
+  type: STRING
+  read_only: true
+  description_en: oms container name.
+- name: regions
+  name_local: 地域列表
+  type: list
+  need_reload: true
+  description_en: oms regions.
+
+
+
+

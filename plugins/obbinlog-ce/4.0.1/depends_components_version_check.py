@@ -33,6 +33,7 @@ def depends_components_version_check(plugin_context, ob_cluster_repositories, *a
     stdio = plugin_context.stdio
     stdio.start_loading('component version check')
     clients = plugin_context.clients
+    binlog_repository = kwargs.get('repository')
 
     # check oceanbase verison
     for server in cluster_config.servers:
@@ -51,8 +52,11 @@ def depends_components_version_check(plugin_context, ob_cluster_repositories, *a
             stdio.stop_loading('fail')
             return plugin_context.return_false()
         sub_dirs = get_subfiles(os.path.join(home_path, 'obcdc'))
+        version_index = 2
+        if not binlog_repository.name.endswith("ce"):
+            version_index = 1
         for sub_dir in sub_dirs:
-            version = sub_dir.split('-')[2]
+            version = sub_dir.split('-')[version_index]
             if version[0] == '3':
                 continue
             else:
@@ -69,7 +73,7 @@ def depends_components_version_check(plugin_context, ob_cluster_repositories, *a
             if min_version <= ob_version <= max_version:
                 break
         else:
-            stdio.error(f"The current %s does not support creating task for %s version %s." % (const.COMP_OBBINLOG_CE, repository.name, ob_version))
+            stdio.error(f"The current %s does not support creating task for %s version %s." % (binlog_repository.name, repository.name, ob_version))
             stdio.stop_loading('fail')
             return plugin_context.return_false()
 

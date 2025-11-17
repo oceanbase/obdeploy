@@ -25,10 +25,6 @@ export default function ComponentsPort({
   lowVersion = false,
   form,
 }: ComponentsPortProps) {
-  const PortOcpExpressFormValue = ProForm.useWatch(
-    ['ocpexpress', 'port'],
-    form,
-  );
   const PortListentFormValue = ProForm.useWatch(
     ['obconfigserver', 'listen_port'],
     form,
@@ -121,17 +117,6 @@ export default function ComponentsPort({
                   defaultMessage: 'OBConfigserver 服务端口',
                 })}
                 fieldProps={{ style: commonStyle }}
-                portError={
-                  PortOcpExpressFormValue === PortListentFormValue &&
-                  intl.formatMessage(
-                    {
-                      id: 'OBD.pages.components.InstallConfig.PortOccupied',
-                      defaultMessage:
-                        '端口${PortListentFormValue}已被占用，请修改',
-                    },
-                    { PortListentFormValue: PortListentFormValue },
-                  )
-                }
               />
             </Col>
           )}

@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { getLocale, history, Outlet, setLocale, useModel } from 'umi';
 import styles from '../Obdeploy/index.less';
 import theme from '../theme';
+import { getTailPath } from '@/utils/helper';
 
 let requestHandler;
 export { requestHandler };
@@ -96,21 +97,24 @@ export default function Layout() {
     }
     setLastError(newLastError);
   }, [errorVisible, errorsList, lastError]);
+  // const taiPath = getTailPath();
+  const isUpgrade = location.hash.split('/').pop()?.split('?')[1] === 'update';
 
   return (
     <ConfigProvider theme={theme} locale={localeConfig}>
       <div
-        className={`${styles.container} ${
-          locale !== 'zh-CN' ? styles.englishContainer : ''
-        }`}
+        className={`${styles.container} ${locale !== 'zh-CN' ? styles.englishContainer : ''
+          }`}
       >
         <header className={styles.pageHeader}>
           <img src="/assets/oceanbase.png" className={styles.logo} alt="logo" />
           <span className={styles.logoText}>
-            {intl.formatMessage({
-              id: 'OBD.src.pages.DeploymentWizard',
-              defaultMessage: '部署向导',
-            })}
+            {
+              isUpgrade ? '升级向导' : intl.formatMessage({
+                id: 'OBD.src.pages.DeploymentWizard',
+                defaultMessage: '部署向导',
+              })
+            }
           </span>
           <Space className={styles.actionContent} size={25}>
             <Dropdown menu={{ items: getLocaleItems() }}>
@@ -144,7 +148,7 @@ export default function Layout() {
               <HomeOutlined className={styles.actionIcon} />
               {intl.formatMessage({
                 id: 'OBD.src.pages.VisitTheOfficialWebsite',
-                defaultMessage: '访问官网',
+                defaultMessage: '官网',
               })}
             </a>
             <a
@@ -162,7 +166,7 @@ export default function Layout() {
               <ProfileOutlined className={styles.actionIcon} />
               {intl.formatMessage({
                 id: 'OBD.src.pages.VisitTheForum',
-                defaultMessage: '访问论坛',
+                defaultMessage: '论坛',
               })}
             </a>
             <a
@@ -180,7 +184,7 @@ export default function Layout() {
               <ReadOutlined className={styles.actionIcon} />
               {intl.formatMessage({
                 id: 'OBD.src.pages.HelpCenter',
-                defaultMessage: '帮助中心',
+                defaultMessage: '帮助',
               })}
             </a>
           </Space>

@@ -1,0 +1,55 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+oms:
+  type: docker # Deployment type, use docker for containerized deployment
+  image_name: reg.docker.alibaba-inc.com/oceanbase/oms # Docker image name for OMS
+  tag: feature_4.2.11_ce # Docker image tag
+  servers:
+    - 127.0.0.1 # Server IP address, please don't use hostname, only IP can be supported
+    - 11.11.11.11 # Server IP address
+    - 11.11.11.12 # Server IP address
+  global:
+    oms_meta_host: "11.11,11,11" # OMS meta database host address
+    oms_meta_password: "" # Password for OMS meta database user
+    oms_meta_port: 2881 # Port number for OMS meta database connection
+    oms_meta_user: root # Username for OMS meta database connection
+#    drc_cm_heartbeat_db: oms_hdb # Heartbeat database name
+#    drc_cm_db: "oms_cm" # DRC cluster manager database name
+#    drc_rm_db: "oms_rm" # DRC resource manager database name
+#    tsdb_enabled: "true" # Whether to enable time series database
+#    tsdb_password: "" # Password for time series database
+#    tsdb_service: "INFLUXDB" # Type of time series database service
+#    tsdb_url: "11.11.11.11:8086" # URL for time series database connection
+#    tsdb_username: "admin" # Username for time series database
+#    ghana_server_port: 8090 # Port for ghana server
+#    nginx_server_port: 8089 # Port for nginx server
+#    cm_server_port: 8088 # Port for cluster manager server
+#    supervisor_server_port: 9000 # Port for supervisor server
+#    sshd_server_port: 2023 # Port for SSH daemon server
+    mount_path: /data/1/oms # Mount path for OMS data storage
+    regions:
+      - cm_location: 1 # Cluster manager location identifier
+        cm_is_default: true # Whether this is the default region
+        cm_region: hz # Region identifier (e.g., hz for Hangzhou)
+        cm_region_cn: 杭州 # Region name in Chinese
+        cm_url: 11.11.11.11:8089 #vip # Cluster manager URL, can be VIP address
+        cm_nodes:
+          - 127.0.0.1, # Cluster manager node IP address
+          - 11.11.11.11 # Cluster manager node IP address
+      - cm_location: 1 # Cluster manager location identifier
+        cm_is_default: false # Whether this is the default region
+        cm_region: bj # Region identifier (e.g., bj for Beijing)
+        cm_region_cn: 北京 # Region name in Chinese
+        cm_url: 11.11.11.12:8088 # Cluster manager URL
+        cm_nodes:
+          - 11.11.11.12 # Cluster manager node IP address
+#    settings:
+#      xxxxxx: "xxxxx" # Custom settings for OMS configuration
+
+
+

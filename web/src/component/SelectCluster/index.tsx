@@ -2,6 +2,7 @@ import type { SelectedCluster } from '@/models/componentDeploy';
 import { intl } from '@/utils/intl';
 import { Select } from 'antd';
 import styles from './index.less';
+import { commonSelectStyle } from '@/pages/constants';
 
 interface SelectClusterProps {
   value?: SelectedCluster;
@@ -28,7 +29,7 @@ export default function SelectCluster({
             id: 'OBD.component.SelectCluster.PleaseSelect',
             defaultMessage: '请选择',
           })}
-          style={{ width: 328 }}
+          style={commonSelectStyle}
           value={value && options ? JSON.stringify(value) : ''}
           onChange={onChange}
           options={options?.map((cluster) => ({

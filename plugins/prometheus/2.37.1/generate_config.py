@@ -46,8 +46,6 @@ def generate_config(plugin_context, auto_depend=False,  return_generate_keys=Fal
         for depend in depends:
             if cluster_config.add_depend_component(depend):
                 break
-    if generate_password:
-        generate_random_password(cluster_config)
 
     stdio.stop_loading('succeed')
     plugin_context.return_true()

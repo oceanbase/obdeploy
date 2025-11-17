@@ -24,6 +24,7 @@ def pre_test(plugin_context, workflow, repository, *args, **kwargs):
     deploy_config = kwargs.get("deploy_config")
     connect_namespaces = kwargs.get("connect_namespaces")
     opts = plugin_context.options
+    target_repository_version = '4.0.0.0' if repository.name == const.COMP_OB_SEEKDB else repository.version
 
     if repository.name in const.COMPS_ODP:
         for component_name in deploy_config.components:
@@ -41,6 +42,6 @@ def pre_test(plugin_context, workflow, repository, *args, **kwargs):
     workflow.add_with_component_version_kwargs(const.STAGE_FIRST, repository.name, repository.version, {"spacename": sys_namespace.spacename}, 'connect')
     connect_namespaces.append(sys_namespace)
 
-    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'tpcc', repository.version, {"repository": repository}, 'parameter_pre')
-    workflow.add_with_component_version_kwargs(const.STAGE_THIRD, 'tpcc', repository.version, {"repository": repository, **kwargs}, 'pre_test')
+    workflow.add_with_component_version_kwargs(const.STAGE_SECOND, 'tpcc', target_repository_version, {"repository": repository}, 'parameter_pre')
+    workflow.add_with_component_version_kwargs(const.STAGE_THIRD, 'tpcc', target_repository_version, {"repository": repository, **kwargs}, 'pre_test')
     return plugin_context.return_true()

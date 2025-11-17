@@ -18,7 +18,7 @@ from __future__ import absolute_import, division, print_function
 
 import const
 def init(plugin_context, workflow, repository, *args, **kwargs):
-
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', repository.version, {"repository": repository}, 'init_pre')
-    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', repository.version, {"repository": repository}, 'init')
+    target_repository_version = '4.0.0.0' if repository.name == const.COMP_OB_SEEKDB else repository.version
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', target_repository_version, {"repository": repository}, 'init_pre')
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'mysqltest', target_repository_version, {"repository": repository}, 'init')
     return plugin_context.return_true()

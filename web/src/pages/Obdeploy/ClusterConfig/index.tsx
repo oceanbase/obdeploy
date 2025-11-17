@@ -28,7 +28,6 @@ import {
   grafanaComponent,
   obagentComponent,
   obproxyComponent,
-  ocpexpressComponent,
   onlyComponentsKeys,
   pathRule,
   prometheusComponent,
@@ -91,7 +90,6 @@ export default function ClusterConfig() {
 
   const {
     oceanbase = {},
-    ocpexpress = {},
     obproxy = {},
     obagent = {},
     obconfigserver = {},
@@ -114,6 +112,7 @@ export default function ClusterConfig() {
   const [prometheusPwd, setPrometheusPwd] = useState<string>(
     prometheus?.basic_auth_users?.admin || '',
   );
+  // 从 configData 中获取原始的未加密密码值
   const [alertmanagerPwd, setAlertmanagerPwd] = useState<string>(
     alertmanager?.basic_auth_users?.admin || '',
   );
@@ -302,7 +301,7 @@ export default function ClusterConfig() {
 
     if (res?.success) {
       const { data } = res,
-        isSelectOcpexpress = selectedConfig.includes(ocpexpressComponent);
+        isSelectOcpexpress = false;
       const newClusterMoreConfig = formatMoreConfig(
         data?.items,
         isSelectOcpexpress,
@@ -327,7 +326,6 @@ export default function ClusterConfig() {
     let currentOnlyComponentsKeys: string[] = onlyComponentsKeys;
     if (lowVersion) {
       currentOnlyComponentsKeys = onlyComponentsKeys.filter(
-        (key) => key !== 'ocpexpress',
       );
     }
     currentOnlyComponentsKeys.forEach((item) => {
@@ -390,13 +388,6 @@ export default function ClusterConfig() {
           },
         };
         if (!lowVersion) {
-          setValues.ocpexpress = {
-            parameters: getInitialParameters(
-              ocpexpress?.component,
-              ocpexpress?.parameters,
-              newComponentsMoreConfig,
-            ),
-          };
         }
         form.setFieldsValue(setValues);
       }
@@ -436,6 +427,14 @@ export default function ClusterConfig() {
     }
   }, [componentsMore]);
 
+  // 确保 alertmanagerPwd 从 configData 中获取原始的未加密密码值
+  useEffect(() => {
+    const originalPwd = alertmanager?.basic_auth_users?.admin;
+    if (originalPwd) {
+      setAlertmanagerPwd(originalPwd);
+    }
+  }, [alertmanager?.basic_auth_users?.admin]);
+
   const initialValues = {
     oceanbase: {
       mode: oceanbase?.mode || 'PRODUCTION',
@@ -472,6 +471,9 @@ export default function ClusterConfig() {
     },
     prometheus: {
       port: prometheus?.port || 9090,
+      basic_auth_users: {
+        admin: prometheus?.basic_auth_users?.admin || '',
+      },
       parameters: getInitialParameters(
         prometheus?.component,
         prometheus?.parameters,
@@ -480,6 +482,10 @@ export default function ClusterConfig() {
     },
     alertmanager: {
       port: alertmanager?.port || 9093,
+      basic_auth_users: {
+        // 从 configData 中获取原始的未加密密码值
+        admin: alertmanager?.basic_auth_users?.admin || '',
+      },
       parameters: getInitialParameters(
         alertmanager?.component,
         alertmanager?.parameters,
@@ -488,6 +494,7 @@ export default function ClusterConfig() {
     },
     grafana: {
       port: grafana?.port || 3000,
+      login_password: grafana?.login_password || '',
       parameters: getInitialParameters(
         grafana?.component,
         grafana?.parameters,
@@ -505,15 +512,6 @@ export default function ClusterConfig() {
   };
 
   if (!lowVersion) {
-    initialValues.ocpexpress = {
-      port: ocpexpress?.port || 8180,
-      admin_passwd: ocpexpress?.admin_passwd,
-      parameters: getInitialParameters(
-        ocpexpress?.component,
-        ocpexpress?.parameters,
-        componentsMoreConfig,
-      ),
-    };
   }
 
   const singleItemStyle = { width: 448 };
@@ -614,13 +612,13 @@ export default function ClusterConfig() {
                     defaultMessage: '数据目录',
                   })}
                   name={['oceanbase', 'data_dir']}
-                // rules={[
-                //   {
-                //     required: true,
-                //     message:'请输入数据目录'
-                //   },
-                //   pathRule
-                // ]}
+                  rules={[
+                    {
+                      required: true,
+                      message: '请输入数据目录'
+                    },
+                    pathRule
+                  ]}
                 >
                   <TooltipInput
                     fieldProps={{ style: commonInputStyle }}
@@ -634,13 +632,13 @@ export default function ClusterConfig() {
                     defaultMessage: '日志目录',
                   })}
                   name={['oceanbase', 'redo_dir']}
-                // rules={[
-                //   {
-                //     required: true,
-                //     message:'请输入日志目录'
-                //   },
-                //   pathRule
-                // ]}
+                  rules={[
+                    {
+                      required: true,
+                      message: '请输入日志目录'
+                    },
+                    pathRule
+                  ]}
                 >
                   <TooltipInput
                     fieldProps={{ style: commonInputStyle }}
@@ -673,7 +671,7 @@ export default function ClusterConfig() {
             </Row>
             <InputPort
               name={['oceanbase', 'obshell_port']}
-              label={'OBShell 端口'}
+              label={'obshell 端口'}
               fieldProps={{ style: commonPortStyle }}
             />
             <div className={styles.moreSwitch}>
@@ -703,7 +701,7 @@ export default function ClusterConfig() {
               loading={clusterMoreLoading}
               customParameter={<Parameter />}
               parameterRules={[metadbParameterRules]}
-              showMetaPassword={isEmpty(ocpexpress)}
+              showMetaPassword={true}
             />
           </ProCard>
         </ProCard>
@@ -780,7 +778,7 @@ export default function ClusterConfig() {
               {selectedConfig.includes(alertManagerComponent) && (
                 <Form.Item
                   label={'AlertManager 密码'}
-                  name={['alertManager', 'basic_auth_users', 'admin']}
+                  name={['alertmanager', 'basic_auth_users', 'admin']}
                   rules={[
                     {
                       required: true,

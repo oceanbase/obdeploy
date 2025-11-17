@@ -17,6 +17,7 @@ from __future__ import absolute_import, division, print_function
 
 from enum import Enum
 
+EXIST_ERROR_CODE = False
 
 class LockError(Exception):
     pass
@@ -43,6 +44,8 @@ class OBDErrorCodeTemplate(object):
         self._str_ = ('OBD-%04d: ' % code) + msg
 
     def format(self, *args, **kwargs):
+        global EXIST_ERROR_CODE
+        EXIST_ERROR_CODE = True
         return OBDErrorCode(
             self.code,
             self._str_.format(*args, **kwargs),
@@ -149,7 +152,7 @@ WC_CHANGE_SYSTEM_PARAMETER_FAILED = OBDErrorCodeTemplate(1023, '({server}) faile
 
 # error code for observer
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
-EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Available: {available}, Need: {need})')
+EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Available [cat /proc/meminfo | grep MemAvailable] : {available}, Need: {need})')
 EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Buff/Cache: {cached}, Need: {need})')
 EC_OBSERVER_CAN_NOT_MIGRATE_IN = OBDErrorCodeTemplate(2001, 'server can not migrate in')
 EC_OBSERVER_FAIL_TO_START = OBDErrorCodeTemplate(2002, 'Failed to start {server} observer')
@@ -177,6 +180,9 @@ EC_OBSERVER_LOG_INCOMPLETE = OBDErrorCodeTemplate(2016, "Primary tenant {primary
 EC_OBSERVER_LOG_RECOVER = OBDErrorCodeTemplate(2017, "Continuous log synchronization is not enabled. Please execute the command `obd cluster tenant recover {cluster_name} {tenant_name} --unlimited` to enable continuous log synchronization")
 EC_OBSERVER_LOCATION_CREATE_STANDBY = OBDErrorCodeTemplate(2018, "For the standby tenant created by {primary_tenant} in log archive mode, it is prohibited to create a network-mode standby tenant for this standby tenant.")
 EC_OBSERVER_AUTO_START_DBUS_ENV = OBDErrorCodeTemplate(2019, "The current user does not have permission to enable autostart; sudo privileges are required and this operation is not allowed in container environments.")
+EC_MULTIPLE_NODES_SAME = OBDErrorCodeTemplate(2020, "Multiple observer nodes on the same server are not supported by the auto start feature")
+EC_OBSERVER_WEB_AUTO_START = OBDErrorCodeTemplate(2021, "Permission denied. Current user {user} on server {ip} requires sudo privileges.")
+
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 
@@ -255,8 +261,15 @@ EC_OBLOGPROXY_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4501, 'OBLogProxy {obl
 # obbinlog
 EC_OBBINLOG_DEPENDS_COMP_MIN_VERSION = OBDErrorCodeTemplate(4601, 'OBBinlog {obbinlog_version} needs to use {comp} with version {min_version} or above.')
 EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER = OBDErrorCodeTemplate(4602, 'Deploy {target_oceanbase_deploy} need depends ob-configserver. You could use `obd cluster component add {target_oceanbase_deploy} -c <ob-configserver.config>` to add.')
+EC_OBBINLOG_CE_WITH_OCENABASE_CE = OBDErrorCodeTemplate(4603, 'The Binlog service for the community version can only be used with the community version of the OceanBase database.')
+EC_OBBINLOG_WITH_OCENABASE = OBDErrorCodeTemplate(4604, 'The Binlog service for the enterprise version can only be used with the enterprise version of the OceanBase database.')
 
 WC_PARAM_USELESS = OBDErrorCodeTemplate(4521, 'The config {key} in {current_comp} did not take effect, please config it in {comp}')
+
+#oms
+EC_OMS_SERVER_CONNECT_METADB = OBDErrorCodeTemplate(4701, 'failed to connect meta db')
+EC_OMS_SERVER_CONNECT_INFLUXDB = OBDErrorCodeTemplate(4702, 'failed to connect influxdb')
+EC_OMS_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4703, '({ip}) {disk} not enough disk space. (Need: {need})')
 
 # sql
 EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")
@@ -297,6 +310,7 @@ SUG_ULIMIT = OBDErrorSuggestionTemplate('Please execute `echo -e "* soft {name} 
 SUG_CONNECT_EXCEPT = OBDErrorSuggestionTemplate('Connection exception or unsupported OS. Please retry or contact us.')
 SUG_UNSUPPORT_OS = OBDErrorSuggestionTemplate('It may be an unsupported OS, please contact us for assistance')
 SUG_CHANGE_SERVER = OBDErrorSuggestionTemplate('Please change the server.')
+SUG_SUDO_PRIVILEGE = OBDErrorSuggestionTemplate('Please grant user {user} on server {ip} sudo privileges.')
 SUG_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorSuggestionTemplate('`system_memory` should be less than {factor} * memory_limit/memory_limit_percentage.', fix_eval=[FixEval(FixEval.DEL, 'system_memory')])
 SUG_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE = OBDErrorSuggestionTemplate('Please execute `echo 1 > /proc/sys/vm/drop_caches` as root in {ip} to release cached.')
 SUG_OBSERVER_REDUCE_MEM = OBDErrorSuggestionTemplate('Please reduce the `memory_limit` or `memory_limit_percentage`', fix_eval=[FixEval(FixEval.DEL, 'memory_limit'), FixEval(FixEval.DEL, 'system_memory'), FixEval(FixEval.DEL, 'memory_limit_percentage')])
@@ -328,3 +342,4 @@ SUG_OB_SYS_USERNAME = OBDErrorSuggestionTemplate('Please delete the "ob_sys_user
 SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_password" for oblogproxy by configuring the "cdcro_password" parameter in the "oceanbase" or "oceanbase-ce" or "oceanbase-standalone" component.''')
 SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)
 SUB_OBSERVER_UNKONE_SCENARIO = OBDErrorSuggestionTemplate('Please select a valid scenario from the options: {scenarios}')
+SUG_CHECK_CONNECT_INFO = OBDErrorSuggestionTemplate('Please check {db} connection information')

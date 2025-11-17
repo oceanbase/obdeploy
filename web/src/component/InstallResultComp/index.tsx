@@ -42,6 +42,7 @@ export enum ResultType {
   OBInstall = 'obInstall',
   CompInstall = 'componentInstall',
   TenantInstall = 'tenantInstall',
+  OmsInstall = 'omsInstall',
 }
 
 interface InstallResultCompProps {
@@ -224,10 +225,12 @@ export default function InstallResultComp({
                   id: 'OBD.pages.components.InstallFinished.OceanbaseSuccessfullyDeployed',
                   defaultMessage: 'OceanBase 部署成功!',
                 })
-                : intl.formatMessage({
-                  id: 'OBD.component.InstallResultComp.ComponentDeploymentSucceeded',
-                  defaultMessage: '组件部署成功',
-                })}
+                : type === ResultType.OmsInstall
+                  ? 'OMS 部署成功!'
+                  : intl.formatMessage({
+                    id: 'OBD.component.InstallResultComp.ComponentDeploymentSucceeded',
+                    defaultMessage: '组件部署成功',
+                  })}
             </div>
           ) : (
             <div
@@ -244,10 +247,12 @@ export default function InstallResultComp({
                   id: 'OBD.pages.components.InstallFinished.OceanbaseDeploymentFailed',
                   defaultMessage: 'OceanBase 部署失败',
                 })
-                : intl.formatMessage({
-                  id: 'OBD.component.InstallResultComp.ComponentDeploymentFailed',
-                  defaultMessage: '组件部署失败',
-                })}
+                : type === ResultType.OmsInstall
+                  ? 'OMS 部署失败'
+                  : intl.formatMessage({
+                    id: 'OBD.component.InstallResultComp.ComponentDeploymentFailed',
+                    defaultMessage: '组件部署失败',
+                  })}
             </div>
           )
         }
@@ -395,24 +400,76 @@ export default function InstallResultComp({
               </Button>
             )}
           </>
-        ) : (
-          <Button
-            type="primary"
-            onClick={handleFinished}
-            data-aspm-click="c307514.d317297"
-            data-aspm-desc={intl.formatMessage({
-              id: 'OBD.pages.components.InstallFinished.DeploymentResultDeploymentCompleted',
-              defaultMessage: '部署结果-部署完成',
-            })}
-            data-aspm-param={``}
-            data-aspm-expo
-          >
-            {intl.formatMessage({
-              id: 'OBD.pages.components.InstallFinished.Complete',
+        ) : type === ResultType.OmsInstall
+          ? <Popconfirm
+            title={
+              <>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  是否要退出页面？
+                </div>
+                <div style={{ color: '#5c6b8a', margin: '8px 0' }}>
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.InstallFinished.4C585A48',
+                    defaultMessage: '退出前，请确保已复制访问地址及账密信息',
+                  })}
+                </div>
+                <Text
+                  copyable={{
+                    text: `${obConnectUrl} ${obConnectInfo}`,
+                  }}
+                  style={{ color: '#006aff' }}
+                >
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.InstallFinished.0B5951B4',
+                    defaultMessage: '复制链接信息',
+                  })}
+                </Text>
+              </>
+            }
+            onConfirm={exitOnOk}
+            okText={intl.formatMessage({
+              id: 'OBD.pages.components.InstallFinished.CE82EA51',
               defaultMessage: '退出',
             })}
-          </Button>
-        )}
+            cancelText={intl.formatMessage({
+              id: 'OBD.pages.components.InstallFinished.F8BD249F',
+              defaultMessage: '取消',
+            })}
+            okButtonProps={{
+              danger: true,
+            }}
+            icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
+          >
+            <Button
+              type="default"
+              data-aspm-click="c307514.d317297"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.InstallFinished.DeploymentResultDeploymentCompleted',
+                defaultMessage: '部署结果-部署完成',
+              })}
+              data-aspm-param={``}
+              data-aspm-expo
+            >
+              完成
+            </Button>
+          </Popconfirm> : (
+            <Button
+              type="primary"
+              onClick={handleFinished}
+              data-aspm-click="c307514.d317297"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.InstallFinished.DeploymentResultDeploymentCompleted',
+                defaultMessage: '部署结果-部署完成',
+              })}
+              data-aspm-param={``}
+              data-aspm-expo
+            >
+              {intl.formatMessage({
+                id: 'OBD.pages.components.InstallFinished.Complete',
+                defaultMessage: '退出',
+              })}
+            </Button>
+          )}
       </CustomFooter>
       <CreatTenant
         open={open}

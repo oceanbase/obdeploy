@@ -44,6 +44,8 @@ OB_CONFIGSERVER = 'obconfigserver'
 PROMETHEUS = 'prometheus'
 GRAFANA = 'grafana'
 ALERTMANAGER = 'alertmanager'
+OMS = 'oms'
+OMS_CE = 'oms-ce'
 
 ALERTMANAGER_DEFAULT_RECEIVER = {
     "receivers": ["mock_webhook"]

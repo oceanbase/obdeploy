@@ -6,6 +6,7 @@ import {
   hasDuplicateIPs,
   serverReg,
   serversValidator,
+  hybridAddressValidator,
 } from '@/utils';
 import { getAllServers } from '@/utils/helper';
 import { intl } from '@/utils/intl';
@@ -44,6 +45,7 @@ import { getLocale, useModel } from 'umi';
 import validator from 'validator';
 import {
   alertManagerComponent,
+  commonSelectStyle,
   commonServerStyle,
   commonStyle,
   configServerComponent,
@@ -87,7 +89,6 @@ export default function NodeConfig() {
   const { components = {}, auth, home_path } = configData || {};
   const {
     oceanbase = {},
-    ocpexpress = {},
     obproxy = {},
     prometheus = {},
     grafana = {},
@@ -102,8 +103,10 @@ export default function NodeConfig() {
   const [alertmanagerValues, setAlertmanagerValues] = useState<string[]>([]);
 
   useEffect(() => {
+    // 严格限制只能有一个值，始终使用最后一个（最新的）值
     if (alertmanager?.servers && Array.isArray(alertmanager.servers) && alertmanager.servers.length > 0) {
-      setAlertmanagerValues(alertmanager.servers);
+      const lastValue = [alertmanager.servers[alertmanager.servers.length - 1]];
+      setAlertmanagerValues(lastValue);
     }
   }, [alertmanager?.servers]);
 
@@ -330,37 +333,18 @@ export default function NodeConfig() {
   };
 
   const nextStep = () => {
-    // 在验证前，确保 alertmanager 的值是有效的
-    if (alertmanagerValues.length > 0) {
-      // 检查当前配置的Alertmanager节点是否仍然有效
-      const validServers = alertmanagerValues.filter(server => allOBServer.includes(server));
-      if (validServers.length > 0) {
-        // 使用有效的服务器
-        form.setFieldValue(['alertmanager', 'servers'], validServers);
-        if (tableFormRef.current) {
-          tableFormRef.current.setFieldValue(['alertmanager', 'servers'], validServers);
-        }
-      } else {
-        // 如果没有有效的服务器，但有可用的OBServer，使用第一个
-        if (allOBServer.length > 0) {
-          const defaultValue = [allOBServer[0]];
-          form.setFieldValue(['alertmanager', 'servers'], defaultValue);
-          if (tableFormRef.current) {
-            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], defaultValue);
-          }
-          // 更新状态
-          setAlertmanagerValues(defaultValue);
-        }
-      }
-    } else if (allOBServer.length > 0) {
-      // 如果没有 alertmanagerValues，但有 allOBServer，则使用第一个
-      const defaultValue = [allOBServer[0]];
-      form.setFieldValue(['alertmanager', 'servers'], defaultValue);
+    // 直接使用表单中的值（用户手动输入的值），与 Prometheus 的处理方式一致
+    // 严格限制只能有一个值，始终使用最后一个（最新的）值
+    const currentFormValue = form.getFieldValue(['alertmanager', 'servers']);
+    if (currentFormValue && Array.isArray(currentFormValue) && currentFormValue.length > 0) {
+      // 只保留最后一个值（最新的）
+      const lastValue = [currentFormValue[currentFormValue.length - 1]];
+      // 同步更新状态和表单值，确保只保留最后一个值
+      setAlertmanagerValues(lastValue);
+      form.setFieldValue(['alertmanager', 'servers'], lastValue);
       if (tableFormRef.current) {
-        tableFormRef.current.setFieldValue(['alertmanager', 'servers'], defaultValue);
+        tableFormRef.current.setFieldValue(['alertmanager', 'servers'], lastValue);
       }
-      // 更新状态
-      setAlertmanagerValues(defaultValue);
     }
 
     const tableFormRefValidate = () => {
@@ -406,7 +390,6 @@ export default function NodeConfig() {
   const getComponentServers = (
     component:
       | 'obproxy'
-      | 'ocpexpress'
       | 'obconfigserver'
       | 'grafana'
       | 'prometheus'
@@ -416,14 +399,13 @@ export default function NodeConfig() {
     const compoentServers = form.getFieldValue([component, 'servers']);
     const componentTextMap = {
       obproxy: 'OBProxy',
-      ocpexpress: 'OCP Express',
       obconfigserver: 'obconfigserver',
       prometheus: 'prometheus',
       grafana: 'grafana',
       alertmanager: 'alertmanager',
     };
 
-    // 为 alertmanager 组件添加特殊逻辑，确保始终只返回一个值
+    // 为 alertmanager 组件添加特殊逻辑，确保始终只返回一个值（最后一个最新输入的值）
     if (component === 'alertmanager') {
       // 如果有删除操作且alertmanagerValues为空，说明应该保持清理状态
       if (lastDeleteServer && alertmanagerValues.length === 0) {
@@ -434,17 +416,16 @@ export default function NodeConfig() {
       const currentValue = form.getFieldValue([component, 'servers']);
 
       if (currentValue && Array.isArray(currentValue) && currentValue.length > 0) {
-        // 如果表单中有值且有效，返回第一个有效值
-        const validValue = currentValue.find(server => allServers.includes(server));
-        if (validValue) {
-          return [validValue];
-        }
+        // 如果表单中有值，返回最后一个值（最新的），即使不在 allServers 中（因为这是用户保存的值）
+        return [currentValue[currentValue.length - 1]];
       }
 
-      if (alertmanagerValues?.length > 0 && allServers.includes(alertmanagerValues[0])) {
-        // 如果alertmanagerValues有值且有效，使用它
-        return [alertmanagerValues[0]];
-      } else if (allServers?.length > 0 && !lastDeleteServer) {
+      if (alertmanagerValues?.length > 0) {
+        // 如果alertmanagerValues有值，返回最后一个值（最新的），即使不在 allServers 中（因为这是用户保存的值）
+        return [alertmanagerValues[alertmanagerValues.length - 1]];
+      }
+
+      if (allServers?.length > 0 && !lastDeleteServer) {
         // 只有在没有删除操作的情况下，才自动分配第一个可用的服务器
         return [allServers[0]];
       }
@@ -508,6 +489,45 @@ export default function NodeConfig() {
     dbConfigData.forEach((item) => {
       allZoneServers[`${item.id}`] = item.servers || [];
     });
+
+    // 优先使用用户手动设置的值（检查表单值和 alertmanagerValues）
+    // 关键：即使值不在 allServers 中，也应该保留用户保存的值
+    const currentFormValue = form.getFieldValue(['alertmanager', 'servers']);
+    const hasFormValue = currentFormValue && Array.isArray(currentFormValue) && currentFormValue.length > 0;
+    // 如果表单中有值，就使用它（即使不在 allServers 中，因为这是用户保存的值）
+    const hasValidFormValue = hasFormValue;
+    // 如果 alertmanagerValues 有值，就使用它（即使不在 allServers 中）
+    const hasValidAlertmanagerValues = alertmanagerValues.length > 0;
+
+    // 优先使用表单值（用户刚刚手动设置的值），其次使用 alertmanagerValues
+    // 只有在表单值无效或不存在时，才使用 getComponentServers 的返回值
+    // 严格限制只能有一个值，始终使用最后一个（最新的）值
+    const alertmanagerServerValue = hasValidFormValue
+      ? (() => {
+        // 使用表单值，只保留最后一个值（即使不在 allServers 中）
+        return [currentFormValue[currentFormValue.length - 1]];
+      })()
+      : hasValidAlertmanagerValues
+        ? (() => {
+          // 使用 alertmanagerValues，只保留最后一个值（即使不在 allServers 中）
+          return [alertmanagerValues[alertmanagerValues.length - 1]];
+        })()
+        : (() => {
+          const componentServers = getComponentServers('alertmanager');
+          // 只保留最后一个值
+          return componentServers && componentServers.length > 0 ? [componentServers[componentServers.length - 1]] : [];
+        })();
+
+    // 只有在 alertmanager 的值需要更新时才更新，避免覆盖用户手动输入的值
+    // 关键：如果表单中有值，说明用户已经手动输入了，不要覆盖它
+    const currentAlertmanagerValue = form.getFieldValue(['alertmanager', 'servers']);
+    const needUpdateAlertmanager = !hasValidFormValue && (
+      !currentAlertmanagerValue ||
+      !Array.isArray(currentAlertmanagerValue) ||
+      currentAlertmanagerValue.length === 0 ||
+      JSON.stringify(currentAlertmanagerValue) !== JSON.stringify(alertmanagerServerValue)
+    );
+
     form.setFieldsValue({
       obproxy: {
         servers: getComponentServers('obproxy'),
@@ -521,16 +541,46 @@ export default function NodeConfig() {
       prometheus: {
         servers: getComponentServers('prometheus'),
       },
-      alertmanager: {
-        servers: getComponentServers('alertmanager'),
-      },
+      // 只有在需要更新时才更新 alertmanager，避免覆盖用户手动输入的值
+      ...(needUpdateAlertmanager ? {
+        alertmanager: {
+          servers: alertmanagerServerValue,
+        },
+      } : {}),
     });
 
     setAllOBServer(allServers);
     setAllZoneOBServer(allZoneServers);
 
     // 优化Alertmanager自动填入逻辑
+    // 关键：如果表单中有值，说明用户已经手动输入了，不要覆盖它（即使不在 allServers 中）
     if (allServers.length > 0) {
+      // 如果用户已经手动设置过值（表单值存在），保持它不变，只同步状态
+      if (hasValidFormValue) {
+        // 严格限制只能有一个值，只保留最后一个（最新的）值
+        // 使用表单值，即使不在 allServers 中（因为这是用户保存的值）
+        const userInputValue = [currentFormValue[currentFormValue.length - 1]];
+        // 同步 alertmanagerValues 状态，但不覆盖表单值
+        if (JSON.stringify(alertmanagerValues) !== JSON.stringify(userInputValue)) {
+          setAlertmanagerValues(userInputValue);
+        }
+        return; // 用户已手动设置，不执行后续的自动填入逻辑
+      }
+
+      // 如果表单中没有值，但状态中有值，使用状态值
+      if (hasValidAlertmanagerValues) {
+        // 严格限制只能有一个值，只保留最后一个（最新的）值
+        // 使用 alertmanagerValues，即使不在 allServers 中（因为这是用户保存的值）
+        const stateValue = [alertmanagerValues[alertmanagerValues.length - 1]];
+        if (JSON.stringify(form.getFieldValue(['alertmanager', 'servers'])) !== JSON.stringify(stateValue)) {
+          form.setFieldValue(['alertmanager', 'servers'], stateValue);
+          if (tableFormRef.current) {
+            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], stateValue);
+          }
+        }
+        return; // 使用状态值，不执行后续的自动填入逻辑
+      }
+
       // 如果Alertmanager还没有配置，且有可用的服务器，自动填入第一个
       if (alertmanagerValues.length === 0 && !lastDeleteServer) {
         const defaultValue = [allServers[0]];
@@ -551,12 +601,15 @@ export default function NodeConfig() {
           if (tableFormRef.current) {
             tableFormRef.current.setFieldValue(['alertmanager', 'servers'], defaultValue);
           }
-        } else if (validServers.length !== alertmanagerValues.length) {
-          // 部分服务器无效，保留有效的服务器
-          setAlertmanagerValues(validServers);
-          form.setFieldValue(['alertmanager', 'servers'], validServers);
-          if (tableFormRef.current) {
-            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], validServers);
+        } else {
+          // 严格限制只能有一个值，只保留最后一个（最新的）值
+          const lastValidServer = [validServers[validServers.length - 1]];
+          if (JSON.stringify(alertmanagerValues) !== JSON.stringify(lastValidServer)) {
+            setAlertmanagerValues(lastValidServer);
+            form.setFieldValue(['alertmanager', 'servers'], lastValidServer);
+            if (tableFormRef.current) {
+              tableFormRef.current.setFieldValue(['alertmanager', 'servers'], lastValidServer);
+            }
           }
         }
       }
@@ -634,8 +687,8 @@ export default function NodeConfig() {
       return Promise.reject(
         new Error(
           intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectOcpExpress',
-            defaultMessage: '请选择正确的 OCP Express 节点',
+            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectNode',
+            defaultMessage: '请选择正确的节点',
           }),
         ),
       );
@@ -832,7 +885,12 @@ export default function NodeConfig() {
       servers: prometheus?.servers?.length ? prometheus?.servers : undefined,
     },
     alertmanager: {
-      servers: alertmanager?.servers?.length ? [alertmanager?.servers[0]] : undefined,
+      // 严格限制只能有一个值，始终使用最后一个（最新的）值
+      servers: alertmanager?.servers?.length
+        ? (Array.isArray(alertmanager.servers)
+          ? [alertmanager.servers[alertmanager.servers.length - 1]]
+          : [alertmanager.servers])
+        : undefined,
     },
     grafana: {
       servers: grafana?.servers?.length ? grafana?.servers : undefined,
@@ -850,11 +908,6 @@ export default function NodeConfig() {
     home_path: initHomePath,
   };
   if (!lowVersion) {
-    initialValues.ocpexpress = {
-      servers: ocpexpress?.servers?.length
-        ? [ocpexpress?.servers[0]]
-        : undefined,
-    };
   }
 
   const componentsToCheck = [
@@ -1197,7 +1250,7 @@ export default function NodeConfig() {
                                           _: any,
                                           value: string[],
                                         ) =>
-                                          serversValidator(
+                                          hybridAddressValidator(
                                             _,
                                             [value],
                                             'OBServer',
@@ -1294,40 +1347,28 @@ export default function NodeConfig() {
                       style: commonServerStyle,
                       maxTagCount: 1,
                       maxTagTextLength: 15,
-                    }}
-                    onChange={(value: string[]) => {
-                      // 严格限制只能有一个值
-                      if (value && value.length > 0) {
-                        // 如果用户尝试输入多个值，只保留最后一个
-                        if (value.length > 1) {
+                      onChange: (value: string[]) => {
+                        // 严格限制只能有一个值，始终使用最后一个最新输入的值
+                        if (value && value.length > 0) {
+                          // 无论输入多少个值，只保留最后一个（最新的）
                           const lastValue = value[value.length - 1];
                           const newValue = [lastValue];
+
+                          // 立即更新状态和表单值，确保只保留最后一个值
                           setAlertmanagerValues(newValue);
                           form.setFieldValue(['alertmanager', 'servers'], newValue);
                           if (tableFormRef.current) {
                             tableFormRef.current.setFieldValue(['alertmanager', 'servers'], newValue);
                           }
-                          return;
-                        }
-
-                        // 检查输入的值是否有效
-                        const inputValue = value[0];
-                        if (allOBServer.includes(inputValue)) {
-                          // 如果输入的值有效，正常设置
-                          setAlertmanagerValues(value);
                         } else {
-                          // 如果输入的值无效，暂时保持用户输入，不自动替换
-                          // 这样可以避免触发不必要的验证
-                          setAlertmanagerValues(value);
+                          // 如果没有值，清空
+                          setAlertmanagerValues([]);
+                          form.setFieldValue(['alertmanager', 'servers'], []);
+                          if (tableFormRef.current) {
+                            tableFormRef.current.setFieldValue(['alertmanager', 'servers'], []);
+                          }
                         }
-                      } else {
-                        // 如果没有值，清空
-                        setAlertmanagerValues([]);
-                        form.setFieldValue(['alertmanager', 'servers'], []);
-                        if (tableFormRef.current) {
-                          tableFormRef.current.setFieldValue(['alertmanager', 'servers'], []);
-                        }
-                      }
+                      },
                     }}
                     placeholder={intl.formatMessage({
                       id: 'OBD.pages.components.NodeConfig.PleaseSelect',
@@ -1437,7 +1478,7 @@ export default function NodeConfig() {
                   </>
                 }
                 fieldProps={{
-                  style: { width: 328 },
+                  style: commonSelectStyle,
                   autoComplete: 'new-password',
                 }}
                 placeholder={intl.formatMessage({
@@ -1474,7 +1515,7 @@ export default function NodeConfig() {
                     defaultMessage: '若各节点间已完成免密配置，则密码可置空',
                   })}
                   fieldProps={{
-                    style: { width: 328 },
+                    style: commonSelectStyle,
                     autoComplete: 'new-password',
                   }}
                   isPassword
@@ -1530,21 +1571,6 @@ export default function NodeConfig() {
         <footer className={styles.pageFooterContainer}>
           <div className={styles.pageFooter}>
             <Space className={styles.foolterAction}>
-              <Button
-                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-                data-aspm-click="c307506.d317278"
-                data-aspm-desc={intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationExit',
-                  defaultMessage: '节点配置-退出',
-                })}
-                data-aspm-param={``}
-                data-aspm-expo
-              >
-                {intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.Exit',
-                  defaultMessage: '退出',
-                })}
-              </Button>
               <Tooltip
                 title={intl.formatMessage({
                   id: 'OBD.pages.components.NodeConfig.TheCurrentPageConfigurationHas',
@@ -1581,6 +1607,21 @@ export default function NodeConfig() {
                 {intl.formatMessage({
                   id: 'OBD.pages.components.NodeConfig.NextStep',
                   defaultMessage: '下一步',
+                })}
+              </Button>
+              <Button
+                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+                data-aspm-click="c307506.d317278"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationExit',
+                  defaultMessage: '节点配置-退出',
+                })}
+                data-aspm-param={``}
+                data-aspm-expo
+              >
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.Exit',
+                  defaultMessage: '退出',
                 })}
               </Button>
             </Space>

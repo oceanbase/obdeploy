@@ -57,7 +57,8 @@ def destroy(plugin_context, *args, **kwargs):
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         stdio.verbose('%s work path cleaning' % server)
-        clean(server, server_config['home_path'])
+        if server_config.get('home_path'):
+            clean(server, server_config['home_path'])
         for key in clean_dirs:
             if server_config.get(key):
                 clean(server, server_config[key])

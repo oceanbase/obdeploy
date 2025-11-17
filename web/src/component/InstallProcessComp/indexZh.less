@@ -4,6 +4,7 @@
 .progressEffectContainer {
   position: relative;
   height: 150px;
+
   .deployTitle {
     position: absolute;
     left: 50%;
@@ -11,48 +12,59 @@
     font-size: 16px;
     transform: translateX(-50%);
   }
+
   .computer {
     position: absolute;
     top: 20px;
     left: 195px;
+
     .computerAnimate {
       width: 150px;
     }
   }
+
   .tenantComputer {
     position: absolute;
     top: 20px;
     left: 25px;
+
     .computerAnimate {
       width: 100px;
     }
   }
+
   .progress {
     position: absolute;
     top: 65px;
-    left:327px ;
+    left: 327px;
+
     .progressVedio {
       width: 285px;
       height: 11px;
       background-color: #fff;
+
       :global {
         .vjs-text-track-display {
           background-color: #fff !important;
         }
+
         .vjs-poster {
           top: 1px !important;
           left: 1px !important;
           background-position: 0 0 !important;
           background-size: 100% !important;
         }
+
         .vjs-modal-dialog {
           background: #fff !important;
         }
+
         .vjs-error-display:before {
           content: '' !important;
         }
       }
     }
+
     .progressCover {
       position: absolute;
       top: 2.5px;
@@ -67,14 +79,17 @@
     position: absolute;
     top: 25px;
     left: 310px;
+
     .spacemanAnimate {
       width: 320px;
     }
   }
+
   .database {
     position: absolute;
     top: 20px;
-    right:  190px;
+    right: 190px;
+
     .sqlAnimate {
       width: 150px;
     }
@@ -94,19 +109,69 @@
 .reportLog {
   background-color: @cardBackgroundColor;
 }
+
 .installLog,
 .reportLog {
   margin: 0 !important;
   overflow: auto;
   color: #8592ad;
 }
+
 .installLog {
   height: 360px;
 }
+
 .reportLog {
   max-width: 1008px;
   min-height: 100px;
   max-height: 360px;
   padding: 16px;
   border-radius: 8px;
+}
+
+.shapeContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.shape {
+  width: 8px;
+  height: 8px;
+  background-color: #8592ad;
+  border-radius: 50%;
+  animation: shapePulse 1.4s ease-in-out infinite;
+
+  &:nth-child(1) {
+    animation-delay: 0s;
+  }
+
+  &:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  &:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  &:nth-child(4) {
+    animation-delay: 0.6s;
+  }
+}
+
+@keyframes shapePulse {
+
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

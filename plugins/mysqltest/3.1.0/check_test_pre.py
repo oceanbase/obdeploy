@@ -14,11 +14,14 @@
 # limitations under the License.
 
 import os
+from const import COMP_OB_SEEKDB
 
 
 def check_test_pre(plugin_context, env, *args, **kwargs):
-    query_sql = 'select zone, count(*) as a from oceanbase.__all_virtual_zone_stat group by region order by a desc limit 1'
-    plugin_context.set_variable('query_sql', query_sql)
+    repository = kwargs.get("repository")
+    if repository.name != COMP_OB_SEEKDB:
+        query_sql = 'select zone, count(*) as a from oceanbase.__all_virtual_zone_stat group by region order by a desc limit 1'
+        plugin_context.set_variable('query_sql', query_sql)
 
     def get_variable_from_python_file(file_path, var_name, default_file=None, default_value=None, stdio=None):
         global_vars = {}
