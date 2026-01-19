@@ -16,13 +16,16 @@
 from __future__ import absolute_import, division, print_function
 
 
-def drop_tenant(plugin_context, cursor, *args, **kwargs):
+def drop_tenant(plugin_context, cursors, *args, **kwargs):
     def error(*arg, **kwargs):
         stdio.error(*arg, **kwargs)
         stdio.stop_loading('fail')
 
     stdio = plugin_context.stdio
     options = plugin_context.options
+
+    deploy_name = plugin_context.cluster_config.deploy_name
+    cursor = cursors.get(deploy_name)
 
     tenant_name = getattr(options, 'tenant_name', '')
     if not tenant_name:

@@ -23,7 +23,7 @@ export default function BasicInfo({ basicInfoProp }: BasicInfoProps) {
           className="card-padding-bottom-24"
         >
           <Col span={12}>
-            <ProCard className={styles.infoSubCard} split="vertical">
+            <ProCard className={`${styles.infoSubCard} ${styles.tenantConfigContainer}`} split="vertical">
               <ProCard
                 style={leftCardStyle}
                 title={intl.formatMessage({
@@ -55,14 +55,14 @@ export default function BasicInfo({ basicInfoProp }: BasicInfoProps) {
         >
           <Row gutter={[0, 0]} style={{ flexDirection: 'column' }}>
             {basicInfoProp.productsInfo.map((versionInfo, idx) => (
-              <Col key={idx} span={14}>
+              <Col key={idx} span={12}>
                 <ProCard
                   style={
                     idx !== basicInfoProp.productsInfo.length - 1
                       ? { marginBottom: 16 }
                       : {}
                   }
-                  className={styles.infoSubCard}
+                  className={`${styles.infoSubCard} ${styles.tenantConfigContainer}`}
                   split="vertical"
                 >
                   <ProCard
@@ -77,13 +77,13 @@ export default function BasicInfo({ basicInfoProp }: BasicInfoProps) {
                       <Tag className={styles.versionTag}>
                         {versionInfo.isCommunity
                           ? intl.formatMessage({
-                              id: 'OBD.OCPPreCheck.CheckInfo.BasicInfo.CommunityEdition',
-                              defaultMessage: '社区版',
-                            })
+                            id: 'OBD.OCPPreCheck.CheckInfo.BasicInfo.CommunityEdition',
+                            defaultMessage: '社区版',
+                          })
                           : intl.formatMessage({
-                              id: 'OBD.OCPPreCheck.CheckInfo.BasicInfo.CommercialEdition',
-                              defaultMessage: '商业版',
-                            })}
+                            id: 'OBD.OCPPreCheck.CheckInfo.BasicInfo.CommercialEdition',
+                            defaultMessage: '商业版',
+                          })}
                       </Tag>
                     )}
                   </ProCard>

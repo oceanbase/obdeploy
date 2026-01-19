@@ -73,6 +73,7 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
     apply_param_plugin(dest_repository)
     start_kwargs = copy(kwargs)
     start_kwargs['bootstrap'] = True
+    setattr(options, 'with_parameter', True)
     if not run_workflow(start_workflows, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):
         return 
     

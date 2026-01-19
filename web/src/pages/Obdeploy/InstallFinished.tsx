@@ -137,6 +137,33 @@ export const connectColumns: ColumnsType<API.ConnectionInfo> = [
   },
 ];
 
+export const omsConnectColumns: ColumnsType<API.ConnectionInfo> = [
+  {
+    title: '地域标识',
+    dataIndex: 'cm_location',
+    render: (text) => text || '-',
+  },
+  {
+    title: '英文地域标志',
+    dataIndex: 'cm_region',
+    render: (text) => text || '-',
+  },
+  {
+    title: '访问地址',
+    dataIndex: 'cm_nodes',
+    render: (text) => text || '-',
+  },
+  {
+    title: '账号',
+    dataIndex: 'user',
+    render: (text) => text || '-',
+  },
+  {
+    title: '密码',
+    dataIndex: 'password',
+    render: (text) => text || '-',
+  },
+];
 export const getReportColumns = (
   clusterName: string,
   isCompChange: boolean = false,

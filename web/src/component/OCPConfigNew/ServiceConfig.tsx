@@ -1,5 +1,5 @@
 import { ocpAddonAfter } from '@/constant/configuration';
-import { commonInputStyle, commonPortStyle } from '@/pages/constants';
+import { commonInputStyle, commonPortStyle, pathRule } from '@/pages/constants';
 import { siteReg } from '@/utils';
 import {
   OCP_PASSWORD_ERROR_REASON,
@@ -61,8 +61,8 @@ export default function ServiceConfig({
   const defaultSiteUrl = ocpserver.ocp_site_url
     ? ocpserver.ocp_site_url
     : isSingleOcpNode === true && ip.length
-    ? `http://${ip[0]}:8080`
-    : '';
+      ? `http://${ip[0]}:8080`
+      : '';
   const [siteUrl, setSiteUrl] = useState<string>(defaultSiteUrl);
   const setPassword = (password: string) => {
     form.setFieldValue(['ocpserver', 'admin_password'], password);
@@ -144,19 +144,19 @@ export default function ServiceConfig({
               title={
                 isLowVersion
                   ? intl.formatMessage(
-                      {
-                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                      },
-                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
-                    )
+                    {
+                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                    },
+                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
+                  )
                   : intl.formatMessage(
-                      {
-                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                      },
-                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
-                    )
+                    {
+                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                    },
+                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
+                  )
               }
             >
               <QuestionCircleOutlined className="ml-10" />
@@ -180,6 +180,7 @@ export default function ServiceConfig({
               defaultMessage: '请输入软件路径',
             }),
           },
+          pathRule,
         ]}
       >
         <Input addonAfter={<span>{ocpAddonAfter}</span>} />
@@ -199,6 +200,7 @@ export default function ServiceConfig({
               defaultMessage: '请输入日志路径',
             }),
           },
+          pathRule,
         ]}
       >
         <Input />
@@ -218,6 +220,7 @@ export default function ServiceConfig({
               defaultMessage: '请输入软件包路径',
             }),
           },
+          pathRule,
         ]}
       >
         <Input />

@@ -418,6 +418,14 @@ export default function PreCheckInfo() {
       {/* 组件配置 */}
       <CompDetailCheckInfo clusterConfigInfo={clusterConfigInfo} />
       <CustomFooter>
+        <Button
+          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
+        >
+          {intl.formatMessage({
+            id: 'OBD.pages.ComponentDeploy.PreCheckInfo.Exit',
+            defaultMessage: '退出',
+          })}
+        </Button>
         <Button onClick={preStep}>
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.PreCheckInfo.PreviousStep',
@@ -428,14 +436,6 @@ export default function PreCheckInfo() {
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.PreCheckInfo.PreCheck',
             defaultMessage: '预检查',
-          })}
-        </Button>
-        <Button
-          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
-        >
-          {intl.formatMessage({
-            id: 'OBD.pages.ComponentDeploy.PreCheckInfo.Exit',
-            defaultMessage: '退出',
           })}
         </Button>
       </CustomFooter>

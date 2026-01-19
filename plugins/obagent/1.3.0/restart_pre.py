@@ -21,7 +21,5 @@ def restart_pre(plugin_context, *args, **kwargs):
     plugin_context.set_variable('dir_list', ['home_path'])
     plugin_context.set_variable('finally_plugins', ['connect', 'display'])
     plugin_context.set_variable('need_bootstrap', False)
+    plugin_context.set_variable('new_deploy_config', kwargs.get('new_deploy_config'))
     return plugin_context.return_true()
-
-
-

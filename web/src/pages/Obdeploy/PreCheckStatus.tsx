@@ -36,7 +36,6 @@ export default function PreCheckStatus() {
   const {
     setCurrentStep,
     configData,
-    setCheckOK,
     getInfoByName,
     setConfigData,
     setErrorVisible,
@@ -355,8 +354,7 @@ export default function PreCheckStatus() {
   };
 
   const prevStep = () => {
-    setCheckOK(false);
-    setCurrentStep(3);
+    setCurrentStep(4);
     setCurrentPage(false);
     setErrorVisible(false);
     setErrorsList([]);
@@ -366,7 +364,7 @@ export default function PreCheckStatus() {
   const handleInstall = async () => {
     const { success } = await handleInstallConfirm({ name });
     if (success) {
-      setCurrentStep(5);
+      setCurrentStep(6);
       setCurrentPage(false);
       setErrorVisible(false);
       setErrorsList([]);

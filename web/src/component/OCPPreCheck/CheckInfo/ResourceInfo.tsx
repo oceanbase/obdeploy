@@ -56,23 +56,28 @@ export default function ResourceInfo({
             })}
             className="card-padding-bottom-24"
           >
-            <Col span={12}>
-              <ProCard className={styles.infoSubCard} split="vertical">
+            <Col span={18}>
+              <ProCard className={`${styles.infoSubCard} ${styles.userConfigContainer}`} split="vertical">
                 <ProCard
-                  style={leftCardStyle}
                   title={intl.formatMessage({
                     id: 'OBD.OCPPreCheck.CheckInfo.ResourceInfo.Username',
                     defaultMessage: '用户名',
                   })}
                 >
                   <Text
-                    style={{ width: 200 }}
                     ellipsis={{ tooltip: userConfig.user }}
                   >
                     {userConfig.user}
                   </Text>
                 </ProCard>
-                <PasswordCard password={userConfig.password} />
+                <ProCard
+                  title={intl.formatMessage({
+                    id: 'OBD.OCPPreCheck.CheckInfo.ResourceInfo.Password',
+                    defaultMessage: '密码',
+                  })}
+                >
+                  <PasswordCard password={userConfig.password} />
+                </ProCard>
                 <ProCard
                   title={intl.formatMessage({
                     id: 'OBD.OCPPreCheck.CheckInfo.ResourceInfo.SshPort',
@@ -94,7 +99,7 @@ export default function ResourceInfo({
             })}
             className="card-padding-bottom-24"
           >
-            <Col span={12}>
+            <Col span={6}>
               <ProCard className={styles.infoSubCard} split="vertical">
                 {ocpServer.map((server, idx) => (
                   <ProCard key={idx} colSpan={10} title={`节点${idx + 1}`}>
@@ -115,7 +120,7 @@ export default function ResourceInfo({
         >
           <Row gutter={16}>
             <Col span={24}>
-              <ProCard className={styles.infoSubCard} split="vertical">
+              <ProCard className={`${styles.infoSubCard} ${styles.serviceConfigContainer}`} split="vertical">
                 {serviceConfig &&
                   Object.keys(serviceConfig).map((key, idx) => {
                     let path =
@@ -165,12 +170,6 @@ export default function ResourceInfo({
         >
           <Col span={6}>
             <ProCard className={styles.infoSubCard} split="vertical">
-              {/* <ProCard colSpan={8} title="管理集群数量">
-                  {resourcePlan.cluster}
-                 </ProCard>
-                 <ProCard colSpan={8} title="管理租户数量">
-                  {resourcePlan.tenant}
-                 </ProCard> */}
               <ProCard
                 title={intl.formatMessage({
                   id: 'OBD.OCPPreCheck.CheckInfo.ResourceInfo.ManageTheNumberOfHosts',
@@ -212,9 +211,8 @@ export default function ResourceInfo({
         >
           <Row gutter={[16, 16]} style={{ padding: '24px' }}>
             <Col span={12}>
-              <ProCard className={styles.infoSubCard} split="vertical">
+              <ProCard className={`${styles.infoSubCard} ${styles.tenantConfigContainer}`} split="vertical">
                 <ProCard
-                  colSpan={10}
                   title={intl.formatMessage({
                     id: 'OBD.OCPPreCheck.CheckInfo.ResourceInfo.TenantName',
                     defaultMessage: '租户名称',
@@ -223,7 +221,6 @@ export default function ResourceInfo({
                   {tenantConfig.info.tenant_name}
                 </ProCard>
                 <ProCard
-                  colSpan={14}
                   title={intl.formatMessage({
                     id: 'OBD.OCPPreCheck.CheckInfo.ResourceInfo.Password',
                     defaultMessage: '密码',
@@ -245,7 +242,7 @@ export default function ResourceInfo({
               </ProCard>
             </Col>
             <Col span={12}>
-              <ProCard className={styles.infoSubCard} split="vertical">
+              <ProCard className={`${styles.infoSubCard} ${styles.tenantConfigContainer}`} split="vertical">
                 <ProCard colSpan={10} title="CPU">
                   {tenantConfig.resource.cpu} VCPUS
                 </ProCard>
@@ -272,7 +269,7 @@ export default function ResourceInfo({
         >
           <Row gutter={[16, 16]} style={{ padding: '24px' }}>
             <Col span={12}>
-              <ProCard className={styles.infoSubCard} split="vertical">
+              <ProCard className={`${styles.infoSubCard} ${styles.tenantConfigContainer}`} split="vertical">
                 <ProCard
                   colSpan={10}
                   title={intl.formatMessage({
@@ -305,7 +302,7 @@ export default function ResourceInfo({
               </ProCard>
             </Col>
             <Col span={12}>
-              <ProCard className={styles.infoSubCard} split="vertical">
+              <ProCard className={`${styles.infoSubCard} ${styles.tenantConfigContainer}`} split="vertical">
                 <ProCard colSpan={10} title="CPU">
                   {monitorConfig.resource.cpu} VCPUS
                 </ProCard>

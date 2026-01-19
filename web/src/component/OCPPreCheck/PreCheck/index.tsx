@@ -10,14 +10,10 @@ import { useRequest } from 'ahooks';
 import NP from 'number-precision';
 import { formatOcpPreCheckStatusData } from '../helper';
 
-interface PreCheckProps {
-  isNewDB: boolean;
-}
-
 export default function PreCheck({
   current,
   setCurrent,
-}: PreCheckProps & API.StepProp) {
+}: API.StepProp) {
   const {
     setCheckOK,
     setErrorVisible,
@@ -223,7 +219,6 @@ export default function PreCheck({
       onSuccess: ({ data, success }) => {
         if (success) {
           setInstallTaskId(data?.id);
-          setCurrent(5);
           setCurrent(current + 1);
           setCurrentPage(false);
           setErrorVisible(false);
@@ -259,7 +254,14 @@ export default function PreCheck({
   }, [onlyManual]);
 
   useEffect(() => {
-    precheckOcpDeployment({ id: connectId });
+    if (connectId) {
+      precheckOcpDeployment({ id: connectId });
+    } else {
+      // 如果connectId为空，直接设置为检查完成状态
+      setCheckFinished(true);
+      setCheckStatus(true);
+    }
+    // precheckOcpDeployment({ id: connectId });
   }, []);
 
   return (

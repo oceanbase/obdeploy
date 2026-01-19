@@ -26,8 +26,9 @@ stdio = None
 
 
 def start(plugin_context, is_reinstall=False, *args, **kwargs):
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     global stdio
-    cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     options = plugin_context.options
     stdio = plugin_context.stdio
@@ -69,7 +70,18 @@ def start(plugin_context, is_reinstall=False, *args, **kwargs):
         home_path = server_config['home_path']
         use_parameter = True
         config_flag = os.path.join(home_path, '.configured')
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % config_flag):
+
+        start_parameters = {}
+        if new_cluster_config:
+            old_config = plugin_context.cluster_config.get_server_conf_with_default(server)
+            new_config = new_cluster_config.get_server_conf_with_default(server)
+            for key in new_config:
+                param_value = new_config[key]
+                if key not in old_config or old_config[key] != param_value:
+                    start_parameters[key] = param_value
+        else:
+            start_parameters = server_config
+        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s' % config_flag):
             use_parameter = False
 
         if is_reinstall:
@@ -87,17 +99,18 @@ def start(plugin_context, is_reinstall=False, *args, **kwargs):
                     content = re.sub(r"cryptoMethod:\s+aes", "cryptoMethod: plain", content)
                     client.write_file(content, conf)
                     client.execute_command('chmod 755 {}'.format(conf))
-            for key in server_config:
-                if server_config[key] is None:
-                    server_config[key] = ''
-                if isinstance(server_config[key], bool):
-                    server_config[key] = str(server_config[key]).lower()
+            for key in start_parameters:
+                if start_parameters[key] is None:
+                    start_parameters[key] = ''
+                if isinstance(start_parameters[key], bool):
+                    start_parameters[key] = str(start_parameters[key]).lower()
 
             cmds = []
-            for key, value in server_config.items():
+            for key, value in start_parameters.items():
                 if key in config_mapper:
                     cmds.append("%s=%s" % (config_mapper[key], value))
-            cmd = 'cd %s;%s/bin/ob_agentctl config -u %s && touch %s' % (home_path, home_path, ','.join(cmds), config_flag)
+            cmd = 'cd %s;%s/bin/ob_agentctl config %s %s' % (home_path, home_path, '-u' if cmds else '', ','.join(cmds))
+            cmd += '&& touch %s' if not client.execute_command('ls %s' % config_flag) else ''
             res = client.execute_command(cmd)
             if not res:
                 stdio.error('failed to set config to {} obagent.'.format(server))

@@ -57,6 +57,12 @@ export function getCompoents(
     }),
     url: OCP_DOCS,
   };
+  const OMS_META: ComponentMetaType = {
+    key: 'oms',
+    name: 'OMS',
+    desc: '是 OceanBase 数据库一站式数据传输和同步的产品。是集数据迁移、实时数据同步和增量数据订阅于一体的数据传输服务。',
+    url: OCP_DOCS,
+  };
 
   const OBPROXY_META: ComponentMetaType = {
     key: OBPROXY,
@@ -99,6 +105,7 @@ export function getCompoents(
     OBPROXY,
     OCP,
     OCEANBASE_META,
+    OMS_META,
     OCP_META,
     OBPROXY_META,
     CompoentsInfo,

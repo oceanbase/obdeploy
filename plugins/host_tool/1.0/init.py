@@ -55,6 +55,21 @@ def init(plugin_context, host_clients, need_change_servers_vars, machine_check_i
                 if not client.execute_command(sudo_prefix + 'chown -R %s %s' % (username, dir_path)):
                     chown_dir = False
             stdio.stop_loading('succeed' if chown_dir else 'fail')
+        if not machine_check_items[ip]['transparent_hugepage']:
+            transparent_hugepage = False
+            stdio.start_loading("disable transparent_hugepage")
+            if client.execute_command(f"echo never | {sudo_prefix} tee /sys/kernel/mm/transparent_hugepage/enabled"):
+                transparent_hugepage = True
+            stdio.stop_loading('succeed' if transparent_hugepage else 'fail')
+        if not machine_check_items[ip]['network_card']:
+            network_card = False
+            stdio.start_loading("set net card MTY value")
+            ret = client.execute_command("ip route | grep default | awk '{print $5}' | head -n1")
+            if ret:
+                card_name = ret.stdout.strip()
+                if client.execute_command(f"{sudo_prefix} sed -i 's/^MTU=.*/MTU=1500/' /etc/sysconfig/network-scripts/ifcfg-{card_name}") and client.execute_command(sudo_prefix + "systemctl restart network"):
+                    network_card = True
+            stdio.stop_loading('succeed' if network_card else 'fail')
 
         need_change_vars = need_change_servers_vars[ip]
         need_change_vars and stdio.print("modify system parameters")

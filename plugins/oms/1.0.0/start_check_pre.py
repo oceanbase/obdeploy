@@ -95,8 +95,7 @@ def start_check_pre(plugin_context, init_check_status=False, first_start=False, 
         client = plugin_context.clients[server]
         prefix = docker_run_sudo_prefix(client)
         if not precheck:
-            ret = client.execute_command(
-                '%sdocker ps --filter "name=%s" --format "{{json .}}"|grep %s' % (prefix, container_name, cluster_config.tag)).stdout.strip()
+            ret = client.execute_command('%sdocker ps --filter "name=%s " --format "{{json .}}"' % (prefix, container_name)).stdout.strip()
             if ret and first_start:
                 exist_container_server.append(server.ip)
             if ret and json.loads(ret).get('State') == 'running':

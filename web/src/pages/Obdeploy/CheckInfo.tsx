@@ -16,7 +16,7 @@ import { generateRandomPassword, isExist } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
 import { ProCard } from '@ant-design/pro-components';
-import { Alert, Button, Col, Input, Row, Space, Table, Tooltip } from 'antd';
+import { Alert, Button, Col, Input, Row, Space, Table, TabsProps, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect } from 'react';
 import { getLocale, useModel } from 'umi';
@@ -109,12 +109,14 @@ export const formatConfigData = (
   return _configData;
 };
 
-export default function CheckInfo() {
+export default function CheckInfo({
+  deployMode,
+}: {
+  deployMode: string,
+}) {
   const {
     configData,
     setConfigData,
-    setCheckOK,
-    lowVersion,
     setCurrentStep,
     handleQuitProgress,
     setErrorVisible,
@@ -140,7 +142,7 @@ export default function CheckInfo() {
     {
       onSuccess: ({ success }: API.OBResponse) => {
         if (success) {
-          setCheckOK(true);
+          setCurrentStep(5);
         }
       },
       onError: (e: any) => {
@@ -203,7 +205,7 @@ export default function CheckInfo() {
   };
 
   // 当前 OB 环境是否为单机版
-  const standAlone = oceanbase?.component === 'oceanbase-standalone';
+  const standAlone = deployMode === 'standalone';
   const dbConfigColumns: ColumnsType<API.DBConfig> = [
     {
       title: intl.formatMessage({
@@ -611,16 +613,19 @@ export default function CheckInfo() {
       direction="vertical"
       size="middle"
     >
-      <Alert
-        message={intl.formatMessage({
-          id: 'OBD.pages.components.CheckInfo.OceanbaseTheInstallationInformationConfiguration',
-          defaultMessage:
-            'OceanBase 安装信息配置已完成，请检查并确认以下配置信息，确定后开始预检查。',
-        })}
-        type="info"
-        showIcon
-      />
-
+      {
+        oceanbase?.topology?.length > 1 ? null : (
+          <Alert
+            message={intl.formatMessage({
+              id: 'OBD.pages.components.CheckInfo.OceanbaseTheInstallationInformationConfiguration',
+              defaultMessage:
+                'OceanBase 安装信息配置已完成，请检查并确认以下配置信息，确定后开始预检查。',
+            })}
+            type="info"
+            showIcon
+          />
+        )
+      }
       <ProCard className={styles.pageCard} split="horizontal">
         <Row gutter={16}>
           <ProCard
@@ -718,6 +723,21 @@ export default function CheckInfo() {
         <div className={styles.pageFooter}>
           <Space className={styles.foolterAction}>
             <Button
+              onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+              data-aspm-click="c307504.d317275"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.PreCheckExit',
+                defaultMessage: '预检查-退出',
+              })}
+              data-aspm-param={``}
+              data-aspm-expo
+            >
+              {intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.Exit',
+                defaultMessage: '退出',
+              })}
+            </Button>
+            <Button
               onClick={prevStep}
               data-aspm-click="c307504.d317274"
               data-aspm-desc={intl.formatMessage({
@@ -747,21 +767,6 @@ export default function CheckInfo() {
               {intl.formatMessage({
                 id: 'OBD.pages.components.CheckInfo.PreCheck.1',
                 defaultMessage: '预检查',
-              })}
-            </Button>
-            <Button
-              onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-              data-aspm-click="c307504.d317275"
-              data-aspm-desc={intl.formatMessage({
-                id: 'OBD.pages.components.CheckInfo.PreCheckExit',
-                defaultMessage: '预检查-退出',
-              })}
-              data-aspm-param={``}
-              data-aspm-expo
-            >
-              {intl.formatMessage({
-                id: 'OBD.pages.components.CheckInfo.Exit',
-                defaultMessage: '退出',
               })}
             </Button>
           </Space>

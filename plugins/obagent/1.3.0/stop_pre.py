@@ -22,4 +22,5 @@ def stop_pre(plugin_context, *args, **kwargs):
         servers_pid_filenames[server] = ['ob_agentd.pid', 'ob_monagent.pid', 'ob_mgragent.pid']
 
     plugin_context.set_variable('port_keys', ['monagent_http_port', 'mgragent_http_port'])
+    plugin_context.set_variable('servers_pid_filenames', servers_pid_filenames)
     return plugin_context.return_true()

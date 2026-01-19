@@ -23,8 +23,8 @@ export default function IndexPage() {
     2: <NodeConfig />,
     3: <ConnectionInfo type={'install'} />,
     4: <PreCheckStatus />,
-    5: <InstallProcess />,
-    6: <InstallFinished />,
+    5: <InstallProcess type={'install'} />,
+    6: <InstallFinished type={'install'} />,
     7: <ExitPage />,
     8: <ProgressQuit />,
   };

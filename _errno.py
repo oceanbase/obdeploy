@@ -150,6 +150,7 @@ WC_FAIL_TO_RESTART_OR_RELOAD = OBDErrorCodeTemplate(1021, 'The components has be
 WC_FAIL_TO_RESTART_OR_RELOAD_AFTER_SCALE_OUT = OBDErrorCodeTemplate(1022, 'The cluster has been scaled out, but encountered problems when reloading or restarting. Details:\n{detail}')
 WC_CHANGE_SYSTEM_PARAMETER_FAILED = OBDErrorCodeTemplate(1023, '({server}) failed to change system parameter: {key})')
 
+
 # error code for observer
 EC_OBSERVER_NOT_ENOUGH_MEMORY = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Free: {free}, Need: {need})')
 EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Available [cat /proc/meminfo | grep MemAvailable] : {available}, Need: {need})')
@@ -182,7 +183,7 @@ EC_OBSERVER_LOCATION_CREATE_STANDBY = OBDErrorCodeTemplate(2018, "For the standb
 EC_OBSERVER_AUTO_START_DBUS_ENV = OBDErrorCodeTemplate(2019, "The current user does not have permission to enable autostart; sudo privileges are required and this operation is not allowed in container environments.")
 EC_MULTIPLE_NODES_SAME = OBDErrorCodeTemplate(2020, "Multiple observer nodes on the same server are not supported by the auto start feature")
 EC_OBSERVER_WEB_AUTO_START = OBDErrorCodeTemplate(2021, "Permission denied. Current user {user} on server {ip} requires sudo privileges.")
-
+EC_CPU_CORE_NOT_ENOUGH = OBDErrorCodeTemplate(2022, "({server}) Insufficient CPU cores. (Current: {current}, Required: {required})")
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 
@@ -270,6 +271,13 @@ WC_PARAM_USELESS = OBDErrorCodeTemplate(4521, 'The config {key} in {current_comp
 EC_OMS_SERVER_CONNECT_METADB = OBDErrorCodeTemplate(4701, 'failed to connect meta db')
 EC_OMS_SERVER_CONNECT_INFLUXDB = OBDErrorCodeTemplate(4702, 'failed to connect influxdb')
 EC_OMS_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4703, '({ip}) {disk} not enough disk space. (Need: {need})')
+EC_OMS_UPDATE_NOT_DISABLE_HA = OBDErrorCodeTemplate(4704, 'HA is enabled, please disable it before upgrade.')
+
+#maas
+EC_MAAS_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4703, '({ip}) {disk} not enough disk space. (Need: {need})')
+
+#powerrag
+EC_POWERRAG_PROJECT_NAME_USED = OBDErrorCodeTemplate(4704, '({ip}) {project_name} is already in use')
 
 # sql
 EC_SQL_EXECUTE_FAILED = OBDErrorCodeTemplate(5000, "{sql} execute failed")

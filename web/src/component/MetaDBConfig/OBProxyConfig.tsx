@@ -2,6 +2,7 @@ import {
   commonInputStyle,
   commonPortStyle,
   commonStyle,
+  pathRule,
 } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import {
@@ -365,6 +366,7 @@ export default function OBProxyConfig({
               defaultMessage: '请输入',
             }),
           },
+          pathRule,
         ]}
         label={intl.formatMessage({
           id: 'OBD.component.MetaDBConfig.OBProxyConfig.SoftwarePath',

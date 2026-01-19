@@ -78,3 +78,14 @@ async def get_web_type():
     handler = handler_utils.new_common_handler()
     data = handler.get_web_type()
     return response_utils.new_ok_response(data)
+
+
+@router.get("/current/user",
+            response_model=OBResponse,
+            description='get current running user',
+            operation_id='get_current_running_user',
+            tags=['Common'])
+async def get_current_user():
+    handler = handler_utils.new_common_handler()
+    data = handler.get_current_user()
+    return response_utils.new_ok_response(data)

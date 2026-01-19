@@ -47,12 +47,12 @@ def get_deployment_connections(plugin_context, relation_deploy_names=[], cursors
                     cursor.stdio = stdio
                     cursors[deploy_name] = cursor
                     continue
-                stdio.verbose("{}'s observer connection unavailable.".format(deploy_name))  
+                stdio.verbose("{}'s seekdb connection unavailable.".format(deploy_name))  
             if not_connect_act == "ignore":
                 continue
             else:
                 # If entering this branch requires an error code to be filled.
-                stdio.error("{}'s observer connection fail.".format(deploy_name))
+                stdio.error("{}'s seekdb connection fail.".format(deploy_name))
                 stdio.stop_loading('fail')
                 return plugin_context.return_false()
     stdio.stop_loading('succeed')

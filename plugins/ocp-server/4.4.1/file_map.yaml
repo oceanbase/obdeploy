@@ -1,0 +1,9 @@
+- src_path: ./home/admin/ocp-server/lib/$name-$version-$release_simple.jar
+  target_path: lib/ocp-server.jar
+  type: jar
+  require: openjdk-jre
+  install_method: cp
+- src_path: ./home/admin/ocp-server/knowledge
+  target_path: knowledge
+  type: dir
+  install_method: cp

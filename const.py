@@ -106,6 +106,14 @@ DDFFI_SCRIPT = 'docker_dump_file_from_image.sh'
 DCDTC_SCRIPT = 'docker_copy_dumpfile_to_container.sh'
 DCDR_SCRIPT = 'docker_copy_dumpfile_rollback.sh'
 
+#maas
+COMP_MAAS = 'maas'
+
+# powerrag
+COMP_PRAG = 'powerrag'
+POWERRAG_IMAGE = 'harbor.oceanbase-dev.com/powerrag/powerrag'
+POWERRAG_PKG_HOME = 'POWERRAG_PKG_HOME'
+
 # service docs url
 DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
 
@@ -169,3 +177,6 @@ NOT_SUPPORT_MODIFY_SUB_PARAMETERS = [
         "sub_keys": ["cm_nodes", "cm_location", "cm_region"]
      }
 ]
+
+# only single server component
+SINGLE_SERVER_COMPONENTS = [COMP_PRAG, COMP_MAAS]

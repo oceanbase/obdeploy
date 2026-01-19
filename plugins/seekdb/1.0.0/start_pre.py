@@ -93,14 +93,14 @@ def start_pre(plugin_context, *args, **kwargs):
         if client.execute_command('ls {}/{}/'.format(server_config['data_dir'], plugin_context.get_variable('clog_sub_dir'))).stdout.strip():
             need_bootstrap = False
 
-        remote_pid_path = '%s/run/observer.pid' % home_path
+        remote_pid_path = '%s/run/seekdb.pid' % home_path
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid:
             if client.execute_command('ls /proc/%s' % remote_pid):
                 continue
 
         stdio.verbose('%s start command construction' % server)
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s/etc/observer.config.bin' % home_path):
+        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s/etc/seekdb.config.bin' % home_path):
             use_parameter = False
         else:
             use_parameter = True
@@ -111,7 +111,7 @@ def start_pre(plugin_context, *args, **kwargs):
         else:
             cmd.append('--port %s' % server_config['mysql_port'])
 
-        clusters_cmd[server] = 'cd %s; %s/bin/observer %s' % (home_path, home_path, ' '.join(cmd))
+        clusters_cmd[server] = 'cd %s; %s/bin/seekdb %s' % (home_path, home_path, ' '.join(cmd))
 
     plugin_context.set_variable('scale_out', scale_out)
     plugin_context.set_variable('need_bootstrap', need_bootstrap)

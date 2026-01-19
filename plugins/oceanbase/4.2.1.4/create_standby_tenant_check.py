@@ -61,9 +61,6 @@ def create_standby_tenant_check(plugin_context, cursors={}, cluster_configs={}, 
     if not res_compatibility:
         error('Query {}:{} compatibility_mode fail.'.format(primary_deploy_name, primary_tenant))
         return
-    if res_compatibility['compatibility_mode'].lower() != 'mysql':
-        error('Primary tenant {}:{} compatibility_mode is not mysql. only support mysql now!'.format(primary_deploy_name, primary_tenant))
-        return
     
     if get_option(options, 'type') == SERVICE_MODE:
         # check primary cluster have full log stream

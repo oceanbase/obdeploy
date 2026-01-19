@@ -45,7 +45,7 @@ def start_pre(plugin_context, *args, **kwargs):
         data_dir = server_config.get('data_dir', os.path.join(home_path, 'data'))
 
         flag_file = os.path.join(home_path, '.alertmanager_started')
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % flag_file):
+        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s' % flag_file):
             use_parameter = False
         else:
             use_parameter = True 

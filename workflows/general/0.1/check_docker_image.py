@@ -19,5 +19,5 @@ from const import STAGE_FIRST
 
 
 def check_docker_image(plugin_context, workflow, *args, **kwargs):
-    workflow.add_with_component(STAGE_FIRST, 'general', 'docker_check', 'image_check')
+    workflow.add_with_component_version(STAGE_FIRST, 'general', '0.1', 'docker_check', 'image_check')
     return plugin_context.return_true()

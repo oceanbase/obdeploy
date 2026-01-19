@@ -15,6 +15,9 @@ import OCPConfigNew from '@/component/OCPConfigNew';
 import OCPPreCheck from '@/component/OCPPreCheck';
 import InstallProcessNew from '@/component/InstallProcessNew';
 import InstallResult from '@/component/InstallResult';
+import { getTailPath } from '@/utils/helper';
+import CheckInfo from '@/component/OCPPreCheck/CheckInfo';
+import PreCheck from '@/component/OCPPreCheck/PreCheck';
 
 const Configuration: React.FC = () => {
   const [current, setCurrent] = useState(1);
@@ -52,7 +55,7 @@ const Configuration: React.FC = () => {
   }, [current, installStatus, installResult]);
 
   return (
-    <PageContainer style={{ paddingBottom: 90,backgroundColor:'#f5f8ff' }}>
+    <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
       <Steps
         currentStep={current}
         stepsItems={METADB_OCP_INSTALL}
@@ -61,7 +64,7 @@ const Configuration: React.FC = () => {
 
       <div
         style={{
-          paddingTop: `${current !== 6 ? 150 : 0}px`,
+          paddingTop: `${current === 7 && installStatus === 'FINISHED' ? 0 : current !== 6 ? 150 : 0}px`,
           width: '1040px',
           margin: '0 auto',
           overflow: 'auto',
@@ -80,10 +83,13 @@ const Configuration: React.FC = () => {
         )}
 
         {current === 4 && (
-          <OCPPreCheck setCurrent={setCurrent} current={current} />
+          <CheckInfo setCurrent={setCurrent} current={current} isNewDB={getTailPath() === 'install'} />
+        )}
+        {current === 5 && (
+          <PreCheck setCurrent={setCurrent} current={current} />
         )}
 
-        {current === 5 && (
+        {current === 6 && installStatus === 'RUNNING' && (
           <InstallProcessNew
             id={connectId}
             current={current}
@@ -95,7 +101,7 @@ const Configuration: React.FC = () => {
           />
         )}
 
-        {current === 6 && (
+        {current === 7 && installStatus === 'FINISHED' && (
           <InstallResult
             current={current}
             setCurrent={setCurrent}

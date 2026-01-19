@@ -21,6 +21,7 @@ import { encrypt } from '@/utils/encrypt';
 import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import ConnectionInfo from './Component/ConnectionInfo';
 import UpdatePreCheck from './Component/UpdatePreCheck';
+import CheckInfo from './Component/UpdatePreCheck/CheckInfo';
 
 const Update: React.FC = () => {
   const location = useLocation();
@@ -98,6 +99,7 @@ const Update: React.FC = () => {
   const { run: createOcpPrecheck } = useRequest(OCP.createUpgradePrecheck, {
     manual: true,
     onSuccess: (res) => {
+      setCurrent(current + 1);
       precheckOcpUpgrade({ cluster_name });
     },
     onError: ({ response, data }: any) => {
@@ -114,7 +116,7 @@ const Update: React.FC = () => {
     manual: true,
     onSuccess: (res) => {
       if (res?.success) {
-        history.push('/update');
+        history.push('/updateOcp');
         getOcpUpgradePrecheckTask({
           cluster_name,
           task_id: res?.data?.id,
@@ -232,11 +234,15 @@ const Update: React.FC = () => {
   const handleSubmit = (currentStep: number) => {
     switch (currentStep) {
       case 0:
+        setCurrent(current + 1);
         break;
       case 1:
-        createOcpPrecheck({ name: cluster_name });
+        setCurrent(current + 1);
         break;
       case 2:
+        createOcpPrecheck({ name: cluster_name });
+        break;
+      case 3:
         if (cluster_name && version) {
           upgradeOcp({
             cluster_name,
@@ -286,7 +292,6 @@ const Update: React.FC = () => {
     });
     setCheckConnectInfo('unchecked');
   };
-
   return (
     <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
       {installResult !== 'FAILED' && installResult !== 'SUCCESSFUL' && (
@@ -304,9 +309,11 @@ const Update: React.FC = () => {
           width: '1040px',
           margin: '0 auto',
           overflow: 'auto',
+          position: 'relative',
+          minHeight: '500px',
         }}
       >
-        {current == -1 && (
+        {current === -1 && (
           <DeployConfig
             current={current}
             clearConnection={resetConnectState}
@@ -315,9 +322,8 @@ const Update: React.FC = () => {
           />
         )}
 
-        {current == 0 && (
+        {current === 0 && (
           <ConnectionInfo
-            // upgraadeHosts={upgraadeHosts}
             allowInputUser={allowInputUser}
             form={form}
             systemUserForm={systemUserForm}
@@ -331,9 +337,16 @@ const Update: React.FC = () => {
           />
         )}
 
-        {current == 1 && (
-          <UpdatePreCheck
+        {current === 1 && (
+          <CheckInfo
             updateInfo={updateInfo}
+            getOcpInfoLoading={getOcpInfoLoading}
+            cluster_name={cluster_name}
+          />
+        )}
+
+        {current == 2 && (
+          <UpdatePreCheck
             refresh={refreshPrecheckOcpUpgrade}
             changePrecheckNoPassed={(val) => {
               setPrecheckNoPassed(val);
@@ -343,11 +356,10 @@ const Update: React.FC = () => {
             precheckOcpUpgradeLoading={
               precheckOcpUpgradeLoading || preCheckLoading
             }
-            cluster_name={cluster_name}
           />
         )}
 
-        {current == 2 && (
+        {current == 3 && (
           <InstallProcess
             installType="OCP"
             type="update"
@@ -361,21 +373,22 @@ const Update: React.FC = () => {
           />
         )}
       </div>
-      {current === 2 && installStatus === 'RUNNING' ? null : (
+
+      {current === 3 && installStatus === 'RUNNING' ? null : (
         <>
           {current !== -1 && (
             <CustomFooter>
               <Space size={16}>
-                {current === 2 && installStatus === 'RUNNING' ? null : (
+                {current === 3 && installStatus === 'RUNNING' ? null : (
                   <ExitBtn />
                 )}
 
-                {current < 2 ? (
+                {current < 3 ? (
                   <>
                     {current > 0 && (
                       <Tooltip
                         title={
-                          current === 1 &&
+                          current === 2 &&
                             precheckOcpUpgradeLoading ?
                             intl.formatMessage({
                               id: 'OBD.OcpInstaller.Update.InThePreCheckProcess',
@@ -384,12 +397,12 @@ const Update: React.FC = () => {
                         }
                       >
                         <Button
-                          disabled={current === 1 && precheckOcpUpgradeLoading}
+                          disabled={current === 2 && precheckOcpUpgradeLoading}
                           onClick={() => {
                             // setCheckConnectInfo('unchecked')
                             setCheckStatus('unchecked');
                             setCurrent(current > 0 ? current - 1 : 0);
-                            history.push('/update');
+                            history.push('/updateOcp');
                           }}
                         >
                           {intl.formatMessage({
@@ -411,7 +424,7 @@ const Update: React.FC = () => {
 
                     <Tooltip
                       title={
-                        current === 1 &&
+                        current === 2 &&
                         precheckOcpUpgradeStatus === 'RUNNING' &&
                         intl.formatMessage({
                           id: 'OBD.OcpInstaller.Update.InThePreCheckProcess.1',
@@ -422,10 +435,10 @@ const Update: React.FC = () => {
 
                       <Button
                         disabled={
-                          (current === 1 &&
+                          (current === 2 &&
                             (precheckOcpUpgradeStatus === 'RUNNING' ||
                               precheckNoPassed)) ||
-                          checkStatus !== 'success'
+                          (current === 0 && checkStatus !== 'success')
                         }
                         type="primary"
                         loading={
@@ -435,7 +448,7 @@ const Update: React.FC = () => {
                         }
                         onClick={() => {
                           if (
-                            current === 1 &&
+                            current === 2 &&
                             ocpUpgradePrecheckTask?.task_info?.status ===
                             'FINISHED' &&
                             (ocpUpgradePrecheckTask?.task_info?.result ===
@@ -443,7 +456,7 @@ const Update: React.FC = () => {
                               !precheckNoPassed)
                           ) {
                             handleSubmit(current + 1);
-                            history.push('/update');
+                            history.push('/updateOcp');
                           } else if (current === 0) {
                             validateFields().then((val) => {
                               setOcpConfigData({
@@ -454,14 +467,14 @@ const Update: React.FC = () => {
                                 },
                               });
                               setCurrent(current + 1);
-                              history.push('/update');
+                              history.push('/updateOcp');
                             });
                           } else {
-                            handleSubmit(current);
+                            handleSubmit(current + 1);
                           }
                         }}
                       >
-                        {current === 1 &&
+                        {current === 2 &&
                           ocpUpgradePrecheckTask?.task_info?.status !==
                           'FINISHED' &&
                           ocpUpgradePrecheckTask?.task_info?.result !==

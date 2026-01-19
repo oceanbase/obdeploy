@@ -18,9 +18,10 @@ import {
   Space,
   Table,
   Tag,
+  Typography,
 } from '@oceanbase/design';
 import { useRequest } from 'ahooks';
-import { Alert, Descriptions, Modal, } from 'antd';
+import { Alert, Descriptions, Modal, Row, } from 'antd';
 import type { ResultProps } from 'antd/es/result';
 import { isEmpty } from 'lodash';
 import React, { useEffect, useState } from 'react';
@@ -29,6 +30,9 @@ import CustomFooter from '@/component/CustomFooter';
 import ExitBtn from '@/component/ExitBtn';
 import styles from './index.less';
 import { ColumnsType } from 'antd/es/table';
+import ArrowIcon from '@/component/Icon/ArrowIcon';
+import NewIcon from '@/component/Icon/NewIcon';
+const { Text } = Typography;
 
 export interface InstallResultProps extends ResultProps {
   upgradeOcpInfo?: any;
@@ -41,14 +45,15 @@ export interface InstallResultProps extends ResultProps {
   setCurrent: React.Dispatch<React.SetStateAction<number>>;
 }
 
-const InstallFinished: React.FC<InstallResultProps> = () => {
+const InstallFinished: React.FC<InstallResultProps> = ({ type, setCurrent }) => {
 
   const {
     configData = {},
     setCurrentStep,
-    selectedOmsType
+    selectedOmsType,
+    ocpConfigData,
+    omsTakeoverData,
   } = useModel('global');
-
   const {
     logData,
     setInstallStatus,
@@ -120,6 +125,43 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
     },
   );
 
+  // 适用于 OMS 安装成功后上报遥测数据
+  const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
+    manual: true,
+    throwOnError: false,
+    onError: () => {
+      // 静默处理错误，不显示错误信息
+    },
+  });
+
+  const { run: getTelemetryData } = useRequest(OCP.getTelemetryData, {
+    manual: true,
+    throwOnError: false,
+    onSuccess: (res) => {
+      // 即使 success 为 false 也不显示错误，静默处理
+      if (res?.success && !isEmpty(res?.data)) {
+        const data = res?.data;
+        telemetryReport({ component: 'obd', content: data?.data });
+      }
+    },
+    onError: () => {
+      // 静默处理错误，不显示错误信息
+    },
+  });
+
+  // 当 configData.appname 存在时，自动获取遥测数据
+  useEffect(() => {
+    if (configData?.appname) {
+      getTelemetryData(
+        {
+          name: configData.appname,
+        } as any,
+        {} as any
+      );
+    }
+  }, [configData?.appname, getTelemetryData]);
+
+
   const omsConnectColumns: ColumnsType<API.ConnectionInfo> = [
     {
       title: intl.formatMessage({
@@ -170,6 +212,8 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
     },
   ];
 
+
+
   return (
     <div
       style={{
@@ -200,17 +244,29 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
         title={
           installResult === 'SUCCESSFUL' ? (
             <div>
-              {intl.formatMessage({
+              {type === 'update' ? (
+                <div>
+                  {intl.formatMessage({
+                    id: 'OBD.pages.Oms.InstallFinished.OmsUpgradeSuccessful',
+                    defaultMessage: 'OMS 升级成功！',
+                  })}
+                </div>
+              ) : intl.formatMessage({
                 id: 'OBD.pages.Oms.InstallFinished.OmsDeploymentSuccessful',
                 defaultMessage: 'OMS 部署成功！',
               })}
             </div>
           ) : (
             <div>
-              {intl.formatMessage({
-                id: 'OBD.pages.Oms.InstallFinished.OmsDeploymentFailed',
-                defaultMessage: 'OMS 部署失败',
-              })}
+              {
+                type === 'update' ? intl.formatMessage({
+                  id: 'OBD.pages.Oms.InstallFinished.OmsUpgradeFailed',
+                  defaultMessage: 'OMS 升级失败！',
+                }) : intl.formatMessage({
+                  id: 'OBD.pages.Oms.InstallFinished.OmsDeploymentFailed',
+                  defaultMessage: 'OMS 部署失败！',
+                })
+              }
             </div>
           )
         }
@@ -224,7 +280,7 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
       />
 
       <div style={{ marginBottom: 16 }}>
-        {installResult === 'SUCCESSFUL' ? (
+        {installResult === 'SUCCESSFUL' && type !== 'update' ? (
           <Card
             className={styles.upgradeReport}
             bordered={false}
@@ -284,7 +340,6 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
                 </div>
               }
             />
-
             <Table
               className={`${styles.connectTable} ob-table`}
               columns={omsConnectColumns as any}
@@ -301,10 +356,17 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
           divided={false}
           title={
             <Space>
-              {intl.formatMessage({
-                id: 'OBD.pages.Oms.InstallFinished.DeploymentReport',
-                defaultMessage: '部署报告',
-              })}
+              {type === 'update' ? installResult === 'FAILED' ? intl.formatMessage({
+                id: 'OBD.pages.Oms.InstallFinished.UpgradeLogs',
+                defaultMessage: '升级日志',
+              }) : intl.formatMessage({
+                id: 'OBD.pages.Oms.InstallFinished.UpgradeReport',
+                defaultMessage: '升级报告',
+              })
+                : intl.formatMessage({
+                  id: 'OBD.pages.Oms.InstallFinished.DeploymentReport',
+                  defaultMessage: '部署报告',
+                })}
               <span
                 style={{
                   cursor: 'pointer',
@@ -325,62 +387,143 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
             background: '#fff',
           }}
         >
-          <Descriptions
-            layout="vertical"
-            column={3}
-          >
-            <Descriptions.Item
-              label={intl.formatMessage({
-                id: 'OBD.pages.Oms.InstallFinished.Product',
-                defaultMessage: '产品',
-              })}
-            >
-              OMS
-              <Tag style={{ marginLeft: 6 }}>{selectedOmsType?.includes('ce') ? intl.formatMessage({
-                id: 'OBD.pages.Oms.ConnectionInfo.CommunityEdition',
-                defaultMessage: '社区版',
-              }) : intl.formatMessage({
-                id: 'OBD.pages.Oms.ConnectionInfo.CommercialEdition',
-                defaultMessage: '商业版',
-              })}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item
-              label={intl.formatMessage({
-                id: 'OBD.pages.Oms.InstallFinished.Version',
-                defaultMessage: '版本',
-              })}
-            >
-              V {selectedOmsType?.toUpperCase()}
-            </Descriptions.Item>
-            <Descriptions.Item
-              label={intl.formatMessage({
-                id: 'OBD.pages.Oms.InstallFinished.InstallationResult',
-                defaultMessage: '安装结果',
-              })}
-            >
-              {
-                installResult === 'SUCCESSFUL'
-                  ? <div >
-                    <CheckCircleFilled style={{ color: '#4dcca2', marginRight: 6 }} />
-                    {intl.formatMessage({
-                      id: 'OBD.pages.Oms.InstallFinished.Success',
-                      defaultMessage: '成功',
-                    })}
-                  </div>
-                  : <div>
-                    <CloseCircleFilled style={{ color: 'rgba(255,75,75,1)', marginRight: 6 }} />
-                    {intl.formatMessage({
-                      id: 'OBD.pages.Oms.InstallFinished.Failed',
-                      defaultMessage: '失败',
-                    })}
-                  </div>
-              }
+          {
+            type !== 'update' ?
+              <Descriptions
+                layout="vertical"
+                column={3}
+              >
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.Oms.InstallFinished.Product',
+                    defaultMessage: '产品',
+                  })}
+                >
+                  OMS
+                  <Tag style={{ marginLeft: 6 }}>{selectedOmsType?.includes('ce') ? intl.formatMessage({
+                    id: 'OBD.pages.Oms.ConnectionInfo.CommunityEdition',
+                    defaultMessage: '社区版',
+                  }) : intl.formatMessage({
+                    id: 'OBD.pages.Oms.ConnectionInfo.CommercialEdition',
+                    defaultMessage: '商业版',
+                  })}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.Oms.InstallFinished.Version',
+                    defaultMessage: '版本',
+                  })}
+                >
+                  V {selectedOmsType?.toUpperCase()}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.Oms.InstallFinished.InstallationResult',
+                    defaultMessage: '安装结果',
+                  })}
+                >
+                  {
+                    installResult === 'SUCCESSFUL'
+                      ? <div >
+                        <CheckCircleFilled style={{ color: '#4dcca2', marginRight: 6 }} />
+                        {intl.formatMessage({
+                          id: 'OBD.pages.Oms.InstallFinished.Success',
+                          defaultMessage: '成功',
+                        })}
+                      </div>
+                      : <div>
+                        <CloseCircleFilled style={{ color: 'rgba(255,75,75,1)', marginRight: 6 }} />
+                        {intl.formatMessage({
+                          id: 'OBD.pages.Oms.InstallFinished.Failed',
+                          defaultMessage: '失败',
+                        })}
+                      </div>
+                  }
 
-            </Descriptions.Item>
-          </Descriptions>
+                </Descriptions.Item>
+              </Descriptions> :
+              installResult === 'SUCCESSFUL' && type === 'update' &&
+              <>
+                {
+                  ocpConfigData?.backup_method === 'data_backup' && <Alert
+                    type="info"
+                    showIcon={true}
+                    style={{
+                      marginBottom: 24,
+                    }}
+                    message={
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '0 4px',
+                          lineHeight: '32px',
+                        }}
+                      >
+                        <div>
+                          备份文件保存地址：
+                        </div>
+                        <Text
+                          copyable={{ text: ocpConfigData?.backup_path }}
+                        >
+                          {ocpConfigData?.backup_path}
+                        </Text>
+                        <div>
+                          ，可根据需要对备份文件进行维护管理。
+                        </div>
+                      </div>
+                    }
+                  />
+                }
+
+                <Row gutter={[24, 16]}>
+                  <Col span={24} className={styles.versionContainer}>
+                    <div className={styles.ocpVersion}>
+                      {intl.formatMessage({
+                        id: 'OBD.component.InsstallResult.PreUpgradeVersion',
+                        defaultMessage: '升级前版本：',
+                      })}
+                      {
+                        ocpConfigData?.current_version ?
+                          <span>V {ocpConfigData?.current_version?.split('feature_')[1]?.toUpperCase()}</span>
+                          :
+                          <span>V {omsTakeoverData?.version?.split('feature_')[1]?.toUpperCase()} </span>
+                      }
+                    </div>
+                    <div
+                      style={{
+                        float: 'left',
+                        margin: '0 45px',
+                        textAlign: 'center',
+                        lineHeight: '69px',
+                      }}
+                    >
+                      <ArrowIcon height={30} width={42} />
+                    </div>
+                    <div className={styles.ocpVersion}>
+                      {intl.formatMessage({
+                        id: 'OBD.component.InsstallResult.UpgradedVersion',
+                        defaultMessage: '升级后版本：',
+                      })}
+                      <span>
+                        V {ocpConfigData?.version?.split('feature_')[1]?.toUpperCase()}{' '}
+                        <NewIcon
+                          size={36}
+                          className={styles.newVersionIcon}
+                        />
+                      </span>
+                    </div>
+                  </Col>
+                </Row>
+              </>
+          }
+
           {
             openLog && <div style={{ marginBottom: 16, color: '#8592ad' }}>
-              {intl.formatMessage({
+              {type === 'update' ? installResult === 'SUCCESSFUL' && intl.formatMessage({
+                id: 'OBD.component.InstallResult.UpgradeLogs',
+                defaultMessage: '升级日志',
+              }) : intl.formatMessage({
                 id: 'OBD.component.InstallResult.DeploymentLogs',
                 defaultMessage: '部署日志',
               })}
@@ -418,30 +561,43 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
       </Col>
       <CustomFooter>
         {installResult === 'SUCCESSFUL' ? (
-          <Button
-            data-aspm="c323702"
-            data-aspm-desc={intl.formatMessage({
-              id: 'OBD.component.InstallResult.ExitTheInstaller',
-              defaultMessage: '退出安装程序',
-            })}
-            data-aspm-param={``}
-            data-aspm-expo
-            type="primary"
-            onClick={() => {
-              suicide();
-            }}
-          >
-            {intl.formatMessage({
-              id: 'OBD.component.InstallResult.Complete',
-              defaultMessage: '完成',
-            })}
-          </Button>
+          <>
+            <Button
+              data-aspm="c323702"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.component.InstallResult.ExitTheInstaller',
+                defaultMessage: '退出安装程序',
+              })}
+              data-aspm-param={``}
+              data-aspm-expo
+              type="primary"
+              onClick={() => {
+                suicide();
+              }}
+            >
+              {
+                type === 'update' ? intl.formatMessage({
+                  id: 'OBD.pages.Oms.InstallFinished.ExitPage',
+                  defaultMessage: '退出页面',
+                }) : intl.formatMessage({
+                  id: 'OBD.component.InstallResult.Complete',
+                  defaultMessage: '完成',
+                })
+              }
+
+            </Button>
+          </>
         ) : (
           <>
+            <ExitBtn />
             <Button
               loading={destroyOmsLoading}
               onClick={() => {
-                destroyOms({ id });
+                if (type !== 'update') {
+                  destroyOms({ id });
+                } else {
+                  setCurrent(1);
+                }
               }}
             >
               {intl.formatMessage({
@@ -449,40 +605,43 @@ const InstallFinished: React.FC<InstallResultProps> = () => {
                 defaultMessage: '上一步',
               })}
             </Button>
-            <Button
-              type="primary"
-              loading={reinstallOmsLoading}
-              onClick={() => {
-                Modal.confirm({
-                  title: intl.formatMessage({
-                    id: 'OBD.component.InstallResult.PleaseConfirmWhetherTheInstallation',
-                    defaultMessage: '请确认是否已定位安装失败原因并修复问题？',
-                  }),
-                  icon: <ExclamationCircleOutlined />,
-                  content: intl.formatMessage({
-                    id: 'OBD.pages.Oms.InstallFinished.ReinstallWillCleanFailedOmsInstallationEnvironment',
-                    defaultMessage: '重新安装将会清理失败的 OMS 安装环境',
-                  }),
-                  okText: intl.formatMessage({
-                    id: 'OBD.component.InstallResult.Ok',
-                    defaultMessage: '确定',
-                  }),
-                  cancelText: intl.formatMessage({
-                    id: 'OBD.component.InstallResult.Cancel',
-                    defaultMessage: '取消',
-                  }),
-                  onOk: () => {
-                    reinstallOms({ id });
-                  },
-                });
-              }}
-            >
-              {intl.formatMessage({
-                id: 'OBD.component.InstallResult.Redeploy',
-                defaultMessage: '重新部署',
-              })}
-            </Button>
-            <ExitBtn />
+            {
+              type !== 'update' &&
+              <Button
+                type="primary"
+                loading={reinstallOmsLoading}
+                onClick={() => {
+                  Modal.confirm({
+                    title: intl.formatMessage({
+                      id: 'OBD.component.InstallResult.PleaseConfirmWhetherTheInstallation',
+                      defaultMessage: '请确认是否已定位安装失败原因并修复问题？',
+                    }),
+                    icon: <ExclamationCircleOutlined />,
+                    content: intl.formatMessage({
+                      id: 'OBD.pages.Oms.InstallFinished.ReinstallWillCleanFailedOmsInstallationEnvironment',
+                      defaultMessage: '重新安装将会清理失败的 OMS 安装环境',
+                    }),
+                    okText: intl.formatMessage({
+                      id: 'OBD.component.InstallResult.Ok',
+                      defaultMessage: '确定',
+                    }),
+                    cancelText: intl.formatMessage({
+                      id: 'OBD.component.InstallResult.Cancel',
+                      defaultMessage: '取消',
+                    }),
+                    onOk: () => {
+                      reinstallOms({ id });
+                    },
+                  });
+                }}
+              >
+                {intl.formatMessage({
+                  id: 'OBD.component.InstallResult.Redeploy',
+                  defaultMessage: '重新部署',
+                })}
+
+              </Button>
+            }
           </>
         )}
       </CustomFooter>

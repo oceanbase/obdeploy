@@ -23,6 +23,7 @@ import { validatePassword } from '@/utils';
 import { PORT_MAX,PORT_MIN } from '@/constant';
 // import tracert from '@/util/tracert';
 import validator from 'validator';
+import { pathRule } from '@/pages/constants';
 
 export interface SystemConfigProps {
   form: any;
@@ -336,6 +337,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({
                     defaultMessage: '请输入软件路径',
                   }),
                 },
+                pathRule,
               ]}
               validateStatus={
                 !checkHomePathcheckStatus &&
@@ -377,6 +379,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({
                     defaultMessage: '请输入数据路径',
                   }),
                 },
+                pathRule,
               ]}
               validateStatus={
                 !checkDataDircheckStatus &&
@@ -417,6 +420,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({
                     defaultMessage: '请输入日志路径',
                   }),
                 },
+                pathRule,
               ]}
               validateStatus={
                 !checkLogDircheckStatus &&

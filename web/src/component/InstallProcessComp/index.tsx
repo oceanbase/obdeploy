@@ -24,6 +24,7 @@ interface InstallProcessCompProps {
 let timerLogScroll: NodeJS.Timer | null = null;
 export default function InstallProcessComp({
   logData,
+  installResult,
   installStatus,
   statusData,
   showProgress,
@@ -110,7 +111,6 @@ export default function InstallProcessComp({
       Video.dispose();
     };
   }, []);
-  console.log('installStatus inpr', installStatus)
   useEffect(() => {
     if (toBottom) {
       toLogBottom();
@@ -146,6 +146,7 @@ export default function InstallProcessComp({
       { name: name },
     );
   };
+ 
   return (
     <ProCard direction="column" className="card-padding-bottom-24">
       <ProCard>
@@ -155,7 +156,7 @@ export default function InstallProcessComp({
               id: 'OBD.pages.components.InstallProces.87DB05E2',
               defaultMessage: '租户创建中',
             }) :
-              type === 'OMS' ? 'OMS 部署中' : intl.formatMessage({
+              type === 'install' ? 'OMS 部署中' : type === 'OMS_UPDATE' ? 'OMS 升级中' : intl.formatMessage({
                 id: 'OBD.pages.components.InstallProcess.Deploying',
                 defaultMessage: '部署中...',
               })
@@ -216,16 +217,22 @@ export default function InstallProcessComp({
           data-aspm-param={``}
           data-aspm-expo
         >
-          {tenantType || type === 'OMS'
+          {tenantType || type === 'install'
             ? null
-            : getText(statusData?.current)}
+            : type === 'OMS_UPDATE' ? '正在升级中' : getText(statusData?.current)}
         </span>
       </ProCard>
       <ProCard
-        title={intl.formatMessage({
-          id: 'OBD.pages.components.InstallProcess.DeploymentLogs',
-          defaultMessage: '部署日志',
-        })}
+        title={type === 'OMS_UPDATE'
+          ? intl.formatMessage({
+            id: 'OBD.component.InstallProcess.UpgradeLogs',
+            defaultMessage: '升级日志',
+          })
+          : intl.formatMessage({
+            id: 'OBD.component.InstallProcess.DeploymentLogs',
+            defaultMessage: '部署日志',
+          })}
+
         className={styles.installSubCard}
       >
         <pre className={styles.installLog} id="installLog">

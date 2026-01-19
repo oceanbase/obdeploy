@@ -32,6 +32,32 @@ export async function listOcpDeployments(options?: { [key: string]: any }) {
     },
   );
 }
+export async function listOmsDeployments(options?: { [key: string]: any }) {
+  return request<API.OBResponse_DataList_OcpDeploymentInfo__>(
+    '/api/v1/oms/deployments',
+    {
+      method: 'GET',
+      ...(options || {}),
+    },
+  );
+}
+
+export async function getOmsUpgradeInfo(
+  params: {
+    name?: string;
+  },
+  options?: { [key: string]: any },
+) {
+  const { name: param0 } = params;
+  return request<API.OBResponse_OcpDeploymentInfo_>(
+    `/api/v1/oms/upgrade/${param0}/info`,
+    {
+      method: 'GET',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
 
 /** create_ocp_deployment create deployment for ocp POST /api/v1/ocp/deployments */
 export async function createOcpDeployment(
@@ -44,6 +70,22 @@ export async function createOcpDeployment(
       'Content-Type': 'application/json',
     },
     data: body,
+    ...(options || {}),
+  });
+}
+
+export async function takeOverOms(
+  params,
+  body,
+  options?: { [key: string]: any },
+) {
+  const { cluster_name: param0, } = params;
+  return request<API.OBResponse_OcpDeploymentInfo_>(`/api/v1/oms/${param0}/takeover`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data:body,
     ...(options || {}),
   });
 }
@@ -63,6 +105,24 @@ export async function getOcpDeployment(
     {
       method: 'GET',
       params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
+export async function getOmsDisplay(
+  // params: {
+  //   // path
+  //   /** deployment id */
+  //   id?: number;
+  // },
+  options?: { [key: string]: any },
+) {
+  // const { id: param0 } = params;
+  return request<API.OBResponse_OcpDeploymentInfo_>(
+    `/api/v1/oms/display`,
+    {
+      method: 'GET',
+      // params: { ...params },
       ...(options || {}),
     },
   );
@@ -625,23 +685,49 @@ export async function createOcpInfo(
 }
 
 /** get_ocp_info get ocp info GET /api/v1/ocp/${param0} */
-export async function getOcpInfo(
+  export async function getOcpInfo(
+    params: {
+      // path
+      /** ocp id */
+      // id?: number;
+      cluster_name?: string;
+    },
+    options?: { [key: string]: any },
+  ) {
+    const { cluster_name: param0 } = params;
+    return request<API.OBResponse_OcpInfo_>(`/api/v1/ocp/${param0}`, {
+      method: 'GET',
+      params: { ...params },
+      ...(options || {}),
+    });
+  }
+
+export async function getCurrentUser(
+  options?: { [key: string]: any },
+) {
+ 
+  return request<API.OBResponse_OcpInfo_>(`/api/v1/current/user`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+export async function getOmsInfo(
+
   params: {
     // path
     /** ocp id */
-    // id?: number;
     cluster_name?: string;
   },
   options?: { [key: string]: any },
 ) {
   const { cluster_name: param0 } = params;
-  return request<API.OBResponse_OcpInfo_>(`/api/v1/ocp/${param0}`, {
+  return request<API.OBResponse_OcpInfo_>(`/api/v1/oms/${param0}`, {
     method: 'GET',
     params: { ...params },
     ...(options || {}),
   });
 }
-
 /** precheck_ocp_upgrade post precheck for ocp upgrade POST /api/v1/ocp/${param0}/upgrade/precheck */
 export async function precheckOcpUpgrade(
   params: {
@@ -663,6 +749,58 @@ export async function precheckOcpUpgrade(
   );
 }
 
+export async function backupOms(
+  params: {
+    // path
+    /** deployment id */
+    // id?: number;
+    cluster_name?: string;
+  },
+  body?: API.OcpDeploymentConfig,
+  options?: { [key: string]: any },
+) {
+  const { cluster_name: param0, ...queryParams } = params;
+  const data =  JSON.stringify({
+    ...body,
+  })
+
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/meta/backup`,
+    {
+      method: 'POST',
+      data,
+      params: { ...queryParams },
+      ...(options || {}),
+    },
+  );
+}
+
+export async function precheckOmsUpgrade(
+  params: {
+    // path
+    /** deployment id */
+    // id?: number;
+    cluster_name?: string;
+  },
+  body?: API.OcpDeploymentConfig,
+  options?: { [key: string]: any },
+) {
+  const { cluster_name: param0, ...queryParams } = params;
+  // const data =  JSON.stringify({
+  //   ...body,
+  // })
+
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/${param0}/upgrade/precheck`,
+    {
+      method: 'POST',
+      // data,
+      params: { ...queryParams },
+      ...(options || {}),
+    },
+  );
+}
+
 /** get_ocp_upgrade_precheck_task get precheck for ocp upgrade GET /api/v1/ocp/${param0}/upgrade/precheck/${param1} */
 export async function getOcpUpgradePrecheckTask(
   params: {
@@ -678,6 +816,27 @@ export async function getOcpUpgradePrecheckTask(
   const { cluster_name: param0, task_id: param1 } = params;
   return request<API.OBResponse_PrecheckTaskInfo_>(
     `/api/v1/ocp/${param0}/upgrade/precheck/${param1}`,
+    {
+      method: 'GET',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
+export async function getOmsUpgradePrecheckTask(
+  params: {
+    // path
+    /** ocp id */
+    // id?: number;
+    cluster_name: string;
+    /** task id */
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { cluster_name: param0, task_id: param1 } = params;
+  return request<API.OBResponse_PrecheckTaskInfo_>(
+    `/api/v1/oms/${param0}/upgrade/precheck/${param1}`,
     {
       method: 'GET',
       params: { ...params },
@@ -710,6 +869,26 @@ export async function upgradeOcp(
     ...(options || {}),
   });
 }
+export async function upgradeOms(
+  params: {
+    // query
+    /** ocp upgrade version */
+    version: string;
+    upgrade_mode: string;
+    image_name: string;
+    cluster_name?: string;
+  },
+  options?: { [key: string]: any },
+) {
+  const { cluster_name: param0, ...queryParams } = params;
+  return request<API.OBResponse_TaskInfo_>(`/api/v1/oms/${param0}/upgrade`, {
+    method: 'POST',
+    params: {
+      ...queryParams,
+    },
+    ...(options || {}),
+  });
+}
 
 /** get_ocp_upgrade_task get ocp upgrade task GET /api/v1/ocp/${param0}/upgrade/${param1} */
 export async function getOcpUpgradeTask(
@@ -725,6 +904,23 @@ export async function getOcpUpgradeTask(
   const { cluster_name: param0, task_id: param1 } = params;
   return request<API.OBResponse_TaskInfo_>(
     `/api/v1/ocp/${param0}/upgrade/${param1}`,
+    {
+      method: 'GET',
+      params: { ...params },
+      ...(options || {}),
+    },
+  );
+}
+export async function getOmsUpgradeTask(
+  params: {
+    cluster_name?: string;
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { cluster_name: param0, task_id: param1 } = params;
+  return request<API.OBResponse_TaskInfo_>(
+    `/api/v1/oms/${param0}/upgrade/${param1}`,
     {
       method: 'GET',
       params: { ...params },
@@ -760,7 +956,23 @@ export async function getOcpUpgradeTaskLog(
     },
   );
 }
-
+export async function getOmsUpgradeTaskLog(
+  params: {
+    cluster_name?: string;
+    task_id?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { cluster_name: param0, task_id: param1, ...queryParams } = params;
+  return request<API.OBResponse_TaskLog_>(
+    `/api/v1/oms/${param0}/upgrade/${param1}/log`,
+    {
+      method: 'GET',
+      params: { ...queryParams },
+      ...(options || {}),
+    },
+  );
+}
 /** get_ocp_upgrade_task_report get ocp upgrade task report GET /api/v1/ocp/${param0}/upgrade/${param1}/report */
 export async function getOcpUpgradeTaskReport(
   params: {
@@ -854,6 +1066,25 @@ export async function createUpgradePrecheck(
     },
   );
 }
+export async function createomsUpgradePrecheck(
+  params: {
+    name?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  const { name } = params;
+  return request<API.createUpgradePrecheck_>(
+    `/api/v1/deployment/upgrade/oms?name=${name}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...(options || {}),
+    },
+  );
+}
+
 export async function createTenants(
   params: {
     name?: string;

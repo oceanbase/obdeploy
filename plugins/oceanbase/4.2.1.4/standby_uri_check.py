@@ -16,7 +16,7 @@
 from __future__ import absolute_import, division, print_function
 import os
 import re
-from const import LOCATION_MODE, SERVICE_MODE
+from const import LOCATION_MODE, SERVICE_MODE, COMP_OB, COMP_OB_STANDALONE
 
 def get_backup_and_archive_uri(path):
     if 'oss' in path:
@@ -103,6 +103,7 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     cmds = plugin_context.cmds
+    ob_repository = kwargs.get("ob_repository")
 
     data_backup_uri = getattr(options, 'data_backup_uri', None)
     archive_log_uri = getattr(options, 'archive_log_uri', None)
@@ -132,7 +133,16 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
 
         uri_check = plugin_context.get_variable('check_uri')
         if (option_mode == 'switchover' and standby_type == LOCATION_MODE) or uri_check:
-            standby_archive_log_uri = get_uri(standby_cursor, 'archive', tenant_role_res['TENANT_ID'], standby_tenant)
+            standby_archive_log_uri = getattr(options, 'standby_archive_log_uri', None)
+            primary_archive_log_uri = getattr(options, 'primary_archive_log_uri', None)
+            if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE] and option_mode == 'switchover':
+                if not primary_archive_log_uri:
+                    error("The `primary_archive_log_uri` parameter is missing. Please pass it in using `--primary_archive_log_uri`.")
+                    return
+                if not standby_archive_log_uri:
+                    error("The `standby_archive_log_uri` parameter is missing. Please pass it in using `--standby_archive_log_uri`.")
+                    return
+            standby_archive_log_uri = standby_archive_log_uri if standby_archive_log_uri else get_uri(standby_cursor, 'archive', tenant_role_res['TENANT_ID'], standby_tenant)
             if not standby_archive_log_uri:
                 stdio.stop_loading('failed')
                 return plugin_context.return_false()
@@ -141,18 +151,11 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
                 return plugin_context.return_false()
             plugin_context.set_variable('standby_archive_log_uri', standby_archive_log_uri)
 
-            standby_data_backup_uri = get_uri(standby_cursor, 'backup', tenant_role_res['TENANT_ID'], standby_tenant)
-            if not standby_data_backup_uri:
-                stdio.stop_loading('failed')
-                return plugin_context.return_false()
-            if standby_data_backup_uri and standby_data_backup_uri.startswith('file://') and not check_nfs_uri(standby_data_backup_uri):
-                return plugin_context.return_false()
-            plugin_context.set_variable('standby_data_backup_uri', standby_data_backup_uri)
-
             primary_cursor = plugin_context.get_variable('primary_tenant_cursor')
             primary_tenant = plugin_context.get_variable('primary_tenant')
             primary_id = plugin_context.get_variable('primary_tenant_id')
-            primary_archive_log_uri = get_uri(primary_cursor, 'archive', primary_id, primary_tenant)
+
+            primary_archive_log_uri = primary_archive_log_uri if primary_archive_log_uri else get_uri(primary_cursor, 'archive', primary_id, primary_tenant)
             if not primary_archive_log_uri:
                 stdio.stop_loading('failed')
                 return plugin_context.return_false()
@@ -160,14 +163,6 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
                 stdio.stop_loading('failed')
                 return plugin_context.return_false()
             plugin_context.set_variable('primary_archive_log_uri', primary_archive_log_uri)
-
-            primary_data_backup_uri = get_uri(primary_cursor, 'backup', primary_id, primary_tenant)
-            if not primary_data_backup_uri:
-                stdio.stop_loading('failed')
-                return plugin_context.return_false()
-            if primary_data_backup_uri and primary_data_backup_uri.startswith('file://') and not check_nfs_uri(primary_data_backup_uri):
-                return plugin_context.return_false()
-            plugin_context.set_variable('primary_data_backup_uri', primary_data_backup_uri)
 
             if uri_check:
                 check_cursor = plugin_context.get_variable('check_tenant_cursor')
@@ -196,6 +191,14 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
             return plugin_context.return_true()
     
     elif option_mode in ['create_standby_tenant']:
+        if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE]:
+            if not data_backup_uri:
+                error("The `data_backup_uri` parameter is missing. Please pass it in using `--data_backup_uri`.")
+                return
+            if not archive_log_uri:
+                error("The `archive_log_uri` parameter is missing. Please pass it in using `--archive_log_uri`.")
+                return
+
         primary_deploy_name = cmds[1]
         primary_tenant = cmds[2]
         primary_cursor = cursors.get(primary_deploy_name)
@@ -213,6 +216,10 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
             return
         
     if option_mode == "log_source":
+        if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE] and standby_type == LOCATION_MODE:
+            if not archive_log_uri:
+                error("The `archive_log_uri` parameter is missing. Please pass it in using `--archive_log_uri`.")
+                return
         primary_cursor = plugin_context.get_variable("primary_cursor")
         primary_tenant_id = plugin_context.get_variable("primary_tenant_id")
         primary_tenant = plugin_context.get_variable("primary_tenant")

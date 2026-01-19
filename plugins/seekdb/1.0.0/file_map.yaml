@@ -1,5 +1,5 @@
-- src_path: ./usr/bin/observer
-  target_path: bin/observer
+- src_path: ./usr/bin/seekdb
+  target_path: bin/seekdb
   type: bin
   mode: 755
 - src_path: ./usr/bin

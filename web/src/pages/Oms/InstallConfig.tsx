@@ -501,9 +501,36 @@ export default function InstallConfig() {
           ...newComponents,
         });
 
-        const omsType = omsDockerData?.find((item: any) => configData?.image?.includes(item?.name))?.version.split('feature_')[1];
-
-        setSelectedOmsType(omsType);
+        // 从 configData?.image 中提取 omsType
+        // configData?.image 的格式可能是：
+        // 1. name:version (如: oms-ce:feature_4.2.12_ce)
+        // 2. 完整镜像路径 (如: reg.docker.alibaba-inc.com/oceanbase/oms-ce:feature_4.2.12_ce)
+        let omsType: string | undefined;
+        if (configData?.image) {
+          // 尝试直接从 image 中提取版本号（如果包含 feature_）
+          const featureMatch = configData.image.match(/feature_([^:]+)/);
+          if (featureMatch && featureMatch[1]) {
+            omsType = featureMatch[1];
+          } else {
+            // 如果无法直接提取，从 omsDockerData 中查找
+            // 查找逻辑：匹配 name:version 格式
+            const imageParts = configData.image.split(':');
+            if (imageParts.length >= 2) {
+              const imageName = imageParts[0].split('/').pop(); // 获取镜像名称（去除路径）
+              const imageVersion = imageParts[imageParts.length - 1]; // 获取版本部分
+              const matchedItem = omsDockerData?.find((item: any) => {
+                // 匹配 name 和 version
+                return item.name === imageName && item.version === imageVersion;
+              });
+              if (matchedItem) {
+                omsType = matchedItem.version.split('feature_')[1];
+              }
+            }
+          }
+        }
+        if (omsType) {
+          setSelectedOmsType(omsType);
+        }
         setCurrentStep(2);
         setIsFirstTime(false);
         setErrorVisible(false);
@@ -513,7 +540,6 @@ export default function InstallConfig() {
       .finally(() => {
         finalValidate.current = false;
       });
-    console.log('configData', configData)
   };
 
   const columns = [
@@ -622,373 +648,49 @@ export default function InstallConfig() {
         defaultMessage: '节点',
       }),
       dataIndex: 'cm_nodes',
-      formItemProps: (_: any, config: any) => {
-        const { record } = config;
-        return {
-          validateFirst: true,
-          validateTrigger: ['onChange'],
-          rules: [
-            {
-              required: true,
-              message: intl.formatMessage({
-                id: 'OBD.pages.components.NodeConfig.ThisItemIsRequired',
-                defaultMessage: '此项是必填项',
-              }),
-            },
-            {
-              validator: async (_: any, value: string[]) => {
-                if (value && value.length !== 0) {
-                  // 过滤掉空字符串和空白字符，并去除空格
-                  const validValues = value
-                    .filter((item) => item && typeof item === 'string' && item.trim() !== '')
-                    .map((item) => item.trim());
+      formItemProps: {
+        validateFirst: true,
+        rules: [
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.ThisItemIsRequired',
+              defaultMessage: '此项是必填项',
+            }),
+          },
+          {
+            validator: (_: any, value: string[]) => {
+              if (value.length !== 0) {
+                let inputServer = [];
+                const currentV = value[value.length - 1];
+                inputServer = allOBServer.concat(currentV);
+                const serverValue = finalValidate.current
+                  ? allOBServer
+                  : inputServer;
 
-                  // 如果过滤后没有有效值，则通过验证（允许用户正在输入）
-                  if (validValues.length === 0) {
-                    return Promise.resolve();
-                  }
-
-                  // 获取当前验证触发源（通过检查是否在最终验证阶段）
-                  // 如果是最终验证，或者是在 onBlur 时触发（通过检查是否有无效IP），严格检查所有值
-                  const invalidIPs = validValues.filter((item) => !validator.isIP(item));
-
-                  // 如果是最终验证，严格检查所有值
-                  if (finalValidate.current) {
-                    if (invalidIPs.length > 0) {
-                      return Promise.reject(intl.formatMessage({
-                        id: 'OBD.pages.Oms.InstallConfig.PleaseEnterCorrectIpNode',
-                        defaultMessage: '请输入正确的 IP 节点',
-                      }));
-                    }
-
-                    // 最终验证：检查重复 IP
-                    const currentRowId = record?.id;
-                    // 1. 检查当前行内是否有重复
-                    if (hasDuplicateIPs(validValues)) {
-                      const errorMessage = intl.formatMessage({
-                        id: 'OBD.component.NodeConfig.TheValidatorNode2',
-                        defaultMessage: '禁止输入重复节点',
-                      });
-                      // 立即设置错误信息，确保错误不会被清除
-                      if (currentRowId) {
-                        tableFormRef?.current?.setFields([
-                          {
-                            name: [currentRowId, 'cm_nodes'],
-                            errors: [errorMessage],
-                          },
-                        ]);
-                      }
-                      return Promise.reject(errorMessage);
-                    }
-
-                    // 2. 检查与其他行是否有重复
-                    if (currentRowId) {
-                      // 收集所有行的节点数据（包括当前行）
-                      const allRowsData: Array<{ id: string; nodes: string[] }> = [];
-
-                      try {
-                        // 从 tableFormRef 获取所有行的表单值
-                        const formValues = tableFormRef?.current?.getFieldsValue() as any;
-                        if (formValues) {
-                          // 遍历所有行，收集所有行的节点
-                          dbConfigData.forEach((item) => {
-                            if (item.id === currentRowId) {
-                              // 当前行，使用 validValues（最新值）
-                              allRowsData.push({
-                                id: item.id,
-                                nodes: validValues
-                              });
-                            } else {
-                              // 其他行，优先使用表单中的最新值
-                              const rowFormValue = formValues[item.id];
-                              const formNodes = rowFormValue?.cm_nodes;
-                              const nodes = formNodes !== undefined && formNodes !== null
-                                ? (Array.isArray(formNodes) ? formNodes : [])
-                                : (item.cm_nodes || []);
-                              allRowsData.push({
-                                id: item.id,
-                                nodes: nodes
-                                  .filter((node: string) => node && typeof node === 'string' && node.trim() !== '')
-                                  .map((node: string) => node.trim())
-                              });
-                            }
-                          });
-                        } else {
-                          // 如果无法获取表单值，使用 dbConfigData
-                          dbConfigData.forEach((item) => {
-                            if (item.id === currentRowId) {
-                              // 当前行，使用 validValues（最新值）
-                              allRowsData.push({
-                                id: item.id,
-                                nodes: validValues
-                              });
-                            } else {
-                              // 其他行，使用 dbConfigData
-                              const nodes = item.cm_nodes || [];
-                              allRowsData.push({
-                                id: item.id,
-                                nodes: nodes
-                                  .filter((node: string) => node && typeof node === 'string' && node.trim() !== '')
-                                  .map((node: string) => node.trim())
-                              });
-                            }
-                          });
-                        }
-                      } catch (e) {
-                        // 如果获取表单值失败，使用 dbConfigData
-                        dbConfigData.forEach((item) => {
-                          if (item.id === currentRowId) {
-                            // 当前行，使用 validValues（最新值）
-                            allRowsData.push({
-                              id: item.id,
-                              nodes: validValues
-                            });
-                          } else {
-                            // 其他行，使用 dbConfigData
-                            const nodes = item.cm_nodes || [];
-                            allRowsData.push({
-                              id: item.id,
-                              nodes: nodes
-                                .filter((node: string) => node && typeof node === 'string' && node.trim() !== '')
-                                .map((node: string) => node.trim())
-                            });
-                          }
-                        });
-                      }
-
-                      // 找出所有包含重复节点的行
-                      const duplicateRowIds = new Set<string>();
-                      const errorMessage = intl.formatMessage({
-                        id: 'OBD.component.NodeConfig.TheValidatorNode2',
-                        defaultMessage: '禁止输入重复节点',
-                      });
-
-                      // 检查每一行的节点是否与其他行重复
-                      allRowsData.forEach((rowData) => {
-                        const { id: rowId, nodes: rowNodes } = rowData;
-                        // 检查当前行的每个节点是否在其他行中也存在
-                        const hasDuplicate = rowNodes.some((node: string) => {
-                          return allRowsData.some((otherRowData) => {
-                            if (otherRowData.id === rowId) {
-                              return false; // 跳过自己
-                            }
-                            return otherRowData.nodes.includes(node);
-                          });
-                        });
-
-                        if (hasDuplicate) {
-                          duplicateRowIds.add(rowId);
-                        }
-                      });
-
-                      // 给所有包含重复节点的行设置错误信息
-                      if (duplicateRowIds.size > 0) {
-                        const fieldsToSet = Array.from(duplicateRowIds).map((rowId) => ({
-                          name: [rowId, 'cm_nodes'],
-                          errors: [errorMessage],
-                        }));
-                        tableFormRef?.current?.setFields(fieldsToSet);
-                        return Promise.reject(errorMessage);
-                      } else {
-                        // 如果没有重复，清除所有行的重复错误信息
-                        const allRowIds = dbConfigData.map((item) => item.id);
-                        const fieldsToClear = allRowIds.map((rowId) => ({
-                          name: [rowId, 'cm_nodes'],
-                          errors: [],
-                        }));
-                        tableFormRef?.current?.setFields(fieldsToClear);
-                      }
-                    }
-                  } else {
-                    // 非最终验证时，检查所有值
-                    // 如果是 onChange 触发，允许最后一个值不是完整 IP（正在输入中）
-                    const lastValue = validValues[validValues.length - 1];
-                    const confirmedValues = validValues.length > 1 ? validValues.slice(0, -1) : [];
-
-                    // 先检查是否已经有重复错误信息（可能是 onValuesChange 设置的）
-                    const currentRowId = record?.id;
-                    const currentErrors = currentRowId ? tableFormRef?.current?.getFieldError([currentRowId, 'cm_nodes']) : null;
-                    const hasDuplicateError = currentErrors && currentErrors.length > 0 &&
-                      currentErrors.some((err: string) => err && err.includes('重复'));
-
-                    // 检查已确认的值是否有无效 IP
-                    const invalidConfirmed = confirmedValues.filter((item) => !validator.isIP(item));
-                    if (invalidConfirmed.length > 0) {
-                      return Promise.reject(intl.formatMessage({
-                        id: 'OBD.pages.Oms.InstallConfig.PleaseEnterCorrectIpNode',
-                        defaultMessage: '请输入正确的 IP 节点',
-                      }));
-                    }
-
-                    // 检查最后一个值的 IP 格式
-                    // 如果只有一个值，或者最后一个值看起来已经输入完成（长度足够或包含明显无效字符），则检查 IP 格式
-                    // 判断是否已经输入完成：
-                    // 1. 如果只有一个值，必须检查（因为用户可能已经输入完成）
-                    // 2. 如果最后一个值长度 >= 7（IP 地址最短为 7 个字符，如 1.1.1.1），可能已经输入完成
-                    // 3. 如果包含非数字和非点的字符，说明可能是无效的 IP
-                    // 4. 如果包含至少3个点（IPv4 格式），可能已经输入完成
-                    const isLastValueComplete = validValues.length === 1 ||
-                      lastValue.length >= 7 || // IP 地址最短为 7 个字符（如 1.1.1.1）
-                      /[^0-9.]/.test(lastValue) || // 包含非数字和非点的字符，说明可能是无效的 IP
-                      (lastValue.match(/\./g) || []).length >= 3; // 包含至少3个点，可能已经输入完成
-
-                    if (isLastValueComplete && !validator.isIP(lastValue)) {
-                      return Promise.reject(intl.formatMessage({
-                        id: 'OBD.pages.Oms.InstallConfig.PleaseEnterCorrectIpNode',
-                        defaultMessage: '请输入正确的 IP 节点',
-                      }));
-                    }
-
-                    // onChange 触发，如果最后一个值也是有效的 IP，则验证重复性
-                    if (validator.isIP(lastValue)) {
-                      // 1. 检查当前行内是否有重复
-                      if (hasDuplicateIPs(validValues)) {
-                        const errorMessage = intl.formatMessage({
-                          id: 'OBD.component.NodeConfig.TheValidatorNode2',
-                          defaultMessage: '禁止输入重复节点',
-                        });
-                        // 立即设置错误信息，确保错误不会被清除
-                        if (currentRowId) {
-                          tableFormRef?.current?.setFields([
-                            {
-                              name: [currentRowId, 'cm_nodes'],
-                              errors: [errorMessage],
-                            },
-                          ]);
-                        }
-                        return Promise.reject(errorMessage);
-                      }
-
-                      // 2. 检查与其他行是否有重复
-                      if (currentRowId) {
-                        // 收集所有行的节点数据（包括当前行）
-                        const allRowsData: Array<{ id: string; nodes: string[] }> = [];
-
-                        try {
-                          // 从 tableFormRef 获取所有行的表单值
-                          const formValues = tableFormRef?.current?.getFieldsValue() as any;
-                          if (formValues) {
-                            // 遍历所有行，收集所有行的节点
-                            dbConfigData.forEach((item) => {
-                              if (item.id === currentRowId) {
-                                // 当前行，使用 validValues（最新值）
-                                allRowsData.push({
-                                  id: item.id,
-                                  nodes: validValues
-                                });
-                              } else {
-                                // 其他行，优先使用表单中的最新值
-                                const rowFormValue = formValues[item.id];
-                                const formNodes = rowFormValue?.cm_nodes;
-                                const nodes = formNodes !== undefined && formNodes !== null
-                                  ? (Array.isArray(formNodes) ? formNodes : [])
-                                  : (item.cm_nodes || []);
-                                allRowsData.push({
-                                  id: item.id,
-                                  nodes: nodes
-                                    .filter((node: string) => node && typeof node === 'string' && node.trim() !== '')
-                                    .map((node: string) => node.trim())
-                                });
-                              }
-                            });
-                          } else {
-                            // 如果无法获取表单值，使用 dbConfigData
-                            dbConfigData.forEach((item) => {
-                              if (item.id === currentRowId) {
-                                // 当前行，使用 validValues（最新值）
-                                allRowsData.push({
-                                  id: item.id,
-                                  nodes: validValues
-                                });
-                              } else {
-                                // 其他行，使用 dbConfigData
-                                const nodes = item.cm_nodes || [];
-                                allRowsData.push({
-                                  id: item.id,
-                                  nodes: nodes
-                                    .filter((node: string) => node && typeof node === 'string' && node.trim() !== '')
-                                    .map((node: string) => node.trim())
-                                });
-                              }
-                            });
-                          }
-                        } catch (e) {
-                          // 如果获取表单值失败，使用 dbConfigData
-                          dbConfigData.forEach((item) => {
-                            if (item.id === currentRowId) {
-                              // 当前行，使用 validValues（最新值）
-                              allRowsData.push({
-                                id: item.id,
-                                nodes: validValues
-                              });
-                            } else {
-                              // 其他行，使用 dbConfigData
-                              const nodes = item.cm_nodes || [];
-                              allRowsData.push({
-                                id: item.id,
-                                nodes: nodes
-                                  .filter((node: string) => node && typeof node === 'string' && node.trim() !== '')
-                                  .map((node: string) => node.trim())
-                              });
-                            }
-                          });
-                        }
-
-                        // 找出所有包含重复节点的行
-                        const duplicateRowIds = new Set<string>();
-                        const errorMessage = intl.formatMessage({
-                          id: 'OBD.component.NodeConfig.TheValidatorNode2',
-                          defaultMessage: '禁止输入重复节点',
-                        });
-
-                        // 检查每一行的节点是否与其他行重复
-                        allRowsData.forEach((rowData) => {
-                          const { id: rowId, nodes: rowNodes } = rowData;
-                          // 检查当前行的每个节点是否在其他行中也存在
-                          const hasDuplicate = rowNodes.some((node: string) => {
-                            return allRowsData.some((otherRowData) => {
-                              if (otherRowData.id === rowId) {
-                                return false; // 跳过自己
-                              }
-                              return otherRowData.nodes.includes(node);
-                            });
-                          });
-
-                          if (hasDuplicate) {
-                            duplicateRowIds.add(rowId);
-                          }
-                        });
-
-                        // 给所有包含重复节点的行设置错误信息
-                        if (duplicateRowIds.size > 0) {
-                          const fieldsToSet = Array.from(duplicateRowIds).map((rowId) => ({
-                            name: [rowId, 'cm_nodes'],
-                            errors: [errorMessage],
-                          }));
-                          tableFormRef?.current?.setFields(fieldsToSet);
-                          return Promise.reject(errorMessage);
-                        } else {
-                          // 如果没有重复，清除当前行的重复错误信息（如果有的话）
-                          if (hasDuplicateError && currentRowId) {
-                            tableFormRef?.current?.setFields([
-                              {
-                                name: [currentRowId, 'cm_nodes'],
-                                errors: [],
-                              },
-                            ]);
-                          }
-                          // 继续验证，不返回错误
-                        }
-                      }
-                    }
-                    // 如果最后一个值不是有效的 IP，可能是用户正在输入，不报错
-                  }
+                if (value?.some((item) => !validator.isIP(item))) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.pages.Oms.InstallConfig.PleaseEnterCorrectIpNode',
+                      defaultMessage: '请输入正确的 IP 节点',
+                    }),
+                  );
+                } else if (
+                  (hasDuplicateIPs(value) && dbConfigData.length === 1) ||
+                  (hasDuplicateIPs(serverValue) && dbConfigData.length > 1)
+                ) {
+                  return Promise.reject(
+                    intl.formatMessage({
+                      id: 'OBD.component.NodeConfig.TheValidatorNode2',
+                      defaultMessage: '禁止输入重复节点',
+                    }),
+                  );
                 }
-                return Promise.resolve();
-              },
+              }
+              return Promise.resolve();
             },
-          ],
-        };
+          },
+        ],
       },
       renderFormItem: (_: any, { isEditable, record }: any) => {
         return isEditable ? (
@@ -1289,14 +991,20 @@ export default function InstallConfig() {
   };
 
   const oceanBaseInfo = {
-    group: '产品',
+    group: intl.formatMessage({
+      id: 'OBD.pages.Oms.InstallConfig.Product',
+      defaultMessage: '产品',
+    }),
     key: 'database',
     content: [
       {
         key: 'oms',
         name: 'OMS',
         onlyAll: false,
-        desc: '是 OceanBase 数据库一站式数据传输和同步的产品。是集数据迁移、实时数据同步和增量数据订阅于一体的数据传输服务。',
+        desc: intl.formatMessage({
+          id: 'OBD.pages.Oms.InstallConfig.OmsDescription',
+          defaultMessage: '是 OceanBase 数据库一站式数据传输和同步的产品。是集数据迁移、实时数据同步和增量数据订阅于一体的数据传输服务。',
+        }),
         doc: OMS_DOCS,
         version_info: omsDockerData
       },
@@ -1892,8 +1600,26 @@ export default function InstallConfig() {
                     }
                   }
 
-                  // 检查节点是否重复
+                  // 检查节点 IP 合法性和重复（与 validator 规则保持一致）
                   if (editorServers && editorServers.length > 0) {
+                    // 检查是否有无效的 IP 地址（直接检查，不先过滤）
+                    if (editorServers.some((item) => !validator.isIP(item))) {
+                      // 设置 IP 格式错误
+                      tableFormRef?.current?.setFields([
+                        {
+                          name: [editableItem.id, 'cm_nodes'],
+                          errors: [
+                            intl.formatMessage({
+                              id: 'OBD.pages.Oms.InstallConfig.PleaseEnterCorrectIpNode',
+                              defaultMessage: '请输入正确的 IP 节点',
+                            })
+                          ],
+                        },
+                      ]);
+                      // 如果有无效 IP，不继续检查重复，直接返回
+                      return;
+                    }
+
                     // 1. 检查当前行内是否有重复
                     const trimmedServers = editorServers.map((s: string) => s.trim()).filter((s: string) => s);
                     if (hasDuplicateIPs(trimmedServers)) {
@@ -2388,7 +2114,21 @@ export default function InstallConfig() {
       <footer className={styles.pageFooterContainer}>
         <div className={styles.pageFooter}>
           <Space className={styles.foolterAction}>
-
+            <Button
+              onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+              data-aspm-click="c307507.d317381"
+              data-aspm-desc={intl.formatMessage({
+                id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationExit',
+                defaultMessage: '部署配置-退出',
+              })}
+              data-aspm-param={``}
+              data-aspm-expo
+            >
+              {intl.formatMessage({
+                id: 'OBD.pages.components.InstallConfig.Exit',
+                defaultMessage: '退出',
+              })}
+            </Button>
             <Button onClick={preStep}>
               {intl.formatMessage({
                 id: 'OBD.pages.Obdeploy.InstallConfig.PreviousStep',
@@ -2410,21 +2150,6 @@ export default function InstallConfig() {
               {intl.formatMessage({
                 id: 'OBD.pages.components.InstallConfig.NextStep',
                 defaultMessage: '下一步',
-              })}
-            </Button>
-            <Button
-              onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-              data-aspm-click="c307507.d317381"
-              data-aspm-desc={intl.formatMessage({
-                id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationExit',
-                defaultMessage: '部署配置-退出',
-              })}
-              data-aspm-param={``}
-              data-aspm-expo
-            >
-              {intl.formatMessage({
-                id: 'OBD.pages.components.InstallConfig.Exit',
-                defaultMessage: '退出',
               })}
             </Button>
           </Space>

@@ -19,5 +19,5 @@ from const import STAGE_FIRST
 
 
 def offline_upgrade_start(plugin_context, workflow, *args, **kwargs):
-    workflow.add(STAGE_FIRST, 'generate_config', 'generate_oms_config', 'start', 'health_check', 'reload')
+    workflow.add(STAGE_FIRST, 'generate_config', 'generate_oms_config', 'start', 'health_check')
     return plugin_context.return_true()

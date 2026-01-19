@@ -31,7 +31,8 @@ stdio = None
 
 def start(plugin_context, *args, **kwargs):
     global stdio
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     options = plugin_context.options
@@ -108,7 +109,7 @@ def start(plugin_context, *args, **kwargs):
         if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
             continue
 
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s/conf/monagent.yaml' % home_path):
+        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s/conf/monagent.yaml' % home_path):
             use_parameter = False
         else:
             use_parameter = True

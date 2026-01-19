@@ -54,7 +54,7 @@ def online_upgrade(plugin_context, dest_repository, default_oms_files_path=None,
     input_path = True
     if default_oms_files_path:
         input_path = False
-    oms_files_path = None
+    oms_files_path = default_oms_files_path
     for server in cluster_config.servers:
         server_config = cluster_config.get_server_conf(server)
         client = clients[server]
@@ -71,7 +71,10 @@ def online_upgrade(plugin_context, dest_repository, default_oms_files_path=None,
                 client.execute_command(f"mkdir -p {oms_files_path}")
             else:
                 stdio.print(f'{oms_files_path} is exist.')
-                continue
+                if input_path:
+                    continue
+                else:
+                    return plugin_context.return_false()
             if Capacity(client.execute_command(f"df -BG {oms_files_path} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes > 20 << 30:
                 break
             stdio.error('The specified directory is too small. Please specify a larger directory.')
@@ -80,7 +83,7 @@ def online_upgrade(plugin_context, dest_repository, default_oms_files_path=None,
             stdio.error('%s: missing script file %s' % (server, const.DDFFI_SCRIPT))
             return plugin_context.return_false()
         client.execute_command(f"rm -rf {oms_files_path}")
-        stdio.start_loading('wait dump oms files from image')
+        stdio.start_loading('%s: wait dump oms files from image' % server.ip)
         sudo_client = get_root_permission_client(client, server, stdio)
         if not sudo_client:
             stdio.stop_loading('fail')
@@ -108,12 +111,12 @@ def online_upgrade(plugin_context, dest_repository, default_oms_files_path=None,
             stdio.stop_loading('fail')
             return plugin_context.return_false()
         prefix = get_sudo_prefix(sudo_client)
-        if not client.execute_command(f'{prefix}sh {oms_script_path}/{const.DCDTC_SCRIPT} {container_name} {oms_files_path} {container_backup_path}'):
+        if not client.execute_command(f'{prefix}sh {oms_script_path}/{const.DCDTC_SCRIPT} {container_name} {oms_files_path} {container_backup_path}', use_tty=True):
             stdio.stop_loading('fail')
             rb_failed_servers = []
             for rb_server in dcdtc_servers:
                 client = clients[rb_server]
-                if not client.execute_command(f"{prefix}sh {oms_script_path}/{const.DCDR_SCRIPT} {container_name} {container_backup_path}"):
+                if not client.execute_command(f"{prefix}sh {oms_script_path}/{const.DCDR_SCRIPT} {container_name} {container_backup_path}", use_tty=True):
                     rb_failed_servers.append(rb_server)
             stdio.error('%s: docker copy dumpfile to container failed. Please contact official technical support.' % server)
             rb_failed_servers and stdio.error('Rollback failed servers: %s.' % rb_failed_servers)

@@ -24,7 +24,8 @@ def health_check(plugin_context, *args, **kwargs):
     if plugin_context.get_variable('scale_out'):
         return plugin_context.return_true()
 
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     stdio.start_loading('observer program health check')

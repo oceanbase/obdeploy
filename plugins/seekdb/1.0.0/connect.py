@@ -48,10 +48,10 @@ def connect(plugin_context, target_server=None, retry_times=101, connect_all=Fal
     if target_server:
         servers = [target_server]
         server_config = cluster_config.get_server_conf(target_server)
-        stdio.start_loading('Connect observer(%s:%s)' % (target_server, server_config['mysql_port']))
+        stdio.start_loading('Connect seekdb(%s:%s)' % (target_server, server_config['mysql_port']))
     else:
         servers = cluster_config.servers
-        stdio.start_loading('Connect to observer')
+        stdio.start_loading('Connect to seekdb')
     while count:
         count -= 1
         connect_nums = 0
@@ -68,7 +68,7 @@ def connect(plugin_context, target_server=None, retry_times=101, connect_all=Fal
                 cursor = Cursor(ip=server.ip, port=server_config.get('mysql_port', 2881), tenant='', password=password if password is not None else '', stdio=stdio)
                 if cursor.execute('select 1', raise_exception=False, exc_level='verbose'):
                     if not connect_all:
-                        stdio.stop_loading('succeed', text='Connect to observer {}:{}'.format(server.ip, server_config.get('mysql_port', 2881)))
+                        stdio.stop_loading('succeed', text='Connect to seekdb {}:{}'.format(server.ip, server_config.get('mysql_port', 2881)))
                         return return_true(connect=cursor.db, cursor=cursor, server=server)
                     else:
                         connect_nums += 1

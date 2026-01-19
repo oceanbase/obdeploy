@@ -32,7 +32,7 @@ def init_pre(plugin_context, *args, **kwargs):
 
     def stop_ob_or_obshell(client=None, home_path=None, server=None, critical=None, EC_FAIL_TO_INIT_PATH=None, *args, **kwargs):
         res = []
-        for bin_name in ['observer', 'obshell']:
+        for bin_name in ['seekdb', 'obshell']:
             client.execute_command(
                 "pkill -9 -u `whoami` -f '^%s/bin/%s'" % (home_path, bin_name))
             ret = client.execute_command('rm -fr %s/*' % home_path, timeout=-1)

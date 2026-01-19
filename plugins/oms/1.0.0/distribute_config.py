@@ -51,8 +51,10 @@ def distribute_config(plugin_context, new_cluster_config=None, *args, **kwargs):
             ret = client.execute_command('%sdocker ps -a --filter "name=%s" --format "{{json .}}"' % (prefix, container_name)).stdout.strip()
             if not ret or new_cluster_config:
                 server_config = cluster_config.get_server_conf(server)
-                run_path = server_config.get('run_mount_path') or (server_config.get('mount_path') + '/run')
-                generate_config_dir = os.path.join(os.path.dirname(run_path), 'config')
+                generate_config_dir = server_config.get('config_mount_path')
+                if not generate_config_dir:
+                    run_path = server_config.get('run_mount_path') or (server_config.get('mount_path') + '/run')
+                    generate_config_dir = os.path.join(os.path.dirname(run_path), 'config')
                 if not client.execute_command('ls {0}'.format(generate_config_dir)):
                     mkdir_cmd = 'mkdir -p {0}'.format(generate_config_dir)
                     client.execute_command(mkdir_cmd)

@@ -14,20 +14,35 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function
 
-from tool import docker_run_sudo_prefix
+from tool import docker_compose_run_sudo_prefix, docker_run_sudo_prefix
+from _rpm import Version
 
 
-def docker_check(plugin_context, *args, **kwargs):
+def docker_check(plugin_context, docker_compose_check=False, docker_version=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-    failed_servers = []
+    docker_not_installed_servers = []
+    docker_compose_not_installed_servers = []
     for server in cluster_config.servers:
         client = clients[server]
-        prefix = docker_run_sudo_prefix(client)
-        if not client.execute_command('%sdocker --version' % prefix):
-            failed_servers.append(server.ip)
-    if failed_servers:
-        stdio.error('%s: docker is not installed' % ','.join(failed_servers))
+        dc_prefix = docker_compose_run_sudo_prefix(client)
+        d_prefix = docker_run_sudo_prefix(client)
+        ret = client.execute_command('%sdocker --version' % d_prefix)
+        if not ret:
+            docker_not_installed_servers.append(server.ip)
+        if ret and ret.stdout and docker_version:
+            if Version(docker_version) > Version(ret.stdout.strip()):
+                stdio.error('%s: Docker version must be greater than %s' % (server.ip, docker_version))
+                return plugin_context.return_false()
+               
+        if docker_compose_check and not client.execute_command('%sdocker compose --version' % dc_prefix):
+            docker_compose_not_installed_servers.append(server.ip)
+    if docker_not_installed_servers:
+        stdio.error('%s: docker is not installed' % ','.join(docker_not_installed_servers))
+    if docker_compose_not_installed_servers:
+        stdio.error('%s: docker-compose is not installed' % ','.join(docker_compose_not_installed_servers))
+
+    if docker_not_installed_servers or docker_compose_not_installed_servers:
         return plugin_context.return_false()
     return plugin_context.return_true()

@@ -1,5 +1,5 @@
 import { oceanbaseAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
-import { commonInputStyle, commonPortStyle } from '@/pages/constants';
+import { commonInputStyle, commonPortStyle, pathRule } from '@/pages/constants';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
 import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import { getErrorInfo } from '@/utils';
@@ -221,6 +221,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
               defaultMessage: '请输入',
             }),
           },
+          pathRule,
         ]}
         fieldProps={{
           addonAfter: <span>{oceanbaseAddonAfter}</span>,
@@ -246,6 +247,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
               defaultMessage: '请输入',
             }),
           },
+          pathRule,
         ]}
         fieldProps={{ style: commonInputStyle }}
       />
@@ -268,6 +270,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
               defaultMessage: '请输入',
             }),
           },
+          pathRule,
         ]}
         fieldProps={{ style: commonInputStyle }}
       />

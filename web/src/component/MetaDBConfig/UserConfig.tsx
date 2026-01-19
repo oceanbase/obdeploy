@@ -49,19 +49,22 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
           </span>
         }
         style={commonInputStyle}
-        rules={
-          !useRunningUser
-            ? [
-                {
-                  required: true,
-                  message: intl.formatMessage({
-                    id: 'OBD.component.MetaDBConfig.UserConfig.EnterAUsername',
-                    defaultMessage: '请输入用户名',
-                  }),
-                },
-              ]
-            : []
-        }
+        rules={[
+          {
+            required: true,
+            message: intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.EnterAUsername',
+              defaultMessage: '请输入用户名',
+            }),
+          },
+          {
+            pattern: /^([a-zA-Z0-9.]{1,20})$/,
+            message: intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.OnlyEnglishNumbersAndDots',
+              defaultMessage: '仅支持英文、数字和点且长度不超过20',
+            }),
+          },
+        ]}
       >
         <Input disabled={useRunningUser} onChange={userChange} />
       </ProForm.Item>
@@ -160,22 +163,22 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
           rules={
             useRunningUser
               ? [
-                  {
-                    required: true,
-                    message: intl.formatMessage({
-                      id: 'OBD.component.MetaDBConfig.UserConfig.EnterARunningUsername',
-                      defaultMessage: '请输入运行用户名',
-                    }),
-                  },
-                  {
-                    pattern: nameReg,
-                    message: intl.formatMessage({
-                      id: 'OBD.component.MetaDBConfig.UserConfig.ItStartsWithALetter',
-                      defaultMessage:
-                        '以英文字母开头，可包含英文、数字、下划线和连字符，且不超过32位',
-                    }),
-                  },
-                ]
+                {
+                  required: true,
+                  message: intl.formatMessage({
+                    id: 'OBD.component.MetaDBConfig.UserConfig.EnterARunningUsername',
+                    defaultMessage: '请输入运行用户名',
+                  }),
+                },
+                {
+                  pattern: nameReg,
+                  message: intl.formatMessage({
+                    id: 'OBD.component.MetaDBConfig.UserConfig.ItStartsWithALetter',
+                    defaultMessage:
+                      '以英文字母开头，可包含英文、数字、下划线和连字符，且不超过32位',
+                  }),
+                },
+              ]
               : []
           }
         >

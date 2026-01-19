@@ -64,6 +64,10 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
                     success = client.execute_command("cd ${source} && find -type l | xargs -i %(install_cmd)s ${source}/{} ${target}/{}" % {"install_cmd": install_cmd}) and success
             else:
                 success = client.execute_command("%(install_cmd)s ${source} ${target}" % {"install_cmd": install_cmd}) and success
+                launch_user = cluster_config.get_global_conf().get("launch_user")
+                if launch_user:
+                    success = client.execute_command("sudo chown -R %s ${target}" % launch_user) and success
+
         return success
     
     stdio = plugin_context.stdio

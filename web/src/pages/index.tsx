@@ -39,14 +39,14 @@ export default function IndexPage() {
       });
     }
     return () => {
-      Video.dispose();
+      if (Video) {
+        Video.dispose();
+      }
     };
   }, []);
 
   const taiPath = getTailPath();
-  const isUpgrade = taiPath === 'update';
-  // const type = 'update';
-  // const isUpgrade = location.hash.split('/').pop()?.split('?')[1] === 'update';
+  const isUpgrade = taiPath.includes('update');
 
   return (
     <div className={styles.videoContainer}>
@@ -111,7 +111,7 @@ export default function IndexPage() {
               data-aspm-expo
               onClick={() => {
                 if (isUpgrade) {
-                  history.push('/update');
+                  history.push('/guide?update');
                 } else {
                   history.push('/guide');
                 }

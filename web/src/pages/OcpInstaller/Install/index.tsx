@@ -19,6 +19,10 @@ import {
 import * as OCP from '@/services/ocp_installer_backend/OCP';
 import { errorHandler } from '@/utils';
 import { useRequest } from 'ahooks';
+import CheckInfo from '@/component/OCPPreCheck/CheckInfo';
+import { getTailPath } from '@/utils/helper';
+import PreCheck from '@/component/OCPPreCheck/PreCheck';
+
 
 const Install: React.FC = () => {
   const [current, setCurrent] = useState(1);
@@ -56,7 +60,9 @@ const Install: React.FC = () => {
     }
   }, [current, installStatus, installResult]);
 
-  const paddingTop = current === 2 ? 132 : current !== 6 ? 150 : 0;
+  const isNewDB = getTailPath() === 'install'
+
+  const paddingTop = current === 2 ? 132 : current === 7 && installStatus === 'FINISHED' ? 0 : current !== 6 ? 150 : 0;
   return (
     <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
       <Steps
@@ -109,10 +115,19 @@ const Install: React.FC = () => {
         )}
 
         {current === 4 && (
-          <OCPPreCheck current={current} setCurrent={setCurrent} />
+          <CheckInfo
+            isNewDB={isNewDB}
+            current={current}
+            setCurrent={setCurrent}
+            showNext={() => { }}
+          />
         )}
 
         {current === 5 && (
+          <PreCheck isNewDB={isNewDB} current={current} setCurrent={setCurrent} />
+        )}
+
+        {current === 6 && (
           <InstallProcessNew
             id={connectId}
             current={current}
@@ -123,7 +138,7 @@ const Install: React.FC = () => {
           />
         )}
 
-        {current === 6 && (
+        {current === 7 && (
           <InstallResult
             current={current}
             setCurrent={setCurrent}

@@ -15,14 +15,16 @@
 
 from __future__ import absolute_import, division, print_function
 
+import json
+
 from _rpm import Version
 from _stdio import FormatText
+from tool import get_metadb_info_from_depends_ob, Cursor
 
 
 def upgrade_pre(plugin_context, run_workflow, get_workflows, upgrade_ctx, upgrade_mode, *args, **kwargs):
-    clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
-
+    global_config = cluster_config.get_original_global_conf()
     stdio = plugin_context.stdio
 
     upgrade_repositories = kwargs.get('upgrade_repositories')
@@ -50,8 +52,36 @@ def upgrade_pre(plugin_context, run_workflow, get_workflows, upgrade_ctx, upgrad
             break
 
     if upgrade_mode == 'offline':
-        if len(cluster_config.servers) > 1 and not stdio.confirm('Before the upgrade, make sure the HA feature is disabled. Is it disabled??', default_option=False):
-            return plugin_context.return_false()
+        if len(cluster_config.servers) > 1:
+            ob_metadb_info = get_metadb_info_from_depends_ob(cluster_config, stdio)
+            if ob_metadb_info:
+                oms_meta_host = ob_metadb_info['host']
+                oms_meta_port = ob_metadb_info['port']
+                oms_meta_user = ob_metadb_info['user']
+                oms_meta_password = ob_metadb_info['password']
+            else:
+                oms_meta_host = global_config.get('oms_meta_host')
+                oms_meta_port = global_config.get('oms_meta_port')
+                oms_meta_user = global_config.get('oms_meta_user')
+                oms_meta_password = global_config.get('oms_meta_password')
+
+            try:
+                cursor = Cursor(ip=oms_meta_host, user=oms_meta_user, port=int(oms_meta_port), tenant='', password=oms_meta_password, stdio=stdio)
+            except:
+                stdio.error('Connect OMS cm meta fail')
+                return plugin_context.return_false()
+            drc_rm_db = global_config.get('drc_rm_db', 'oms_rm')
+            cursor.execute('use %s' % drc_rm_db)
+            rv = cursor.fetchone("select cfg_value from oms_normal_config where cfg_name='ha.config';")
+            if rv:
+                cfg_value = rv['cfg_value']
+                if isinstance(cfg_value, str):
+                    cfg_value = json.loads(cfg_value)
+                for k, v in cfg_value.items():
+                    if k.find('enable') != -1 and v:
+                        stdio.error('ha is enabled, please disable it before upgrade')
+                        return plugin_context.return_false()
+
         offline_upgrade_workflow = get_workflows('offline_upgrade', repositories=[cur_repository])
         if not run_workflow(offline_upgrade_workflow, repositories=[cur_repository]):
             return plugin_context.return_false()
@@ -60,7 +90,7 @@ def upgrade_pre(plugin_context, run_workflow, get_workflows, upgrade_ctx, upgrad
         if not run_workflow(offline_upgrade_start_workflow, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):
             return plugin_context.return_false()
     else:
-        component_kwargs = kwargs.get('component_kwargs', {})
+        component_kwargs = kwargs.get('comp_kwargs') or {}
         online_upgrade_workflow = get_workflows('online_upgrade', repositories=[cur_repository])
         upgrade_kwargs = {'dest_repository': dest_repository}
         upgrade_kwargs.update(component_kwargs)

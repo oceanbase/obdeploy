@@ -20,6 +20,9 @@ import const
 
 def stop(plugin_context, workflow, *args, **kwargs):
     component_name = plugin_context.cluster_config.name
+    skip_compaction = kwargs.get('component_kwargs', {}).get('skip_compaction', False)
+    if not skip_compaction:
+        workflow.add(const.STAGE_FIRST, 'connect', 'compaction')
 
     workflow.add(const.STAGE_FIRST, 'stop')
     if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:

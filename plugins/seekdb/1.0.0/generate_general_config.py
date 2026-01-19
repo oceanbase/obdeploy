@@ -433,7 +433,8 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
         }
 
     if generate_password:
-        generate_random_password(cluster_config, auto_depend)
+        dev_mode = getattr(plugin_context, 'dev_mode', False)
+        generate_random_password(cluster_config, auto_depend, dev_mode=dev_mode)
 
     if generate_consistent_config:
         generate_global_config = generate_configs['global']

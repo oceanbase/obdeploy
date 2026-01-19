@@ -7,11 +7,15 @@ import ExitPageWrapper from '@/component/ExitPageWrapper';
 import { OBD_COMMAND } from '@/constant/configuration';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
+import { getTailPath } from '@/utils/helper';
 
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 export default function ExitPage() {
+
+  const taiPath = getTailPath();
+  const isUpdate = taiPath.includes('update');
 
   const handleCopy = () => {
     copy(OBD_COMMAND);
@@ -41,10 +45,15 @@ export default function ExitPage() {
           data-aspm-param={``}
           data-aspm-expo
         >
-          {intl.formatMessage({
-            id: 'OBD.pages.components.ExitPage.TheDeploymentProgramHasExited',
-            defaultMessage: '部署程序已经退出！',
-          })}
+          {
+            isUpdate ? intl.formatMessage({
+              id: 'OBD.pages.Oms.ExitPage.TheUpgradeProgramHasExited',
+              defaultMessage: '升级程序已经退出！',
+            }) : intl.formatMessage({
+              id: 'OBD.pages.components.ExitPage.TheDeploymentProgramHasExited',
+              defaultMessage: '部署程序已经退出！',
+            })
+          }
         </h1>
         <div
           className={styles.exitPageText}

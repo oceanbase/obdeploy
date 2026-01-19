@@ -25,6 +25,8 @@
     "@ant-design/pro-components": "2.3.34",
     "@ant-design/pro-layout": "6.5.0",
     "@antv/g6": "^4.8.22",
+    "@antv/g6-react-node": "^1.4.8",
+    "@babel/runtime": "7.28.2",
     "@oceanbase/design": "0.2.16",
     "@oceanbase/icons": "^0.2.0",
     "@oceanbase/ui": "0.2.17",

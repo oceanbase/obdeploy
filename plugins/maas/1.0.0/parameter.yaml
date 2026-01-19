@@ -1,0 +1,44 @@
+- name: model_cache_path
+  name_local: 模型缓存目录
+  type: PATH
+  read_only: true
+  description_en: model cache directory for oms
+- name: v
+  name_local: runtime镜像目录
+  type: PATH
+  read_only: true
+  description_en: docker image directory for oms
+- name: data_dir
+  required: true
+  name_local: 数据目录
+  type: PATH
+  read_only: true
+  description_en: data directory for oms
+- name: prometheus_host_port
+  name_local: Prometheus端口号
+  essential: true
+  type: INT
+  default: 9090
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: the port number for prometheus server.
+- name: port
+  name_local: MAAS服务端口号
+  essential: true
+  type: INT
+  default: 8087
+  min_value: 1025
+  max_value: 65535
+  need_reload: true
+  description_en: the port number for maas service.
+- name: container_name
+  name_local: 容器名称
+  type: STRING
+  need_redeploy: true
+  description_en: the container name for oms.
+
+
+
+
+

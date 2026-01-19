@@ -161,7 +161,6 @@ class Upgrader(object):
         total = len(self.route)
         self.apply_param_plugin(self.repositories[self.route_index - 1])
         while self.route_index < total:
-            setattr(self.plugin_context.options, 'without_parameter', True)
             start_workflows = self.get_workflows('upgrade_start', [self.repositories[self.route_index - 1]])
             self.run_workflow(start_workflows, self.repositories[self.route_index], self.cluster_config, **{self.repositories[self.route_index].name: {"local_home_path": None, "repository_dir": None}})
             self.close()

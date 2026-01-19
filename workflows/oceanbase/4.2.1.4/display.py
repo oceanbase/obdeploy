@@ -25,5 +25,5 @@ def display(plugin_context, workflow, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     component_name = cluster_config.name
     if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:
-        workflow.add_workflow(const.STAGE_THIRD, 'obshell_dashboard')
+        workflow.add(const.STAGE_SECOND, 'obshell_client', 'obshell_health_check', 'obshell_dashboard')
     plugin_context.return_true()

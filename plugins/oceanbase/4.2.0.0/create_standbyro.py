@@ -32,7 +32,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=Non
         for tenant_server_port in tenant_server_ports:
             tenant_ip = tenant_server_port['SVR_IP']
             tenant_port = tenant_server_port['SQL_PORT']
-            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, print_exception=print_exception)
+            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=print_exception)
             if tenant_cursor:
                 if tenant not in tenant_cursor_cache[cursor]:
                     tenant_cursor_cache[cursor][tenant] = {}
@@ -95,17 +95,17 @@ def create_standbyro(plugin_context, cursors={}, cluster_configs={}, *args, **kw
 
     # create standbyro in primary tenant
     # try to connect to tenant with standbyro if the user has entered a password or there is a password in the inner_config
-    if (standbyro_password_input is None and not standbyro_password_inner) or not exec_sql_in_tenant('select 1', primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=2, exec_type='fetchone'):
+    if (standbyro_password_input is None and not standbyro_password_inner) or not exec_sql_in_tenant('select 1' if mode == 'mysql' else 'select 1 from DUAL', primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=2, exec_type='fetchone'):
         # can not connect to tenant with standbyro user, try to connect to tenant with root user
-        if exec_sql_in_tenant('select 1', primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=2, exec_type='fetchone'):
+        if exec_sql_in_tenant('select 1' if mode == 'mysql' else 'select 1 from DUAL', primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=2, exec_type='fetchone'):
             # if standbyro exists ?
-            sql = "select * from oceanbase.__all_user where user_name = 'standbyro'"
+            sql = "select * from %s.__all_user where user_name = 'standbyro'" % ('oceanbase' if mode == 'mysql' else 'SYS')
             if exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=1, exec_type='fetchone'):
                 error("Authentication failed because the standbyro user already exists but the password is incorrect. Please re-create the tenant with ' --standbyro-password=xxxxxx'")
                 return
             # create standbyro
-            sql = "CREATE USER standbyro IDENTIFIED BY %s"
-            if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, args=[standbyro_password], password=root_password, retries=1):
+            sql = f"""CREATE USER standbyro IDENTIFIED BY "{standbyro_password}" """
+            if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, retries=1):
                 error('Create standbyro user failed')
                 return
         else:
@@ -114,8 +114,12 @@ def create_standbyro(plugin_context, cursors={}, cluster_configs={}, *args, **kw
             return
 
     # GRANT oceanbase to standbyro
-    if not exec_sql_in_tenant('show databases like "oceanbase"', primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=1, exec_type='fetchone') and \
-          not exec_sql_in_tenant("GRANT SELECT ON oceanbase.* TO standbyro;", primary_cursor, primary_tenant, mode, password=root_password, retries=3):
+    show_db_sql = 'show databases like "oceanbase"' if mode == 'mysql' else "SELECT username FROM all_users WHERE username = 'SYS'"
+    grant_sql = "GRANT SELECT ON %s.* TO standbyro;" % ("oceanbase" if mode == "mysql" else "SYS")
+    if not exec_sql_in_tenant(show_db_sql, primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=1, exec_type='fetchone'):
+        error("show database error")
+        return
+    if not exec_sql_in_tenant(grant_sql, primary_cursor, primary_tenant, mode, password=root_password, retries=3):
         error('Grant standbyro failed')
         return
 

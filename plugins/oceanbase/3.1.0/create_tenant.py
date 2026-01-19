@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 import time
+import re
 
 from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 from _types import Capacity
@@ -248,7 +249,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
             sql = sql % (name, replica_num, zone_list, primary_zone, pool_name)
             if charset:
                 sql += ", charset = '%s'" % charset
-            if collate:
+            if collate and mode == "mysql":
                 sql += ", collate = '%s'" % collate
             if logonly_replica_num:
                 sql += ", logonly_replica_num = %d" % logonly_replica_num
@@ -258,8 +259,32 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
                 sql += ", locality = '%s'" % locality
 
             set_mode = "ob_compatibility_mode = '%s'" % mode
+
+            variables_map = {}
+            ob_tcp_invited_nodes_value = None
             if variables:
-                sql += "set %s, %s" % (variables, set_mode)
+                pattern = r"(\w+)\s*=\s*((?:'[^']*'|\"[^\"]*\"|[^,]+))"
+                matches = re.findall(pattern, variables)
+                for key, value in matches:
+                    key = key.strip()
+                    value = value.strip()
+                    if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
+                        value = value[1:-1]
+                    if key == 'ob_tcp_invited_nodes':
+                        ob_tcp_invited_nodes_value = value
+                        value = "'%'"
+
+                    variables_map[key] = value
+
+            variables_str = ','.join(['{}={}'.format(k, v) for k, v in variables_map.items()])
+
+            if ob_tcp_invited_nodes_value:
+                tenant_whitelist = {}
+                tenant_whitelist[name] = ob_tcp_invited_nodes_value
+                plugin_context.set_variable('tenant_whitelist', tenant_whitelist)
+
+            if variables_str:
+                sql += "set %s, %s" % (variables_str, set_mode)
             else:
                 sql += "set %s" % set_mode
             res = cursor.execute(sql, stdio=stdio)

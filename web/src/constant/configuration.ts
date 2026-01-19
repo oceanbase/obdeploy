@@ -21,26 +21,26 @@ export const NEW_METADB_OCP_INSTALL = [
     }),
     key: 3,
   },
-  // {
-  //   title: intl.formatMessage({
-  //     id: 'OBD.src.constant.configuration.ConfigurationConfirmation',
-  //     defaultMessage: '配置确认',
-  //   }),
-  //   key: 4,
-  // },
+  {
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.ConfigurationConfirmation',
+      defaultMessage: '配置确认',
+    }),
+    key: 4,
+  },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.PreCheck',
       defaultMessage: '预检查',
     }),
-    key: 4,
+    key: 5,
   },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.Deployment',
       defaultMessage: '部署',
     }),
-    key: 5,
+    key: 6,
   },
 ];
 
@@ -59,26 +59,33 @@ export const METADB_OCP_INSTALL = [
     }),
     key: 2,
   },
-  {
-    title: intl.formatMessage({
-      id: 'OBD.src.constant.configuration.OcpConfiguration',
-      defaultMessage: 'OCP 配置',
-    }),
-    key: 3,
-  },
+    {
+      title: intl.formatMessage({
+        id: 'OBD.src.constant.configuration.OcpConfiguration',
+        defaultMessage: 'OCP 配置',
+      }),
+      key: 3,
+    },
+    {
+      title: intl.formatMessage({
+        id: 'OBD.pages.Oms.Steps.ConfigurationConfirmation',
+        defaultMessage: '配置确认',
+      }),
+      key: 4,
+    },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.PreCheck',
       defaultMessage: '预检查',
     }),
-    key: 4,
+    key: 5,
   },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.Deployment',
       defaultMessage: '部署',
     }),
-    key: 5,
+    key: 6,
   },
 ];
 
@@ -130,8 +137,9 @@ export const COMPONENT_UNINSTALL = [
   },
 ];
 
-export const STEPS_KEYS_INSTALL = [1, 2, 3, 4, 5];
-export const STEPS_KEYS_UPDATE = [1, 2, 3, 4];
+export const STEPS_KEYS_INSTALL = [1, 2, 3, 4, 5, 6];
+export const STEPS_KEYS_UPDATE = [1, 2, 3, 4, 5];
+export const STEPS_KEYS_UPDATE_OMS = [1, 2, 3, 4, 5];
 export const STEPS_KEYS_COMP_INSTALL = [1, 2, 3, 4];
 export const STEPS_KEYS_COMP_UNINSTALL = [1, 2];
 export const METADB_OCP_UPDATE = [
@@ -149,26 +157,26 @@ export const METADB_OCP_UPDATE = [
     }),
     key: 2,
   },
-  // {
-  //   title: intl.formatMessage({
-  //     id: 'OBD.src.constant.configuration.ConfigurationConfirmation',
-  //     defaultMessage: '配置确认',
-  //   }),
-  //   key: 3,
-  // },
+  {
+    title: intl.formatMessage({
+      id: 'OBD.src.constant.configuration.ConfigurationConfirmation',
+      defaultMessage: '配置确认',
+    }),
+    key: 3,
+  },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.EnvironmentPreCheck',
       defaultMessage: '环境预检查',
     }),
-    key: 3,
+    key: 4,
   },
   {
     title: intl.formatMessage({
       id: 'OBD.src.constant.configuration.OcpUpgrade',
       defaultMessage: 'OCP升级',
     }),
-    key: 4,
+    key: 5,
   },
 ];
 
@@ -195,10 +203,7 @@ export const METADB_OMS_UPDATE = [
     key: 3,
   },
   {
-    title: intl.formatMessage({
-      id: 'OBD.src.constant.configuration.DataBackup',
-      defaultMessage: '数据备份',
-    }),
+    title: '数据备份',
     key: 4,
   },
   {

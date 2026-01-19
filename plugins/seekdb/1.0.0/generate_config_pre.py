@@ -19,7 +19,7 @@ import const
 from tool import ConfigUtil
 
 
-def generate_random_password(cluster_config, auto_depend):
+def generate_random_password(cluster_config, auto_depend, dev_mode=False):
     add_components = cluster_config.get_deploy_added_components()
     global_config = cluster_config.get_original_global_conf()
     be_depend = cluster_config.be_depends
@@ -32,7 +32,7 @@ def generate_random_password(cluster_config, auto_depend):
         for component in const.COMPS_ODP + const.COMPS_OCP + [const.COMP_OCP_EXPRESS, const.COMP_OBAGENT, const.COMP_OBLOGPROXY, const.COMP_OBBINLOG_CE]
     }
 
-    if added_components[cluster_config.name] and 'root_password' not in global_config:
+    if added_components[cluster_config.name] and 'root_password' not in global_config and not dev_mode:
         cluster_config.update_global_conf('root_password', ConfigUtil.get_random_pwd_by_total_length(20), False)
 
     if added_components[const.COMP_OBAGENT] and be_depends[const.COMP_OBAGENT] and 'ocp_agent_monitor_password' not in global_config:
@@ -115,7 +115,8 @@ def generate_config_pre(plugin_context, auto_depend=False, *args, **kwargs):
     generate_password_keys = ['root_password', 'proxyro_password', 'ocp_meta_password', 'ocp_agent_monitor_password']
     generate_random_password_func_params = {
         'cluster_config': plugin_context.cluster_config,
-        'auto_depend': auto_depend
+        'auto_depend': auto_depend,
+        'dev_mode': getattr(plugin_context, 'dev_mode', False)
     }
     generate_configs = {'global': {}}
     plugin_context.set_variable('generate_configs', generate_configs)

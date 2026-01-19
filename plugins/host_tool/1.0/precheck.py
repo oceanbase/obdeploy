@@ -82,6 +82,8 @@ def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kw
             "network_tool": True,
             "dir_check": True,
             "cpu": True,
+            "transparent_hugepage": True,
+            "network_card": True,
         }
         machine_check_items[ip] = check_items
         ret = client.execute_command('cat /proc/meminfo')
@@ -96,6 +98,19 @@ def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kw
         if client.execute_command('systemctl is-active %s ' % firewalld_name).stdout.strip() == 'active':
             warn_msgs.append("The firewall service %s is active." % firewalld_name)
             check_items['firewalld'] = False
+
+        if '[never]' not in client.execute_command('cat /sys/kernel/mm/transparent_hugepage/enabled').stdout.strip():
+            warn_msgs.append("Transparent Hugepages needs to be set to nevere to ensure system stability.")
+            check_items['transparent_hugepage'] = False
+
+        mut_msg = client.execute_command("ip link show $(ip route | grep default | awk '{print $5}' | head -n1) | grep mtu").stdout.strip()
+        if mut_msg:
+            match = re.search(r'mtu\s+(\d+)', mut_msg)
+            if match:
+                mtu_value = int(match.group(1))
+                if mtu_value != 1500:
+                    warn_msgs.append(f"The default MTU value of the network card is {mtu_value}, which affects network transmission efficiency. It is recommended to set it to 1500.")
+                    check_items['network_card'] = False
 
         if client.execute_command('systemctl is-enabled %s' % firewalld_name).stdout.strip() == 'enabled':
             warn_msgs.append("The firewall %s auto-start service is not disabled." % firewalld_name)

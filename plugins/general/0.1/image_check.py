@@ -16,6 +16,8 @@ from __future__ import absolute_import, division, print_function
 
 import json
 
+import const
+from _rpm import Version
 from tool import docker_run_sudo_prefix
 
 
@@ -23,7 +25,13 @@ def image_check(plugin_context, image_name=None, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-    image_name = image_name or (cluster_config.image_name + ':' + cluster_config.tag)
+    if not image_name:
+        image_name = cluster_config.image_name + ':' + cluster_config.tag
+        for oms_name in const.COMPS_OMS:
+            if oms_name in image_name:
+                if oms_name == const.COMP_OMS_CE and Version(cluster_config.tag) < Version('4.2.11'):
+                    image_name = image_name.replace(const.COMP_OMS_CE, const.COMP_OMS)
+
     failed_servers = []
     image_hash = None
     for server in cluster_config.servers:

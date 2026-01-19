@@ -21,6 +21,21 @@ export default function Footer({ prevStep, nextStep }: FooterProps) {
     <footer className={styles.pageFooterContainer}>
       <div className={styles.pageFooter}>
         <Space className={styles.foolterAction}>
+          <Button
+            onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+            data-aspm-click="c307508.d317282"
+            data-aspm-desc={intl.formatMessage({
+              id: 'OBD.pages.components.ClusterConfig.ClusterConfigurationExit',
+              defaultMessage: '集群配置-退出',
+            })}
+            data-aspm-param={``}
+            data-aspm-expo
+          >
+            {intl.formatMessage({
+              id: 'OBD.pages.components.ClusterConfig.Exit',
+              defaultMessage: '退出',
+            })}
+          </Button>
           <Tooltip
             title={intl.formatMessage({
               id: 'OBD.pages.components.ClusterConfig.TheCurrentPageConfigurationHas',
@@ -57,21 +72,6 @@ export default function Footer({ prevStep, nextStep }: FooterProps) {
             {intl.formatMessage({
               id: 'OBD.pages.components.ClusterConfig.NextStep',
               defaultMessage: '下一步',
-            })}
-          </Button>
-          <Button
-            onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-            data-aspm-click="c307508.d317282"
-            data-aspm-desc={intl.formatMessage({
-              id: 'OBD.pages.components.ClusterConfig.ClusterConfigurationExit',
-              defaultMessage: '集群配置-退出',
-            })}
-            data-aspm-param={``}
-            data-aspm-expo
-          >
-            {intl.formatMessage({
-              id: 'OBD.pages.components.ClusterConfig.Exit',
-              defaultMessage: '退出',
             })}
           </Button>
         </Space>

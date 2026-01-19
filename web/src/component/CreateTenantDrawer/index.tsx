@@ -442,7 +442,7 @@ export default function CreatTenantDrawer({
         if (data?.status !== 'RUNNING') {
           setCurrentPage(false);
           setTimeout(() => {
-            setCurrentStep(6);
+            setCurrentStep(7);
             setErrorVisible(false);
             setErrorsList([]);
           }, 2000);
@@ -937,7 +937,6 @@ export default function CreatTenantDrawer({
             }}
           </Form.Item>
         )}
-
         <Form.Item noStyle shouldUpdate>
           {() => {
             const ipV = form.getFieldValue('ip');
@@ -975,99 +974,99 @@ export default function CreatTenantDrawer({
                     }}
                   />
                 </Form.Item>
-
-                <Form.Item
-                  label={intl.formatMessage({
-                    id: 'OBD.Obdeploy.CreateTenantDrawer.955306E3',
-                    defaultMessage: '字符序',
-                  })}
-                  name="collate"
-                  initialValue={'utf8mb4_general_ci'}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.Obdeploy.CreateTenantDrawer.9A3F36F0',
-                        defaultMessage: '请输入字符序',
-                      }),
-                    },
-                  ]}
-                >
-                  <Select
-                    style={{ width: 300 }}
-                    options={getCharsetList?.map((item) => ({
-                      label: item,
-                      value: item,
-                    }))}
-                  />
-                </Form.Item>
-
                 {modeValue === 'mysql' && (
-                  <Form.Item
-                    label={
-                      <ContentWithQuestion
-                        content={intl.formatMessage({
-                          id: 'OBD.Obdeploy.CreateTenantDrawer.E139E5CB',
-                          defaultMessage: '表名大小写敏感',
-                        })}
-                        tooltip={{
-                          title: (
-                            <>
-                              <div>
-                                {intl.formatMessage({
-                                  id: 'OBD.Obdeploy.CreateTenantDrawer.0D3C1AE5',
-                                  defaultMessage:
-                                    '·0:表名将按照指定的大小写形式进行存储，并以区分大小写形式进行比较。',
-                                })}
-                              </div>
-                              <div>
-                                {intl.formatMessage({
-                                  id: 'OBD.Obdeploy.CreateTenantDrawer.7B721489',
-                                  defaultMessage:
-                                    '·1:表名将按照小写形式进行存储，并以不区分大小写形式进行比较。',
-                                })}
-                              </div>
-                              <div>
-                                {intl.formatMessage({
-                                  id: 'OBD.Obdeploy.CreateTenantDrawer.F00332E1',
-                                  defaultMessage:
-                                    '·2:表名将按照指定的大小写形式进行存储，并以不区分大小写形式进行比较。',
-                                })}
-                              </div>
-                            </>
-                          ),
-                        }}
-                      />
-                    }
-                    name="lower_case_table_names"
-                    rules={[
-                      {
-                        required: true,
-                        message: intl.formatMessage({
-                          id: 'OBD.Obdeploy.CreateTenantDrawer.73578D0F',
-                          defaultMessage: '请输入表名大小写敏感',
-                        }),
-                      },
-                    ]}
-                  >
-                    <Select
-                      style={{ width: 300 }}
-                      options={[
+                  <>
+                    <Form.Item
+                      label={intl.formatMessage({
+                        id: 'OBD.Obdeploy.CreateTenantDrawer.955306E3',
+                        defaultMessage: '字符序',
+                      })}
+                      name="collate"
+                      initialValue={'utf8mb4_general_ci'}
+                      rules={[
                         {
-                          value: 0,
-                          label: 0,
-                        },
-                        {
-                          value: 1,
-                          label: 1,
-                        },
-                        {
-                          value: 2,
-                          label: 2,
+                          required: true,
+                          message: intl.formatMessage({
+                            id: 'OBD.Obdeploy.CreateTenantDrawer.9A3F36F0',
+                            defaultMessage: '请输入字符序',
+                          }),
                         },
                       ]}
-                    />
-                  </Form.Item>
+                    >
+                      <Select
+                        style={{ width: 300 }}
+                        options={getCharsetList?.map((item) => ({
+                          label: item,
+                          value: item,
+                        }))}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      label={
+                        <ContentWithQuestion
+                          content={intl.formatMessage({
+                            id: 'OBD.Obdeploy.CreateTenantDrawer.E139E5CB',
+                            defaultMessage: '表名大小写敏感',
+                          })}
+                          tooltip={{
+                            title: (
+                              <>
+                                <div>
+                                  {intl.formatMessage({
+                                    id: 'OBD.Obdeploy.CreateTenantDrawer.0D3C1AE5',
+                                    defaultMessage:
+                                      '·0:表名将按照指定的大小写形式进行存储，并以区分大小写形式进行比较。',
+                                  })}
+                                </div>
+                                <div>
+                                  {intl.formatMessage({
+                                    id: 'OBD.Obdeploy.CreateTenantDrawer.7B721489',
+                                    defaultMessage:
+                                      '·1:表名将按照小写形式进行存储，并以不区分大小写形式进行比较。',
+                                  })}
+                                </div>
+                                <div>
+                                  {intl.formatMessage({
+                                    id: 'OBD.Obdeploy.CreateTenantDrawer.F00332E1',
+                                    defaultMessage:
+                                      '·2:表名将按照指定的大小写形式进行存储，并以不区分大小写形式进行比较。',
+                                  })}
+                                </div>
+                              </>
+                            ),
+                          }}
+                        />
+                      }
+                      name="lower_case_table_names"
+                      rules={[
+                        {
+                          required: true,
+                          message: intl.formatMessage({
+                            id: 'OBD.Obdeploy.CreateTenantDrawer.73578D0F',
+                            defaultMessage: '请输入表名大小写敏感',
+                          }),
+                        },
+                      ]}
+                    >
+                      <Select
+                        style={{ width: 300 }}
+                        options={[
+                          {
+                            value: 0,
+                            label: 0,
+                          },
+                          {
+                            value: 1,
+                            label: 1,
+                          },
+                          {
+                            value: 2,
+                            label: 2,
+                          },
+                        ]}
+                      />
+                    </Form.Item>
+                  </>
                 )}
 
                 <Form.Item
@@ -1399,15 +1398,16 @@ export default function CreatTenantDrawer({
                 >
                   {paramsData?.charset || '-'}
                 </Descriptions.Item>
-                <Descriptions.Item
-                  label={intl.formatMessage({
-                    id: 'OBD.Obdeploy.CreateTenantDrawer.A17440B',
-                    defaultMessage: '字符序',
-                  })}
-                >
-                  {paramsData?.collate || '-'}
-                </Descriptions.Item>
-                {paramsData?.mode !== 'oracle' && (
+
+                {paramsData?.mode !== 'oracle' && (<>
+                  <Descriptions.Item
+                    label={intl.formatMessage({
+                      id: 'OBD.Obdeploy.CreateTenantDrawer.A17440B',
+                      defaultMessage: '字符序',
+                    })}
+                  >
+                    {paramsData?.collate || '-'}
+                  </Descriptions.Item>
                   <Descriptions.Item
                     label={intl.formatMessage({
                       id: 'OBD.Obdeploy.CreateTenantDrawer.51E589C8',
@@ -1416,6 +1416,8 @@ export default function CreatTenantDrawer({
                   >
                     {paramsData?.lower_case_table_names || 1}
                   </Descriptions.Item>
+                </>
+
                 )}
                 <Descriptions.Item
                   label={intl.formatMessage({
@@ -1501,6 +1503,7 @@ export default function CreatTenantDrawer({
                     cpu_size,
                     memory_size,
                     log_disk_size,
+                    collate
                   } = values;
                   const invited_nodes =
                     ob_tcp_invited_nodes === undefined
@@ -1516,6 +1519,7 @@ export default function CreatTenantDrawer({
                     lower_case_table_names: undefined,
                     max_cpu: cpu_size,
                     min_cpu: cpu_size,
+                    collate: modeValue === 'mysql' ? collate : '',
                     memory_size: `${memory_size}G`,
                     log_disk_size: `${log_disk_size}G`,
                     variables:

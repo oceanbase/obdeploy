@@ -529,6 +529,7 @@ export default function PreCehckComponent({
         </ProCard>
       </ProCard>
       <CustomFooter>
+        <ExitBtn />
         <Button onClick={prevStep} disabled={checkStatus && !checkFinished}>
           {intl.formatMessage({
             id: 'OBD.component.PreCheck.preCheck.PreviousStep',
@@ -561,7 +562,6 @@ export default function PreCehckComponent({
             })}
           </Button>
         )}
-        <ExitBtn />
       </CustomFooter>
     </Space>
   );

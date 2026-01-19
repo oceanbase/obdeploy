@@ -57,8 +57,8 @@ def obshell_dashboard(plugin_context, obshell_clients, config_encrypted, display
     obshell_version = obshell_version_ret.version.split('-')[0]
     dashboard_info = ''
     if compare(obshell_version, Version('4.3.0.0'), '>='):
-        global_config = cluster_config.get_global_conf_with_default()
-        obshell_port = global_config.get('obshell_port')
+        server_config = cluster_config.get_server_conf(cluster_config.servers[0])
+        obshell_port = server_config.get("obshell_port")
         if ip == '127.0.0.1':
             ip = NetUtil.get_host_ip()
         dashboard_info = f"http://{ip}:{str(obshell_port)}"

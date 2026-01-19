@@ -102,6 +102,7 @@ def resource_check(plugin_context, generate_configs={}, strict_check=False, *arg
     critical = plugin_context.get_variable('critical')
     servers_memory = plugin_context.get_variable('servers_memory')
     servers_clog_mount = plugin_context.get_variable('servers_clog_mount')
+    slog_size = plugin_context.get_variable('slog_size')
 
     global_generate_config = generate_configs.get('global', {})
     START_NEED_MEMORY = 3 << 30

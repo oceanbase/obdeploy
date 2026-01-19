@@ -1,0 +1,76 @@
+- name: compose_project
+  name_local: 项目名称
+  require: true
+  essential: true
+  type: STRING
+  default: group1
+  need_redeploy: true
+  description_en: the name of the docker compose project
+  description_local: docker compose 项目名称
+- name: home_path
+  name_local: 部署主目录
+  essential: true
+  type: PATH
+  need_redeploy: true
+  description_en: home path for powerrag deployment
+  description_local: powerrag 部署的主目录
+- name: volume_mount
+  name_local: 数据挂载目录
+  essential: true
+  type: PATH
+  need_redeploy: true
+  description_en: data volume mount path for powerrag
+  description_local: powerrag 数据卷挂载目录
+- name: enable_gpu
+  name_local: 启用 GPU
+  essential: false
+  type: BOOL
+  default: false
+  description_en: whether to enable GPU support
+  description_local: 是否启用 GPU 支持
+- name: ob_tenant_name
+  name_local: OB 租户名
+  essential: true
+  type: STRING
+  default: powerrag
+  description_en: OceanBase tenant name for powerrag
+  description_local: powerrag 使用的 OceanBase 租户名
+- name: default_password
+  name_local: 默认密码
+  essential: true
+  type: STRING
+  need_redeploy: true
+  description_en: default password for powerrag components
+  description_local: powerrag 组件默认密码
+- name: ob_tenant_password
+  name_local: OB 租户密码
+  essential: true
+  type: STRING
+  need_redeploy: true
+  description_en: OceanBase tenant password for powerrag
+  description_local: powerrag 使用的 OceanBase 租户密码
+- name: cache_scheme
+  name_local: 缓存方案
+  essential: false
+  type: STRING
+  default: mysql
+  need_redeploy: true
+  description_en: cache scheme for powerrag
+  description_local: powerrag 缓存方案
+- name: expose_powerrag_api_port
+  name_local: powerrag API 暴露端口
+  essential: true
+  type: INT
+  min_value: 1025
+  max_value: 65535
+  default: 2801
+  description_en: exposed api port for powerrag
+  description_local: powerrag 对外 API 端口
+- name: enable_oceanbase
+  name_local: 启用 OceanBase
+  essential: true
+  type: BOOL
+  default: false
+  only_read: true
+  description_en: whether to enable OceanBase
+  description_local: 是否启用 OceanBase

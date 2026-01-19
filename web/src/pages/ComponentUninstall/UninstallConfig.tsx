@@ -162,7 +162,8 @@ export default function UninstallConfig() {
   /**
    * @description
    * 组件选择逻辑：
-   * 如果选择grafana/prometheus，则 OBAgent 则自动选择
+   * 如果选择obagent，则prometheus、grafana、alertmanager自动选择
+   * 如果选择prometheus，则grafana、alertmanager自动选择
    * 如果选择 grafana，则 OBAgent&&prometheus 则自动选择
    * 勾选alertManager，prometheus、 OBAgent 则自动选择
    * 取消勾选obagent，grafana、prometheus和alertmanager也取消掉
@@ -175,14 +176,31 @@ export default function UninstallConfig() {
       // 选择逻辑
       let newSelectedComponents = [...selectedComponents];
 
-      if (record.component_name === 'prometheus') {
-        // 如果选择prometheus，则OBAgent自动选择
-        const obagentComp = componentsList?.find(comp => comp.component_name === 'obagent');
-        if (obagentComp && !newSelectedComponents.some(comp => comp.component_name === 'obagent')) {
+      if (record.component_name === 'obagent') {
+        // 如果选择obagent，则prometheus、grafana、alertmanager自动选择
+        const prometheusComp = componentsList?.find(comp => comp.component_name === 'prometheus');
+        const grafanaComp = componentsList?.find(comp => comp.component_name === 'grafana');
+        const alertmanagerComp = componentsList?.find(comp => comp.component_name === 'alertmanager');
+
+        if (prometheusComp && !newSelectedComponents.some(comp => comp.component_name === 'prometheus')) {
           newSelectedComponents.push({
-            component_name: obagentComp.component_name,
-            version: obagentComp.version || '',
-            node: obagentComp.node || ''
+            component_name: prometheusComp.component_name,
+            version: prometheusComp.version || '',
+            node: prometheusComp.node || ''
+          });
+        }
+        if (grafanaComp && !newSelectedComponents.some(comp => comp.component_name === 'grafana')) {
+          newSelectedComponents.push({
+            component_name: grafanaComp.component_name,
+            version: grafanaComp.version || '',
+            node: grafanaComp.node || ''
+          });
+        }
+        if (alertmanagerComp && !newSelectedComponents.some(comp => comp.component_name === 'alertmanager')) {
+          newSelectedComponents.push({
+            component_name: alertmanagerComp.component_name,
+            version: alertmanagerComp.version || '',
+            node: alertmanagerComp.node || ''
           });
         }
         if (!newSelectedComponents.some(comp => comp.component_name === record.component_name)) {
@@ -192,49 +210,23 @@ export default function UninstallConfig() {
             node: record.node || ''
           });
         }
-      } else if (record.component_name === 'grafana') {
-        // 如果选择grafana，则OBAgent和prometheus自动选择
-        const obagentComp = componentsList?.find(comp => comp.component_name === 'obagent');
-        const prometheusComp = componentsList?.find(comp => comp.component_name === 'prometheus');
+      } else if (record.component_name === 'prometheus') {
+        // 如果选择prometheus，则grafana、alertmanager自动选择
+        const grafanaComp = componentsList?.find(comp => comp.component_name === 'grafana');
+        const alertmanagerComp = componentsList?.find(comp => comp.component_name === 'alertmanager');
 
-        if (obagentComp && !newSelectedComponents.some(comp => comp.component_name === 'obagent')) {
+        if (grafanaComp && !newSelectedComponents.some(comp => comp.component_name === 'grafana')) {
           newSelectedComponents.push({
-            component_name: obagentComp.component_name,
-            version: obagentComp.version || '',
-            node: obagentComp.node || ''
+            component_name: grafanaComp.component_name,
+            version: grafanaComp.version || '',
+            node: grafanaComp.node || ''
           });
         }
-        if (prometheusComp && !newSelectedComponents.some(comp => comp.component_name === 'prometheus')) {
+        if (alertmanagerComp && !newSelectedComponents.some(comp => comp.component_name === 'alertmanager')) {
           newSelectedComponents.push({
-            component_name: prometheusComp.component_name,
-            version: prometheusComp.version || '',
-            node: prometheusComp.node || ''
-          });
-        }
-        if (!newSelectedComponents.some(comp => comp.component_name === record.component_name)) {
-          newSelectedComponents.push({
-            component_name: record.component_name,
-            version: record.version || '',
-            node: record.node || ''
-          });
-        }
-      } else if (record.component_name === 'alertmanager') {
-        // 如果选择alertmanager，则prometheus和OBAgent自动选择
-        const obagentComp = componentsList?.find(comp => comp.component_name === 'obagent');
-        const prometheusComp = componentsList?.find(comp => comp.component_name === 'prometheus');
-
-        if (prometheusComp && !newSelectedComponents.some(comp => comp.component_name === 'prometheus')) {
-          newSelectedComponents.push({
-            component_name: prometheusComp.component_name,
-            version: prometheusComp.version || '',
-            node: prometheusComp.node || ''
-          });
-        }
-        if (obagentComp && !newSelectedComponents.some(comp => comp.component_name === 'obagent')) {
-          newSelectedComponents.push({
-            component_name: obagentComp.component_name,
-            version: obagentComp.version || '',
-            node: obagentComp.node || ''
+            component_name: alertmanagerComp.component_name,
+            version: alertmanagerComp.version || '',
+            node: alertmanagerComp.node || ''
           });
         }
         if (!newSelectedComponents.some(comp => comp.component_name === record.component_name)) {
@@ -254,7 +246,6 @@ export default function UninstallConfig() {
           });
         }
       }
-
       setSelectedComponents(newSelectedComponents);
     } else {
       // 取消选择逻辑
@@ -286,7 +277,6 @@ export default function UninstallConfig() {
           (comp) => comp.component_name !== record.component_name
         );
       }
-
       setSelectedComponents(newSelectedComponents);
     }
   };
@@ -452,6 +442,14 @@ export default function UninstallConfig() {
           </ProCard>
         </ProCard>
         <CustomFooter>
+          <Button
+            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 3)}
+          >
+            {intl.formatMessage({
+              id: 'OBD.pages.ComponentUninstall.UninstallConfig.Exit',
+              defaultMessage: '退出',
+            })}
+          </Button>
           <Button onClick={preStep}>
             {intl.formatMessage({
               id: 'OBD.pages.ComponentUninstall.UninstallConfig.PreviousStep',
@@ -466,14 +464,6 @@ export default function UninstallConfig() {
             {intl.formatMessage({
               id: 'OBD.pages.ComponentUninstall.UninstallConfig.Uninstall',
               defaultMessage: '卸载',
-            })}
-          </Button>
-          <Button
-            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 3)}
-          >
-            {intl.formatMessage({
-              id: 'OBD.pages.ComponentUninstall.UninstallConfig.Exit',
-              defaultMessage: '退出',
             })}
           </Button>
         </CustomFooter>

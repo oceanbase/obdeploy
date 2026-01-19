@@ -52,7 +52,7 @@ def passwd_format(passwd):
 
 def display(plugin_context, cursor, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
-    stdio.start_loading('Wait for observer init')
+    stdio.start_loading('Wait for seekdb init')
     cluster_config = plugin_context.cluster_config
     if not config_encrypted:
         display_encrypt_password = None
@@ -92,6 +92,6 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
                     raise e
                 time.sleep(3)
     except:
-        stdio.stop_loading('fail', 'observer need bootstarp')
+        stdio.stop_loading('fail', 'seekdb need bootstarp')
     stdio.exception('')
     plugin_context.return_false()

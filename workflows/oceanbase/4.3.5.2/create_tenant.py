@@ -24,4 +24,11 @@ def create_tenant(plugin_context, workflow, *args, **kwargs):
     repository = kwargs.get('repository')
     if repository.name == const.COMP_OB_CE:
         workflow.add_with_kwargs(const.STAGE_FIRST, {"system_parameters": {'global_index_auto_split_policy': 'ALL'}}, 'alter_tenant_system_parameters')
+    component_kwargs = kwargs.get("component_kwargs")
+    create_tenant_options = None
+    if component_kwargs and component_kwargs.get('create_tenant_options'):
+        create_tenant_options = component_kwargs.get('create_tenant_options')[0]
+    options = create_tenant_options if create_tenant_options else plugin_context.options
+    if getattr(options, 'variables', None):
+        workflow.add(const.STAGE_FIRST, 'set_tenant_whitelist')
     plugin_context.return_true()

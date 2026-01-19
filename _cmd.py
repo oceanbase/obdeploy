@@ -24,6 +24,7 @@ import json
 import glob
 import datetime
 import copy
+import getpass
 from uuid import uuid1 as uuid, UUID
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
 
@@ -906,6 +907,10 @@ class WebCommand(ObdCommand):
         # white_ip_list = self.get_white_ip_list()
         url = '/#/updateWelcome' if self.cmds and self.cmds[0] in ('upgrade', 'update') else ''
 
+        if self.opts.port < 1024:
+            ROOT_IO.error('The port number must be in the range of 1025-65535.')
+            return False
+
         ROOT_IO.print('start OBD WEB in 0.0.0.0:%s' % self.opts.port)
         ROOT_IO.print('please open http://{0}:{1}{2}'.format(NetUtil.get_host_ip(), self.opts.port, url))
         try:
@@ -930,7 +935,7 @@ class ClusterAutoDeployCommand(ClusterMirrorCommand):
         self.parser.add_option('-U', '--unuselibrepo', '--ulp', action='store_true', help="Disable OBD from installing the libs mirror automatically.")
         self.parser.add_option('-A', '--auto-create-tenant', '--act', action='store_true', help="Automatically create a tenant named `test` by using all the available resource of the cluster.")
         self.parser.add_option('--force-delete', action='store_true', help="Force delete, delete the registered cluster.")
-        self.parser.add_option('-s', '--strict-check', action='store_true', help="Throw errors instead of warnings when check fails.")
+        self.parser.add_option('-S', '--strict-check', action='store_true', help="Throw errors instead of warnings when check fails.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1047,7 +1052,8 @@ class ClusterStartCommand(ClusterMirrorCommand):
         self.parser.add_option('-c', '--components', type='string', help="List of components to be started. Multiple components are separated with commas.")
         self.parser.add_option('-f', '--force-delete', action='store_true', help="Force delete, delete the registered cluster.")
         self.parser.add_option('-S', '--strict-check', action='store_true', help="Throw errors instead of warnings when check fails.")
-        self.parser.add_option('--without-parameter', '--wop', action='store_true', help='Start without parameters.')
+        self.parser.add_option('--with-parameter', '--wp', action='store_true', help='Start with parameters.')
+        self.parser.add_option('--service-names', '--sn', type='string', help='List of services to be started for PowerRAG. Multiple services are separated with commas.')
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1065,6 +1071,7 @@ class ClusterStopCommand(ClusterMirrorCommand):
         super(ClusterStopCommand, self).__init__('stop', 'Stop a started cluster.')
         self.parser.add_option('-s', '--servers', type='string', help="List of servers to be stoped. Multiple servers are separated with commas.")
         self.parser.add_option('-c', '--components', type='string', help="List of components to be stoped. Multiple components are separated with commas.")
+        self.parser.add_option('--service-names', '--sn', type='string', help='List of services to be stoped for PowerRAG. Multiple services are separated with commas.')
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1128,8 +1135,8 @@ class ClusterRestartCommand(ClusterMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
-            if not getattr(self.opts, 'with_parameter', False):
-                setattr(self.opts, 'without_parameter', True)
+            # if not getattr(self.opts, 'with_parameter', False):
+            #     setattr(self.opts, 'without_parameter', True)
             obd.set_options(self.opts)
             res = obd.restart_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
@@ -1227,6 +1234,8 @@ class CLusterUpgradeCommand(ClusterMirrorCommand):
         self.parser.add_option('-e', '--executer-path', type='string', help="Executer path.", default=os.path.join(ObdCommand.OBD_INSTALL_PATH, 'lib/executer'))
         self.parser.add_option('-t', '--script-query-timeout', type='string', help="The timeout(s) for executing sql in upgrade scripts. Supported since version 4.1.0", default='')
         self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force upgrade, before upgrade standby tenant`s cluster.")
+        self.parser.add_option('--oms-backup-path', type='string', help="Upgrade the OMS backup meta data directory", default=os.path.join(os.path.expanduser('~'), 'oms', 'meta_backup_data'))
+        self.parser.add_option('--disable-oms-backup', '--dob', action='store_true', help="disable OMS backup meta data.")
 
     def _do_command(self, obd):
         oms_upgrade_mode = None
@@ -1324,6 +1333,8 @@ class ClusterTenantSwitchoverCommand(ClusterMirrorCommand):
         super(ClusterTenantSwitchoverCommand, self).__init__('switchover', 'Switchover primary-standby tenant.')
         self.parser.add_option('-p', '--tenant-root-password', type='string', help="tenant root password")
         self.parser.add_option('--standbyro-password', type='string', help="standbyro user password.")
+        self.parser.add_option('--standby_archive_log_uri', type='string', help='The storage directory path for standby tenant archive logs.')
+        self.parser.add_option('--primary_archive_log_uri', type='string', help='The storage directory path for primary tenant archive logs.')
 
     def init(self, cmd, args):
         super(ClusterTenantSwitchoverCommand, self).init(cmd, args)
@@ -1485,21 +1496,21 @@ class ClusterTenantRestoreCommand(ClusterMirrorCommand):
     def __init__(self):
         super(ClusterTenantRestoreCommand, self).__init__('restore', 'Restore tenant from backup.')
         self.parser.add_option('-z', '--zone', type='string', help='The zones of the tenant. example: zone1,zone2,zone3')
-        self.parser.add_option('--unit_num', type='int', help='The number of units in each zone. Default: 1.', default=1)
-        self.parser.add_option('--replica_type ', type='string', help='The replica type of the tenant.')
-        self.parser.add_option('-p', '--primary_zone', type='string', help="The primary zone of the tenant to be restored.")
+        self.parser.add_option('--unit-num', type='int', help='The number of units in each zone. Default: 1.', default=1)
+        self.parser.add_option('--replica-type ', type='string', help='The replica type of the tenant.')
+        self.parser.add_option('-p', '--primary-zone', type='string', help="The primary zone of the tenant to be restored.")
         self.parser.add_option('-T', '--timestamp', type='string', help='The timestamp to restore to.')
         self.parser.add_option('-S', '--scn', type='int', help="The SCN to restore to. Default: 0.")
-        self.parser.add_option('-s', '--ha_high_thread_score', type='int', help='The high thread score for HA. Range: [0, 100]')
+        self.parser.add_option('-s', '--ha-high-thread-score', type='int', help='The high thread score for HA. Range: [0, 100]')
         self.parser.add_option('-c', '--concurrency', type='int', help='The number of threads to use for the restore operation.')
         self.parser.add_option('-D', '--decryption', type='string', help='The decryption password for all backups. example: key1,key2,key3')
-        self.parser.add_option('-k', '--kms_encrypt_info', type='string', help='The KMS encryption information.')
-        self.parser.add_option('--memory_size', type='string', help='The memory size of the resource unit config')
-        self.parser.add_option('--max_cpu', type='int', help='The max cpu of the resource unit config, should be greater than 1.')
-        self.parser.add_option('--min_cpu', type='int', help='The min cpu of the resource unit config, should be greater than 1.If not set, the min cpu will be set to the max cpu.')
-        self.parser.add_option('--max_iops', type='int', help='The max iops of the resource unit config.If not set, the max iops will be set default value by observer.')
-        self.parser.add_option('--min_iops', type='int', help='The min iops of the resource unit config.If not set, the min iops will be set default value by observer.')
-        self.parser.add_option('--log_disk_size', type='string', help='The log disk size of the resource unit config.If not set, the log disk size will be set default value by observer.')
+        self.parser.add_option('-k', '--kms-encrypt-info', type='string', help='The KMS encryption information.')
+        self.parser.add_option('--memory-size', type='string', help='The memory size of the resource unit config')
+        self.parser.add_option('--max-cpu', type='int', help='The max cpu of the resource unit config, should be greater than 1.')
+        self.parser.add_option('--min-cpu', type='int', help='The min cpu of the resource unit config, should be greater than 1.If not set, the min cpu will be set to the max cpu.')
+        self.parser.add_option('--max-iops', type='int', help='The max iops of the resource unit config.If not set, the max iops will be set default value by observer.')
+        self.parser.add_option('--min-iops', type='int', help='The min iops of the resource unit config.If not set, the min iops will be set default value by observer.')
+        self.parser.add_option('--log-disk-size', type='string', help='The log disk size of the resource unit config.If not set, the log disk size will be set default value by observer.')
 
     def init(self, cmd, args):
         super(ClusterTenantRestoreCommand, self).init(cmd, args)
@@ -1659,6 +1670,7 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(ClusterRestartCommand())
         self.register_command(ClusterRedeployCommand())
         self.register_command(ClusterEditConfigCommand())
+        self.register_command(ClusterReloadCommand())
         self.register_command(ClusterReloadCommand())
         self.register_command(CLusterUpgradeCommand())
         self.register_command(ClusterChangeRepositoryCommand())
@@ -2656,18 +2668,22 @@ class HostPrecheckCommand(ObdCommand):
 
     def init(self, cmd, args):
         super(HostPrecheckCommand, self).init(cmd, args)
-        self.parser.set_usage('%s <ssh username>  <server ip>' % self.prev_cmd)
+        self.parser.set_usage('%s [<ssh username>] [<server ip>]' % self.prev_cmd)
         return self
 
     def _do_command(self, obd):
-        if len(self.cmds) == 2:
-            return obd.precheck_host(self.cmds[0], self.cmds[1])
-        elif len(self.cmds) == 3:
-            if self.cmds[2] == 'code100':
-                cmd_ret = obd.precheck_host(self.cmds[0], self.cmds[1], dev=True)
-                if isinstance(cmd_ret, bool):
-                    return cmd_ret
-                return CmdReturn(cmd_ret, cmd_ret)
+        # Set default values: username = current user, ip = 127.0.0.1
+        username = getpass.getuser() if len(self.cmds) == 0 else self.cmds[0]
+        ip = '127.0.0.1' if len(self.cmds) <= 1 else self.cmds[1]
+        
+        if len(self.cmds) == 3 and self.cmds[2] == 'code100':
+            cmd_ret = obd.precheck_host(username, ip, dev=True)
+            if isinstance(cmd_ret, bool):
+                return cmd_ret
+            return CmdReturn(cmd_ret, cmd_ret)
+        elif len(self.cmds) <= 2:
+            # Normal case: 0, 1, or 2 arguments (defaults applied above)
+            return obd.precheck_host(username, ip)
         else:
             return self._show_help()
 
@@ -2682,18 +2698,22 @@ class HostInitCommand(ObdCommand):
 
     def init(self, cmd, args):
         super(HostInitCommand, self).init(cmd, args)
-        self.parser.set_usage('%s <ssh username>  <server ip>' % self.prev_cmd)
+        self.parser.set_usage('%s [<ssh username>] [<server ip>]' % self.prev_cmd)
         return self
 
     def _do_command(self, obd):
-        if len(self.cmds) == 2:
-            return obd.init_host(self.cmds[0], self.cmds[1])
-        elif len(self.cmds) == 3:
-            if self.cmds[2] == 'code101':
-                cmd_ret = obd.init_host(self.cmds[0], self.cmds[1], dev=True)
-                if isinstance(cmd_ret, bool):
-                    return cmd_ret
-                return CmdReturn(cmd_ret, cmd_ret)
+        # Set default values: username = current user, ip = 127.0.0.1
+        username = getpass.getuser() if len(self.cmds) == 0 else self.cmds[0]
+        ip = '127.0.0.1' if len(self.cmds) <= 1 else self.cmds[1]
+        
+        if len(self.cmds) == 3 and self.cmds[2] == 'code101':
+            cmd_ret = obd.init_host(username, ip, dev=True)
+            if isinstance(cmd_ret, bool):
+                return cmd_ret
+            return CmdReturn(cmd_ret, cmd_ret)
+        elif len(self.cmds) <= 2:
+            # Normal case: 0, 1, or 2 arguments (defaults applied above)
+            return obd.init_host(username, ip)
         else:
             return self._show_help()
 
@@ -2968,8 +2988,6 @@ class SeekdbRestartCommand(SeekdbMirrorCommand):
 
     def _do_command(self, obd):
         if self.cmds:
-            if not getattr(self.opts, 'with_parameter', False):
-                setattr(self.opts, 'without_parameter', True)
             obd.set_options(self.opts)
             res = obd.restart_cluster(self.cmds[0])
             self.background_telemetry_task(obd)

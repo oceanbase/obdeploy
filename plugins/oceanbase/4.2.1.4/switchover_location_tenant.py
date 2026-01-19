@@ -117,13 +117,18 @@ def switchover_location_tenant(plugin_context, cluster_configs, cursors={}, prim
         return
     primary_tenant_id = res['TENANT_ID']
 
-    sql = "SELECT VALUE FROM oceanbase.CDB_OB_ARCHIVE_DEST WHERE TENANT_ID=%s AND NAME='path'"
-    res = primary_cursor.fetchone(sql, (primary_tenant_id, ))
-    if not res:
-        error("Primary tenant archiving path query failed")
-        return
-    get_backup_and_archive_uri = plugin_context.get_variable('get_backup_and_archive_uri')
-    plugin_context.set_variable('primary_archive_log_uri', get_backup_and_archive_uri(res['VALUE']))
+    options = plugin_context.options
+    primary_archive_log_uri = getattr(options, 'primary_archive_log_uri', None)
+    if not primary_archive_log_uri:
+        sql = "SELECT VALUE FROM oceanbase.CDB_OB_ARCHIVE_DEST WHERE TENANT_ID=%s AND NAME='path'"
+        res = primary_cursor.fetchone(sql, (primary_tenant_id, ))
+        if not res:
+            error("Primary tenant archiving path query failed")
+            return
+        get_backup_and_archive_uri = plugin_context.get_variable('get_backup_and_archive_uri')
+        plugin_context.set_variable('primary_archive_log_uri', get_backup_and_archive_uri(res['VALUE']))
+    else:
+        plugin_context.set_variable('primary_archive_log_uri', primary_archive_log_uri)
 
     max_attempts = 1200
     interval_seconds = 5

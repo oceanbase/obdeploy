@@ -48,7 +48,7 @@ def init(plugin_context, source_option=None, *args, **kwargs):
     data_dir_same_redo_dir_keys = plugin_context.get_variable('data_dir_same_redo_dir_keys')
     stop_ob_or_obshell = plugin_context.get_variable('stop_ob_or_obshell')
     stdio.verbose('option `force` is %s' % force)
-    stdio.start_loading('Initializes observer work home')
+    stdio.start_loading('Initializes seekdb work home')
     for server in cluster_config.servers:
         ip = server.ip
         if ip not in servers_dirs:
@@ -79,7 +79,7 @@ def init(plugin_context, source_option=None, *args, **kwargs):
                 'key': key,
             }
 
-        stdio.verbose('%s initializes observer work home' % server)
+        stdio.verbose('%s initializes seekdb work home' % server)
         need_clean = force
         if clean and not force:
             if client.execute_command('bash -c \'if [[ "$(ls -d {0} 2>/dev/null)" != "" && ! -O {0} ]]; then exit 0; else exit 1; fi\''.format(home_path)):

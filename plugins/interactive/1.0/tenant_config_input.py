@@ -116,6 +116,7 @@ def tenant_config_input(plugin_context, *args, **kwargs):
         tenant_character_set = character_dict.get(tenant_character_num)
         break
     while True:
+        tenant_collate = None
         tenant_character_collate_dict = {
             "utf8mb4": {
                 '1': 'utf8mb4_general_ci',
@@ -149,16 +150,19 @@ def tenant_config_input(plugin_context, *args, **kwargs):
             break
 
         print_str = ''
-        for k, v in collate_dict.items():
-            print_str += f'    {k}) {v}\n'
-        stdio.print(FormatText.warning('    Please select the tenant collation (enter the corresponding number): '))
-        stdio.print(print_str[:-1])
-        tenant_collate_num = stdio.read(f'Enter the tenant collation (Default: 1): ', blocked=True).strip() or '1'
-        if not collate_dict.get(tenant_collate_num):
-            stdio.print(FormatText.error('The tenant collation is invalid. Please try again.'))
-            continue
-        tenant_collate = collate_dict[tenant_collate_num]
-        break
+        if tenant_mode == 'mysql':
+            for k, v in collate_dict.items():
+                print_str += f'    {k}) {v}\n'
+            stdio.print(FormatText.warning('    Please select the tenant collation (enter the corresponding number): '))
+            stdio.print(print_str[:-1])
+            tenant_collate_num = stdio.read(f'Enter the tenant collation (Default: 1): ', blocked=True).strip() or '1'
+            if not collate_dict.get(tenant_collate_num):
+                stdio.print(FormatText.error('The tenant collation is invalid. Please try again.'))
+                continue
+            tenant_collate = collate_dict[tenant_collate_num]
+            break
+        else:
+            break
 
     while True:
         time_zone = {

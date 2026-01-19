@@ -54,6 +54,7 @@ export default () => {
   const [componentsVersionInfo, setComponentsVersionInfo] = useState<API.ComponentsVersionInfo>({});
 
   const [omsDockerData, setOmsDockerData] = useState<any>({});
+  const [omsTakeoverData, setOmsTakeoverData] = useState<any>({});
 
   const { run: handleQuitProgress } = useRequest(exitProcess, {
     onError: (e: any) => {
@@ -133,6 +134,8 @@ export default () => {
     timerProgress,
     omsDockerData, 
     setOmsDockerData,
+    omsTakeoverData, 
+    setOmsTakeoverData,
     ...docs,
   };
 };

@@ -24,6 +24,7 @@ from singleton_decorator import singleton
 from collections import defaultdict
 
 from _rpm import Version
+from _types import Capacity
 from service.handler.base_handler import BaseHandler
 from service.handler.rsa_handler import RSAHandler
 from service.common import log, task, util, const
@@ -33,9 +34,8 @@ from service.model.deployments import OMSDeploymentStatus, DeploymentStatus, Dep
 from service.model.task import TaskStatus, TaskResult, TaskInfo, PreCheckResult, PrecheckTaskInfo, PrecheckEventResult, TaskStepInfo
 from _deploy import DeployStatus, DeployConfigStatus
 from _errno import CheckStatus
-
-
-
+from ssh import LocalClient
+from tool import YamlLoader
 
 
 @singleton
@@ -815,13 +815,17 @@ class OmsHandler(BaseHandler):
             raise Exception("no usable images found.")
 
         dest_repositories = []
+        data = {
+            "current_version": current_version,
+            "dest_versions":dest_repositories
+        }
         for image in usable_images['oms_images']:
             if Version(image['version']) > current_version:
                 dest_repositories.append(image)
-        return dest_repositories
+        return data
 
     @serial("upgrade_precheck")
-    def upgrade_precheck(self, cluster_name, background_tasks):
+    def upgrade_precheck(self, cluster_name, background_tasks, path):
         task_manager = task.get_task_manager()
         if not cluster_name:
             raise Exception(f"no such deploy for cluster_name: {cluster_name}")
@@ -831,6 +835,7 @@ class OmsHandler(BaseHandler):
         deploy = self.obd.deploy
         if not deploy:
             raise Exception(f"no such deploy: {cluster_name}")
+        self.context["oms_upgrade"] = {"upgrade_path": path}
         deploy_config = deploy.deploy_config
         pkgs, repositories, errors = self.obd.search_components_from_mirrors(deploy_config, only_info=True)
         if errors:
@@ -875,50 +880,20 @@ class OmsHandler(BaseHandler):
             self._do_upgrade_precheck(repositories)
 
     def _init_upgrade_precheck(self, repositories):
-        for repository in repositories:
-            if repository.name in [const.OMS, const.OMS_CE]:
-                repo_name = repository.name
-                break
-        param_check_status = {}
-        servers_set = set()
+        repo_kwargs = {repository.name: {"init_check_status": True, 'path': ''} for repository in repositories}
         init_check_status_workflows = self.obd.get_workflows('web_upgrade_check', no_found_act='ignore', repositories=repositories)
-        workflows_ret = self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore', repositories=repositories)
-
+        self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore', repositories=repositories, **repo_kwargs)
         for repository in repositories:
-            if not self.obd.namespaces.get(repository.name):
-                continue
-            if not workflows_ret and self.obd.namespaces.get(repository.name).get_return('exception'):
-                raise self.obd.namespaces.get(repository.name).get_return('exception')
-            repository_status = {}
-            servers = self.obd.deploy.deploy_config.components.get(repository.name).servers
-            for server in servers:
-                repository_status[server] = {'param': CheckStatus()}
-                servers_set.add(server)
-            param_check_status[repository.name] = repository_status
+            if self.obd.get_namespace(repository.name).get_return('exception'):
+                raise self.obd.get_namespace(repository.name).get_return('exception')
 
     def _do_upgrade_precheck(self, repositories):
-        gen_config_plugins = self.obd.search_py_script_plugin(repositories, 'generate_config')
-        if len(repositories) != len(gen_config_plugins):
-            raise Exception("param_check: config error, check stop!")
-
-        components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
-        workflows = self.obd.get_workflows('generate_config', repositories=repositories)
-        component_kwargs = {repository.name: {"generate_check": False, "generate_consistent_config": True, "auto_depend": True, "components": components} for repository in repositories}
-        workflow_ret = self.obd.run_workflow(workflows, repositories=repositories, **component_kwargs)
-        if not workflow_ret:
-            for repository in repositories:
-                if self.obd.get_namespace(repository.name).get_return('exception'):
-                    raise self.obd.get_namespace(repository.name).get_return('exception')
-            raise Exception('generate config error!')
-        if not self.obd.deploy.deploy_config.dump():
-            raise Exception('generate config dump error,place check disk space!')
-        log.get_logger().info('generate config succeed')
-
         ssh_clients = self.obd.get_clients(self.obd.deploy.deploy_config, repositories)
-
         log.get_logger().info('start upgrade_check')
+        path = self.context['oms_upgrade']['upgrade_path']
+        repo_kwargs = {repository.name: {"path": path} for repository in repositories}
         workflows = self.obd.get_workflows('web_upgrade_check', no_found_act='ignore', repositories=repositories)
-        if not self.obd.run_workflow(workflows, repositories=repositories, no_found_act='ignore', error_exit=False):
+        if not self.obd.run_workflow(workflows, repositories=repositories, no_found_act='ignore', error_exit=False, **repo_kwargs):
             for repository in repositories:
                 if self.obd.get_namespace(repository.name).get_return('exception'):
                     raise self.obd.get_namespace(repository.name).get_return('exception')
@@ -962,15 +937,21 @@ class OmsHandler(BaseHandler):
 
 
     @serial("upgrade")
-    def upgrade_oms(self, cluster_name, version, image_name, upgrade_mode, default_oms_files_path, background_tasks):
+    def upgrade_oms(self, cluster_name, version, image_name, upgrade_mode, background_tasks):
+        default_oms_files_path = None
         if upgrade_mode == 'online':
+            default_oms_files_path = self.context['oms_upgrade']['upgrade_path']
             if not default_oms_files_path:
-                raise Exception("default_oms_files_path is required for online upgrade")
+                raise Exception("upgrade_path is required for online upgrade")
         task_manager = task.get_task_manager()
         task_info = task_manager.get_task_info(cluster_name, task_type="oms_upgrade")
         if task_info is not None and task_info.status != TaskStatus.FINISHED:
             raise Exception(f"task {cluster_name} exists and not finished")
         task_manager.del_task_info(cluster_name, task_type="upgrade")
+        if Version('4.2.11') > Version(version):
+            raise Exception("version must be greater than 4.2.11")
+        if const.OMS_CE not in image_name:
+            image_name = image_name.replace(const.OMS, const.OMS_CE)
         background_tasks.add_task(self._upgrade, cluster_name, version, image_name, upgrade_mode, default_oms_files_path)
         self.context['oms_deployment']['task_id'] = self.context['oms_deployment']['task_id'] + 1 if self.context['oms_deployment']['task_id'] else 1
         task_status = TaskStatus.RUNNING.value
@@ -1000,9 +981,11 @@ class OmsHandler(BaseHandler):
         if not deploy:
             raise Exception(f"no such deploy: {cluster_name}")
 
-        self.obd.set_options(Values({'component': const.OMS_CE, "image_name": image_name, "tag": version}))
-        if not self.obd.upgrade(cluster_name, upgrade_mode, component_kwargs={"default_oms_files_path": default_oms_files_path}):
+        self.obd.set_options(Values({'component': const.OMS_CE, "image_name": image_name, "tag": version, "version": None, "disable_oms_backup": True}))
+        if not self.obd.upgrade_cluster(cluster_name, upgrade_mode, comp_kwargs={"default_oms_files_path": default_oms_files_path}, web=True):
+            self.context['upgrade']['succeed'] = False
             return False
+        self.context['upgrade']['succeed'] = True
         return True
 
     def get_oms_upgrade_task(self, task_id):
@@ -1014,42 +997,100 @@ class OmsHandler(BaseHandler):
         task_info.info = []
         task_info.finished = ''
 
-        for component in self.obd.deploy.deploy_config.components:
-            plugin = const.UPGRADE_PLUGINS
-            step_info = TaskStepInfo(name=f'{component}-{plugin}', status=TaskStatus.RUNNING, result=TaskResult.RUNNING)
-            task_info.current = f'{component}-{plugin}'
-            if component not in self.obd.namespaces:
-                break
-            if self.obd.namespaces[component].get_return('stop').value is not None:
-                if not self.obd.namespaces[component].get_return('stop'):
-                    step_info.result = TaskResult.FAILED
-                else:
-                    step_info.result = TaskResult.SUCCESSFUL
-                step_info.status = TaskStatus.FINISHED
-
-            if self.obd.namespaces[component].get_return('start').value is not None:
-                if not self.obd.namespaces[component].get_return('start'):
-                    step_info.result = TaskResult.FAILED
-                else:
-                    step_info.result = TaskResult.SUCCESSFUL
-                step_info.status = TaskStatus.FINISHED
-
-            if self.obd.namespaces[component].get_return('display').value is not None:
-                if not self.obd.namespaces[component].get_return('display'):
-                    step_info.result = TaskResult.FAILED
-                else:
-                    step_info.result = TaskResult.SUCCESSFUL
-                step_info.status = TaskStatus.FINISHED
-
-            task_info.info.append(step_info)
-            task_info.finished += f'{component}-{plugin} '
-
-        status_flag = [i.result for i in task_info.info]
-        if TaskResult.FAILED in status_flag or self.context['upgrade']['succeed'] is False:
+        if self.context['upgrade']['succeed'] is False:
             task_info.result = TaskResult.FAILED
             task_info.status = TaskStatus.FINISHED
-
-        if self.obd.deploy.deploy_info.status == DeployStatus.STATUS_RUNNING and self.context['upgrade']['succeed']:
+        if self.context['upgrade']['succeed'] is True:
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
         return task_info
+
+    def takeover_oms(self, cluster_name, host, container_name, user, password, port):
+        password = RSAHandler().decrypt_private_key(password) if password is not None else password
+        ssh_info = {"host": host, "username": user, "password": password, "port": port}
+        repository = self.obd.repository_manager.get_repository_allow_shadow(const.OMS_CE, '1.0.0')
+        self.obd.set_repositories([repository])
+        data = {
+            "nodes": '',
+            "success": False,
+            "error": ''
+        }
+
+        workflows = self.obd.get_workflows('get_takeover_config')
+        if not self.obd.run_workflow(workflows, **{repository.name: {"ssh_info": ssh_info, "container_name": container_name}}):
+            error = self.obd.get_namespace(const.OMS_CE).get_return('get_takeover_config').get_return('error') or []
+            data['error'] = error
+            return data
+
+        config = self.obd.get_namespace(const.OMS_CE).get_return('get_takeover_config').get_return('cluster_config')
+        data['nodes'] = self.obd.get_namespace(const.OMS_CE).get_return('get_takeover_config').get_return('servers')
+        data['version'] = self.obd.get_namespace(const.OMS_CE).get_return('get_takeover_config').get_return('version')
+
+        cluster_config_yaml_path = ''
+        log.get_logger().info('dump oms config from path: %s' % cluster_config_yaml_path)
+        yaml = YamlLoader()
+        with tempfile.NamedTemporaryFile(delete=False, prefix="oms", suffix="yaml", mode="w", encoding="utf-8") as f:
+            f.write(yaml.dumps(config))
+            cluster_config_yaml_path = f.name
+
+        deploy = self.obd.deploy_manager.create_deploy_config(cluster_name, cluster_config_yaml_path)
+        if not deploy:
+            log.get_logger().error('Failed to create deploy: %s. please check you configuration file' % cluster_name)
+            raise Exception('Failed to create deploy: %s. please check you configuration file' % cluster_name)
+        self.obd.set_deploy(deploy)
+        deploy_config = deploy.deploy_config
+        repositories, _ = self.obd.search_components_from_mirrors_and_install(deploy_config, raise_exception=False)
+        self.obd.repositories = repositories
+        for repository in repositories:
+            deploy.use_model(repository.name, repository, False)
+        repository = repositories[0]
+        self.obd.deploy.deploy_info.components[const.OMS_CE]['md5'] = repository.md5
+        self.obd.deploy.deploy_info.status = DeployStatus.STATUS_RUNNING
+        self.obd.deploy.dump_deploy_info()
+        data['success'] = True
+        return data
+
+    def display(self):
+        workflows = self.obd.get_workflows('display')
+        if not self.obd.run_workflow(workflows, repositories=self.obd.repositories):
+            raise Exception('display failed')
+        else:
+            url = self.obd.get_namespace(const.OMS_CE).get_return('display').get_return('url') or ''
+            return url
+
+    def meta_info_backup(self, backup_path, pre_check):
+        data = {"error": '', 'success': False}
+        exist_ret = LocalClient.execute_command(
+            f"if [ -e '{backup_path}' ]; then echo exist; else echo not_exist; fi").stdout.strip()
+        if exist_ret == 'exist':
+            check_empty_ret = LocalClient.execute_command(
+                f"if [ -d '{backup_path}' ]; then "
+                f"res=$(find '{backup_path}' -maxdepth 1 -mindepth 1 -not -name 'lost+found' -not -name '.DS_Store' 2>/dev/null | head -n 1); "
+                f"if [ -n \"$res\" ]; then echo not_empty; else echo empty; fi; "
+                f"else echo not_dir; fi"
+            ).stdout.strip()
+            if check_empty_ret == 'not_empty':
+                data['error'] = 'backup_path is exist and not empty'
+                return data
+
+        ret = LocalClient.execute_command(f"mkdir -p {backup_path}")
+        if not ret:
+            error = ret.stderr
+            data['error'] = error
+            return data
+        if Capacity(LocalClient.execute_command(f"df -BG {backup_path} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes < 2 << 30:
+            data['error'] = 'backup_path is not enough space. (need: 2G)'
+            return data
+        else:
+            LocalClient.execute_command(f"rm -rf {backup_path}")
+
+        if pre_check:
+            data['success'] = True
+            return data
+        workflows = self.obd.get_workflows('meta_backup')
+        if not self.obd.run_workflow(workflows, **{const.OMS_CE: {"backup_path": backup_path}}):
+            data['error'] = 'backup failed. See the obd log for details..'
+            return data
+        else:
+            data['success'] = True
+            return data

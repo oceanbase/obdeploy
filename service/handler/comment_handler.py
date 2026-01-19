@@ -14,6 +14,7 @@
 # limitations under the License.
 import os
 import time
+import getpass
 
 from singleton_decorator import singleton
 
@@ -51,3 +52,6 @@ class CommonHandler(BaseHandler):
 
     def get_web_type(self):
         return COMMAND_ENV.get(ENV_OBD_WEB_TYPE, '')
+
+    def get_current_user(self):
+        return getpass.getuser()

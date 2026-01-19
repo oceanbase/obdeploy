@@ -74,7 +74,7 @@ export const handleQuit = (
 ) => {
   const quitRequest = async () => {
     await handleQuitProgress();
-    setCurrentStep(finalStep ? finalStep : 7);
+    setCurrentStep(finalStep ? finalStep : 8);
   };
   if (isFinshed) {
     quitRequest();

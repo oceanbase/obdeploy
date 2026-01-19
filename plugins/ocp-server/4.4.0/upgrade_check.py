@@ -53,8 +53,6 @@ def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', in
         stdio.error(error)
 
     check_status = {}
-    repositories = plugin_context.repositories
-    options = plugin_context.options
     stdio = plugin_context.stdio
     clients = plugin_context.clients
     cluster_config = plugin_context.cluster_config
@@ -89,7 +87,7 @@ def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', in
                 if not ret:
                     critical('java', err.EC_OCP_SERVER_JAVA_NOT_FOUND.format(server=server),
                             [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='17')])
-                version_pattern = r'version\s+\"(\d+\.\d+\.\d+)(\_\d+)'
+                version_pattern = r'version\s+\"(\d+\.\d+\.\d+)'
                 found = re.search(version_pattern, ret.stdout) or re.search(version_pattern, ret.stderr)
                 if not found:
                     error('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='17'),
@@ -97,8 +95,6 @@ def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', in
                 else:
                     java_major_version = found.group(1)
                     stdio.verbose('java_major_version %s' % java_major_version)
-                    java_update_version = found.group(2)[1:]
-                    stdio.verbose('java_update_version %s' % java_update_version)
                     if Version(java_major_version) > Version('18') or Version(java_major_version) < Version('17'):
                         critical('java', err.EC_OCP_SERVER_JAVA_VERSION_ERROR.format(server=server, version='17'),
                                 [err.SUG_OCP_SERVER_INSTALL_JAVA_WITH_VERSION.format(version='17'), ])
@@ -119,7 +115,7 @@ def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', in
                 meta_user = server_config['ocp_meta_username']
                 meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
                 meta_password = server_config['ocp_meta_password']
-                meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio)
+                meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio=stdio)
         sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL', 'ABORTED');" % database
         if meta_cursor.fetchone(sql)['num'] > 0:
             success = False
@@ -145,6 +141,3 @@ def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', in
     else:
         stdio.stop_loading('fail')
         return plugin_context.return_false()
-
-
-

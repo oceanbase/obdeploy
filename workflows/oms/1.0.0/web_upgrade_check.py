@@ -18,6 +18,6 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def upgrade_check(plugin_context, workflow, *args, **kwargs):
+def web_upgrade_check(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'web_upgrade_check')
     plugin_context.return_true()

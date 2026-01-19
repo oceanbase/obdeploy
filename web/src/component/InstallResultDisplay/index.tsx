@@ -68,21 +68,29 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
   // 上报遥测数据
   const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
     manual: true,
+    throwOnError: false,
+    onError: () => {
+      // 静默处理错误，不显示错误信息
+    },
   });
 
   useRequest(OCP.getTelemetryData, {
     ready: !!oceanbase?.appname,
+    throwOnError: false,
     defaultParams: [
       {
         name: oceanbase?.appname,
       },
     ],
     onSuccess: (res) => {
-      const data = res?.data;
-
-      if (!isEmpty(res?.data)) {
+      // 即使 success 为 false 也不显示错误，静默处理
+      if (res?.success && !isEmpty(res?.data)) {
+        const data = res?.data;
         telemetryReport({ component: 'obd', content: data?.data });
       }
+    },
+    onError: () => {
+      // 静默处理错误，不显示错误信息
     },
   });
 
@@ -407,11 +415,7 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                     })}
 
                     <a target="_blank" href={RELEASE_RECORD}>
-                      `${installType} `
-                      {intl.formatMessage({
-                        id: 'OBD.component.InsstallResult.OcpReleaseRecords',
-                        defaultMessage: '发布记录',
-                      })}
+                      OCP 发布记录
                     </a>
                     {intl.formatMessage({
                       id: 'OBD.component.InsstallResult.LearnMoreAboutTheNew',

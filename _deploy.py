@@ -482,7 +482,12 @@ class DefaultConfigParser(ConfigParser):
 class ClusterConfig(object):
 
     def __init__(self, servers, name, version, tag, release, package_hash, comp_type, image_name, parser=None):
-        version = Version('1.0.0') if comp_type == 'docker' else version
+        if comp_type == 'docker':
+            version = Version('1.0.0')
+        if comp_type == 'dockers':
+            version = Version(tag)
+            if name == const.COMP_PRAG:
+                image_name = const.POWERRAG_IMAGE
         self._version = version
         self.origin_version = version
         self.tag = tag
@@ -594,6 +599,10 @@ class ClusterConfig(object):
     @property
     def docker_install(self):
         return self.comp_type == 'docker'
+
+    @property
+    def docker_compose_install(self):
+        return self.comp_type == 'dockers'
 
     @property
     def deploy_name(self):
@@ -1835,7 +1844,7 @@ class Deploy(object):
     def _load_deploy_config(self, path):
         yaml_loader = YamlLoader(stdio=self.stdio)
         inner_config = InnerConfig(self.get_inner_config_path(self.config_dir), yaml_loader=yaml_loader)
-        deploy_config = DeployConfig(path, yaml_loader=yaml_loader, inner_config=inner_config, config_parser_manager=self.config_parser_manager, config_encrypted=self._config_encrypted,stdio=self.stdio)
+        deploy_config = DeployConfig(path, yaml_loader=yaml_loader, inner_config=inner_config, config_parser_manager=self.config_parser_manager, config_encrypted=self._config_encrypted, stdio=self.stdio)
         deploy_info = self.deploy_info
         for component_name in deploy_info.components:
             if component_name not in deploy_config.components:

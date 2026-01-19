@@ -60,7 +60,7 @@ def get_use_centos_release(stdio=None):
         'uos': {'20': 8},
         'anolis': {'23': 7},
         'openEuler': {'22.03': 7},
-        'kylin': {'V10': 8},
+        'kylin': {'V10': 7},
         'alinux': {'2': 7, '3': 8}
     }
     _SERVER_VARS = {
