@@ -338,7 +338,6 @@ export default function PreCheckStatus() {
       }
     };
   }, []);
-  console.log('checkStatus', checkStatus)
   return (
     <PreCehckComponent
       checkFinished={checkFinished}

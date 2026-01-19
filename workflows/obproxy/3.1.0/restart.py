@@ -31,7 +31,7 @@ def restart(plugin_context, workflow, *args, **kwargs):
     workflow.add_with_component(const.STAGE_FIRST, 'general', 'stop')
     if new_clients:
         workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {"new_clients": new_clients}, 'chown_dir')
-    workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": new_cluster_config if new_cluster_config else cluster_config}, 'parameter_pre', 'start_pre', 'start', 'health_check')
+    workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": cluster_config}, 'parameter_pre', 'start_pre', 'start', 'health_check')
 
     finally_plugins = ['connect', 'bootstrap', 'display']
     if new_cluster_config:

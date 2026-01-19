@@ -2004,3 +2004,10 @@
   need_reload: true
   description_en: Install oceanbase-ce-utils package
   description_local: 安装oceanbase-ce-utils包
+- name: powerrag_tenant_password
+  essential: true
+  require: false
+  type: STRING
+  need_redeploy: true
+  description_en: The password for powerrag tenant
+  description_local: powerrag 租户的密码

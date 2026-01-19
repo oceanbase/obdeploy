@@ -70,8 +70,9 @@ def start(plugin_context, upgrade=False, web_start=False, *args, **kwargs):
                 run_path = server_config.get('run_mount_path') or (server_config.get('mount_path') + '/run')
                 logs_path = server_config.get('logs_mount_path') or (server_config.get('mount_path') + '/logs')
                 store_path = server_config.get('store_mount_path') or (server_config.get('mount_path') + '/store')
+                config_mount_path = server_config.get('config_mount_path') or os.path.join(run_path, 'config.yaml')
                 cmd = f"""{prefix}docker run -dit --net host \
-                        -v {os.path.join(run_path, 'config.yaml')}:/home/admin/conf/config.yaml \
+                        -v {config_mount_path}:/home/admin/conf/config.yaml \
                         -v {logs_path}:/home/admin/logs \
                         -v {store_path}:/home/ds/store \
                         -v {run_path}:/home/ds/run \

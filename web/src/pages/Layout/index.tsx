@@ -97,8 +97,9 @@ export default function Layout() {
     }
     setLastError(newLastError);
   }, [errorVisible, errorsList, lastError]);
-  // const taiPath = getTailPath();
-  const isUpgrade = location.hash.split('/').pop()?.split('?')[1] === 'update';
+
+  const taiPath = getTailPath();
+  const isUpgrade = taiPath.includes('update');
 
   return (
     <ConfigProvider theme={theme} locale={localeConfig}>

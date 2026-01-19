@@ -383,6 +383,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
           setMetaMsgInfo={setMetaMsgInfo}
         />
         <CustomFooter>
+          <ExitBtn />
           <Button
             data-aspm-click="ca54436.da43439"
             data-aspm-desc={intl.formatMessage({
@@ -415,7 +416,6 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
               defaultMessage: '下一步',
             })}
           </Button>
-          <ExitBtn />
         </CustomFooter>
       </Space>
     </ProForm>

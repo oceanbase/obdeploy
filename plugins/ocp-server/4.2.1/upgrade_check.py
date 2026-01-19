@@ -24,7 +24,7 @@ from _rpm import Version
 from tool import Cursor
 
 
-def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', init_check_status=False, java_check=True, *args, **kwargs):
+def upgrade_check(plugin_context, meta_cursor=None, database=None, init_check_status=False, java_check=True, *args, **kwargs):
     def check_pass(item):
         status = check_status[server]
         if status[item].status == err.CheckStatus.WAIT:
@@ -120,6 +120,8 @@ def upgrade_check(plugin_context, meta_cursor=None, database='meta_database', in
                 meta_tenant = server_config['ocp_meta_tenant']['tenant_name']
                 meta_password = server_config['ocp_meta_password']
                 meta_cursor = Cursor(host, port, meta_user, meta_tenant, meta_password, stdio=stdio)
+        if not database:
+            database = server_config.get('ocp_meta_db') or 'meta_database'
         sql = "select count(*) num from %s.task_instance where state not in ('FAILED', 'SUCCESSFUL', 'ABORTED');" % database
         if meta_cursor.fetchone(sql)['num'] > 0:
             success = False

@@ -108,6 +108,9 @@ for DIR in workflows plugins config_parser; do
     if [ ! -e ${OBD_HOME}/${DIR}/obbinlog-ce ]; then
         ln -s ${OBD_HOME}/${DIR}/obbinlog ${OBD_HOME}/${DIR}/obbinlog-ce
     fi
+    if [ ! -e ${OBD_HOME}/${DIR}/oms-ce ]; then
+        ln -s ${OBD_HOME}/${DIR}/oms ${OBD_HOME}/${DIR}/oms-ce
+    fi
 done
 
 echo -n '<VERSION>' > ${OBD_HOME}/version
@@ -121,7 +124,7 @@ if [[ "${ALIAS_OBD_EXIST}" != "" ]]; then
 fi
 
 echo "export OBD_INSTALL_PATH=${WORK_DIR}" >> ~/.bashrc
-echo "alias obd='python ${WORK_DIR}/_cmd.py'" >> ~/.bashrc
+echo "alias obd='python3 ${WORK_DIR}/_cmd.py'" >> ~/.bashrc
 echo -e "if [ -d ${WORK_DIR} ]\nthen\n    source ${WORK_DIR}/profile/obd.sh\nfi" >> ~/.bashrc
 
 echo "Please enter ob-deploy dir and install python requirements by 'pip install -r requirements.txt' when your python version is '2.x' and replace requirements.txt with requirements3.txt when your python version is '3.x'"

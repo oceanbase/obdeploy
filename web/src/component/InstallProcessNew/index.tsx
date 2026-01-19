@@ -158,6 +158,12 @@ export default function InstallProcessNew({
         setInstallResult(data?.result);
         if (data?.status && data?.status !== 'RUNNING') {
           setInstallStatus(data?.status);
+          // 在跳转之前，最后一次获取日志
+          if (type === 'update') {
+            getInstallTaskLog({ cluster_name, task_id });
+          } else {
+            getInstallTaskLog({ id, task_id });
+          }
           setCurrentPage(false);
           setTimeout(() => {
             setCurrentStep(current + 1);
@@ -209,7 +215,8 @@ export default function InstallProcessNew({
     manual: true,
     onSuccess: ({ success, data }: API.OBResponseInstallLog_) => {
       if (success) setLogData(data || {});
-      if (success && installStatus === 'RUNNING') {
+      // 继续轮询日志，直到状态不再是 RUNNING
+      if (success && installStatus === 'RUNNING' && currentPage) {
         setTimeout(() => {
           if (type === 'update') {
             getInstallTaskLog({ cluster_name, task_id });

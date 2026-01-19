@@ -195,14 +195,8 @@ def prepare_parameters(cluster_config, stdio):
 
 
 def parameter_pre(plugin_context, **kwargs):
-    check_status = plugin_context.get_variable('start_check_status')
-    check_pass = plugin_context.get_variable('check_pass')
-    check_fail = plugin_context.get_variable('check_fail')
-    critical = plugin_context.get_variable('critical')
-    get_option = plugin_context.get_variable('get_option')
-    error = plugin_context.get_variable('error')
-
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     stdio = plugin_context.stdio
 
     env = prepare_parameters(cluster_config, stdio)

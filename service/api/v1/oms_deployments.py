@@ -36,7 +36,7 @@ async def get_usable_oms_docker_images(
         username: str = Query(description="ssh username"),
         password: str = Query(description="ssh password"),
         port: int = Query(description="ssh port")
-                                       ):
+):
     oms_handler = handler_utils.new_oms_handler()
     try:
         images = oms_handler.get_oms_images(oms_servers, username, password, port)
@@ -64,12 +64,11 @@ async def create_deployment(name: str = Path(description='name'),
         return response_utils.new_bad_request_exception(Exception('deployment {0} already exists'.format(name)))
 
 
-
 @router.post("/oms/deployments/{id}/precheck",
-            response_model=OBResponse[TaskInfo],
-            description='precheck for oms deployment',
-            operation_id='precheck_oms_deployment',
-            tags=['oms'])
+             response_model=OBResponse[TaskInfo],
+             description='precheck for oms deployment',
+             operation_id='precheck_oms_deployment',
+             tags=['oms'])
 async def precheck_oms_deployment(background_tasks: BackgroundTasks,
                                   id: int = Path(description="deployment id")):
     try:
@@ -98,10 +97,10 @@ async def get_oms_precheck_task(id: int = Path(description="deployment id"),
 
 
 @router.post("/oms/deployments/{id}/install",
-            response_model=OBResponse[TaskInfo],
-            description='install oms',
-            operation_id='install_oms',
-            tags=['oms'])
+             response_model=OBResponse[TaskInfo],
+             description='install oms',
+             operation_id='install_oms',
+             tags=['oms'])
 async def install_oms(background_tasks: BackgroundTasks, id: int = Path(description="deployment id")):
     handler = handler_utils.new_oms_handler()
     ret = handler.install(id, background_tasks)
@@ -142,10 +141,10 @@ async def get_oms_install_task_log(id: int = Path(description="deployment id"),
 
 
 @router.post("/oms/deployments/{id}/reinstall",
-            response_model=OBResponse[TaskInfo],
-            description='reinstall oms',
-            operation_id='reinstall_oms',
-            tags=['oms'])
+             response_model=OBResponse[TaskInfo],
+             description='reinstall oms',
+             operation_id='reinstall_oms',
+             tags=['oms'])
 async def reinstall_oms(background_tasks: BackgroundTasks, id: int = Path(description="deployment id")):
     handler = handler_utils.new_oms_handler()
     ret = handler.reinstall(id, background_tasks)
@@ -160,7 +159,7 @@ async def reinstall_oms(background_tasks: BackgroundTasks, id: int = Path(descri
             operation_id='get_oms_reinstall_task',
             tags=['oms'])
 async def get_oms_reinstall_task(id: int = Path(description="deployment id"),
-                               task_id: int = Path(description="task id")):
+                                 task_id: int = Path(description="task id")):
     handler = handler_utils.new_oms_handler()
     task_info = handler.get_reinstall_task_info(id, task_id)
     if not isinstance(task_info, TaskInfo):
@@ -174,8 +173,8 @@ async def get_oms_reinstall_task(id: int = Path(description="deployment id"),
             operation_id='get_oms_reinstall_task_log',
             tags=['oms'])
 async def get_oms_reinstall_task_log(id: int = Path(description="deployment id"),
-                                   task_id: int = Path(description="task id"),
-                                   offset: int = Query(0, description="offset to read task log")):
+                                     task_id: int = Path(description="task id"),
+                                     offset: int = Query(0, description="offset to read task log")):
     handler = handler_utils.new_oms_handler()
     task_info = handler.get_reinstall_task_info(id, task_id)
     if task_info is None:
@@ -186,10 +185,10 @@ async def get_oms_reinstall_task_log(id: int = Path(description="deployment id")
 
 
 @router.delete("/oms/deployments/{id}",
-            response_model=OBResponse[TaskInfo],
-            description='destroy oms',
-            operation_id='destroy_oms',
-            tags=['oms'])
+               response_model=OBResponse[TaskInfo],
+               description='destroy oms',
+               operation_id='destroy_oms',
+               tags=['oms'])
 async def destroy_oms(id: int, background_tasks: BackgroundTasks):
     handler = handler_utils.new_oms_handler()
     try:
@@ -240,14 +239,15 @@ async def get_oms_upgrade_info(name: str = Path(description='name')):
 
 
 @router.post("/oms/{cluster_name}/upgrade/precheck",
-            response_model=OBResponse[TaskInfo],
-            description='post precheck for oms upgrade',
-            operation_id='precheck_oms_upgrade',
-            tags=['oms'])
+             response_model=OBResponse[TaskInfo],
+             description='precheck for oms upgrade',
+             operation_id='precheck_oms_upgrade',
+             tags=['oms'])
 async def precheck_oms_upgrade(background_tasks: BackgroundTasks,
-                               cluster_name: str = Path(description="deployment cluster_name")):
+                               cluster_name: str = Path(description="deployment cluster_name"),
+                               default_oms_files_path: str = Query(description="oms upgrade default_oms_files_path")):
     handler = handler_utils.new_oms_handler()
-    ret = handler.upgrade_precheck(cluster_name, background_tasks)
+    ret = handler.upgrade_precheck(cluster_name, background_tasks, default_oms_files_path)
     if not isinstance(ret, TaskInfo) and ret:
         return response_utils.new_internal_server_error_exception(ret[1])
     return response_utils.new_ok_response(ret)
@@ -269,20 +269,19 @@ async def get_oms_upgrade_precheck_task(cluster_name: str = Path(description="om
 
 
 @router.post("/oms/{cluster_name}/upgrade",
-            response_model=OBResponse[TaskInfo],
-            description='upgrade oms',
-            operation_id='upgrade_oms',
-            tags=['oms'])
+             response_model=OBResponse[TaskInfo],
+             description='upgrade oms',
+             operation_id='upgrade_oms',
+             tags=['oms'])
 async def upgrade_oms(
         background_tasks: BackgroundTasks,
         cluster_name: str = Path(description="oms cluster_name"),
         version: str = Query(description="oms upgrade version"),
         image_name: str = Query('', description="oms upgrade image_name"),
-        upgrade_mode: str = Query('', description="oms upgrade mode"),
-        default_oms_files_path: str = Query('', description="oms upgrade default_oms_files_path")
+        upgrade_mode: str = Query('', description="oms upgrade mode")
 ):
     handler = handler_utils.new_oms_handler()
-    ret = handler.upgrade_oms(cluster_name, version, image_name, upgrade_mode, default_oms_files_path, background_tasks)
+    ret = handler.upgrade_oms(cluster_name, version, image_name, upgrade_mode, background_tasks)
     if not isinstance(ret, TaskInfo) and ret:
         return response_utils.new_internal_server_error_exception(ret[1])
     return response_utils.new_ok_response(ret)
@@ -311,7 +310,7 @@ async def get_oms_upgrade_task_log(cluster_name: str = Path(description="oms clu
                                    task_id: int = Path(description="task id"),
                                    offset: int = Query(0, description="offset to read task log")):
     handler = handler_utils.new_oms_handler()
-    task_info = handler.get_oms_upgrade_task(cluster_name, task_id)
+    task_info = handler.get_oms_upgrade_task(task_id)
     if task_info is None:
         return response_utils.new_internal_server_error_exception("task {0} not found".format(cluster_name))
     origin_log = handler.buffer.read()
@@ -319,12 +318,40 @@ async def get_oms_upgrade_task_log(cluster_name: str = Path(description="oms clu
     return response_utils.new_ok_response(TaskLog(log=masked_log, offset=offset))
 
 
+@router.post("/oms/{cluster_name}/takeover",
+             response_model=OBResponse,
+             description='takeover oms',
+             operation_id='takeover_oms',
+             tags=['oms'])
+async def takeover_oms(cluster_name: str = Path(description="oms cluster_name"),
+                       host: str = Body(description="oms container host"),
+                       container_name: str = Body(description="oms container name"),
+                       user: str = Body(description="ssh user"),
+                       password: str = Body(description="ssh password"),
+                       port: int = Body(22, description="ssh port")):
+    handler = handler_utils.new_oms_handler()
+    ret = handler.takeover_oms(cluster_name, host, container_name, user, password, port)
+    return response_utils.new_ok_response(ret)
 
 
+@router.get("/oms/display",
+            response_model=OBResponse,
+            description='get oms login url',
+            operation_id='get_oms_login_url',
+            tags=['oms'])
+async def get_usable_oms_docker_images():
+    handler = handler_utils.new_oms_handler()
+    ret = handler.display()
+    return response_utils.new_ok_response(ret)
 
 
-
-
-
-
-
+@router.post("/oms/meta/backup",
+            response_model=OBResponse,
+            description='backup oms',
+            operation_id='backup_oms',
+            tags=['oms'])
+async def backup_oms(backup_path: str = Query(..., description="backup path"),
+                    pre_check: bool = Query(False, description="backup pre check")):
+    handler = handler_utils.new_oms_handler()
+    ret = handler.meta_info_backup(backup_path, pre_check)
+    return response_utils.new_ok_response(ret)

@@ -255,6 +255,8 @@ class ComponentWorkflowLoader(WorkflowLoader):
     def get_workflow_template(self, version):
         template = self.get_best_plugin(version)
         if not template:
+            if not version:
+                version = '0.1'
             template = self._general_loader.get_best_plugin(version)
         return template
 

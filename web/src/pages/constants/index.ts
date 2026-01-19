@@ -19,7 +19,7 @@ export const grafanaComponent = 'grafana';
 export const alertManagerComponent = 'alertmanager';
 
 export const configServerComponentKey = 'obconfigserver';
-export const dashboardComponentKey = 'obshell_dashboard';
+export const dashboardComponentKey = `obshell Dashboard`;
 
 export const componentVersionTypeToComponent = {
   'oceanbase-ce': oceanbaseComponent,
@@ -31,7 +31,7 @@ export const componentVersionTypeToComponent = {
   'alertmanager': alertManagerComponent,
   'ocp-server-ce': ocpComponent,
   'ocp-server': ocpComponent,
-  'obshell_dashboard': dashboardComponentKey,
+  'obshell Dashboard': `obshell Dashboard`,
 };
 
 export const onlyComponentsKeys = [
@@ -189,9 +189,9 @@ export const componentsConfig = {
       defaultMessage: 'AlertManager 参数名称',
     }),
   },
-  ['obshell_dashboard']: {
-    name: 'obshell_dashboard',
-    showComponentName: 'obshell Dashboard',
+  [`obshell Dashboard`]: {
+    name: `obshell Dashboard`,
+    showComponentName: `obshell Dashboard`,
   },
 };
 

@@ -199,10 +199,13 @@ class LocalClient(SafeStdio):
 
 
     @staticmethod
-    def execute_command(command, env=None, timeout=None, stdio=None):
+    def execute_command(command, env=None, timeout=None, use_tty=False, stdio=None):
         stdio.verbose('local execute: %s ' % command, end='')
         try:
-            p = Popen(command, env=LocalClient.init_env(env), shell=True, stdout=PIPE, stderr=PIPE)
+            if use_tty:
+                p = Popen(command, env=LocalClient.init_env(env), shell=True, stdout=PIPE, stderr=PIPE, preexec_fn=lambda: os.setsid())
+            else:
+                p = Popen(command, env=LocalClient.init_env(env), shell=True, stdout=PIPE, stderr=PIPE)
             output, error = p.communicate(timeout=timeout)
             code = p.returncode
             output = output.decode(errors='replace')
@@ -512,14 +515,14 @@ class SshClient(SafeStdio):
             error = str(e)
         return SshReturn(code, stdout, error)
 
-    def execute_command(self, command, timeout=None, stdio=None):
+    def execute_command(self, command, timeout=None, use_tty=False, stdio=None):
         if timeout is None:
             timeout = self.config.timeout
         elif timeout <= 0:
             timeout = None
 
         if not self._disable_local and self._is_local:
-            return LocalClient.execute_command(command, self.env if self.env else None, timeout, stdio=stdio)
+            return LocalClient.execute_command(command, self.env if self.env else None, timeout, use_tty, stdio=stdio)
 
         verbose_msg = '%s execute: %s ' % (self.config, command)
         stdio.verbose(verbose_msg, end='')

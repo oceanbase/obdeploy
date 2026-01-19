@@ -19,7 +19,8 @@ import hashlib
 
 
 def start_pre(plugin_context, need_bootstrap=False, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     options = plugin_context.options
     clusters_cmd = {}
@@ -27,7 +28,7 @@ def start_pre(plugin_context, need_bootstrap=False, *args, **kwargs):
     pid_path = {}
     obproxy_config_server_url = plugin_context.get_variable('obproxy_config_server_url')
 
-    if getattr(options, 'without_parameter', False):
+    if not getattr(options, 'with_parameter', False):
         use_parameter = False
     else:
         # Bootstrap is required when starting with parameter, ensure the passwords are correct.
@@ -46,6 +47,17 @@ def start_pre(plugin_context, need_bootstrap=False, *args, **kwargs):
 
         pid_path[server] = "%s/run/obproxy-%s-%s.pid" % (home_path, server.ip, server_config["listen_port"])
 
+        start_parameters = {}
+        if new_cluster_config:
+            old_config = plugin_context.cluster_config.get_server_conf_with_default(server)
+            new_config = new_cluster_config.get_server_conf_with_default(server)
+            for key in new_config:
+                param_value = new_config[key]
+                if key not in old_config or old_config[key] != param_value:
+                    start_parameters[key] = param_value
+        else:
+            start_parameters = server_config
+        
         if use_parameter:
             not_opt_str = [
                 'listen_port',
@@ -55,29 +67,31 @@ def start_pre(plugin_context, need_bootstrap=False, *args, **kwargs):
                 'rpc_listen_port'
             ]
             start_unuse = ['home_path', 'observer_sys_password', 'obproxy_sys_password', 'observer_root_password']
-            get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else \
-            server_config[key]
+            get_value = lambda key: "'%s'" % start_parameters[key] if isinstance(start_parameters[key], str) else \
+            start_parameters[key]
             opt_str = []
-            if server_config.get('obproxy_sys_password'):
-                obproxy_sys_password = hashlib.sha1(server_config['obproxy_sys_password'].encode("utf-8")).hexdigest()
-            else:
-                obproxy_sys_password = ''
-            if server_config.get('proxy_id'):
-                opt_str.append("client_session_id_version=%s,proxy_id=%s" % (server_config.get('client_session_id_version', 2), server_config.get('proxy_id')))
-            opt_str.append("obproxy_sys_password='%s'" % obproxy_sys_password)
-            for key in server_config:
+            if not new_cluster_config:
+                if start_parameters.get('obproxy_sys_password'):
+                    obproxy_sys_password = hashlib.sha1(start_parameters['obproxy_sys_password'].encode("utf-8")).hexdigest()
+                else:
+                    obproxy_sys_password = ''
+                opt_str.append("obproxy_sys_password='%s'" % obproxy_sys_password)
+            if start_parameters.get('proxy_id'):
+                opt_str.append("client_session_id_version=%s,proxy_id=%s" % (start_parameters.get('client_session_id_version', 2), start_parameters.get('proxy_id')))
+            for key in start_parameters:
                 if key not in start_unuse and key not in not_opt_str:
                     value = get_value(key)
                     opt_str.append('%s=%s' % (key, value))
-            cmd = ['-o %s' % ','.join(opt_str)]
+            cmd = ['-o %s' % ','.join(opt_str)] if opt_str else []
+            start_parameters['listen_port'] = server_config['listen_port']
             for key in not_opt_str:
-                if key in server_config:
+                if key in start_parameters:
                     if key == 'rpc_listen_port' and not server_config['enable_obproxy_rpc_service']:
                         continue
                     value = get_value(key)
                     cmd.append('--%s %s' % (key, value))
         else:
-            cmd = ['--listen_port %s' % server_config.get('listen_port')]
+            cmd = ['--listen_port %s' % start_parameters.get('listen_port')]
 
         real_cmd[server] = '%s/bin/obproxy %s' % (home_path, ' '.join(cmd))
         clusters_cmd[server] = 'cd %s; %s' % (home_path, real_cmd[server])

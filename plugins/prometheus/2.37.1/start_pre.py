@@ -112,7 +112,7 @@ def start_pre(plugin_context, obagent_repo=None, *args, **kwargs):
                     return False
             else:
                 prometheus_conf_content = {'global': None}
-        if not without_parameter and config:
+        if with_parameter and config:
             prometheus_conf_content.update(config)
         try:
             config_content = yaml.dumps(prometheus_conf_content).strip()
@@ -130,12 +130,13 @@ def start_pre(plugin_context, obagent_repo=None, *args, **kwargs):
             return False
         return True
 
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     options = plugin_context.options
     prometheusd_path = os.path.join(os.path.split(__file__)[0], 'prometheusd.sh')
-    without_parameter = getattr(options, 'without_parameter', False)
+    with_parameter = getattr(options, 'with_parameter', False)
     invalid_key_map = {
         'web.listen-address': 'port & address',
         'web.enable-lifecycle': 'enable_lifecycle',
@@ -168,7 +169,7 @@ def start_pre(plugin_context, obagent_repo=None, *args, **kwargs):
         address = server_config['address']
         flag_file = os.path.join(home_path, '.prometheus_started')
         if not client.execute_command('ls {}'.format(flag_file)):
-            without_parameter = False
+            with_parameter = True
         if not generate_or_update_config():
             stdio.stop_loading('fail')
             return False

@@ -32,7 +32,7 @@ def restart(plugin_context, workflow, *args, **kwargs):
     cursor = plugin_context.get_return('connect').get_return('cursor')
     workflow.add_with_kwargs(const.STAGE_FIRST, {'cursor': cursor if cursor else None, 'need_bootstrap': need_bootstrap,
                                                  'clients': new_clients if new_clients else clients, 'new_cluster_config': new_cluster_config,
-                                                 'cluster_config': new_cluster_config if new_cluster_config else cluster_config}, 'parameter_pre', 'cursor_check', 'start', 'health_check')
+                                                 'cluster_config': cluster_config}, 'parameter_pre', 'cursor_check', 'start', 'health_check')
 
     finally_plugins = plugin_context.get_variable('finally_plugins')
     if not finally_plugins:

@@ -30,7 +30,7 @@ def status(plugin_context, *args, **kwargs):
         client = clients[server]
         cluster_status[server] = ClusterStatus.STATUS_STOPPED.value
         prefix = docker_run_sudo_prefix(client)
-        ret = client.execute_command('%sdocker ps --filter "name=%s" --format "{{json .}}"|grep %s' % (prefix, container_name, cluster_config.tag)).stdout.strip()
+        ret = client.execute_command('%sdocker ps --filter "name=%s " --format "{{json .}}"' % (prefix, container_name)).stdout.strip()
         if ret and json.loads(ret).get('State') == 'running':
             cluster_status[server] = ClusterStatus.STATUS_RUNNING.value
     return plugin_context.return_true(cluster_status=cluster_status)

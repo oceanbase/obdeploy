@@ -27,18 +27,18 @@ def health_check(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
-    stdio.start_loading('observer program health check')
+    stdio.start_loading('seekdb program health check')
     time.sleep(3)
     failed = []
     for server in cluster_config.servers:
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
-        remote_pid_path = '%s/run/observer.pid' % home_path
+        remote_pid_path = '%s/run/seekdb.pid' % home_path
         stdio.verbose('%s program health check' % server)
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
-            stdio.verbose('%s observer[pid: %s] started', server, remote_pid)
+            stdio.verbose('%s seekdb[pid: %s] started', server, remote_pid)
         else:
             failed.append(EC_OBSERVER_FAIL_TO_START.format(server=server))
     if failed:

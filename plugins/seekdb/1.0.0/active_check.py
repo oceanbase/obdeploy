@@ -23,7 +23,7 @@ def active_check(plugin_context,  *args, **kwargs):
     stdio = plugin_context.stdio
     restart_manager = plugin_context.get_variable('restart_manager')
 
-    stdio.start_loading('Observer active check')
+    stdio.start_loading('Seekdb active check')
     if not restart_manager.connect():
         stdio.stop_loading('stop_loading', 'fail')
         return plugin_context.return_false()

@@ -3,7 +3,7 @@ import { intl } from '@/utils/intl';
 import { ProCard, } from '@ant-design/pro-components';
 import { Spin } from '@oceanbase/design';
 import { useRequest } from 'ahooks';
-import { Alert, Button, Col, Input, Table, Tag } from 'antd';
+import { Alert, Button, Col, Input, Table, Tag, Typography } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
 import React, { useEffect } from 'react';
 import { useModel } from 'umi';
@@ -16,6 +16,7 @@ import { creatOmsDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
 import { getErrorInfo } from '@/utils';
 import { encrypt } from '@/utils/encrypt';
 import { getPublicKey } from '@/services/ob-deploy-web/Common';
+const { Text } = Typography;
 
 const locale = getLocale();
 const mainStyles = locale === 'zh-CN' ? ZhStyles : EnStyles;
@@ -58,6 +59,8 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
     setErrorsList,
     selectedOmsType,
     errorsList,
+    ocpConfigData,
+    omsTakeoverData
   } = useModel('global');
 
   const { setConnectId } = useModel('ocpInstallData');
@@ -68,12 +71,14 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
     setErrorsList([]);
   }, []);
 
+
   // 当前为 OBD ，适用于 oms 升级
-  const OBDUpdate = false
+  const OBDUpdate = ocpConfigData?.install_type === 'obd_install'
+
   const { run: handleCreateConfig, loading: createConfigLoading } = useRequest(
     creatOmsDeploymentConfig,
     {
-      manual: true, // 手动触发，避免组件挂载时自动执行
+      manual: true,
       onSuccess: ({ success, data }: API.OBResponse) => {
         if (success) {
           setConnectId(data);
@@ -87,6 +92,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
       },
     },
   );
+
 
 
   const handlePreCheck = async () => {
@@ -129,72 +135,20 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
     );
   };
 
+  const handleUpdate = () => {
+    setCurrentStep(1);
+  }
+
   const prevStep = () => {
     if (type === 'install') {
       setCurrentStep(2);
-      setErrorVisible(false);
-      setErrorsList([]);
-      window.scrollTo(0, 0);
+    } else if (type === 'update') {
+      setCurrentStep(-1);
     }
+    setErrorVisible(false);
+    setErrorsList([]);
+    window.scrollTo(0, 0);
   };
-
-  // 当前 OMS 选择的节点环境是否为单节点
-  const standAlone = configData?.mode === 'compact' || configData?.mode === 'standard';
-
-  const columns = [
-    {
-      title: intl.formatMessage({
-        id: 'OBD.pages.Oms.ConnectionInfo.RegionIdentifier',
-        defaultMessage: '地域标识',
-      }),
-      dataIndex: 'cm_location',
-    },
-    {
-      title: intl.formatMessage({
-        id: 'OBD.pages.Oms.ConnectionInfo.EnglishRegionIdentifier',
-        defaultMessage: '英文地域标志',
-      }),
-      dataIndex: 'cm_region',
-    },
-    ...(!standAlone ? [
-      {
-        title: intl.formatMessage({
-          id: 'OBD.pages.Oms.ConnectionInfo.AccessPriority',
-          defaultMessage: '访问优先',
-        }),
-        dataIndex: 'cm_is_default',
-        render: (text: any) => (
-          <span> {text ? intl.formatMessage({
-            id: 'OBD.pages.Oms.ConnectionInfo.Yes',
-            defaultMessage: '是',
-          }) : intl.formatMessage({
-            id: 'OBD.pages.Oms.ConnectionInfo.No',
-            defaultMessage: '否',
-          })}</span>
-        ),
-      },
-    ] : []),
-    {
-      title: intl.formatMessage({
-        id: 'OBD.pages.Oms.ConnectionInfo.Node',
-        defaultMessage: '节点',
-      }),
-      dataIndex: 'cm_nodes',
-      render: (text: any) => {
-        if (Array.isArray(text)) {
-          return text.join(', ');
-        }
-        return text || '-';
-      },
-    },
-    ...(type === 'install' ? [{
-      title: intl.formatMessage({
-        id: 'OBD.pages.Oms.ConnectionInfo.CmAccessAddress',
-        defaultMessage: 'CM 访问地址',
-      }),
-      dataIndex: 'cm_url',
-    }] : []),
-  ];
 
   const deployMode = [
     {
@@ -238,7 +192,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               defaultMessage: '用户名',
             })}
           >
-            {configData?.auth?.username}
+            {type === 'install' ? configData?.auth?.username : ocpConfigData?.user}
           </ProCard>
           <ProCard
             colSpan={6}
@@ -248,9 +202,9 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
             })}
           >
             {
-              configData?.auth?.password ?
+              (configData?.auth?.password || ocpConfigData?.password) ?
                 <Input.Password
-                  value={configData?.auth?.password}
+                  value={configData?.auth?.password || ocpConfigData?.password}
                   visibilityToggle={true}
                   readOnly
                   bordered={false}
@@ -266,7 +220,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               defaultMessage: 'SSH 端口',
             })}
           >
-            {configData?.auth?.ssh_port}
+            {type === 'install' ? configData?.auth?.ssh_port : ocpConfigData?.port}
           </ProCard>
           <ProCard
             colSpan={6}
@@ -403,7 +357,81 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
       </ProCard>
     )
   }
+  const visibleConnectInfo = (title: string) => {
+    return (
+      <ProCard
+        title={title}
+        className="card-padding-bottom-24"
+      >
+        <Col span={24}>
+          <ProCard
+            className={mainStyles.infoSubCard}
+            split="vertical"
+          >
+            <ProCard
+              colSpan={6}
+              title={intl.formatMessage({
+                id: 'OBD.pages.Oms.ConnectionInfo.OmsAccessAddress',
+                defaultMessage: 'OMS 访问地址',
+              })}
+            >
+              {ocpConfigData?.host}
+            </ProCard>
+            <ProCard
+              colSpan={18}
+              title={intl.formatMessage({
+                id: 'OBD.pages.Oms.ConnectionInfo.OmsContainerName',
+                defaultMessage: 'OMS 容器名称',
+              })}
+            >
+              {ocpConfigData?.container_name}
+            </ProCard>
 
+          </ProCard>
+        </Col>
+        <Col span={24}>
+          <ProCard
+            className={mainStyles.infoSubCard}
+            split="vertical"
+          >
+            <ProCard
+              colSpan={6}
+              title={intl.formatMessage({
+                id: 'OBD.pages.Oms.ConnectionInfo.AccessAccount',
+                defaultMessage: '访问账号',
+              })}
+            >
+              {ocpConfigData?.user}
+            </ProCard>
+            <ProCard
+              colSpan={6}
+              title={intl.formatMessage({
+                id: 'OBD.pages.Oms.ConnectionInfo.Password',
+                defaultMessage: '密码',
+              })}
+            >
+              <Input.Password
+                value={ocpConfigData?.password}
+                visibilityToggle={true}
+                readOnly
+                bordered={false}
+                style={{ padding: 0 }}
+              />
+            </ProCard>
+            <ProCard
+              colSpan={6}
+              title={intl.formatMessage({
+                id: 'OBD.pages.Oms.ConnectionInfo.Port',
+                defaultMessage: '端口',
+              })}
+            >
+              {ocpConfigData?.port}
+            </ProCard>
+          </ProCard>
+        </Col>
+      </ProCard>
+    )
+  }
   const moreConfigColumns = [
     {
       title: 'drc_cm_heartbeat_db',
@@ -466,7 +494,6 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
             >
               {
                 type === 'update' &&
-
                 <ProCard
                   colSpan={OBDUpdate ? 6 : 10}
                   title={intl.formatMessage({
@@ -474,7 +501,13 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                     defaultMessage: '原部署方式',
                   })}
                 >
-                  {configData?.appname}
+                  {OBDUpdate ? intl.formatMessage({
+                    id: 'OBD.pages.Oms.ConnectionInfo.ObdDeployment',
+                    defaultMessage: 'OBD 部署',
+                  }) : intl.formatMessage({
+                    id: 'OBD.pages.Oms.ConnectionInfo.NonObdDeployment',
+                    defaultMessage: '非OBD 部署',
+                  })}
                 </ProCard>
               }
 
@@ -485,21 +518,8 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                   defaultMessage: '部署名称',
                 })}
               >
-                {configData?.appname}
+                {type === 'install' ? configData?.appname : ocpConfigData?.cluster_name}
               </ProCard>
-              {
-                OBDUpdate && (
-                  <ProCard
-                    colSpan={6}
-                    title={intl.formatMessage({
-                      id: 'OBD.pages.Oms.ConnectionInfo.DeploymentMode',
-                      defaultMessage: '部署模式',
-                    })}
-                  >
-                    {findByValue(deployMode, configData?.mode)?.label}
-                  </ProCard>
-                )
-              }
             </ProCard>
           </Col>
         </ProCard>
@@ -510,7 +530,6 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               defaultMessage: '部署模式',
             })}
             className="card-padding-bottom-24"
-
           >
             <Col span={12}>
               <ProCard
@@ -533,33 +552,11 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
             <>
               {
                 type === 'update' &&
-                visibleMirrorInfo(intl.formatMessage({
+                visibleConnectInfo(intl.formatMessage({
                   id: 'OBD.pages.Oms.ConnectionInfo.ConnectionInformation',
                   defaultMessage: '连接信息',
                 }))
               }
-              <ProCard
-                title={intl.formatMessage({
-                  id: 'OBD.pages.Oms.ConnectionInfo.NodeConfiguration',
-                  defaultMessage: '节点配置',
-                })}
-                className="card-padding-bottom-24"
-              >
-                <Col span={24}>
-                  <Table
-                    className={mainStyles.nodeCard}
-                    columns={columns}
-                    dataSource={configData?.regions || []}
-                    rowKey="id"
-                    scroll={{ y: 300 }}
-                    pagination={false}
-                  />
-                </Col>
-              </ProCard>
-              {type === 'update' && userInfo(intl.formatMessage({
-                id: 'OBD.pages.Oms.ConnectionInfo.UserInformation',
-                defaultMessage: '用户信息',
-              }))}
             </>
           )
         }
@@ -681,7 +678,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 })}
               >
                 OMS
-                <Tag style={{ marginLeft: 6 }}>{selectedOmsType?.includes('ce') ? intl.formatMessage({
+                <Tag style={{ marginLeft: 6 }}>{(type == 'install' ? selectedOmsType?.includes('ce') : ocpConfigData?.version?.includes('ce')) ? intl.formatMessage({
                   id: 'OBD.pages.Oms.ConnectionInfo.CommunityEdition',
                   defaultMessage: '社区版',
                 }) : intl.formatMessage({
@@ -699,7 +696,13 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                   defaultMessage: '原版本',
                 })}
               >
-                <span style={{ whiteSpace: 'nowrap' }}>V {selectedOmsType?.toUpperCase()}</span>
+                <span style={{ whiteSpace: 'nowrap' }}>
+                  {
+                    type == 'install' ? selectedOmsType?.toUpperCase()
+                      : ocpConfigData?.current_version ?
+                        `V ${ocpConfigData?.current_version?.split('feature_')[1]?.toUpperCase()}` :
+                        `V ${omsTakeoverData?.version?.split('feature_')[1]?.toUpperCase()}`}
+                </span>
               </ProCard>
               {
                 type === 'update' && <ProCard
@@ -709,9 +712,30 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                     defaultMessage: '目标版本',
                   })}
                 >
-                  value
+                  V {ocpConfigData?.version?.split('feature_')[1]?.toUpperCase()}
                 </ProCard>
               }
+              {
+                type === 'update' && ocpConfigData?.path &&
+                ocpConfigData?.upgrade_mode === 'online' &&
+                <ProCard
+                  colSpan={6}
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.Oms.ConnectionInfo.UpgradeFilePath',
+                    defaultMessage: '存放升级文件路径',
+                  })}
+                  style={{ backgroundColor: '#f8fafe' }}
+                >
+                  <Text
+                    ellipsis={{
+                      tooltip: ocpConfigData?.path,
+                    }}
+                  >
+                    {ocpConfigData?.path}
+                  </Text>
+                </ProCard>
+              }
+
             </ProCard>
           </Col>
         </ProCard>
@@ -731,18 +755,19 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 colSpan={6}
                 style={{ backgroundColor: '#f8fafe' }}
               >
-                {intl.formatMessage({
-                  id: 'OBD.pages.Oms.ConnectionInfo.OnlineUpgrade',
-                  defaultMessage: '在线升级',
-                })}
+                {
+                  ocpConfigData?.upgrade_mode === 'online' ?
+                    intl.formatMessage({
+                      id: 'OBD.pages.Oms.ConnectionInfo.OnlineUpgrade',
+                      defaultMessage: '在线升级',
+                    }) : intl.formatMessage({
+                      id: 'OBD.pages.Oms.ConnectionInfo.OfflineUpgrade',
+                      defaultMessage: '停服升级',
+                    })}
               </ProCard>
-
             </ProCard>
           </Col>
         </ProCard>
-        }
-        {
-          !OBDUpdate && type === 'update' && mirrorInfo()
         }
       </ProCard>
       {
@@ -801,6 +826,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
         </ProCard>
       }
       <CustomFooter>
+        <ExitBtn />
         <Button
           onClick={prevStep}
         >
@@ -815,6 +841,8 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
           onClick={() => {
             if (type === 'install') {
               handlePreCheck()
+            } else if (type === 'update') {
+              handleUpdate()
             }
           }}>
           {intl.formatMessage({
@@ -822,7 +850,6 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
             defaultMessage: '下一步',
           })}
         </Button>
-        <ExitBtn />
       </CustomFooter>
     </Spin>
   );

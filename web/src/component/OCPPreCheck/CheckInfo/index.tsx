@@ -25,14 +25,12 @@ import type {
 } from './type';
 
 interface CheckInfoProps {
-  showNext: React.Dispatch<React.SetStateAction<boolean>>;
   isNewDB: boolean;
 }
 
 export const leftCardStyle = { width: 211 };
 
 export default function CheckInfo({
-  showNext,
   current,
   setCurrent,
   isNewDB,
@@ -68,6 +66,7 @@ export default function CheckInfo({
         redo_dir: oceanbase.redo_dir,
         mysql_port: oceanbase.mysql_port,
         rpc_port: oceanbase.rpc_port,
+        obshell_port: oceanbase.obshell_port,
       },
     },
     dbNode: oceanbase.topology,
@@ -166,7 +165,8 @@ export default function CheckInfo({
       onSuccess: ({ success, data }: API.OBResponse) => {
         if (success) {
           setConnectId(data);
-          showNext(true);
+          setCurrent(current + 1);
+          // showNext(true);
         }
       },
       onError: (e: any) => {
@@ -223,6 +223,7 @@ export default function CheckInfo({
         </Row>
       </ProCard>
       <CustomFooter>
+        <ExitBtn />
         <Button
           data-aspm-click="ca54437.da43442"
           data-aspm-desc={intl.formatMessage({
@@ -250,12 +251,8 @@ export default function CheckInfo({
           type="primary"
           onClick={nextStep}
         >
-          {intl.formatMessage({
-            id: 'OBD.OCPPreCheck.CheckInfo.PreCheck.1',
-            defaultMessage: '预检查',
-          })}
+          下一步
         </Button>
-        <ExitBtn />
       </CustomFooter>
     </Space>
   );

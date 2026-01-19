@@ -29,10 +29,17 @@ interface CustomCardProps {
 }
 
 export default function Guide() {
+
+  const {
+    setCurrentStep: setOBCurrentStep,
+    DOCS_PRODUCTION,
+    setOmsDockerData,
+    setOmsTakeoverData,
+  } = useModel('global');
+
   const isCN = locale === 'zh-CN';
   const buttonStyle = isCN ? styles.guideBtn : styles.guideBtnUS;
 
-  // const taiPath = getTailPath();
   const isUpgrade = location.hash.split('/').pop()?.split('?')[1] === 'update';
 
   const guideConfigListRef = [
@@ -242,6 +249,8 @@ export default function Guide() {
             setOBCurrentStep(1);
             if (isUpgrade) {
               history.push('/updateOms');
+              setOmsDockerData([]);
+              setOmsTakeoverData({});
             } else {
               history.push('/oms');
             }
@@ -271,8 +280,7 @@ export default function Guide() {
     },
   ];
 
-  const { setCurrentStep: setOBCurrentStep, DOCS_PRODUCTION } =
-    useModel('global');
+
   const CustomCard = ({
     disable,
     icon,
@@ -282,7 +290,6 @@ export default function Guide() {
     id,
     upgradeStyle,
   }: CustomCardProps) => {
-
 
     return (
       <Card

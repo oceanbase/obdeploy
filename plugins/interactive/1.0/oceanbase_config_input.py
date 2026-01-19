@@ -350,7 +350,7 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
     else:
         # log disk size
         log_disk_free = Capacity(
-            client.execute_command(f"df -BG {log_dir} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes * 0.9
+            client.execute_command(f"df -BG {log_dir} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes * 0.9 - slog_size - clog_size
         if log_disk_free < 2 * memory_limit:
             stdio.error(f'The disk space is not enough, please check the log_dir.(need: {str(Capacity(2 * memory_limit))}, available: {str(Capacity(log_disk_free))})')
             return plugin_context.return_false()
@@ -359,7 +359,7 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
 
         # datafile_maxsize
         data_disk_free = Capacity(client.execute_command(
-            f"df -BG {data_dir} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes * 0.9 - slog_size - clog_size
+            f"df -BG {data_dir} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes * 0.9
         if data_disk_free < 2 * memory_limit:
             stdio.error(f'The disk space is not enough, please check the data_dir.(need: {str(Capacity(2 * memory_limit))}, available: {str(Capacity(data_disk_free))})')
             return plugin_context.return_false()

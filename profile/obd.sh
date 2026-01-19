@@ -69,7 +69,7 @@ function _obd_complete_func
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev=${!#}
 
-  all_cmds["obd"]="mirror cluster seekdb test update repo demo web obdiag display-trace binlog license pwd host pref"
+  all_cmds["obd"]="mirror cluster seekdb test update repo demo web obdiag display-trace binlog license pwd host perf"
   all_cmds["obd seekdb"]="deploy start stop restart destroy display"
   all_cmds["obd seekdb *"]="_obd_reply_deploy_names"
   all_cmds["obd cluster"]="autodeploy tenant component start deploy redeploy restart reload destroy prune-config stop edit-config takeover export-to-ocp list display upgrade chst check4ocp reinstall scale_out init4env"

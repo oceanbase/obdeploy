@@ -14,7 +14,7 @@ import { Button, Empty, Space, Spin, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import DataEmpty from '../../.././/public/assets/data-empty.svg';
-import { alertManagerComponent, componentVersionTypeToComponent, configServerComponent, grafanaComponent, obagentComponent, prometheusComponent } from '../constants';
+import { alertManagerComponent, componentVersionTypeToComponent, configServerComponent, grafanaComponent, obagentComponent, obproxyCeComponent, obproxyComponent, prometheusComponent } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 const locale = getLocale();
@@ -214,10 +214,10 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
 
       if (record.component_name === obagentComponent) {
         // 取消勾选obagent，grafana和prometheus也取消掉
-        componentsToRemove = [obagentComponent, grafanaComponent, prometheusComponent];
+        componentsToRemove = [obagentComponent, grafanaComponent, prometheusComponent, alertManagerComponent];
       } else if (record.component_name === prometheusComponent) {
         // 取消勾选prometheus，grafana也取消掉，但alertmanager可以独立存在
-        componentsToRemove = [prometheusComponent, grafanaComponent];
+        componentsToRemove = [prometheusComponent, grafanaComponent, alertManagerComponent];
       } else if (record.component_name === alertManagerComponent) {
         // 取消勾选alertmanager，只取消掉自己
         componentsToRemove = [alertManagerComponent];
@@ -227,6 +227,9 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
       } else if (record.component_name === configServerComponent) {
         // 取消勾选obconfigserver，只取消掉自己
         componentsToRemove = [configServerComponent];
+      } else if (record.component_name === obproxyCeComponent || record.component_name === obproxyComponent) {
+        // 取消勾选obproxy，只取消掉自己
+        componentsToRemove = [obproxyCeComponent, obproxyComponent];
       }
 
       // 保留不在取消列表中的组件
@@ -245,20 +248,15 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
         if (!selectedConfig.includes(obagentComponent)) {
           componentsToAdd.push(obagentComponent);
         }
-      } else if (record.component_name === grafanaComponent) {
-        // 如果选择grafana，则OBAgent和prometheus自动选择
+      } else if (record.component_name === grafanaComponent || record.component_name === alertManagerComponent) {
+        // 如果选择grafana或是alertManager，则OBAgent和prometheus自动选择
         if (!selectedConfig.includes(obagentComponent)) {
           componentsToAdd.push(obagentComponent);
         }
         if (!selectedConfig.includes(prometheusComponent)) {
           componentsToAdd.push(prometheusComponent);
         }
-      } else if (record.component_name === alertManagerComponent) {
-        // 如果选择alertmanager，只选择自己，不自动选择其他组件
-        // 用户可以根据需要手动选择 Prometheus 和 OBAgent
-        // componentsToAdd 已经包含了 record.component_name，无需额外处理
       }
-
       // 添加新选择的组件和依赖组件
       setSelectedConfig([...selectedConfig, ...componentsToAdd]);
     }
@@ -449,6 +447,14 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
           </ProCard>
         </ProCard>
         <CustomFooter>
+          <Button
+            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
+          >
+            {intl.formatMessage({
+              id: 'OBD.pages.ComponentDeploy.DeployConfig.Exit',
+              defaultMessage: '退出',
+            })}
+          </Button>
           <Button onClick={preStep}>
             {intl.formatMessage({
               id: 'OBD.pages.ComponentDeploy.DeployConfig.PreviousStep',
@@ -463,14 +469,6 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
             {intl.formatMessage({
               id: 'OBD.pages.ComponentDeploy.DeployConfig.NextStep',
               defaultMessage: '下一步',
-            })}
-          </Button>
-          <Button
-            onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
-          >
-            {intl.formatMessage({
-              id: 'OBD.pages.ComponentDeploy.DeployConfig.Exit',
-              defaultMessage: '退出',
             })}
           </Button>
         </CustomFooter>

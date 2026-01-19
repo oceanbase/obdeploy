@@ -747,7 +747,7 @@ class DeploymentHandler(BaseHandler):
             if self.obd.run_workflow(obshell_dashboard_workflows, repositories=[ob_repository]):
                 dashboard_info = self.obd.get_namespace(ob_repository.name).get_return('obshell_dashboard').get_return('obshell_dashboard')
                 if dashboard_info:
-                    obshell_dashboard_info = ConnectionInfo(component='obshell_dashboard', access_url=dashboard_info, user='', password='', connect_url='')
+                    obshell_dashboard_info = ConnectionInfo(component='obshell Dashboard', access_url=dashboard_info, user='', password='', connect_url='')
         pwd_rege = r"-p'[^']*'\s*"
         if self.context["connection_info"][name] is not None:
             log.get_logger().info("get deployment {0} connection info from context".format(name))

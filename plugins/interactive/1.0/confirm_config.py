@@ -59,6 +59,7 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
 
 
     if tenant_config:
+        tenant_opt = plugin_context.get_return('tenant_config_input').get_return('tenant_opt')
         tenant_name = tenant_config['tenant_name']
         tenant_cpu = tenant_config['max_cpu']
         tenant_memory = tenant_config['memory_size']
@@ -76,7 +77,8 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
         stdio.print(f'mode: {mode}')
         stdio.print(f'time zone: {time_zone}')
         stdio.print(f'charset: {charset}')
-        stdio.print(f'collate: {collate}')
+        if getattr(tenant_opt, 'mode') == 'mysql':
+            stdio.print(f'collate: {collate}')
         stdio.print(f'optimize: {optimize}')
         stdio.print(f'variables: {variables}')
 

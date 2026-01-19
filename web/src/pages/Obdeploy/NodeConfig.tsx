@@ -72,7 +72,11 @@ interface FormValues extends API.Components {
   home_path?: string;
 }
 
-export default function NodeConfig() {
+export default function NodeConfig({
+  deployMode,
+}: {
+  deployMode: string,
+}) {
   const {
     selectedConfig,
     setCurrentStep,
@@ -111,14 +115,20 @@ export default function NodeConfig() {
   }, [alertmanager?.servers]);
 
   // 当前 OB 环境是否为单机版
-  const standAlone = oceanbase?.component === 'oceanbase-standalone';
+  const standAlone = deployMode === 'standalone';
 
   const initDBConfigData = oceanbase?.topology?.length
-    ? oceanbase?.topology?.map((item: API.Zone, index: number) => ({
-      id: (Date.now() + index).toString(),
-      ...item,
-      servers: item?.servers?.map((server) => server?.ip),
-    }))
+    ? (() => {
+      // 单机版模式下，如果 topology 大于 1，只取第一条
+      const topologyData = standAlone && oceanbase.topology.length > 1
+        ? [oceanbase.topology[0]]
+        : oceanbase.topology;
+      return topologyData.map((item: API.Zone, index: number) => ({
+        id: (Date.now() + index).toString(),
+        ...item,
+        servers: item?.servers?.map((server) => server?.ip),
+      }));
+    })()
     : [];
 
   const homePathSuffix = `/${oceanbase.appname}`;
@@ -134,14 +144,19 @@ export default function NodeConfig() {
   );
 
   useEffect(() => {
-    const init = oceanbase?.topology?.map((item: API.Zone, index: number) => ({
+    // 单机版模式下，如果 topology 大于 1，只取第一条
+    const topologyData = standAlone && oceanbase?.topology?.length > 1
+      ? [oceanbase.topology[0]]
+      : oceanbase?.topology || [];
+
+    const init = topologyData.map((item: API.Zone, index: number) => ({
       id: (Date.now() + index).toString(),
       ...item,
       servers: item?.servers?.map((server) => server?.ip),
     }));
 
     if (
-      oceanbase?.topology?.length &&
+      topologyData.length &&
       init?.every((item) => item.servers.length > 0)
     ) {
       setDBConfigData(init);
@@ -670,31 +685,6 @@ export default function NodeConfig() {
         }),
       ),
     );
-  };
-
-  const ocpServersValidator = (_: any, value: string[]) => {
-    if (value?.length > 1) {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.OnlyOneNodeCanBe',
-            defaultMessage: '仅可选择或输入一个节点',
-          }),
-        ),
-      );
-    }
-    if (value?.some((item) => !validator.isIP(item))) {
-      return Promise.reject(
-        new Error(
-          intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.SelectTheCorrectNode',
-            defaultMessage: '请选择正确的节点',
-          }),
-        ),
-      );
-    } else {
-      return Promise.resolve();
-    }
   };
 
   const columns: ProColumns<API.DBConfig>[] = [
@@ -1571,6 +1561,21 @@ export default function NodeConfig() {
         <footer className={styles.pageFooterContainer}>
           <div className={styles.pageFooter}>
             <Space className={styles.foolterAction}>
+              <Button
+                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+                data-aspm-click="c307506.d317278"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationExit',
+                  defaultMessage: '节点配置-退出',
+                })}
+                data-aspm-param={``}
+                data-aspm-expo
+              >
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.Exit',
+                  defaultMessage: '退出',
+                })}
+              </Button>
               <Tooltip
                 title={intl.formatMessage({
                   id: 'OBD.pages.components.NodeConfig.TheCurrentPageConfigurationHas',
@@ -1609,21 +1614,7 @@ export default function NodeConfig() {
                   defaultMessage: '下一步',
                 })}
               </Button>
-              <Button
-                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-                data-aspm-click="c307506.d317278"
-                data-aspm-desc={intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationExit',
-                  defaultMessage: '节点配置-退出',
-                })}
-                data-aspm-param={``}
-                data-aspm-expo
-              >
-                {intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.Exit',
-                  defaultMessage: '退出',
-                })}
-              </Button>
+
             </Space>
           </div>
         </footer>

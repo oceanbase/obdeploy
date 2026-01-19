@@ -54,6 +54,7 @@ const InstallResult: React.FC<InstallResultProps> = ({
   type,
   setCurrent,
   current,
+  taskId,
   ...restProps
 }) => {
   let isHaveMetadb = 'install';
@@ -72,7 +73,7 @@ const InstallResult: React.FC<InstallResultProps> = ({
       },
     },
   );
-  const { logData, setInstallStatus, setInstallResult } =
+  const { logData, setInstallStatus, setInstallResult, setLogData, isReinstall } =
     useModel('ocpInstallData');
   const [openLog, setOpenLog] = useState(
     installResult === 'FAILED' ? true : false,
@@ -80,6 +81,23 @@ const InstallResult: React.FC<InstallResultProps> = ({
   const { setIsReinstall, connectId, setInstallTaskId } =
     useModel('ocpInstallData');
   const upgraadeHosts = upgraadeAgentHosts?.data || {};
+
+  // 获取日志的 API
+  const getInstallTaskLogFn =
+    type === 'update' ? OCP.getOcpUpgradeTaskLog : OCP.getOcpInstallTaskLog;
+  const getReinstallTaskLogFn = OCP.getOcpReinstallTaskLog;
+  const getTaskLogFn = isReinstall ? getReinstallTaskLogFn : getInstallTaskLogFn;
+
+  // 获取日志
+  const { run: getInstallTaskLog } = useRequest(getTaskLogFn, {
+    manual: true,
+    onSuccess: ({ success, data }: API.OBResponseInstallLog_) => {
+      if (success) setLogData(data || {});
+    },
+    onError: () => {
+      // 静默处理错误
+    },
+  });
 
   // 重装ocp
   const {
@@ -145,27 +163,54 @@ const InstallResult: React.FC<InstallResultProps> = ({
     }
   }, [type, installStatus, installResult]);
 
+  // 当部署失败且日志为空时，尝试获取一次日志
+  useEffect(() => {
+    if (
+      installResult === 'FAILED' &&
+      installStatus === 'FINISHED' &&
+      (!logData?.log || logData?.log === '') &&
+      taskId &&
+      connectId
+    ) {
+      if (type === 'update') {
+        // 对于 update 类型，需要 cluster_name，这里暂时不处理
+        // 因为 update 场景下可能没有 cluster_name
+      } else if (connectId) {
+        getInstallTaskLog({ id: connectId, task_id: taskId });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [installResult, installStatus, taskId, connectId, type]);
+
   const { components = {} } = ocpConfigData;
   const { oceanbase = {} } = components;
 
   // 上报遥测数据
   const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
     manual: true,
+    throwOnError: false,
+    onError: () => {
+      // 静默处理错误，不显示错误信息
+    },
   });
 
   useRequest(OCP.getTelemetryData, {
     ready: !!oceanbase?.appname,
+    throwOnError: false,
     defaultParams: [
       {
         name: oceanbase?.appname,
       },
     ],
     onSuccess: (res) => {
-      const data = res?.data;
-
-      if (!isEmpty(res?.data)) {
+      // 即使 success 为 false 也不显示错误，静默处理
+      if (res?.success && !isEmpty(res?.data)) {
+        const data = res?.data;
         telemetryReport({ component: 'obd', content: data?.data });
       }
+    },
+    onError: () => {
+      // 静默处理错误，不显示错误信息
     },
   });
 
@@ -193,7 +238,6 @@ const InstallResult: React.FC<InstallResultProps> = ({
       },
     },
   ];
-
   return (
     <div
       style={{
@@ -454,11 +498,7 @@ const InstallResult: React.FC<InstallResultProps> = ({
                   })}
 
                   <a target="_blank" href={RELEASE_RECORD}>
-                    {' '}
-                    {intl.formatMessage({
-                      id: 'OBD.component.InstallResult.OcpReleaseRecords',
-                      defaultMessage: 'OCP 发布记录',
-                    })}{' '}
+                    OCP 发布记录
                   </a>
                   {intl.formatMessage({
                     id: 'OBD.component.InstallResult.LearnMoreAboutTheNew',
@@ -667,6 +707,7 @@ const InstallResult: React.FC<InstallResultProps> = ({
           </Button>
         ) : (
           <>
+            <ExitBtn />
             <Button
               loading={destroyOCPLoading}
               onClick={() => {
@@ -711,7 +752,6 @@ const InstallResult: React.FC<InstallResultProps> = ({
                 defaultMessage: '重新部署',
               })}
             </Button>
-            <ExitBtn />
           </>
         )}
       </CustomFooter>

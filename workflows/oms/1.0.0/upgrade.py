@@ -19,5 +19,5 @@ from const import STAGE_FIRST
 
 
 def upgrade(plugin_context, workflow, *args, **kwargs):
-    workflow.add(STAGE_FIRST, 'upgrade_pre', 'generate_oms_config', 'health_check')
+    workflow.add(STAGE_FIRST, 'meta_backup', 'upgrade_pre', 'generate_oms_config', 'health_check')
     return plugin_context.return_true()

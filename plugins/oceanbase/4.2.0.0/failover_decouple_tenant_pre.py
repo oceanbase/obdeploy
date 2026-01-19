@@ -48,12 +48,15 @@ def failover_decouple_tenant_pre(plugin_context, cursors={}, *args, **kwargs):
         return False
     # role check
     stdio.start_loading('Check tenant')
-    sql = "select TENANT_ID, TENANT_ROLE, TENANT_TYPE, STATUS from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
+    sql = "select TENANT_ID, TENANT_ROLE, TENANT_TYPE, STATUS, COMPATIBILITY_MODE from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
     standby_info_res = standby_cursor.fetchone(sql, (standby_tenant, ), raise_exception=True)
     if not standby_info_res:
         stdio.error("Tenant:{} not exists in deployment:{}".format(standby_tenant, standby_deploy_name))
         stdio.stop_loading('fail')
         return
+    
+    plugin_context.set_variable('tenant_mode', standby_info_res['COMPATIBILITY_MODE'])
+
     if standby_info_res['TENANT_ROLE'] != 'STANDBY':
         stdio.error("Standby tenant {}:{}'s role is invalid, Expect: USER , Current:{}.".format(standby_deploy_name, standby_tenant, standby_info_res['TENANT_ROLE']))
         stdio.stop_loading('fail')

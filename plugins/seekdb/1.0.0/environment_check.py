@@ -150,7 +150,7 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
         if not client.execute_command("systemctl status dbus"):
             critical(server, 'auto start', err.EC_OBSERVER_AUTO_START_DBUS_ENV.format(service=server), [err.SUG_CHANGE_SERVER.format()])
         if contains_duplicate_nodes(cluster_config.servers):
-            critical(server, 'auto start', 'Multiple observer nodes on the same server are not supported by the auto start feature', [err.SUG_CHANGE_SERVER.format()])
+            critical(server, 'auto start', 'Multiple seekdb nodes on the same server are not supported by the auto start feature', [err.SUG_CHANGE_SERVER.format()])
 
     if success:
         for ip in servers_net_interface:

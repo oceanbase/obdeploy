@@ -28,7 +28,7 @@ def status(plugin_context, *args, **kwargs):
         if 'home_path' not in server_config:
             stdio.print('%s home_path is empty', server)
             continue
-        remote_pid_path = '%s/run/observer.pid' % server_config['home_path']
+        remote_pid_path = '%s/run/seekdb.pid' % server_config['home_path']
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
             cluster_status[server] = 1

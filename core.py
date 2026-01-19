@@ -144,7 +144,7 @@ class ObdHome(object):
     def set_docker_repositories(self):
         docker_repositories = []
         for repository in self.repositories:
-            if self.deploy:
+            if self.deploy and repository.name in self.deploy.deploy_config.components:
                 config = self.deploy.deploy_config.components[repository.name]
                 if config.docker_install:
                     docker_repositories.append(repository)
@@ -181,7 +181,8 @@ class ObdHome(object):
 
     def set_repositories(self, repositories):
         self.repositories = repositories
-        self.set_docker_repositories()
+        if self.repositories:
+            self.set_docker_repositories()
 
     def set_cmds(self, cmds):
         self.cmds = cmds
@@ -631,7 +632,7 @@ class ObdHome(object):
                 else:
                     pkgs.append(pkg)
             else:
-                if not config.docker_install:
+                if not any([config.docker_install, config.docker_compose_install]):
                     pkg_name = [component]
                     if config.version:
                         pkg_name.append("version: %s" % config.version)
@@ -648,7 +649,7 @@ class ObdHome(object):
                 else:
                     repository = self.repository_manager.get_repository_allow_shadow(component, config.version)
                     self.set_repositories([repository])
-                    if self.deploy:
+                    if self.deploy and repository.name in self.deploy.deploy_config.components.keys():
                         workflow = self.get_workflows('check_docker_image', repositories=[repository])
                         if not self.run_workflow(workflow, repositories=[repository]):
                             errors.append('%s: docker component check failed.' % component)
@@ -915,7 +916,7 @@ class ObdHome(object):
 
             for component_name in param_plugins:
                 deploy_config.components[component_name].update_temp_conf(param_plugins[component_name].params)
-            if deploy.deploy_info.status != DeployStatus.STATUS_DESTROYED:
+            if deploy and deploy.deploy_info.status != DeployStatus.STATUS_DESTROYED:
                 for component_name in deploy_config.components:
                     new_cluster_config = deploy_config.components[component_name]
                     old_cluster_config = deploy.deploy_config.components[component_name]
@@ -923,6 +924,8 @@ class ObdHome(object):
                         for server in new_cluster_config.servers:
                             new_read_only_items = new_cluster_config.get_read_only_items(server)
                             old_read_only_items = old_cluster_config.get_read_only_items(server)
+                            if new_read_only_items is None or old_read_only_items is None:
+                                continue
                             diff_need_redeploy_keys = [key for key in
                                                        list(set(new_read_only_items) | set(old_read_only_items)) if
                                                        new_read_only_items.get(key, '') != old_read_only_items.get(key, '')]
@@ -991,9 +994,10 @@ class ObdHome(object):
                 return True
 
             if is_deployed and config_status != DeployConfigStatus.NEED_REDEPLOY:
-                if is_started:
+                if is_started or is_deployed:
                     if deploy.deploy_config.user.username != deploy_config.user.username:
-                        config_status = DeployConfigStatus.NEED_RESTART
+                        config_status = DeployConfigStatus.NEED_REDEPLOY
+                if is_started:
                     errors = []
                     for component_name in param_plugins:
                         if component_name in chang_component_names:
@@ -1150,14 +1154,18 @@ class ObdHome(object):
 
     def get_install_plugin_and_install(self, repositories, pkgs):
         # Check if the component contains the installation plugins
+        docker_compose_repositories = []
         docker_repositories = []
         for repository in repositories:
-            config = self.deploy.deploy_config.components[repository.name]
-            if config.docker_install:
+            config = self.deploy.deploy_config.components.get(repository.name)
+            if config and config.docker_install:
                 docker_repositories.append(repository)
+            if config and config.docker_compose_install:
+                docker_compose_repositories.append(repository)
+        ignore_install_plugins_repositories = docker_repositories + docker_compose_repositories
         install_plugins = {}
-        if list(set(repositories).difference(set(docker_repositories))):
-            install_plugins = self.search_plugins(list(set(repositories).difference(set(docker_repositories))), PluginType.INSTALL)
+        if list(set(repositories).difference(set(ignore_install_plugins_repositories))):
+            install_plugins = self.search_plugins(list(set(repositories).difference(set(ignore_install_plugins_repositories))), PluginType.INSTALL)
             if install_plugins is None:
                 return None
         temp = self.search_plugins(pkgs, PluginType.INSTALL)
@@ -1175,6 +1183,25 @@ class ObdHome(object):
                 self._call_stdio('verbose', 'create instance repository for %s-%s' % (repository.name, repository.version))
                 new_repository = self.repository_manager.create_instance_repository(repository.name, repository.version, repository.hash)
                 new_repository.load_image(repository.version, repository.hash)
+            else:
+                new_repository = local_repo
+            repositories.remove(repository)
+            repositories.append(new_repository)
+
+        for repository in docker_compose_repositories:
+            local_repo = self.repository_manager.get_repository(repository.name, repository.version, repository.hash)
+            if not local_repo:
+                self._call_stdio('verbose', 'create instance repository for %s-%s' % (repository.name, repository.version))
+                new_repository = self.repository_manager.create_instance_repository(repository.name, repository.version, repository.hash)
+                new_repository.load_image(repository.version, repository.hash)
+                load_docker_workflows = self.get_workflows('load_dockers', repositories=[new_repository])
+                if not self.run_workflow(load_docker_workflows, repositories=[new_repository]):
+                    return None
+                image_files = self.get_namespace(repository.name).get_return('load_dockers').get_return('image_files')
+                dump_kwargs = {}
+                if image_files:
+                    dump_kwargs = {"image_files": image_files}
+                new_repository.update_info(**dump_kwargs)
             else:
                 new_repository = local_repo
             repositories.remove(repository)
@@ -1557,19 +1584,18 @@ class ObdHome(object):
         self.set_repositories(repositories)
         ssh_clients = self.get_clients(deploy_config, repositories)
 
+        if const.COMP_OB in deploy_config.components:
+            cluster_config = deploy_config.components[const.COMP_OB]
+        elif const.COMP_OB_STANDALONE in deploy_config.components:
+            cluster_config = deploy_config.components[const.COMP_OB_STANDALONE]
+        elif const.COMP_OB_CE in deploy_config.components:
+            cluster_config = deploy_config.components[const.COMP_OB_CE]
         # search and get all related plugins using a mock ocp repository
         self._call_stdio('verbose', 'get plugins by mocking an ocp repository.')
         if const.COMP_OCP_SERVER in deploy_config.components:
             mock_ocp_repository = Repository(const.COMP_OCP_SERVER, "/")
-            if const.COMP_OB in deploy_config.components:
-                cluster_config = deploy_config.components[const.COMP_OB]
-            elif const.COMP_OB_STANDALONE in deploy_config.components:
-                cluster_config = deploy_config.components[const.COMP_OB_STANDALONE]
-            elif const.COMP_OB_CE in deploy_config.components:
-                cluster_config = deploy_config.components[const.COMP_OB_CE]
         else:
             mock_ocp_repository = Repository(const.COMP_OCP_SERVER_CE, "/")
-            cluster_config = deploy_config.components[const.COMP_OB_CE]
             # search and install oceanbase-ce-utils, just log warning when failed since it can be installed after takeover
             repositories_utils_map = self.get_repositories_utils(repositories)
             if not repositories_utils_map:
@@ -1878,6 +1904,12 @@ class ObdHome(object):
             if not deploy_config.components[component_name].servers:
                 self._call_stdio('error', '%s\'s servers list is empty.' % component_name)
                 return False
+            elif len(deploy_config.components[component_name].servers) > 1 and component_name in const.SINGLE_SERVER_COMPONENTS:
+                self._call_stdio('error', '%s\'s servers list is more than 1, but it only support one server.' % component_name)
+                return False
+            elif component_name == const.COMP_PRAG and deploy_config.components[component_name].servers[0].ip == '127.0.0.1':
+                self._call_stdio('error', '%s：The IP address cannot be 127.0.0.1; please use the network interface IP instead.' % component_name)
+                return False
 
         install_mode = COMMAND_ENV.get(ENV_REPO_INSTALL_MODE)
         if not install_mode:
@@ -1897,7 +1929,7 @@ class ObdHome(object):
 
         # Check the best suitable mirror for the components and installation plugins. Install locally
         repositories, install_plugins = self.search_components_from_mirrors_and_install(deploy_config)
-        if not repositories:
+        if not repositories or install_plugins is None:
             return False
         self.set_repositories(repositories)
 
@@ -1946,6 +1978,17 @@ class ObdHome(object):
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
         self._call_stdio('stop_loading', 'succeed')
+
+        # version check
+        for repository in repositories:
+            if repository.name in const.COMPS_OB and const.COMP_PRAG in [repo.name for repo in repositories]:
+                if repository.version < Version('4.3.5.1') or repository.version >= Version('4.4.0.0'):
+                    self._call_stdio('error', 'The OceanBase version must be between 4.3.5.1 and 4.4.0.0 (inclusive).')
+                    return False
+            if repository.name == const.COMP_MAAS:
+                if repository.version < Version('1.3.0'):
+                    self._call_stdio('error', '%s: The version of MAAS must be 1.3.0 or above' % repository.name)
+                    return False
 
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
@@ -2109,6 +2152,7 @@ class ObdHome(object):
         if not self.run_workflow(workflows):
             return False
         setattr(self.options, 'skip_cluster_status_check', True)
+        setattr(self.options, 'with_parameter', True)
 
         deploy_config = deploy.deploy_config
         deploy_config.set_undumpable()
@@ -2119,7 +2163,7 @@ class ObdHome(object):
         components = deploy_config.changed_components
         self._call_stdio('start_loading', 'Get local repositories and plugins')
         repositories, install_plugins = self.search_components_from_mirrors_and_install(deploy_config, components=components)
-        if not install_plugins:
+        if not install_plugins or install_plugins is None:
             return False
         self.search_param_plugin_and_apply(repositories, deploy_config)
         self._call_stdio('stop_loading', 'succeed')
@@ -2201,6 +2245,7 @@ class ObdHome(object):
         if not self.run_workflow(workflows):
             return False
         setattr(self.options, 'skip_cluster_status_check', True)
+        setattr(self.options, 'with_parameter', True)
 
         deploy_config.set_undumpable()
         if not deploy_config.add_components(config_path):
@@ -2363,8 +2408,8 @@ class ObdHome(object):
         if deploy_info.config_status == DeployConfigStatus.NEED_REDEPLOY:
             self._call_stdio('error', 'Deploy needs redeploy')
             return False
-        if deploy_info.config_status != DeployConfigStatus.UNCHNAGE and deploy_info.status != DeployStatus.STATUS_STOPPED and not getattr(self.options, 'without_parameter', False):
-            self._call_stdio('error', 'Deploy %s.%s\nIf you still need to start the cluster, use the `obd cluster start %s --wop` option to start the cluster without loading parameters. ' % (deploy_info.config_status.value, deploy.effect_tip(), name))
+        if deploy_info.config_status != DeployConfigStatus.UNCHNAGE and deploy_info.status != DeployStatus.STATUS_STOPPED and getattr(self.options, 'with_parameter', False):
+            self._call_stdio('error', 'Deploy %s.%s\nIf you still need to start the cluster, use the `obd cluster start %s ` option to start the cluster without loading parameters. ' % (deploy_info.config_status.value, deploy.effect_tip(), name))
             return False
 
         self._call_stdio('start_loading', 'Get local repositories')
@@ -2380,6 +2425,9 @@ class ObdHome(object):
         deploy_config = deploy.deploy_config
         deploy_info = deploy.deploy_info
         name = deploy.name
+
+        if deploy_info.status == DeployStatus.STATUS_DEPLOYED:
+            setattr(self.options, 'with_parameter', True)
 
         update_deploy_status = True
         components = getattr(self.options, 'components', '')
@@ -2421,6 +2469,7 @@ class ObdHome(object):
         first_start = False
         if deploy_info.status == DeployStatus.STATUS_DEPLOYED:
             first_start = True
+        setattr(self.options, 'first_start', first_start)
         start_check_args = {}
         for repo in repositories:
             if repo.name in const.COMPS_OMS:
@@ -2512,7 +2561,7 @@ class ObdHome(object):
         if tenant_config:
             create_tenant_options.append(tenant_config)
 
-        workflows = self.get_workflows('create_tenant', no_found_act='ignore')
+        workflows = self.get_workflows('create_tenant', no_found_act='ignore', **{"create_tenant_options": create_tenant_options})
         if not self.run_workflow(workflows, no_found_act='ignore', **{ob_repository.name: {"create_tenant_options": create_tenant_options}}):
             return False
         return True
@@ -2561,6 +2610,11 @@ class ObdHome(object):
         if standby_type not in [SERVICE_MODE, LOCATION_MODE]:
             self._call_stdio('error', "The value of type must be 'SERVICE' or 'LOCATION' and cannot be other values")
             return False
+        if standby_type == LOCATION_MODE:
+            for repository in standby_repositories:
+                if repository.name == const.COMP_OB:
+                    self._call_stdio('error', "Only oceanbase-standalone or oceanbase-ce are allowed to create archive-based standalone tenants.")
+                    return False   
 
         workflows = self.get_workflows('create_standby_tenant', no_found_act='ignore')
         if not self.run_workflow(workflows, no_found_act='ignore'):
@@ -2774,7 +2828,7 @@ class ObdHome(object):
             sub_io = None
             if getattr(self.stdio, 'sub_io'):
                 sub_io = self.stdio.sub_io(msg_lv=MsgLevel.ERROR)
-            obd = self.fork(options=Values({'without_parameter': True}), stdio=sub_io)
+            obd = self.fork(stdio=sub_io)
             if not obd._start_cluster(deploy, repositories):
                 if self.stdio:
                     self._call_stdio('error', err.EC_SOME_SERVER_STOPED.format())
@@ -2865,7 +2919,7 @@ class ObdHome(object):
         self._call_stdio('stop_loading', 'succeed')
         return self._stop_cluster(deploy, repositories)
 
-    def _stop_cluster(self, deploy, repositories, dump=True):
+    def _stop_cluster(self, deploy, repositories, dump=True, skip_compaction=False):
         self._call_stdio('verbose', 'Get deploy config')
         deploy_config = deploy.deploy_config
         deploy_info = deploy.deploy_info
@@ -2908,7 +2962,7 @@ class ObdHome(object):
 
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
-        workflows = self.get_workflows('stop')
+        workflows = self.get_workflows('stop', **{'skip_compaction':skip_compaction})
         if not self.run_workflow(workflows, sorted_components=components):
             return False
 
@@ -2960,7 +3014,7 @@ class ObdHome(object):
         self._call_stdio('start_loading', 'Load cluster param plugin')
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
-        if getattr(self.options, 'without_parameter', False) is False and deploy_info.config_status != DeployConfigStatus.UNCHNAGE:
+        if getattr(self.options, 'with_parameter', False) is True and deploy_info.config_status != DeployConfigStatus.UNCHNAGE:
             apply_change = True
             new_deploy_config = deploy.temp_deploy_config
             self.search_param_plugin_and_apply(repositories, new_deploy_config)
@@ -3022,7 +3076,7 @@ class ObdHome(object):
             sub_io = None
             if getattr(self.stdio, 'sub_io'):
                 sub_io = self.stdio.sub_io(msg_lv=MsgLevel.ERROR)
-            obd = self.fork(options=Values({'without_parameter': True}), stdio=sub_io)
+            obd = self.fork(stdio=sub_io)
             if not obd._start_cluster(deploy, repositories):
                 if self.stdio:
                     self._call_stdio('error', err.EC_SOME_SERVER_STOPED.format())
@@ -3116,7 +3170,7 @@ class ObdHome(object):
         self._call_stdio('verbose', 'Check deploy status')
         if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
             obd = self.fork(options=Values({'force': True}))
-            if not obd._stop_cluster(deploy, repositories):
+            if not obd._stop_cluster(deploy, repositories, skip_compaction=True):
                 return False
         elif deploy_info.status not in [DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_DEPLOYED]:
             self._call_stdio('error', 'Deploy "%s" is %s. You could not destroy an undeployed cluster' % (
@@ -3134,7 +3188,7 @@ class ObdHome(object):
             self._call_stdio('verbose', 'Get deploy configuration')
             deploy_config = deploy.deploy_config
             repositories, install_plugins = self.search_components_from_mirrors_and_install(deploy_config)
-            if not repositories:
+            if not repositories or install_plugins is None:
                 return False
             self.set_repositories(repositories)
             install_repositories = list(set(repositories).difference(set(self.docker_repositories)))
@@ -3189,7 +3243,7 @@ class ObdHome(object):
             return True
         elif deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
             obd = self.fork(options=Values({'force': True}))
-            if not obd._stop_cluster(deploy, repositories):
+            if not obd._stop_cluster(deploy, repositories, skip_compaction=True):
                 return False
         elif deploy_info.status not in [DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_DEPLOYED]:
             self._call_stdio('error', 'Deploy "%s" is %s. You could not destroy an undeployed cluster' % (name, deploy_info.status.value))
@@ -3215,7 +3269,7 @@ class ObdHome(object):
                 self._call_stdio('verbose', 'Try to stop cluster')
                 status = deploy.deploy_info.status
                 deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
-                if not self._stop_cluster(deploy, repositories):
+                if not self._stop_cluster(deploy, repositories, skip_compaction=True):
                     deploy.update_deploy_status(status)
                     self._call_stdio('error', 'Fail to stop cluster')
                     return False
@@ -3358,7 +3412,6 @@ class ObdHome(object):
 
         # start cluster if needed
         if need_restart and deploy_info.status == DeployStatus.STATUS_RUNNING:
-            setattr(self.options, 'without_parameter', True)
             obd = self.fork(options=self.options)
             workflow = obd.get_workflows('reinstall', repositories=[current_repository])
             if not obd.run_workflow(workflow, repositories=[current_repository]) and getattr(self.options, 'force', False) is False:
@@ -3370,7 +3423,7 @@ class ObdHome(object):
             deploy.update_component_repository(dest_repository)
         return True
 
-    def upgrade_cluster(self, name, upgrade_mode, component_kwargs=None):
+    def upgrade_cluster(self, name, upgrade_mode, comp_kwargs=None, web=False):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
         self.set_deploy(deploy)
@@ -3443,15 +3496,12 @@ class ObdHome(object):
                 if not image_name:
                     self._call_stdio('error', 'please use `--image-name` to specify the image name')
                     return False
-                check_image_workflows = self.get_workflows('check_docker_image', [current_repository])
                 image_name = image_name + ':' + version
-                if not self.run_workflow(check_image_workflows, **{current_repository.name: {"image_name": image_name}}):
-                    self._call_stdio('error', 'No such docker image %s' % image_name)
-                    return False
                 repository = self.repository_manager.get_repository_allow_shadow(component, version)
                 self.set_repositories([repository])
                 workflow = self.get_workflows('check_docker_image', repositories=[repository])
-                if not self.run_workflow(workflow, repositories=[repository]):
+                if not self.run_workflow(workflow, repositories=[repository], **{current_repository.name: {"image_name": image_name}}):
+                    self._call_stdio('error', 'No such docker image %s' % image_name)
                     return False
                 image_hash = self.get_namespace(repository.name).get_return('image_check').get_return('image_hash')
                 repository.set_version(getattr(self.options, 'tag'))
@@ -3599,6 +3649,7 @@ class ObdHome(object):
                     current_repository=current_repository,
                     upgrade_repositories=upgrade_repositories,
                     route=route,
+                    java_check=java_check,
                 ):
                     return False
 
@@ -3619,7 +3670,7 @@ class ObdHome(object):
                     title='Packages Will Be Used'
                 )
 
-            if not self._call_stdio('confirm', 'If you use a non-official release, we cannot guarantee a successful upgrade or technical support when you fail. Make sure that you want to use the above package to upgrade.'):
+            if not web and not self._call_stdio('confirm', 'If you use a non-official release, we cannot guarantee a successful upgrade or technical support when you fail. Make sure that you want to use the above package to upgrade.'):
                 return False
 
             index = 1
@@ -3660,7 +3711,7 @@ class ObdHome(object):
             signal.signal(signal.SIGINT, signal.SIG_DFL)
             raise KeyboardInterrupt
 
-        signal.signal(signal.SIGINT, signal_handler)
+        not web and signal.signal(signal.SIGINT, signal_handler)
 
         while upgrade_ctx['index'] < n:
             repository = upgrade_repositories[upgrade_ctx['index']]
@@ -3680,7 +3731,7 @@ class ObdHome(object):
                 "run_workflow": self.run_workflow,
                 "get_workflows": self.get_workflows,
                 "upgrade_mode": upgrade_mode,
-                "component_kwargs": component_kwargs,
+                "comp_kwargs": comp_kwargs,
             }}
             ret = self.run_workflow(upgrade_workflows, repositories=[repository], **component_kwargs)
             deploy.update_upgrade_ctx(**upgrade_ctx)
@@ -3866,7 +3917,7 @@ class ObdHome(object):
             stdio = None
         obd = ObdHome(self.home_path, self.dev_mode, stdio=stdio)
         obd.lock_manager.set_try_times(-1)
-        obd.set_options(Values({'components': ','.join(components), 'without_parameter': True}))
+        obd.set_options(Values({'components': ','.join(components)}))
         if obd.stop_cluster(name=deploy_name) and \
                 obd.start_cluster(name=deploy_name) and obd.display_cluster(name=deploy_name):
             self._call_stdio('stop_loading', 'succeed')
@@ -3887,7 +3938,6 @@ class ObdHome(object):
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Check deploy status')
         if fast_reboot:
-            setattr(opts, 'without_parameter', True)
             status = [DeployStatus.STATUS_DEPLOYED, DeployStatus.STATUS_RUNNING]
         else:
             status = [DeployStatus.STATUS_RUNNING]
@@ -3992,10 +4042,9 @@ class ObdHome(object):
         ret = self.run_workflow(test_workflow)
         if not ret:
             return False
-
+    
         connect_ret = self.get_namespace(target_repository.name).get_return('connect')
         cursor = connect_ret.get_return('cursor')
-
         use_snap = False
         if env['need_init'] or env['init_only']:
             if fast_reboot:

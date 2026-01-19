@@ -16,11 +16,11 @@ export default [
       },
       {
         path: 'updateWelcome',
-        component: 'OcpInstaller/Welcome',
-        name: 'ocp升级欢迎页',
+        component: 'index',
+        name: '升级欢迎页',
       },
       {
-        path: 'update',
+        path: 'updateOcp',
         component: 'OcpInstaller/Update',
         name: 'ocp升级',
         spmb: 'b71440',
@@ -66,6 +66,12 @@ export default [
         component: 'Oms',
         name: 'oms部署',
       },
+      {
+        path: 'updateOms',
+        component: 'Oms/Update',
+        name: 'oms升级',
+      },
     ],
   },
 ];
+

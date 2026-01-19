@@ -126,7 +126,7 @@ export default function ConfigInfo({
           label: 'obshell 端口',
           key: 'obshell_port',
           colSpan: 4,
-          value: obConfigInfo?.rpc_port,
+          value: obConfigInfo?.obshell_port,
         },
       ],
 
@@ -318,7 +318,14 @@ export default function ConfigInfo({
                   {userConfig.user}
                 </Text>
               </ProCard>
-              <PasswordCard password={userConfig.password} />
+
+              <ProCard
+                style={leftCardStyle}
+                title={'密码'}
+              >
+                <PasswordCard password={userConfig.password} />
+              </ProCard>
+
               <ProCard
                 title={intl.formatMessage({
                   id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.SshPort',

@@ -46,7 +46,8 @@ class EnvVariables(object):
 def start(plugin_context,  *args, **kwargs):
     global stdio
     stdio = plugin_context.stdio
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     clusters_cmd = plugin_context.get_variable('clusters_cmd')
     pid_path = plugin_context.get_variable('pid_path')

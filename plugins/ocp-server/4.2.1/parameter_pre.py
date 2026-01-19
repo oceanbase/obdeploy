@@ -108,7 +108,8 @@ def get_ocp_depend_config(cluster_config, stdio):
 
 
 def parameter_pre(plugin_context, **kwargs):
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     stdio = plugin_context.stdio
 
     env = get_ocp_depend_config(cluster_config, stdio)

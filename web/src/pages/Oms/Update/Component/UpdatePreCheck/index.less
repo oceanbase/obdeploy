@@ -1,0 +1,66 @@
+@cardBackgroundColor: #f8fafe;
+@subTitleColor: #5c6b8a;
+
+.ocpVersion {
+  float: left;
+  width: calc(50% - 66px);
+  padding: 21px 0;
+  color: #5c6b8a;
+  font-size: 16px;
+  text-align: center;
+  background-color: #ffffff;
+  border: 1px solid #cdd5e4;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  span {
+    padding-right: 8px;
+    color: #132039;
+    font-weight: 500;
+  }
+}
+.infoSubCard {
+  overflow: hidden;
+  border-radius: 8px;
+  .pwdIcon {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    color: #8592ad;
+    font-size: 17px;
+  }
+  :global {
+    .ant-pro-card .ant-pro-card-body {
+      padding-top: 4px !important;
+    }
+
+    .ant-pro-card-body,
+    .ant-pro-card-header {
+      background-color: @cardBackgroundColor !important;
+    }
+    .ant-pro-card-title {
+      color: @subTitleColor !important ;
+      font-weight: normal !important;
+      font-size: 14px !important;
+    }
+    .ant-pro-card-body {
+      color: #132039 !important;
+    }
+    .ant-pro-card-col.ant-pro-card-split-vertical {
+      border-inline-end: none !important;
+      .ant-pro-card::before {
+        position: absolute;
+        top: 50%;
+        width: 1px;
+        height: 48px;
+        background-color: #e8eaf3;
+        transform: translateY(-50%);
+        transition: #e8eaf3 0.3s;
+        content: '';
+        inset-inline-end: 0;
+      }
+    }
+  }
+}

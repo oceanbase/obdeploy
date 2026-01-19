@@ -239,6 +239,7 @@ export default function ConnectConfig({ setCurrent, current }: API.StepProp) {
         </ProForm>
       </ProCard>
       <CustomFooter>
+        <ExitBtn />
         <Button onClick={prevStep}>
           {intl.formatMessage({
             id: 'OBD.component.ConnectConfig.PreviousStep',
@@ -251,7 +252,6 @@ export default function ConnectConfig({ setCurrent, current }: API.StepProp) {
             defaultMessage: '下一步',
           })}
         </Button>
-        <ExitBtn />
       </CustomFooter>
     </Space>
   );

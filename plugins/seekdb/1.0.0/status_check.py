@@ -48,7 +48,7 @@ def status_check(plugin_context, work_dir_check=False, precheck=False, source_op
             data_dir = server_config['data_dir'] if server_config.get('data_dir') else '%s/store' % home_path
             if client.execute_command('ls %s/clog/tenant_1/' % data_dir).stdout.strip():
                 ocp_need_bootstrap = False
-            remote_pid_path = '%s/run/observer.pid' % home_path
+            remote_pid_path = '%s/run/seekdb.pid' % home_path
             remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
             if remote_pid:
                 if client.execute_command('ls /proc/%s' % remote_pid):

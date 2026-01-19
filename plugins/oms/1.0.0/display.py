@@ -58,5 +58,6 @@ def display(plugin_context, *args, **kwargs):
     stdio.print_list(regions_info, ['region', 'url', 'cm_is_default', 'nodes'],
                      lambda x: [x['region'], x['cm_url'], x['default'], x['nodes']],
                      title=cluster_config.name)
-    return plugin_context.return_true()
+    url = regions_info[0].get('cm_url')
+    return plugin_context.return_true(url=url)
 

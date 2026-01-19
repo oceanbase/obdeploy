@@ -20,7 +20,8 @@ from tool import confirm_port
 
 
 def health_check(plugin_context, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     cmd_args_map = plugin_context.get_variable('cmd_args_map')

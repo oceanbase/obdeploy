@@ -759,6 +759,18 @@
     "@antv/util" "^2.0.9"
     insert-css "^2.0.0"
 
+"@antv/g6-react-node@^1.4.8":
+  version "1.4.8"
+  resolved "https://registry.npmmirror.com/@antv/g6-react-node/-/g6-react-node-1.4.8.tgz#014547892b341982b9838b3c44798fce7b2bbace"
+  integrity sha512-kO1upIVS7ymlevvaE4W61UiZGgi/GwbK+/KYAl7c7q/v47d2RJ6yivbIRMXWQzUZ7AtTZYKpSb+SHi+CZ/WAvw==
+  dependencies:
+    "@antv/g-base" "^0.5.1"
+    "@antv/g-canvas" "^0.5.2"
+    "@antv/g6-core" "0.8.24"
+    "@types/yoga-layout" "^1.9.3"
+    react "^16.12.0"
+    yoga-layout-prebuilt "^1.10.0"
+
 "@antv/g6@^4.8.22":
   version "4.8.25"
   resolved "https://registry.npmmirror.com/@antv/g6/-/g6-4.8.25.tgz#ad9df58116f07b754860dfa8f8ba7df842f126be"
@@ -2786,6 +2798,16 @@
   integrity sha512-WpxBCKWPLr4xSsHgz511rFJAM+wS28w2zEO1QDNY5zM/S8ok70NNfztH0xwhqKyaK0OHCbN98LDAZuy1ctxDkA==
   dependencies:
     "@types/yargs-parser" "*"
+
+"@types/yoga-layout@1.9.2":
+  version "1.9.2"
+  resolved "https://registry.npmmirror.com/@types/yoga-layout/-/yoga-layout-1.9.2.tgz#efaf9e991a7390dc081a0b679185979a83a9639a"
+  integrity sha512-S9q47ByT2pPvD65IvrWp7qppVMpk9WGMbVq9wbWZOHg6tnXSD4vyhao6nOSBwwfDdV2p3Kx9evA9vI+XWTfDvw==
+
+"@types/yoga-layout@^1.9.3":
+  version "1.9.7"
+  resolved "https://registry.npmmirror.com/@types/yoga-layout/-/yoga-layout-1.9.7.tgz#cb60565e69af9d132cac420a4bb94e6472847f6f"
+  integrity sha512-TlYNIa9XHCGYRqVrijiDVj72Sc4Yd9At0NYEaHm8Su94GwcsXRq5y1AhA8tZUVNXYRCNpGWuOWI4VQ+R58MgUw==
 
 "@typescript-eslint/eslint-plugin@^5.62.0":
   version "5.62.0"
@@ -11148,6 +11170,15 @@ react@18.3.1:
   dependencies:
     loose-envify "^1.1.0"
 
+react@^16.12.0:
+  version "16.14.0"
+  resolved "https://registry.npmmirror.com/react/-/react-16.14.0.tgz#94d776ddd0aaa37da3eda8fc5b6b18a4c9a3114d"
+  integrity sha512-0X2CImDkJGApiAlcf0ODKIneSwBPhqJawOa5wCtKbu7ZECrmS26NvtSILynQ66cgkT/RJ4LidJOc3bUESwmU8g==
+  dependencies:
+    loose-envify "^1.1.0"
+    object-assign "^4.1.1"
+    prop-types "^15.6.2"
+
 reactcss@^1.2.3:
   version "1.2.3"
   resolved "https://registry.npmmirror.com/reactcss/-/reactcss-1.2.3.tgz#c00013875e557b1cf0dfd9a368a1c3dab3b548dd"
@@ -13210,6 +13241,13 @@ yocto-queue@^0.1.0:
   version "0.1.0"
   resolved "https://registry.npmmirror.com/yocto-queue/-/yocto-queue-0.1.0.tgz#0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
+
+yoga-layout-prebuilt@^1.10.0:
+  version "1.10.0"
+  resolved "https://registry.npmmirror.com/yoga-layout-prebuilt/-/yoga-layout-prebuilt-1.10.0.tgz#2936fbaf4b3628ee0b3e3b1df44936d6c146faa6"
+  integrity sha512-YnOmtSbv4MTf7RGJMK0FvZ+KD8OEe/J5BNnR0GHhD8J/XcG/Qvxgszm0Un6FTHWW4uHlTgP0IztiXQnGyIR45g==
+  dependencies:
+    "@types/yoga-layout" "1.9.2"
 
 yorkie@2.0.0:
   version "2.0.0"

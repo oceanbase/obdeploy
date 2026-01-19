@@ -26,12 +26,12 @@ def start(plugin_context, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     clusters_cmd = plugin_context.get_variable('clusters_cmd')
-    stdio.start_loading('Start observer')
+    stdio.start_loading('Start seekdb')
     for server in clusters_cmd:
         environments = deepcopy(cluster_config.get_environments())
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
-        stdio.verbose('starting %s observer', server)
+        stdio.verbose('starting %s seekdb', server)
         if 'LD_LIBRARY_PATH' not in environments:
             environments['LD_LIBRARY_PATH'] = '%s/lib:' % server_config['home_path']
         with EnvVariables(environments, client):

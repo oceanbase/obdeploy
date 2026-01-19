@@ -37,7 +37,7 @@ export default function InstallProcess() {
           setInstallStatus(data?.status);
           setCurrentPage(false);
           setTimeout(() => {
-            setCurrentStep(6);
+            setCurrentStep(7);
             setErrorVisible(false);
             setErrorsList([]);
           }, 2000);

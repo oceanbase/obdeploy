@@ -83,7 +83,8 @@ def init_config_server(ocp_config_server, appname, cid, force_delete, stdio):
     return cfg_url
 
 def configserver_pre(plugin_context, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     options = plugin_context.options

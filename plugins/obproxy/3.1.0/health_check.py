@@ -63,7 +63,8 @@ def obproxyd(home_path, client, ip, port):
 
 def health_check(plugin_context, **kwargs):
     stdio = plugin_context.stdio
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     need_bootstrap = plugin_context.get_variable('need_bootstrap')
     pid_path = plugin_context.get_variable('pid_path')

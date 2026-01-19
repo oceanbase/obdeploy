@@ -1741,7 +1741,6 @@ class OcpHandler(BaseHandler):
                     log.get_logger().error("failed to deploy component: %s", repository.name)
                     raise Exception("failed to deploy component: %s", repository.name)
                 opt = Values()
-                setattr(opt, "without_parameter", True)
                 setattr(opt, "skip_password_check", True)
                 setattr(opt, "source_option", 'upgrade')
                 self.obd.set_options(opt)

@@ -154,7 +154,9 @@ export default function NodeConfig() {
           password: configData.oms_meta_password ? configData.oms_meta_password.trim() : '',
         };
         // 如果 configData 中有值，假设之前校验成功过，恢复状态为 success
-        setMetadbConnectionCheckStatus('success');
+        if (createMetadbConnectionData?.data) {
+          setMetadbConnectionCheckStatus('success');
+        }
       }
     }
 
@@ -168,8 +170,9 @@ export default function NodeConfig() {
           user: configData.tsdb_username.trim(),
           password: configData.tsdb_password ? configData.tsdb_password.trim() : '',
         };
-        // 如果 configData 中有值，假设之前校验成功过，恢复状态为 success
-        setCheckMirrorStatus('success');
+        if (connectInfluxdbResult) {
+          setCheckMirrorStatus('success');
+        }
       }
     }
   }, []); // 只在组件挂载时执行一次
@@ -229,7 +232,11 @@ export default function NodeConfig() {
   ];
 
 
-  const { run: createMetadbConnection, loading: createMetadbConnectionLoading } = useRequest(
+  const {
+    run: createMetadbConnection,
+    loading: createMetadbConnectionLoading,
+    data: createMetadbConnectionData
+  } = useRequest(
     Metadb.createMetadbConnection,
     {
       manual: true,
@@ -267,6 +274,7 @@ export default function NodeConfig() {
   const {
     run: connectInfluxdb,
     loading: connectInfluxdbLoading,
+    data: connectInfluxdbData,
   } = useRequest(omsConnectInfluxdb, {
     onSuccess: ({ data }) => {
       if (data?.check_result) {
@@ -288,7 +296,8 @@ export default function NodeConfig() {
     },
   });
 
-  // console.log('connectInfluxdbData', connectInfluxdbData)
+  const connectInfluxdbResult = connectInfluxdbData?.data?.check_result;
+
   const handleMetadbConnectionCheck = async () => {
     // 在函数内部获取最新的表单值
     const formValues = form.getFieldsValue();
@@ -338,10 +347,10 @@ export default function NodeConfig() {
         // 参数有变化，重置校验状态
         setMetadbConnectionCheckStatus('unchecked');
       } else {
-        // 参数没有变化，如果当前状态是 unchecked（可能是初始化），恢复为 success
+        // 参数没有变化，与当前的校验结果一致
         setMetadbConnectionCheckStatus((prevStatus) => {
           if (prevStatus === 'unchecked') {
-            return 'success';
+            return createMetadbConnectionData?.data?.check_result ? 'success' : 'fail';
           }
           return prevStatus; // 保持其他状态不变
         });
@@ -363,19 +372,22 @@ export default function NodeConfig() {
       };
 
       // 比较当前参数和上一次校验的参数，如果有变化则重置校验状态
-      if (
-        lastParams.host !== currentParams.host ||
-        lastParams.port !== currentParams.port ||
-        lastParams.user !== currentParams.user ||
-        lastParams.password !== currentParams.password
-      ) {
+      // 特别注意：password 变化时必须重置状态
+      const hasHostChanged = lastParams.host !== currentParams.host;
+      const hasPortChanged = lastParams.port !== currentParams.port;
+      const hasUserChanged = lastParams.user !== currentParams.user;
+      const hasPasswordChanged = (lastParams.password || '') !== (currentParams.password || '');
+
+      const hasParamChanged = hasHostChanged || hasPortChanged || hasUserChanged || hasPasswordChanged;
+
+      if (hasParamChanged) {
         // 参数有变化，重置校验状态
         setCheckMirrorStatus('unchecked');
       } else {
         // 参数没有变化，如果当前状态是 unchecked（可能是初始化），恢复为 success
         setCheckMirrorStatus((prevStatus) => {
           if (prevStatus === 'unchecked') {
-            return 'success';
+            return connectInfluxdbResult ? 'success' : 'fail';
           }
           return prevStatus; // 保持其他状态不变
         });
@@ -770,7 +782,10 @@ export default function NodeConfig() {
                     rules={[
                       {
                         required: true,
-                        message: '请输入 drc_rm_db',
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.Oms.NodeConfig.PleaseEnterDrcRmDb',
+                          defaultMessage: '请输入 drc_rm_db',
+                        }),
                       }
                     ]}
                   />
@@ -787,7 +802,10 @@ export default function NodeConfig() {
                     rules={[
                       {
                         required: true,
-                        message: '请输入 drc_cm_db',
+                        message: intl.formatMessage({
+                          id: 'OBD.pages.Oms.NodeConfig.PleaseEnterDrcCmDb',
+                          defaultMessage: '请输入 drc_cm_db',
+                        }),
                       },
                     ]}
                   />
@@ -854,11 +872,24 @@ export default function NodeConfig() {
             }
           </div>
         </ProCard>
-
-
         <footer className={styles.pageFooterContainer}>
           <div className={styles.pageFooter}>
             <Space className={styles.foolterAction}>
+              <Button
+                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+                data-aspm-click="c307506.d317278"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationExit',
+                  defaultMessage: '节点配置-退出',
+                })}
+                data-aspm-param={``}
+                data-aspm-expo
+              >
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.Exit',
+                  defaultMessage: '退出',
+                })}
+              </Button>
               <Tooltip
                 title={intl.formatMessage({
                   id: 'OBD.pages.components.NodeConfig.TheCurrentPageConfigurationHas',
@@ -899,21 +930,6 @@ export default function NodeConfig() {
                 {intl.formatMessage({
                   id: 'OBD.pages.components.NodeConfig.NextStep',
                   defaultMessage: '下一步',
-                })}
-              </Button>
-              <Button
-                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-                data-aspm-click="c307506.d317278"
-                data-aspm-desc={intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.NodeConfigurationExit',
-                  defaultMessage: '节点配置-退出',
-                })}
-                data-aspm-param={``}
-                data-aspm-expo
-              >
-                {intl.formatMessage({
-                  id: 'OBD.pages.components.NodeConfig.Exit',
-                  defaultMessage: '退出',
                 })}
               </Button>
             </Space>

@@ -19,9 +19,8 @@ export default function Steps() {
       <CheckCircleOutlined className={styles.stepIcon} />
     ) : (
       <ClockCircleOutlined
-        className={`${styles.stepIcon} ${styles.stepWaitIcon} ${
-          currentStep === key ? styles.stepCurrentIcon : ''
-        }`}
+        className={`${styles.stepIcon} ${styles.stepWaitIcon} ${currentStep === key ? styles.stepCurrentIcon : ''
+          }`}
       />
     );
   };
@@ -54,24 +53,36 @@ export default function Steps() {
       },
       {
         title: intl.formatMessage({
-          id: 'OBD.pages.components.Steps.PreCheck',
-          defaultMessage: '预检查',
+          id: 'OBD.pages.Oms.Steps.ConfigurationConfirmation',
+          defaultMessage: '配置确认',
         }),
         key: 4,
         icon: getIcon(4),
       },
       {
         title: intl.formatMessage({
-          id: 'OBD.pages.components.Steps.Deployment',
-          defaultMessage: '部署',
+          id: 'OBD.pages.components.Steps.PreCheck',
+          defaultMessage: '预检查',
         }),
         key: 5,
         icon: getIcon(5),
       },
+      {
+        title: intl.formatMessage({
+          id: 'OBD.pages.components.Steps.Deployment',
+          defaultMessage: '部署',
+        }),
+        key: 6,
+        icon: getIcon(6),
+      },
     ];
   };
 
-  const showStepsKeys = [1, 2, 3, 4, 5];
+  const showStepsKeys = [1, 2, 3, 4, 5, 6];
+
+  // 判断是否应该显示步骤条：只要 currentStep 在 showStepsKeys 的范围内就显示
+  const shouldShowSteps = currentStep >= Math.min(...showStepsKeys) &&
+    currentStep <= Math.max(...showStepsKeys);
 
   const handleScroll = () => {
     if (document.documentElement.scrollTop > 0) {
@@ -90,23 +101,24 @@ export default function Steps() {
       className={styles.stepsContainer}
       style={{ borderBottom: `${showBorder ? '1px solid #dde4ed' : '0px'}` }}
     >
-      {showStepsKeys.includes(currentStep) ? (
-        <div style={{ height: 120 }}>
-          <div className={styles.stepsContent}>
+      {shouldShowSteps ? (
+        <div style={{ height: 120, overflow: 'visible' }}>
+          <div className={styles.stepsContent} style={{ overflow: 'visible' }}>
             <div className={styles.stepsBackground}>
               <div
                 className={styles.stepsBackgroundProgress}
-                style={{ width: `${(currentStep - 1) * 25}%` }}
+                style={{
+                  width: `${((currentStep - 1) / (showStepsKeys.length - 1)) * 100}%`
+                }}
               ></div>
             </div>
-            <Space size={locale === 'zh-CN' ? 100 : 0}>
+            <Space size={locale === 'zh-CN' ? 100 : 0} wrap={false}>
               {getStepsItems().map((item) => (
                 <span className={styles.stepItem} key={item.key}>
                   {item.icon}
                   <span
-                    className={`${styles.stepTitle} ${
-                      currentStep === item.key ? styles.stepCurrentTitle : ''
-                    } ${currentStep > item.key ? styles.stepAlreadyTitle : ''}`}
+                    className={`${styles.stepTitle} ${currentStep === item.key ? styles.stepCurrentTitle : ''
+                      } ${currentStep > item.key ? styles.stepAlreadyTitle : ''}`}
                   >
                     {item.title}
                   </span>

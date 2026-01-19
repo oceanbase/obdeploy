@@ -688,6 +688,14 @@ export default function ComponentConfig() {
         ) : null}
       </Space>
       <CustomFooter>
+        <Button
+          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
+        >
+          {intl.formatMessage({
+            id: 'OBD.pages.ComponentDeploy.ComponentConfig.Exit',
+            defaultMessage: '退出',
+          })}
+        </Button>
         <Button onClick={preStep}>
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.ComponentConfig.PreviousStep',
@@ -698,14 +706,6 @@ export default function ComponentConfig() {
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.ComponentConfig.NextStep',
             defaultMessage: '下一步',
-          })}
-        </Button>
-        <Button
-          onClick={() => handleQuit(handleQuitProgress, setCurrent, false, 5)}
-        >
-          {intl.formatMessage({
-            id: 'OBD.pages.ComponentDeploy.ComponentConfig.Exit',
-            defaultMessage: '退出',
           })}
         </Button>
       </CustomFooter>

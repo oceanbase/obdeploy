@@ -782,7 +782,7 @@ class Cursor(SafeStdio):
         self.mode = mode
         self.ip = ip
         self.port = port
-        self._user = user if mode == 'mysql' else 'SYS@' + tenant
+        self._user = user if mode == 'mysql' else (user if user else 'SYS') + '@' + tenant
         self.tenant = tenant
         self.password = password
         self.cursor = None
@@ -822,7 +822,7 @@ class Cursor(SafeStdio):
             if self.mode == 'mysql':
                 self.stdio.verbose('mysql connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
                 self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password),
-                                        cursorclass=mysql.cursors.DictCursor)
+                                        cursorclass=mysql.cursors.DictCursor, charset='utf8mb4')
                 self.cursor = self.db.cursor()
             elif self.mode == 'oracle':
                 try:
@@ -869,9 +869,6 @@ class Cursor(SafeStdio):
             return None
 
     def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):
-        if self.mode == 'oracle' and args:
-            stdio.error('oracle mode not support args')
-            return False
         try:
             stdio.verbose('%s execute sql: %s. args: %s' % (self.mode, sql, args))
             if not args:
@@ -903,6 +900,10 @@ class Cursor(SafeStdio):
         if self.db:
             self.db.close()
             self.db = None
+
+    def reconnect(self):
+        self.close()
+        self._connect()
 
 
 class Exector(SafeStdio):
@@ -1168,8 +1169,10 @@ def get_sys_log_disk_size(memory_limit):
         sys_log_disk_size = 3 << 30
     elif memory_limit < 80 << 30:
         sys_log_disk_size = 4 << 30
-    else:
+    elif memory_limit < 128 << 30:
         sys_log_disk_size = 5 << 30
+    else:
+        sys_log_disk_size = int(memory_limit * 0.03) + (1 << 30)
     return sys_log_disk_size
 
 def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
@@ -1234,6 +1237,7 @@ def input_int_value(name, min_value, max_value, unit='G', default_value=None, st
 
 
 def byte_to_GB(byte):
+    aa = int(byte // (1024 * 1024 * 1024))
     return int(byte // (1024 * 1024 * 1024))
 
 
@@ -1317,6 +1321,13 @@ def get_metadb_info_from_depends_ob(cluster_config, stdio=None):
 
 def docker_run_sudo_prefix(client):
     if not client.execute_command('docker images'):
+        prefix = 'sudo '
+    else:
+        prefix = ''
+    return prefix
+
+def docker_compose_run_sudo_prefix(client):
+    if not client.execute_command('docker compose ls >/dev/null 2>&1'):
         prefix = 'sudo '
     else:
         prefix = ''

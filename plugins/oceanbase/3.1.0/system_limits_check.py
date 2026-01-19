@@ -104,7 +104,7 @@ def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict
                 cmd = 'sysctl -a'
                 ret = client.execute_command(cmd)
                 if not ret:
-                    alert_strict(server, 'kernel', err.EC_FAILED_TO_GET_PARAM.format(key='kernel parameter ', cmd=cmd), [err.SUG_CONNECT_EXCEPT.format(ip=ip)])
+                    alert_strict(server, 'kernel', err.EC_FAILED_TO_GET_PARAM.format(ip=ip, key='kernel parameter ', cmd=cmd), [err.SUG_CONNECT_EXCEPT.format()])
                     continue
                 kernel_params = {}
                 kernel_param_src = ret.stdout.split('\n')
@@ -131,10 +131,13 @@ def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict
                                 suggest = [err.SUG_SYSCTL.format(var=check_item, value=' '.join(str(i) for i in recommend) if isinstance(recommend, list) else recommend, ip=ip)]
                                 need = 'within {}'.format(needs) if needs[-1] != INF else 'greater than {}'.format(needs[0])
                                 now = '[{}]'.format(', '.join(values)) if len(values) > 1 else item_value
-                                alert_strict(server, check_item, err.EC_PARAM_NOT_IN_NEED.format(ip=ip, check_item=check_item, need=need, now=now, recommend=recommends), suggest)
+                                recommend_str = ' '.join(str(i) for i in recommends) if isinstance(recommends, (list, tuple)) else str(recommends)
+                                alert_strict(server, check_item, err.EC_PARAM_NOT_IN_NEED.format(ip=ip, check_item=check_item, need=need, now=now, recommend=recommend_str), suggest)
                                 break
                         elif item_value != need:
-                            alert_strict(server, check_item, err.EC_PARAM_NOT_IN_NEED.format(ip=ip, check_item=check_item, need=needs, recommend=recommend, now=item_value), [err.SUG_SYSCTL.format(var=check_item, value=recommend, ip=ip)])
+                            need_str = ' '.join(str(i) for i in needs) if isinstance(needs, (list, tuple)) else str(needs)
+                            recommend_str = ' '.join(str(i) for i in recommend) if isinstance(recommend, (list, tuple)) else str(recommend)
+                            alert_strict(server, check_item, err.EC_PARAM_NOT_IN_NEED.format(ip=ip, check_item=check_item, need=need_str, recommend=recommend_str, now=item_value), [err.SUG_SYSCTL.format(var=check_item, value=' '.join(str(i) for i in recommend) if isinstance(recommend, (list, tuple)) else recommend, ip=ip)])
             except:
                 stdio.exception('')
 

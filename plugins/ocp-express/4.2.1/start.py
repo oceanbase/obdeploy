@@ -23,7 +23,8 @@ from tool import FileUtil, YamlLoader, ConfigUtil
 
 
 def start(plugin_context, start_env=None, *args, **kwargs):
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     options = plugin_context.options
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -63,7 +64,7 @@ def start(plugin_context, start_env=None, *args, **kwargs):
         if pids and all([client.execute_command('ls /proc/%s' % pid) for pid in pids.split('\n')]):
             server_pid[server] = pids
             continue
-        if getattr(options, 'without_parameter', False) and bootstrap_flag:
+        if not getattr(options, 'with_parameter', False) and bootstrap_flag:
             use_parameter = False
         else:
             use_parameter = True
@@ -92,15 +93,27 @@ def start(plugin_context, start_env=None, *args, **kwargs):
             log_dir = os.path.join(home_path, 'log')
         else:
             log_dir = server_config["log_dir"]
-        server_config["logging_file_name"] = os.path.join(log_dir, 'ocp-express.log')
+
+        start_parameters = {}
+        if new_cluster_config:
+            old_config = plugin_context.cluster_config.get_server_conf_with_default(server)
+            new_config = new_cluster_config.get_server_conf_with_default(server)
+            for key in new_config:
+                param_value = new_config[key]
+                if key not in old_config or old_config[key] != param_value:
+                    start_parameters[key] = param_value
+        else:
+            start_parameters = server_config
+        if not new_cluster_config:
+            server_config["logging_file_name"] = os.path.join(log_dir, 'ocp-express.log')
         if use_parameter:
             cmd += ' --bootstrap --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
-            for key in server_config:
+            for key in start_parameters:
                 if key not in exclude_keys and key in config_mapper:
                     if key == 'logging_file_total_size_cap':
-                        cmd += ' --with-property=ocp.logging.file.total.size.cap:{}'.format(CapacityWithB(server_config[key]))
+                        cmd += ' --with-property=ocp.logging.file.total.size.cap:{}'.format(CapacityWithB(start_parameters[key]))
                         continue
-                    cmd += ' --with-property={}:{}'.format(config_mapper[key], server_config[key])
+                    cmd += ' --with-property={}:{}'.format(config_mapper[key], start_parameters[key])
         elif not bootstrap_flag:
             cmd += ' --bootstrap --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
         data = {

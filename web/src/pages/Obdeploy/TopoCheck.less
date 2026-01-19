@@ -1,0 +1,39 @@
+.topoCheckTabs {
+  :global {
+    .ant-tabs-nav {
+      margin-bottom: 0;
+      
+      &::before {
+        display: none;
+      }
+    }
+    
+    .ant-tabs-content-holder {
+      margin-top: 16px;
+      background-color: transparent;
+    }
+    
+    .ant-tabs-tabpane {
+      padding: 0;
+    }
+  }
+  
+  &.showBorder {
+    :global {
+      .ant-tabs-content-holder {
+        border: 1px solid #d9d9d9;
+        border-radius: 4px;
+        padding: 16px;
+      }
+    }
+  }
+  
+  // checkInfo tab 时不显示边框和 padding
+  &:not(.showBorder) {
+    :global {
+      .ant-tabs-content-holder {
+        padding: 0;
+      }
+    }
+  }
+}

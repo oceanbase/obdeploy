@@ -23,7 +23,7 @@ def destroy_pre(plugin_context, *args, **kwargs):
     run_path = global_config.get('run_mount_path')
     store_path = global_config.get('store_mount_path')
     if logs_path or run_path or store_path:
-        dir_list = ['logs_mount_path', 'run_mount_path', 'store_mount_path']
+        dir_list = ['logs_mount_path', 'run_mount_path', 'store_mount_path', 'config_mount_path']
     else:
         dir_list = ['mount_path']
     sudo_command = {}

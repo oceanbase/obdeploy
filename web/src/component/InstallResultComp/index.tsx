@@ -169,21 +169,29 @@ export default function InstallResultComp({
   // 上报遥测数据
   const { run: telemetryReport } = useRequest(OCP.telemetryReport, {
     manual: true,
+    throwOnError: false,
+    onError: () => {
+      // 静默处理错误，不显示错误信息
+    },
   });
 
   useRequest(OCP.getTelemetryData, {
     ready: !!name,
+    throwOnError: false,
     defaultParams: [
       {
         name,
       },
     ],
     onSuccess: (res) => {
-      const data = res?.data;
-
-      if (!isEmpty(res?.data)) {
+      // 即使 success 为 false 也不显示错误，静默处理
+      if (res?.success && !isEmpty(res?.data)) {
+        const data = res?.data;
         telemetryReport({ component: 'obd', content: data?.data });
       }
+    },
+    onError: () => {
+      // 静默处理错误，不显示错误信息
     },
   });
 
@@ -405,7 +413,10 @@ export default function InstallResultComp({
             title={
               <>
                 <div style={{ fontSize: 16, fontWeight: 600 }}>
-                  是否要退出页面？
+                  {intl.formatMessage({
+                    id: 'OBD.component.InstallResult.DoYouWantToExit',
+                    defaultMessage: '是否要退出页面？',
+                  })}
                 </div>
                 <div style={{ color: '#5c6b8a', margin: '8px 0' }}>
                   {intl.formatMessage({

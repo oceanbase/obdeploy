@@ -33,7 +33,15 @@ export default function UserCheckInfo({
           >
             {user}
           </ProCard>
-          {password ? <PasswordCard password={password} /> : null}
+          {
+            password ?
+              <ProCard
+                title={'密码'}
+              >
+                <PasswordCard password={password} />
+              </ProCard> :
+              null
+          }
         </ProCard>
       </Col>
     </ProCard>

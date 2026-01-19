@@ -165,7 +165,8 @@ def start(plugin_context, *args, **kwargs):
             stdio.exception(e)
             return False
 
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     options = plugin_context.options
@@ -203,7 +204,7 @@ def start(plugin_context, *args, **kwargs):
                 continue
 
         config_flag = os.path.join(home_path, '.configured')
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s' % config_flag):
+        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s' % config_flag):
             use_parameter = False
         else:
             use_parameter = True

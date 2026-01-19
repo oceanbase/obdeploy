@@ -333,11 +333,13 @@ class Repository(PackageInfo):
         if not self.version:
             self.set_version(version)
 
-    def _dump(self):
+    def _dump(self, **kwargs):
         data = {'version': self.version, 'hash': self.hash,
                 'release': self.release, 'arch': self.arch, 'size': self.size}
         if self.install_time:
             data['install_time'] = self.install_time
+        for k, v in kwargs.items():
+            data[k] = v
         try:
             with open(self.data_file_path, 'w') as f:
                 YamlLoader().dump(data, f)
@@ -460,6 +462,9 @@ class Repository(PackageInfo):
         os.symlink(self.repository_dir, dst_dir)
         self.install_time = time.time()
         self._dump()
+
+    def update_info(self, **kwargs):
+        self._dump(**kwargs)
 
     def clear(self):
         if os.path.exists(self.repository_dir):

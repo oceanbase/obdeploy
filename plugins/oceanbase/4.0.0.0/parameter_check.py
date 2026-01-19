@@ -100,7 +100,7 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
                     # if need is integer, it means use datafile_disk_percentage
                     disk[data_path]['need'] = int(server_config['datafile_disk_percentage'])
 
-                if 'log_disk_size' in server_config and server_config['log_disk_size'] and server_config['log_disk_size']:
+                if 'log_disk_size' in server_config and server_config['log_disk_size']:
                     # if need is string, it means use log_disk_size
                     clog_mount[clog_dir]['need'] = server_config['log_disk_size']
                 elif 'log_disk_percentage' in server_config and server_config['log_disk_percentage']:

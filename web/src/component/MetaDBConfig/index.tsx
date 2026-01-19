@@ -317,6 +317,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
         <OBProxyConfig form={form} parameterRules={parameterRules} />
       </Space>
       <CustomFooter>
+        <ExitBtn />
         <Button
           spm={intl.formatMessage({
             id: 'OBD.component.MetaDBConfig.MetadbConfigurationPreviousStep',
@@ -343,7 +344,6 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
             defaultMessage: '下一步',
           })}
         </Button>
-        <ExitBtn />
       </CustomFooter>
     </ProForm>
   );

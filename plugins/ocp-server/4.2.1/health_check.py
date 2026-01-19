@@ -32,7 +32,7 @@ def confirm_port(client, pid, port, stdio, launch_user=None):
     socket_inodes = get_port_socket_inode(client, port, stdio)
     if not socket_inodes:
         return False
-    if launch_user:
+    if launch_user and launch_user != client.config.username:
         ret = client.execute_command("""sudo su - %s -c 'ls -l /proc/%s/fd/ |grep -E "socket:\[(%s)\]"'""" % (launch_user, pid, '|'.join(socket_inodes)))
     else:
         ret = client.execute_command("ls -l /proc/%s/fd/ |grep -E 'socket:\[(%s)\]'" % (pid, '|'.join(socket_inodes)))
@@ -43,7 +43,8 @@ def confirm_port(client, pid, port, stdio, launch_user=None):
 
 def health_check(plugin_context, **kwargs):
     stdio = plugin_context.stdio
-    cluster_config = plugin_context.cluster_config
+    new_cluster_config = kwargs.get('new_cluster_config')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     server_pid = plugin_context.get_variable('server_pid')
 

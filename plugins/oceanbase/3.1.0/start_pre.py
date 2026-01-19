@@ -62,7 +62,7 @@ def construct_opts(server_config, param_list, rs_list_opt, cfg_url, cmd, need_bo
 
 
 def start_pre(plugin_context, *args, **kwargs):
-    new_cluster_config = plugin_context.get_variable('new_cluster_config')
+    new_cluster_config = kwargs.get('new_cluster_config')
     cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -91,16 +91,16 @@ def start_pre(plugin_context, *args, **kwargs):
         server_config = cluster_config.get_server_conf(server)
         home_path = server_config['home_path']
 
-        param_config = {}
+        start_parameters = {}
         if new_cluster_config:
             old_config = plugin_context.cluster_config.get_server_conf_with_default(server)
             new_config = new_cluster_config.get_server_conf_with_default(server)
             for key in new_config:
                 param_value = new_config[key]
                 if key not in old_config or old_config[key] != param_value:
-                    param_config[key] = param_value
+                    start_parameters[key] = param_value
         else:
-            param_config = server_config
+            start_parameters = server_config
 
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
@@ -115,14 +115,14 @@ def start_pre(plugin_context, *args, **kwargs):
                 continue
 
         stdio.verbose('%s start command construction' % server)
-        if getattr(options, 'without_parameter', False) and client.execute_command('ls %s/etc/observer.config.bin' % home_path):
+        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s/etc/observer.config.bin' % home_path):
             use_parameter = False
         else:
             use_parameter = True
 
         cmd = []
         if use_parameter:
-            construct_opts(server_config, param_config, rs_list_opt, cfg_url, cmd, need_bootstrap)
+            construct_opts(server_config, start_parameters, rs_list_opt, cfg_url, cmd, need_bootstrap)
         else:
             cmd.append('-p %s' % server_config['mysql_port'])
 

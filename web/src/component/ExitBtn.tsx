@@ -59,12 +59,24 @@ export default function ExitBtn() {
       }),
     },
     oms: {
-      title: '退出 OMS 部署程序',
-      content: '退出后，部署工作将被终止，请谨慎操作',
+      title: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.ExitTheOmsDeploymentProgram',
+        defaultMessage: '退出 OMS 部署程序',
+      }),
+      content: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.AfterExitingTheDeploymentWill',
+        defaultMessage: '退出后，部署工作将被终止，请谨慎操作',
+      }),
     },
     updateOms: {
-      title: '退出 OMS 升级程序',
-      content: '退出后，升级工作将被终止，请谨慎操作',
+      title: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.ExitTheOmsUpgradeProgram',
+        defaultMessage: '退出 OMS 升级程序',
+      }),
+      content: intl.formatMessage({
+        id: 'OBD.src.component.ExitBtn.AfterExitingTheUpgradeWill',
+        defaultMessage: '退出后，升级工作将被终止，请谨慎操作',
+      }),
     },
 
     install: ocpTextMap,

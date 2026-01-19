@@ -31,6 +31,7 @@ export type ConnectInfoPropType = {
       redo_dir: string;
       mysql_port: number;
       rpc_port: number;
+      obshell_port: number;
     };
     more?: any;
   };

@@ -37,7 +37,7 @@ def restart(plugin_context, workflow, *args, **kwargs):
             workflow.add_with_kwargs(const.STAGE_FIRST, {"cluster_config": cluster_config, "zone": zone}, "stop_zone", "stop")
             if new_clients:
                 workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {"new_clients": new_clients, "cluster_config": cluster_config}, 'chown_dir')
-            workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": new_cluster_config if new_cluster_config else cluster_config},
+            workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": cluster_config},
                                      'configserver_pre', 'start_pre', 'start', 'health_check')
             pre_zone = zone
         workflow.add_with_kwargs(const.STAGE_FIRST, {"cluster_config": cluster_config, "zone": pre_zone}, 'start_zone')
@@ -49,7 +49,7 @@ def restart(plugin_context, workflow, *args, **kwargs):
         workflow.add(const.STAGE_FIRST,  "stop")
         if new_clients:
             workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {"new_clients": new_clients}, 'chown_dir')
-        workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": new_cluster_config if new_cluster_config else cluster_config},
+        workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients, "new_cluster_config": new_cluster_config, "cluster_config": cluster_config},
                                  'configserver_pre', 'start_pre', 'start', 'health_check')
 
     workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": new_clients if new_clients else clients}, 'connect')

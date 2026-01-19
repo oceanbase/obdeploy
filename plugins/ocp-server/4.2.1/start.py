@@ -31,13 +31,41 @@ def append_format_parameters(original, kv):
         updated = kv
     return f"'{updated}'"
 
-def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwargs):
 
+def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwargs):
+    def generate_ocp_bootstrap_with_property(start_parameters):
+            ocp_bootstrap_with_property = ''
+            connection_propertiy_fields = {
+                "ocp_monitor_db": "ocp.monitordb.database",
+                "ocp_monitor_password": "ocp.monitordb.password",
+                "ocp_monitor_username": "ocp.monitordb.username",
+                "ocp_site_url": "ocp.site.url",
+            }
+            connection_properties = []
+            for key in start_parameters:
+                if key == 'jdbc_url' and monitor_user:
+                    ocp_monitordb_host = f"ocp.monitordb.host:{jdbc_host}"
+                    connection_properties.append(ocp_monitordb_host)
+                    ocp_monitordb_port = f"ocp.monitordb.port:{jdbc_port}"
+                    connection_properties.append(ocp_monitordb_port)
+                if key in connection_propertiy_fields:
+                    connection_properties.append("%s:%s" % (connection_propertiy_fields[key], start_parameters[key]))
+                ocp_bootstrap_with_property = append_format_parameters(ocp_bootstrap_with_property, "\n".join(connection_properties))
+                if key not in EXCLUDE_KEYS and key in CONFIG_MAPPER:
+                    if key == 'logging_file_total_size_cap':
+                        ocp_bootstrap_with_property = append_format_parameters(ocp_bootstrap_with_property, "ocp.logging.file.total.size.cap:{}".format(CapacityWithB(start_parameters[key])))
+                        continue
+                    ocp_bootstrap_with_property = append_format_parameters(ocp_bootstrap_with_property, "{}:{}".format(CONFIG_MAPPER[key], start_parameters[key]))
+
+            return ocp_bootstrap_with_property
+                
+
+
+    new_cluster_config = kwargs.get('new_cluster_config')
     EXCLUDE_KEYS = plugin_context.get_variable('EXCLUDE_KEYS')
     CONFIG_MAPPER = plugin_context.get_variable('CONFIG_MAPPER')
     start_env = plugin_context.get_variable('start_env')
-    without_parameter = plugin_context.get_variable('without_parameter')
-    cluster_config = plugin_context.cluster_config
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     options = plugin_context.options
@@ -112,45 +140,60 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
             admin_password = server_config['admin_password'].replace("'", """'"'"'""")
             environ_variable += "export OCP_INITIAL_ADMIN_PASSWORD=\'%s\'; \n" % admin_password
         OCP_BOOTSTRAP_WITH_PROPERTY = ''
-        if not without_parameter and not get_option(options, 'without_parameter', ''):
-            for key in server_config:
-                if key == 'jdbc_url' and monitor_user:
-                    monitor_password = monitor_password.replace("'", """'"'"'""")
-                    username = monitor_user + "@" + monitor_tenant + cluster_name
-                    connection_properties = [
-                        f"ocp.monitordb.database:{monitor_db}",
-                        f"ocp.monitordb.host:{jdbc_host}",
-                        f"ocp.monitordb.password:{monitor_password}",
-                        f"ocp.monitordb.port:{jdbc_port}",
-                        f"ocp.monitordb.username:{username}"
-                    ]
-                    OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "\n".join(connection_properties))
-                if key not in EXCLUDE_KEYS and key in CONFIG_MAPPER:
-                    if key == 'logging_file_total_size_cap':
-                        OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.logging.file.total.size.cap:{}".format(CapacityWithB(server_config[key])))
-                        continue
-                    OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "{}:{}".format(CONFIG_MAPPER[key], server_config[key]))
-            if site_url:
-                OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.site.url:{}".format(site_url))
-                pass
-            cmd += ' --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
-            connection_properties = [
-                "obsdk.ob.connection.mode:direct",
-                "ocp.iam.login.client.max-attempts:60",
-                "ocp.iam.login.client.lockout-minutes:1",
-                f"ocp.file.local.built-in.dir:{home_path}/ocp-server/lib",
-                f"ocp.log.download.tmp.dir:{home_path}/logs/ocp"
-            ]
-            OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "\n".join(connection_properties))
-            if soft_dir:
-                OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.file.local.dir:{}".format(soft_dir))
-            else:
-                OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.file.local.dir:{}".format(f"{home_path}/data/files"))
+        if not get_option(options, 'with_parameter', False) and client.execute_command('ls %s/.bootstrapped' % home_path):
+            use_parameter = False
+        else:
+            use_parameter = True
 
-        environ_variable += "export OCP_BOOTSTRAP_WITH_PROPERTY=%s;" % OCP_BOOTSTRAP_WITH_PROPERTY
+        if use_parameter:
+            start_parameters = {}
+            if new_cluster_config:
+                old_config = plugin_context.cluster_config.get_server_conf_with_default(server)
+                new_config = new_cluster_config.get_server_conf_with_default(server)
+                for key in new_config:
+                    param_value = new_config[key]
+                    if key not in old_config or old_config[key] != param_value:
+                        start_parameters[key] = param_value
+                OCP_BOOTSTRAP_WITH_PROPERTY = generate_ocp_bootstrap_with_property(start_parameters)
+            else:
+                for key in server_config:
+                    if key == 'jdbc_url' and monitor_user:
+                        monitor_password = monitor_password.replace("'", """'"'"'""")
+                        username = monitor_user + "@" + monitor_tenant + cluster_name
+                        connection_properties = [
+                            f"ocp.monitordb.database:{monitor_db}",
+                            f"ocp.monitordb.host:{jdbc_host}",
+                            f"ocp.monitordb.password:{monitor_password}",
+                            f"ocp.monitordb.port:{jdbc_port}",
+                            f"ocp.monitordb.username:{username}"
+                        ]
+                        OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "\n".join(connection_properties))
+                    if key not in EXCLUDE_KEYS and key in CONFIG_MAPPER:
+                        if key == 'logging_file_total_size_cap':
+                            OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.logging.file.total.size.cap:{}".format(CapacityWithB(server_config[key])))
+                            continue
+                        OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "{}:{}".format(CONFIG_MAPPER[key], server_config[key]))
+                if site_url:
+                    OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.site.url:{}".format(site_url))
+                    pass
+                connection_properties = [
+                    "obsdk.ob.connection.mode:direct",
+                    "ocp.iam.login.client.max-attempts:60",
+                    "ocp.iam.login.client.lockout-minutes:1",
+                    f"ocp.file.local.built-in.dir:{home_path}/ocp-server/lib",
+                    f"ocp.log.download.tmp.dir:{home_path}/logs/ocp"
+                ]
+                OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "\n".join(connection_properties))
+                if soft_dir:
+                    OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.file.local.dir:{}".format(soft_dir))
+                else:
+                    OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.file.local.dir:{}".format(f"{home_path}/data/files"))
+
+        cmd += ' --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
+        environ_variable += ("export OCP_BOOTSTRAP_WITH_PROPERTY=%s;" % OCP_BOOTSTRAP_WITH_PROPERTY) if OCP_BOOTSTRAP_WITH_PROPERTY else ""
         real_cmd = environ_variable + cmd
         execute_cmd = "cd {}; {} > /dev/null 2>&1 &".format(home_path, real_cmd)
-        if launch_user:
+        if launch_user and launch_user != client.config.username:
             cmd_file = os.path.join(home_path, 'cmd.sh')
             client.write_file(execute_cmd, cmd_file)
             execute_cmd = "chmod +x {0};sudo chown -R {1} {0};sudo su - {1} -c '{0}' &".format(cmd_file, launch_user)
@@ -175,5 +218,4 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
         return plugin_context.return_false()
 
     plugin_context.set_variable('server_pid', server_pid)
-    plugin_context.set_variable('without_parameter', True)
     return plugin_context.return_true(need_bootstrap=True)

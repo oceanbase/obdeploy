@@ -81,7 +81,7 @@ def stop(plugin_context, *args, **kwargs):
     appname = global_config['appname'] if 'appname' in global_config else None
     cluster_id = global_config['cluster_id'] if 'cluster_id' in global_config else None
     obconfig_url = global_config['obconfig_url'] if 'obconfig_url' in global_config else None
-    stdio.start_loading('Stop observer')
+    stdio.start_loading('Stop seekdb')
     if obconfig_url and appname and cluster_id:
         if not is_ob_configserver(obconfig_url, stdio):
             try:
@@ -99,10 +99,10 @@ def stop(plugin_context, *args, **kwargs):
         if 'home_path' not in server_config:
             stdio.verbose('%s home_path is empty', server)
             continue
-        remote_pid_path = '%s/run/observer.pid' % server_config['home_path']
+        remote_pid_path = '%s/run/seekdb.pid' % server_config['home_path']
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid and client.execute_command('ps uax | egrep " %s " | grep -v grep' % remote_pid):
-            stdio.verbose('%s observer[pid:%s] stopping ...' % (server, remote_pid))
+            stdio.verbose('%s seekdb[pid:%s] stopping ...' % (server, remote_pid))
             client.execute_command('kill -9 %s' % (remote_pid))
             servers[server] = {
                 'client': client,
@@ -111,7 +111,7 @@ def stop(plugin_context, *args, **kwargs):
                 'path': remote_pid_path
             }
         else:
-            stdio.verbose('%s observer is not running ...' % server)
+            stdio.verbose('%s seekdb is not running ...' % server)
     count = 30
     time.sleep(1)
     while count and servers:
@@ -127,7 +127,7 @@ def stop(plugin_context, *args, **kwargs):
                 data[key] = ''
             else:
                 client.execute_command('rm -f %s' % (data['path']))
-                stdio.verbose('%s observer is stopped', server)
+                stdio.verbose('%s seekdb is stopped', server)
         servers = tmp_servers
         count -= 1
         if count and servers:
@@ -137,7 +137,7 @@ def stop(plugin_context, *args, **kwargs):
                     server_config = cluster_config.get_server_conf(server)
                     client = clients[server]
                     client.execute_command(
-                        "if [[ -d /proc/%s ]]; then pkill -9 -u `whoami` -f '%s/bin/observer -p %s';fi" %
+                        "if [[ -d /proc/%s ]]; then pkill -9 -u `whoami` -f '%s/bin/seekdb -p %s';fi" %
                         (data['pid'], server_config['home_path'], server_config['mysql_port']))
             time.sleep(3)
 

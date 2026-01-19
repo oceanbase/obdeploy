@@ -101,7 +101,7 @@ export default function DeployConfig({
   const [componentLoading, setComponentLoading] = useState(false);
   // 获取当前的路由
   const taiPath = getTailPath();
-  const isUpdate = taiPath === 'update';
+  const isUpdate = taiPath.includes('update');
   const isNewDB = taiPath === 'install';
   const isConfiguration = taiPath === 'configuration';
   const [form] = ProForm.useForm();
@@ -207,7 +207,7 @@ export default function DeployConfig({
             <>
               {name}
               {(!record?.versionInfo?.find(
-                (item) => item.version === '4.2.1.8',
+                (item) => item.version === '4.3.5.3' || item.version === '4.2.1.8',
               ) ||
                 !record.versionInfo.length) &&
                 name === 'OceanBase' &&
@@ -300,7 +300,7 @@ export default function DeployConfig({
                   const metaDBLimit =
                     isNewDB &&
                     record.key === OCEANBASE &&
-                    item.version !== '4.2.1.8';
+                    item.version !== '4.3.5.3' && item.version !== '4.2.1.8';
                   const OptionValue = `${item.version}-${item?.release}-${item.md5}`;
                   return (
                     <Select.Option
@@ -316,7 +316,7 @@ export default function DeployConfig({
                           intl.formatMessage({
                             id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
                             defaultMessage:
-                              '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
+                              '系统默认 MetaDB 的数据库版本为 4.3.5.3 或 4.2.1.8，暂不支持修改其它版本。',
                           })
                         }
                       >
@@ -484,7 +484,7 @@ export default function DeployConfig({
       }
     }
     if (data.name === 'oceanbase') {
-      return data.info?.find((item) => item.version === '4.2.1.8');
+      return data.info?.find((item) => item.version === '4.3.5.3' || item.version === '4.2.1.8');
     }
     return data.info[0];
   };
@@ -552,7 +552,7 @@ export default function DeployConfig({
     setObproxyVersionInfo(undefined);
     setTableData(undefined);
     if (isUpdate) {
-      history.push('/updateWelcome');
+      history.push('/guide?update');
     } else {
       history.push('/guide');
     }
@@ -702,7 +702,7 @@ export default function DeployConfig({
 
   const OceanBaseNoVersion = !tableData
     ?.find((item) => item.key === 'oceanbase')
-    ?.versionInfo?.find((item1) => item1.version === '4.2.1.8');
+    ?.versionInfo?.find((item1) => item1.version === '4.3.5.3' || item1.version === '4.2.1.8');
 
   const { run: fetchListRemoteMirrors } = useRequest(listRemoteMirrors, {
     onSuccess: () => {
@@ -869,7 +869,7 @@ export default function DeployConfig({
       message={intl.formatMessage({
         id: 'OBD.component.DeployConfig.ByDefaultTheDatabaseVersion',
         defaultMessage:
-          '系统默认 MetaDB 的数据库版本为 4.2.1.8，暂不支持修改版本。',
+          '系统默认 MetaDB 的数据库版本为 4.3.5.3 或 4.2.1.8，暂不支持修改其它版本。',
       })}
       type="warning"
       showIcon
@@ -1055,6 +1055,7 @@ export default function DeployConfig({
         </Space>
       </Spin>
       <CustomFooter>
+        <ExitBtn />
         <Button
           data-aspm-click="ca54435.da43437"
           data-aspm-desc={intl.formatMessage({
@@ -1093,7 +1094,6 @@ export default function DeployConfig({
             defaultMessage: '下一步',
           })}
         </Button>
-        <ExitBtn />
       </CustomFooter>
     </>
   );

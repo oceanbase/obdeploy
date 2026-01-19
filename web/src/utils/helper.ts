@@ -527,7 +527,7 @@ export const connectInfoForPwd = (
       item.password = components.oceanbase?.root_password;
       item.connect_url = insertPwd(item.connect_url, item.password);
     }
-    if (item.component === 'obshell_dashboard') {
+    if (item.component === `obshell Dashboard`) {
       item.password = components.oceanbase?.root_password;
       item.user = 'root';
       item.connect_url = item.access_url;
@@ -564,6 +564,5 @@ export const connectInfoForPwd = (
       item.password = components.grafana?.login_password;
     }
   });
-  
   return connectInfo;
 };

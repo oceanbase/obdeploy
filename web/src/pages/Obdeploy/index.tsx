@@ -17,6 +17,10 @@ import NodeConfig from './NodeConfig';
 import PreCheck from './PreCheck';
 import ProgressQuit from './ProgressQuit';
 import Steps from './Steps';
+import PreCheckStatus from './PreCheckStatus';
+import CheckInfo from './CheckInfo';
+import TopoComponent from './TopoComponent';
+import TopoCheck from './TopoCheck';
 
 export default function IndexPage() {
   const uuid = window.localStorage.getItem('uuid');
@@ -37,6 +41,7 @@ export default function IndexPage() {
   } = useModel('global');
   const [isInstall, setIsInstall] = useState(false);
 
+  const [deployMode, setDeployMode] = useState('distributed');
   const { run: fetchDeploymentInfo } = useRequest(getDeployment, {
     onError: (e: any) => {
       const errorInfo = getErrorInfo(e);
@@ -70,16 +75,16 @@ export default function IndexPage() {
                   handleValidateOrSetKeepAliveToken({ token, overwrite: true });
                 },
                 onCancel: () => {
-                  setCurrentStep(8);
+                  setCurrentStep(9);
                 },
               });
               setTimeout(() => {
                 document.activeElement.blur();
               }, 100);
             } else {
-              setCurrentStep(8);
+              setCurrentStep(9);
             }
-          } else if (currentStep > 4) {
+          } else if (currentStep > 5) {
             if (!isInstall && !requestPipeline.processExit) {
               handleValidateOrSetKeepAliveToken({
                 token: token,
@@ -102,7 +107,7 @@ export default function IndexPage() {
           setErrorVisible(true);
           setErrorsList([...errorsList, errorInfo]);
         }
-        if (currentStep > 4 && !requestPipeline.processExit) {
+        if (currentStep > 5 && !requestPipeline.processExit) {
           handleValidateOrSetKeepAliveToken({ token: token, is_clear: true });
         } else {
           // 进程可能退出，停止轮询
@@ -116,15 +121,22 @@ export default function IndexPage() {
   );
 
   const contentConfig = {
-    1: <InstallConfig />,
-    // 1: <InstallFinished />,
-    2: <NodeConfig />,
+    1: <InstallConfig
+      deployMode={deployMode}
+      setDeployMode={setDeployMode}
+    />,
+    2: <NodeConfig
+      deployMode={deployMode}
+    />,
     3: <ClusterConfig />,
-    4: <PreCheck />,
-    5: <InstallProcess />,
-    6: <InstallFinished />,
-    7: <ExitPage />,
-    8: <ProgressQuit />,
+    4: <TopoCheck
+      deployMode={deployMode}
+    />,
+    5: <PreCheckStatus />,
+    6: <InstallProcess />,
+    7: <InstallFinished />,
+    8: <ExitPage />,
+    9: <ProgressQuit />,
   };
 
   useEffect(() => {
@@ -166,17 +178,15 @@ export default function IndexPage() {
   }, []);
 
   const containerStyle = {
-    minHeight: `${
-      currentStep < 6 ? 'calc(100% - 240px)' : 'calc(100% - 140px)'
-    }`,
-    paddingTop: `${currentStep < 6 ? '170px' : '70px'}`,
+    minHeight: `${currentStep < 7 ? 'calc(100% - 240px)' : 'calc(100% - 140px)'
+      }`,
+    paddingTop: `${currentStep < 7 ? '170px' : '70px'}`,
   };
 
   return (
     <div
-      className={`${styles.container} ${
-        locale !== 'zh-CN' ? styles.englishContainer : ''
-      }`}
+      className={`${styles.container} ${locale !== 'zh-CN' ? styles.englishContainer : ''
+        }`}
     >
       <Steps />
       <div className={styles.pageContainer} style={containerStyle}>

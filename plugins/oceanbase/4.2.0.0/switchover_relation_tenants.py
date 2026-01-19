@@ -22,7 +22,7 @@ from const import SERVICE_MODE
 tenant_cursor_cache = defaultdict(dict)
 
 def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *args, **kwargs):
-    def switchover_service_standby(deploy_name, tenant_name, primary_cluster, primary_tenant):
+    def switchover_service_standby(deploy_name, tenant_name, primary_cluster, primary_tenant, mode='mysql'):
         deploy_config = cluster_configs.get(deploy_name)
         if deploy_config:
             standbyro_password_dict = deploy_config.get_component_attr('standbyro_password')
@@ -41,7 +41,7 @@ def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *ar
         standbyro_password = plugin_context.get_variable('standbyro_password')
         sql = 'ALTER SYSTEM SET LOG_RESTORE_SOURCE = "SERVICE={} USER=standbyro@{} PASSWORD={}"'.format(ip_list, primary_tenant, standbyro_password)
         try:
-            exec_sql_in_tenant(sql, cursors.get(deploy_name), tenant_name, 'mysql', user='root', password=standby_tenant_password, raise_exception=True, retries=5)
+            exec_sql_in_tenant(sql, cursors.get(deploy_name), tenant_name, mode, password=standby_tenant_password, raise_exception=True, retries=5)
         except Exception as e:
             retry_message = 'After resolving the issue, you can retry by manually executing SQL:\'{}\' with the root user in the tenant {}:{}.'.format(sql, deploy_name, tenant_name)
             stdio.exception("Set the old primary`s standby tenant {}:{} as a standby tenant of the new primary`s standby tenant {}:{} failed:{}. \n {}".format(deploy_name, tenant_name, deploy_name, primary_tenant, e, retry_message))
@@ -86,7 +86,7 @@ def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *ar
             for tenant_server_port in tenant_server_ports:
                 tenant_ip = tenant_server_port['SVR_IP']
                 tenant_port = tenant_server_port['SQL_PORT']
-                tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, print_exception=raise_exception)
+                tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=raise_exception)
                 if tenant_cursor:
                     if tenant not in tenant_cursor_cache[cursor]:
                         tenant_cursor_cache[cursor][tenant] = {}
@@ -154,9 +154,10 @@ def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *ar
         if not cursor:
             stdio.error("Connect to {} failed.".format(deploy_name))
             return
-        res = cursor.fetchone('select TENANT_ROLE,TENANT_ID from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s', (tenant_name, ), raise_exception=False)
+        res = cursor.fetchone('select TENANT_ROLE,TENANT_ID,COMPATIBILITY_MODE from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s', (tenant_name, ), raise_exception=False)
         if not res:
             return
+        standby_tenant_mode = res['COMPATIBILITY_MODE'].lower()
 
         sql = 'SELECT TYPE FROM oceanbase.CDB_OB_LOG_RESTORE_SOURCE where TENANT_ID=%s' % res['TENANT_ID']
         res = cursor.fetchone(sql, raise_exception=False)
@@ -164,7 +165,7 @@ def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *ar
             stdio.verbose('Select {} log restore source is failed.'.format(deploy_name))
             continue
         if res['TYPE'] == SERVICE_MODE:
-            switch_ret = switchover_service_standby(deploy_name, tenant_name, standby_cluster, standby_tenant)
+            switch_ret = switchover_service_standby(deploy_name, tenant_name, standby_cluster, standby_tenant, standby_tenant_mode)
             if not switch_ret:
                 return
         else:
@@ -183,9 +184,10 @@ def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *ar
         if not cursor:
             stdio.error("Connect to {} failed.".format(deploy_name))
             return
-        res = cursor.fetchone('select TENANT_ROLE,TENANT_ID from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s', (tenant_name,), raise_exception=False)
+        res = cursor.fetchone('select TENANT_ROLE,TENANT_ID,COMPATIBILITY_MODE from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s', (tenant_name,), raise_exception=False)
         if not res:
             return
+        standby_tenant_mode = res['COMPATIBILITY_MODE'].lower()
 
         sql = 'SELECT TYPE FROM oceanbase.CDB_OB_LOG_RESTORE_SOURCE where TENANT_ID=%s' % res['TENANT_ID']
         res = cursor.fetchone(sql, raise_exception=False)
@@ -193,7 +195,7 @@ def switchover_relation_tenants(plugin_context, cluster_configs, cursors={}, *ar
             stdio.verbose('Select {} log restore source is failed.'.format(deploy_name))
             continue
         if res['TYPE'] == SERVICE_MODE:
-            switch_ret = switchover_service_standby(deploy_name, tenant_name, primary_cluster, primary_tenant)
+            switch_ret = switchover_service_standby(deploy_name, tenant_name, primary_cluster, primary_tenant, standby_tenant_mode)
             if not switch_ret:
                 return
         else:

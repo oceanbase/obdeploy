@@ -16,16 +16,18 @@
 
 from singleton_decorator import singleton
 from service.handler.base_handler import BaseHandler
+from service.handler.rsa_handler import RSAHandler
 
 
 @singleton
 class ConnectHandler(BaseHandler):
     def connect_influxdb(self, host, port, user, password):
+        password = RSAHandler().decrypt_private_key(password)
         from influxdb import InfluxDBClient
         client = InfluxDBClient(host=host, port=port, username=user, password=password)
         try:
             client.ping()
             return {"check_result": True}
-        except:
-
+        except Exception as e:
+            self.obd._call_stdio('error', e)
             return {"check_result": False}

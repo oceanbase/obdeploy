@@ -9,12 +9,13 @@ import styles from './index.less';
 export default function PasswordCard({ password }: { password: string }) {
   const [showPwd, setShowPwd] = useState<boolean>(false);
   return (
-    <ProCard
+    <div
       title={intl.formatMessage({
         id: 'OBD.component.PasswordCard.Password',
         defaultMessage: '密码',
       })}
       className={styles.passwordCardContainer}
+
     >
       {password ? (
         <div style={{ position: 'relative' }}>
@@ -46,6 +47,6 @@ export default function PasswordCard({ password }: { password: string }) {
       ) : (
         '-'
       )}
-    </ProCard>
+    </div>
   );
 }

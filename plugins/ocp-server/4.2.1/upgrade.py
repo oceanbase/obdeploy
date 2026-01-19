@@ -57,7 +57,6 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, run_wor
         return plugin_context.return_false()
 
     start_kwargs = copy(kwargs)
-    start_kwargs['without_parameter'] = True
     if not run_workflow(start_workflows, repositories=[dest_repository], **{dest_repository.name: start_kwargs}):
         return plugin_context.return_false()
     upgrade_ctx = kwargs.get('upgrade_ctx')

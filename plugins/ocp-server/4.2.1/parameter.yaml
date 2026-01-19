@@ -51,9 +51,9 @@
 - name: admin_password
   name_local: ocp login password
   type: STRING
-  require: true
+  require: false
   essential: true
-  default: aaAA11__
+  default: ''
   need_restart: true
   description_local: ocp 登录密码
   description_en: When logining ocp, use it

@@ -1,0 +1,20 @@
+## Only need to configure when remote login is required
+# user:
+#   username: your username
+#   password: your password if need
+#   key_file: your ssh-key file path if need
+#   port: your ssh port, default 22
+#   timeout: ssh connection timeout (second), default 30
+maas:
+  type: docker # Deployment type, use docker for containerized deployment
+  image_name: harbor.oceanbase-dev.com/obmaas/ob-maas-backend # Docker image name for MAAS BACKEND
+  tag: v1.2.0 # Docker image tag
+  servers:
+    - 127.0.0.1 # Server IP address, please don't use hostname, only IP can be supported
+  global:
+    data_dir: /data # Data directory for MAAS BACKEND
+    prometheus_port: 9090 # Prometheus port for MAAS BACKEND
+    port: 8001 # MAAS BACKEND port
+
+
+

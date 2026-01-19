@@ -57,7 +57,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_ex
         for tenant_server_port in tenant_server_ports:
             tenant_ip = tenant_server_port['SVR_IP']
             tenant_port = tenant_server_port['SQL_PORT']
-            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, print_exception=raise_exception)
+            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=raise_exception)
             if tenant_cursor:
                 if tenant not in tenant_cursor_cache[cursor]:
                     tenant_cursor_cache[cursor][tenant] = {}
@@ -69,8 +69,11 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_ex
     return tenant_cursor.execute(sql, raise_exception=False, exc_level='verbose') if tenant_cursor else False
 
 
-def verify_password(cursor, tenant_name, stdio, key, password='', user='root', mode='mysql'):
-    if exec_sql_in_tenant('select 1', cursor, tenant_name, mode, user=user, password=password, raise_exception=False, retries=5):
+def verify_password(cursor, tenant_name, stdio, key, password='', user='', mode='mysql'):
+    if not user:
+        user = 'SYS' if mode == 'oracle' else 'root'
+    sql = 'select 1' if mode == 'mysql' else 'select 1 from DUAL'
+    if exec_sql_in_tenant(sql, cursor, tenant_name, mode, user=user, password=password, raise_exception=False, retries=5):
         return True
     if key == 'standbyro_password':
         key = 'standbyro-password'
@@ -143,10 +146,12 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     if not standby_info_res:
         error("Tenant {}:{} not exists".format(standby_deploy_name, standby_tenant))
         return
+    standby_tenant_mode = standby_info_res['COMPATIBILITY_MODE'].lower()
     primary_res = primary_cursor.fetchone(sql, [primary_tenant, ])
     if not primary_res:
         error("Primary tenant {}:{} not exists".format(primary_deploy_name, primary_tenant))
         return
+    primary_tenant_mode = primary_res['COMPATIBILITY_MODE'].lower()
 
     # check tenant role
     if standby_info_res['TENANT_ROLE'] != 'STANDBY':
@@ -233,33 +238,27 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     primary_tenant_password = getattr(plugin_context.options, 'tenant_root_password') if getattr(plugin_context.options, 'tenant_root_password') else ''
     standby_tenant_password = getattr(plugin_context.options, 'tenant_root_password') if getattr(plugin_context.options, 'tenant_root_password') else ''
 
-    if not verify_password(primary_cursor, primary_tenant, stdio, key='tenant-root-password', password=primary_tenant_password):
+    if not verify_password(primary_cursor, primary_tenant, stdio, key='tenant-root-password', password=primary_tenant_password, mode=primary_tenant_mode):
         stdio.stop_loading('fail')
         return
-    if not verify_password(standby_cursor, standby_tenant, stdio, key='standbyro_password', password=standbyro_password, user='standbyro'):
+    if not verify_password(standby_cursor, standby_tenant, stdio, key='standbyro_password', password=standbyro_password, user='standbyro', mode=standby_tenant_mode):
         stdio.stop_loading('fail')
         return
-    if not verify_password(standby_cursor, standby_tenant, stdio, key='tenant-root-password', password=standby_tenant_password):
+    if not verify_password(standby_cursor, standby_tenant, stdio, key='tenant-root-password', password=standby_tenant_password, mode=standby_tenant_mode):
         stdio.stop_loading('fail')
         return
-    if not verify_password(primary_cursor, primary_tenant, stdio, key='standbyro_password', password=standbyro_password, user='standbyro'):
+    if not verify_password(primary_cursor, primary_tenant, stdio, key='standbyro_password', password=standbyro_password, user='standbyro', mode=primary_tenant_mode):
         stdio.stop_loading('fail')
         return
 
-    # 1.do ob inner switchover verify
+    # 1.do ob inner primary switchover verify
     try:
         sql = "ALTER SYSTEM SWITCHOVER TO STANDBY VERIFY"
-        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode='mysql', user='root', password=primary_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode=primary_tenant_mode, password=primary_tenant_password, raise_exception=True, retries=5)
     except Exception as e:
         exception("Primary tenant {}:{} do switchover verify failed:{}".format(primary_deploy_name, primary_tenant, e))
         return
 
-    try:
-        sql = "ALTER SYSTEM SWITCHOVER TO PRIMARY VERIFY"
-        exec_sql_in_tenant(sql, standby_cursor, standby_tenant, mode='mysql', user='root', password=standby_tenant_password, raise_exception=True, retries=5)
-    except Exception as e:
-        exception("Standby tenant {}:{} do switchover verify failed:{}".format(standby_deploy_name, standby_tenant, e))
-        return
     stdio.stop_loading('succeed')
 
     stdio.start_loading('Switchover')
@@ -268,17 +267,23 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     stdio.verbose("begin switchover primary tenant to standby tenant on the tenant {}:{}".format(primary_deploy_name, primary_tenant))
     try:
         sql = "ALTER SYSTEM SWITCHOVER TO STANDBY"
-        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode='mysql', user='root', password=primary_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode=primary_tenant_mode, password=primary_tenant_password, raise_exception=True, retries=5)
     except Exception as e:
         exception("Switchover primary tenant {} to standby tenant {} failed. error message info:{}".format(primary_tenant, standby_tenant, e))
         return
     stdio.verbose("switchover primary tenant to standby tenant succeed on the tenant {}:{}".format(primary_deploy_name, primary_tenant))
 
-    # 3. switch standby tenant to primary tenant
+    # 3. standby switchover verify, switch standby tenant to primary tenant
+    try:
+        sql = "ALTER SYSTEM SWITCHOVER TO PRIMARY VERIFY"
+        exec_sql_in_tenant(sql, standby_cursor, standby_tenant, mode=standby_tenant_mode, password=standby_tenant_password, raise_exception=True, retries=5)
+    except Exception as e:
+        exception("Standby tenant {}:{} do switchover verify failed:{}".format(standby_deploy_name, standby_tenant, e))
+        return
     stdio.verbose("begin switchover standby tenant to primary tenant on the tenant {}:{}".format(standby_deploy_name, standby_tenant))
     try:
         sql = "ALTER SYSTEM SWITCHOVER TO PRIMARY"
-        exec_sql_in_tenant(sql, standby_cursor, standby_tenant, mode='mysql', user='root', password=standby_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(sql, standby_cursor, standby_tenant, mode=standby_tenant_mode, password=standby_tenant_password, raise_exception=True, retries=5)
     except Exception as e:
         exception("Switchover standby tenant {} to primary tenant {} failed. error message info:{}".format(standby_tenant, primary_tenant, e))
         return
@@ -291,9 +296,9 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     if not ip_list:
         stdio.error("Get the ip list of the tenant {}:{} failed.".format(standby_deploy_name, standby_tenant))
         return
-    sql = 'ALTER SYSTEM SET LOG_RESTORE_SOURCE = "SERVICE={} USER=standbyro@{} PASSWORD={}"'.format(ip_list, standby_tenant, standbyro_password)
+    sql = "ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE={} USER=standbyro@{} PASSWORD={}'".format(ip_list, standby_tenant, standbyro_password)
     try:
-        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, 'mysql', user='root', password=standby_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, primary_tenant_mode, password=standby_tenant_password, raise_exception=True, retries=5)
         stdio.stop_loading('succeed')
     except Exception as e:
         retry_message = 'After resolving the issue, you can retry by manually executing SQL:\'{}\' with the root user in the tenant {}:{}.'.format(sql, primary_deploy_name, primary_tenant)

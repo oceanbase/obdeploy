@@ -34,7 +34,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=Non
         for tenant_server_port in tenant_server_ports:
             tenant_ip = tenant_server_port['SVR_IP']
             tenant_port = tenant_server_port['SQL_PORT']
-            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, print_exception=print_exception)
+            tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=print_exception)
             if tenant_cursor:
                 if tenant not in tenant_cursor_cache[cursor]:
                     tenant_cursor_cache[cursor][tenant] = {}
@@ -74,11 +74,6 @@ def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *a
     stdio.start_loading('Check primary tenant')
     if primary_tenant.lower() == 'sys':
         error('Primary tenant can not be sys.')
-        return
-
-    mode = get_option('mode', 'mysql').lower()
-    if not mode in ['mysql', 'oracle']:
-        error('No such tenant mode: %s.\n--mode must be `mysql` or `oracle`' % mode)
         return
 
     primary_cluster_config = cluster_configs.get(primary_deploy_name)
@@ -122,9 +117,11 @@ def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *a
     if not res_compatibility:
         error('Query {}:{} compatibility_mode fail.'.format(primary_deploy_name, primary_tenant))
         return
-    if res_compatibility['compatibility_mode'].lower() != 'mysql':
-        error('Primary tenant {}:{} compatibility_mode is not mysql. only support mysql now!'.format(primary_deploy_name, primary_tenant))
+    if res_compatibility['compatibility_mode'].lower() not in ['mysql', 'oracle']:
+        error('Primary tenant {}:{} compatibility_mode is not mysql or oracle. only support mysql or oracle now!'.format(primary_deploy_name, primary_tenant))
         return
+    mode = res_compatibility['compatibility_mode'].lower()
+    setattr(options, 'mode', mode)
 
     # check primary tenant have full log stream
     sql = '(select LS_ID from oceanbase.DBA_OB_LS_HISTORY) minus (select LS_ID from oceanbase.DBA_OB_LS)'
@@ -168,27 +165,39 @@ def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *a
 
     # create standbyro in primary tenant
     # try to connect to tenant with standbyro if the user has entered a password or there is a password in the inner_config
-    if (standbyro_password_input is None and not standbyro_password_inner) or not exec_sql_in_tenant('select 1', primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=2, exec_type='fetchone'):
+    if (standbyro_password_input is None and not standbyro_password_inner) or not exec_sql_in_tenant('select 1' if mode == 'mysql' else 'select 1 from DUAL', primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=2, exec_type='fetchone'):
         # can not connect to tenant with standbyro user, try to connect to tenant with root user
-        if exec_sql_in_tenant('select 1', primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=2, exec_type='fetchone'):
+        if exec_sql_in_tenant('select 1' if mode == 'mysql' else 'select 1 from DUAL', primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=2, exec_type='fetchone'):
             # if standbyro exists ?
-            sql = "select * from oceanbase.__all_user where user_name = 'standbyro'"
+            sql = "select * from oceanbase.__all_user where user_name = 'standbyro'" if mode == 'mysql' else "select * from SYS.ALL_USERS where username = 'standbyro'"
             if exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=1, exec_type='fetchone'):
                 error("Authentication failed because the standbyro user already exists but the password is incorrect. Please re-create the tenant with ' --standbyro-password=xxxxxx'")
                 return
             # create standbyro
-            sql = "CREATE USER standbyro IDENTIFIED BY %s"
-            if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, args=[standbyro_password], password=root_password, retries=1):
+            sql = f"""CREATE USER standbyro IDENTIFIED BY "{standbyro_password}" """
+            if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, retries=1):
                 error('Create standbyro user failed')
                 return
+            if mode == "oracle":
+                sql = "GRANT CREATE SESSION TO standbyro"
+                if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, retries=1):
+                    error("Grant create session failed")
+                    return
+                sql = "GRANT STANDBY_REPLICATION TO standbyro"
+                if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, retries=1):
+                    error("Grant STANDBY_REPLICATION failed")
+                    return
+
         else:
             # can not connect to tenant with root user,need user supply password
             error("Authentication failed because the root_password is invalid for the primary tenant. Please re-create the tenant with '--tenant-root-password=xxxxxx'")
             return
 
     # GRANT oceanbase to standbyro
-    if not exec_sql_in_tenant('show databases like "oceanbase"', primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=1, exec_type='fetchone') and \
-          not exec_sql_in_tenant("GRANT SELECT ON oceanbase.* TO standbyro;", primary_cursor, primary_tenant, mode, password=root_password, retries=3):
+    show_db_sql = 'show databases like "oceanbase"' if mode == 'mysql' else "SELECT username FROM all_users WHERE username = 'SYS'"
+    grant_sql = "GRANT SELECT ON %s.* TO standbyro;" % ("oceanbase" if mode == "mysql" else "SYS")
+    if not exec_sql_in_tenant(show_db_sql, primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=1, exec_type='fetchone') and \
+        not exec_sql_in_tenant(grant_sql, primary_cursor, primary_tenant, mode, password=root_password, retries=3):
         error('Grant standbyro failed')
         return
 

@@ -4,6 +4,7 @@
 .pageCard {
   box-shadow: 0 2px 4px 0 rgba(19, 32, 57, 0.02),
     0 1px 6px -1px rgba(19, 32, 57, 0.02), 0 1px 2px 0 rgba(19, 32, 57, 0.03);
+
   :global {
     .ant-space-item {
       .ant-col {
@@ -11,31 +12,97 @@
         padding-left: 0 !important;
       }
     }
+
+    .ant-pro-card-col {
+      width: auto !important;
+    }
+
+    // 部署用户配置：让三个卡片平均等分
+    .userConfigContainer {
+      .ant-pro-card-col {
+        flex: 1 !important;
+        width: auto !important;
+      }
+    }
   }
+
   .dbTable {
     :global {
-      .ant-table-tbody > tr > td {
+      .ant-table-tbody>tr>td {
         border-bottom: 1px solid #e2e8f3 !important;
       }
-      .ant-table-tbody > tr > td,
-      .ant-table-thead > tr > th {
+
+      .ant-table-tbody>tr>td,
+      .ant-table-thead>tr>th {
         background-color: #f5f8fe !important;
       }
-      .ant-table-tbody > tr:last-child > td {
+
+      .ant-table-tbody>tr:last-child>td {
         border: none !important;
       }
-      .ant-table-tbody > tr:last-child > td:first-child {
+
+      .ant-table-tbody>tr:last-child>td:first-child {
         border-bottom-left-radius: 8px !important;
       }
-      .ant-table-tbody > tr:last-child > td:last-child {
+
+      .ant-table-tbody>tr:last-child>td:last-child {
         border-bottom-right-radius: 8px !important;
       }
     }
   }
 }
+
 .infoSubCard {
   overflow: hidden;
   border-radius: 8px;
+
+  // 部署用户配置容器：使用 flex 布局让三个卡片平均等分
+  &.userConfigContainer {
+    :global {
+      .ant-pro-card-body {
+        display: flex !important;
+      }
+
+      .ant-pro-card-col {
+        flex: 1 !important;
+        width: 0 !important; // 设置为 0 让 flex: 1 生效
+      }
+    }
+  }
+
+  // 服务配置容器：支持换行，每行最多4个（colSpan=6），超出的自动换行
+  &.serviceConfigContainer {
+    :global {
+      .ant-pro-card-body {
+        display: flex !important;
+        flex-wrap: wrap !important;
+      }
+
+      // 每个卡片占 25%（6/24），确保每行最多4个，超出的自动换行
+      // 分隔线是绝对定位的，不会影响 flex 布局
+      .ant-pro-card-col {
+        flex: 0 0 25% !important;
+        max-width: 25% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+      }
+    }
+  }
+
+  // 租户配置容器：让两个卡片平均等分（各占50%）
+  &.tenantConfigContainer {
+    :global {
+      .ant-pro-card-body {
+        display: flex !important;
+      }
+
+      .ant-pro-card-col {
+        flex: 1 !important;
+        width: 0 !important; // 设置为 0 让 flex: 1 生效
+      }
+    }
+  }
+
   .pwdIcon {
     position: absolute;
     top: 2px;
@@ -43,10 +110,12 @@
     color: #8592ad;
     font-size: 17px;
   }
-  .versionTag{
+
+  .versionTag {
     position: absolute;
     right: 45px;
   }
+
   :global {
     .ant-pro-card .ant-pro-card-body {
       padding-top: 4px !important;
@@ -56,16 +125,20 @@
     .ant-pro-card-header {
       background-color: @cardBackgroundColor !important;
     }
+
     .ant-pro-card-title {
-      color: @subTitleColor !important ;
+      color: @subTitleColor !important;
       font-weight: normal !important;
       font-size: 14px !important;
     }
+
     .ant-pro-card-body {
       color: #132039 !important;
     }
+
     .ant-pro-card-col.ant-pro-card-split-vertical {
       border-inline-end: none !important;
+
       .ant-pro-card::before {
         position: absolute;
         top: 50%;

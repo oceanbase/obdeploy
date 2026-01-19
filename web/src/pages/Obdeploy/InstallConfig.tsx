@@ -30,6 +30,7 @@ import {
   Button,
   message,
   Modal,
+  Radio,
   Select,
   Space,
   Spin,
@@ -39,7 +40,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import copy from 'copy-to-clipboard';
-import { isNull } from 'lodash';
+import { divide, isNull } from 'lodash';
 import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
 import { getLocale, history, useModel } from 'umi';
@@ -73,7 +74,13 @@ const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
 const mirrors = ['oceanbase.community.stable', 'oceanbase.development-kit'];
 
-export default function InstallConfig() {
+export default function InstallConfig({
+  deployMode,
+  setDeployMode
+}: {
+  deployMode: string,
+  setDeployMode: (mode: string) => void
+}) {
   const {
     initAppName,
     setCurrentStep,
@@ -95,19 +102,16 @@ export default function InstallConfig() {
     selectedConfig,
     setSelectedConfig,
     aliveTokenTimer,
-    clusterMoreConfig,
-    setClusterMoreConfig,
     OBD_DOCS,
     OBD_STANDALONE_DOCS,
-    OBAGENT_DOCS,
-    OBPROXY_DOCS,
-    OBCONFIGSERVER_DOCS,
     setScenarioParam,
     loadTypeVisible,
     setLoadTypeVisible,
     selectedLoadType,
     setSelectedLoadType,
   } = useModel('global');
+
+  const [form] = ProForm.useForm();
 
   const { components, home_path } = configData || {};
   const { oceanbase } = components || {};
@@ -121,14 +125,14 @@ export default function InstallConfig() {
   const [deleteName, setDeleteName] = useState('');
   const [deployMemory, setDeployMemory] = useState(0);
   const [componentsMemory, setComponentsMemory] = useState(0);
-  const [form] = ProForm.useForm();
-  const [unavailableList, setUnavailableList] = useState<string[]>([]);
-  const [oceanbaseType, setOceanbaseType] = useState<string>();
+  const [oceanbaseType, setOceanbaseType] = useState<string>('');
   const [componentLoading, setComponentLoading] = useState(false);
   const draftNameRef = useRef();
 
   // 当前 OB 环境是否为单机版
+  // const standAlone = deployMode === 'standalone';
   const standAlone = oceanbaseType === 'standalone';
+
   const componentsGroupInfo = useComponents(true, standAlone);
 
   const oceanBaseInfo = {
@@ -157,12 +161,15 @@ export default function InstallConfig() {
     setErrorVisible(true);
     setErrorsList([...errorsList, errorInfo]);
   };
+
   const { run: fetchDeploymentInfo, loading } = useRequest(getDeployment, {
     onError: errorCommonHandle,
   });
+
   const { run: handleDeleteDeployment } = useRequest(destroyDeployment, {
     onError: errorCommonHandle,
   });
+
   const { run: fetchListRemoteMirrors, data: listRemoteMirror } = useRequest(
     listRemoteMirrors,
     {
@@ -182,8 +189,6 @@ export default function InstallConfig() {
     },
   );
 
-  const { run: getMoreParamsters } = useRequest(queryComponentParameters);
-
   const { run: fetchAllComponentVersions, loading: versionLoading } =
     useRequest(queryAllComponentVersions, {
       onSuccess: async ({
@@ -193,7 +198,7 @@ export default function InstallConfig() {
         if (success) {
           const newComponentsVersionInfo = {};
           const oceanbaseVersionsData = data?.items?.filter((item) =>
-            [oceanbaseComponent, oceanbaseStandaloneComponent].includes(
+            deployComponent.includes(
               item.name,
             ),
           );
@@ -284,7 +289,6 @@ export default function InstallConfig() {
                   }
                 });
               }
-              setUnavailableList(nameList);
             }
           } else {
             setComponentLoading(false);
@@ -553,7 +557,9 @@ export default function InstallConfig() {
     }
   };
 
-  const combinedDataSources = [oceanbaseStandaloneComponent, oceanbaseComponent]
+  // 根据部署模式选择部署类型
+  const deployComponent = deployMode === 'distributed' ? [oceanbaseComponent] : [oceanbaseStandaloneComponent, oceanbaseComponent];
+  const combinedDataSources = deployComponent
     .flatMap((component) => componentsVersionInfo[component]?.dataSource || [])
     .filter((dataSource) => dataSource !== undefined);
 
@@ -712,87 +718,69 @@ export default function InstallConfig() {
   };
 
   /**
-   * tip:
-   * 如果选择grafana/prometheus，则 OBAgent 则自动选择，无需提示
-   * 如果选择 grafana，则 OBAgent&&prometheus 则自动选择，无需提示
-   * 如果不选择 OBAgent, 则 grafana/prometheus 则自动不选择，无需提示
-   * 用户取消勾选prometheus，granfana也取消掉
+   * @description
+   * 组件选择逻辑：
+   * 如果选择obagent，只勾选自己，不自动选择其他组件
+   * 如果选择prometheus，则obagent自动选择
+   * 如果选择 grafana，则 OBAgent和prometheus 则自动选择
+   * 如果选择alertmanager，则prometheus、OBAgent自动选择
+   * 取消勾选obagent，grafana、prometheus和alertmanager也取消掉
+   * 取消勾选prometheus，grafana和alertmanager也取消掉
+   * 取消勾选alertmanager，只取消掉自己
+   * 取消勾选grafana，只取消掉自己
    */
-
   const handleSelect = (record: rowDataType, selected: boolean) => {
-    if (!selected) {
-      let newConfig = [],
-        target = false;
-      const shouldInclude = [grafanaComponent, prometheusComponent].some(
-        (component) => selectedConfig.includes(component),
-      );
-      // 取消勾选prometheus，granfana也取消掉
-      // 取消勾选obagent，grafana和prometheus也取消掉
-      // 取消勾选alertmanager，obagent和prometheus也取消掉
-      target =
-        record.key === obagentComponent ||
-        (record.key === prometheusComponent && shouldInclude) ||
-        record.key === alertManagerComponent;
+    // 组件依赖关系映射：选择某个组件时，需要自动选择的依赖组件
+    const selectDependencies: Record<string, string[]> = {
+      [obagentComponent]: [],
+      [prometheusComponent]: [obagentComponent],
+      [grafanaComponent]: [obagentComponent, prometheusComponent],
+      [alertManagerComponent]: [prometheusComponent, obagentComponent],
+    };
 
-      for (let val of selectedConfig) {
-        if (target && val === grafanaComponent) continue;
-        if (target && val === prometheusComponent) continue;
-        if (target && val === alertManagerComponent) continue;
-        if (val !== record.key) {
-          newConfig.push(val);
+    // 取消选择时的依赖关系映射：取消某个组件时，需要同时取消的组件
+    const unselectDependencies: Record<string, string[]> = {
+      [obagentComponent]: [
+        obagentComponent,
+        grafanaComponent,
+        prometheusComponent,
+        alertManagerComponent,
+      ],
+      [prometheusComponent]: [
+        prometheusComponent,
+        grafanaComponent,
+        alertManagerComponent,
+      ],
+      [alertManagerComponent]: [alertManagerComponent],
+      [grafanaComponent]: [grafanaComponent],
+    };
+
+    if (selected) {
+      // 选择逻辑
+      const newConfig = [...selectedConfig];
+      const dependencies = selectDependencies[record.key] || [];
+
+      // 添加依赖组件
+      dependencies.forEach((comp) => {
+        if (!newConfig.includes(comp)) {
+          newConfig.push(comp);
         }
+      });
+
+      // 添加当前组件
+      if (!newConfig.includes(record.key)) {
+        newConfig.push(record.key);
       }
+
       setSelectedConfig(newConfig);
     } else {
-      if (
-        record.key === prometheusComponent &&
-        !selectedConfig.includes(obagentComponent)
-      ) {
-        setSelectedConfig([...selectedConfig, record.key, obagentComponent]);
-      } else if (
-        record.key === grafanaComponent &&
-        !selectedConfig.includes(obagentComponent) &&
-        !selectedConfig.includes(prometheusComponent)
-      ) {
-        setSelectedConfig([
-          ...selectedConfig,
-          record.key,
-          obagentComponent,
-          prometheusComponent,
-        ]);
-      } else if (
-        record.key === grafanaComponent &&
-        !selectedConfig.includes(prometheusComponent)
-      ) {
-        setSelectedConfig([
-          ...selectedConfig,
-          record.key,
-          obagentComponent,
-          prometheusComponent,
-        ]);
-      } else if (
-        record.key === alertManagerComponent &&
-        !selectedConfig.includes(obagentComponent)
-      ) {
-        setSelectedConfig([
-          ...selectedConfig,
-          record.key,
-          obagentComponent,
-          prometheusComponent,
-        ]);
-      } else if (
-        record.key === alertManagerComponent &&
-        !selectedConfig.includes(prometheusComponent)
-      ) {
-        setSelectedConfig([
-          ...selectedConfig,
-          record.key,
-          obagentComponent,
-          prometheusComponent,
-        ]);
-      } else {
-        setSelectedConfig([...selectedConfig, record.key]);
-      }
+      // 取消选择逻辑
+      const toRemove = unselectDependencies[record.key] || [record.key];
+      const newConfig = selectedConfig.filter(
+        (comp) => !toRemove.includes(comp),
+      );
+
+      setSelectedConfig(newConfig);
     }
   };
 
@@ -809,23 +797,6 @@ export default function InstallConfig() {
   };
   const caculateSize = (originSize: number): string => {
     return NP.divide(NP.divide(originSize, 1024), 1024).toFixed(2);
-  };
-
-  const getNewParamsters = async () => {
-    const res = await getParamstersHandler(
-      getMoreParamsters,
-      oceanbase,
-      errorCommonHandle,
-    );
-    if (res?.success) {
-      const { data } = res;
-      const newClusterMoreConfig = formatMoreConfig(
-        data?.items,
-        false,
-      );
-
-      return newClusterMoreConfig;
-    }
   };
 
   useEffect(() => {
@@ -907,7 +878,7 @@ export default function InstallConfig() {
     } else {
       fetchAllComponentVersions();
     }
-  }, []);
+  }, [deployMode]);
 
   // 判断是否开启在线仓库
   const remoteMirror = listRemoteMirror?.items?.find(
@@ -1032,12 +1003,61 @@ export default function InstallConfig() {
           </ProCard>
           <ProCard
             title={
-              <>
-                {intl.formatMessage({
-                  id: 'OBD.pages.Obdeploy.InstallConfig.DeployADatabase',
-                  defaultMessage: '部署数据库',
-                })}
+              <span style={{ fontWeight: '400' }}>
+                部署模式
+              </span>
+            }
+            headStyle={{ paddingTop: 0 }}
+            bodyStyle={{ paddingBottom: 24, paddingTop: 8 }}
+          >
 
+            <Radio.Group
+              optionType='button'
+              value={deployMode}
+              onChange={(e) => {
+                setDeployMode(e.target.value)
+                setOceanbaseType('');
+                setOBVersionValue(undefined);
+              }
+              }
+            >
+              <Tooltip
+                color={'#fff'}
+                placement='bottom'
+                overlayInnerStyle={{ width: 400 }}
+                title={
+                  <div style={{ color: '#132039' }}>
+                    分布式集群是 OceanBase 的企业级原生分布式数据库架构，相较于集中式单机，分布式集群具备金融级高可用以及平滑扩缩容能力，高度兼容 Oracle（仅商业版）/MySQL 模式，适用于对数据安全要求较高的核心业务系统。
+                  </div>
+                }
+              >
+                <Radio value="distributed">分布式</Radio>
+              </Tooltip>
+              <Tooltip
+                color={'#fff'}
+                placement='bottom'
+                overlayInnerStyle={{ width: 400 }}
+                title={
+                  <div style={{ color: '#132039' }}>
+                    相较于分布式集群，单机集中式仅需一台主机，部署简单，即开即用。但无多副本及扩缩容能力，适用于开发测试以及数据安全要求不高的业务系统。
+                  </div>
+                }
+              >
+                <Radio value="standalone">单机</Radio>
+              </Tooltip>
+
+            </Radio.Group>
+
+          </ProCard>
+          <ProCard
+            title={
+              <>
+                <span style={{ fontWeight: '400' }}>
+                  {intl.formatMessage({
+                    id: 'OBD.pages.Obdeploy.InstallConfig.DeployADatabase',
+                    defaultMessage: '部署数据库',
+                  })}
+                </span>
                 <span className={styles.titleExtra}>
                   <InfoCircleOutlined style={{ marginRight: 4 }} />{' '}
                   {intl.formatMessage(
@@ -1156,10 +1176,12 @@ export default function InstallConfig() {
             <ProCard
               title={
                 <>
-                  {intl.formatMessage({
-                    id: 'OBD.pages.Obdeploy.InstallConfig.LoadType',
-                    defaultMessage: '负载类型',
-                  })}
+                  <span style={{ fontWeight: '400' }}>
+                    {intl.formatMessage({
+                      id: 'OBD.pages.Obdeploy.InstallConfig.LoadType',
+                      defaultMessage: '负载类型',
+                    })}
+                  </span>
 
                   <span className={styles.titleExtra}>
                     负载类型主要影响 SQL
@@ -1233,7 +1255,7 @@ export default function InstallConfig() {
               <>
                 {intl.formatMessage({
                   id: 'OBD.pages.components.InstallConfig.OptionalComponents',
-                  defaultMessage: '可选组件',
+                  defaultMessage: '部署组件',
                 })}
 
                 <span className={styles.titleExtra}>
@@ -1278,6 +1300,21 @@ export default function InstallConfig() {
         <footer className={styles.pageFooterContainer}>
           <div className={styles.pageFooter}>
             <Space className={styles.foolterAction}>
+              <Button
+                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
+                data-aspm-click="c307507.d317381"
+                data-aspm-desc={intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationExit',
+                  defaultMessage: '部署配置-退出',
+                })}
+                data-aspm-param={``}
+                data-aspm-expo
+              >
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.InstallConfig.Exit',
+                  defaultMessage: '退出',
+                })}
+              </Button>
               <Button onClick={preStep}>
                 {intl.formatMessage({
                   id: 'OBD.pages.Obdeploy.InstallConfig.PreviousStep',
@@ -1301,21 +1338,7 @@ export default function InstallConfig() {
                   defaultMessage: '下一步',
                 })}
               </Button>
-              <Button
-                onClick={() => handleQuit(handleQuitProgress, setCurrentStep)}
-                data-aspm-click="c307507.d317381"
-                data-aspm-desc={intl.formatMessage({
-                  id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationExit',
-                  defaultMessage: '部署配置-退出',
-                })}
-                data-aspm-param={``}
-                data-aspm-expo
-              >
-                {intl.formatMessage({
-                  id: 'OBD.pages.components.InstallConfig.Exit',
-                  defaultMessage: '退出',
-                })}
-              </Button>
+
             </Space>
           </div>
         </footer>

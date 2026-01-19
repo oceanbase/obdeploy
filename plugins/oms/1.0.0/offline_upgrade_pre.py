@@ -45,10 +45,6 @@ def offline_upgrade_pre(plugin_context, *args, **kwargs):
     for region in regions:
         drc_cm_heartbeat_db = region.get('drc_cm_heartbeat_db') or (global_config.get('drc_cm_heartbeat_db', 'oms_cm_heartbeat') + "_" + str(region['cm_location']))
         drc_cm_heartbeat_dbs.add(drc_cm_heartbeat_db)
-
-    for drc_cm_heartbeat_db in drc_cm_heartbeat_dbs:
-        cursor.execute('use %s' % drc_cm_heartbeat_db)
-        cursor.execute('delete from heatbeat_sequence where id < (select max(id) from heatbeat_sequence);')
     plugin_context.set_variable('cursor', cursor)
 
     return plugin_context.return_true()

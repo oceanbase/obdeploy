@@ -81,7 +81,7 @@ class Region(object):
     def parameters_check(self):
         if not self.region_data.get('cm_url'):
             raise ValueError('cm_url is required.')
-        if not self.region_data.get('cm_location'):
+        if self.region_data.get('cm_location', None) is None:
             raise ValueError('cm_location is required.')
         if not self.region_data.get('cm_nodes'):
             raise ValueError('cm_nodes is required.')

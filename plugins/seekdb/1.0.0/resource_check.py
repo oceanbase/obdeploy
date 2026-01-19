@@ -239,7 +239,8 @@ def resource_check(plugin_context, generate_configs={}, strict_check=False, *arg
                                 break
                         tmp_suggests.append(suggest)
                     tmp_suggests = sorted(tmp_suggests, key=lambda suggest: suggest.auto_fix, reverse=True)
-                    critical(server, 'disk', err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=p, avail=str(Capacity(avail)), need=str(Capacity(need))), tmp_suggests + suggests)
+                    alert(server, 'disk', err.EC_OBSERVER_NOT_ENOUGH_DISK.format(ip=ip, disk=p, avail=str(Capacity(avail)), need=str(Capacity(need))), tmp_suggests + suggests)
+
     success = plugin_context.get_variable('get_success')()
     if success:
         times = []

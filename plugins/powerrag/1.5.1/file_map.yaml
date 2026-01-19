@@ -1,0 +1,5 @@
+- src_path: ./*
+  target_path: ./
+  type: dir
+  install_method: cp
+
