@@ -363,7 +363,10 @@ def run_test(plugin_context, env, *args, **kwargs):
         if opt.get('case_mode'):
             test_env['TENANT'] = opt['case_mode']
             if opt.get('user'):
-                test_env['OBMYSQL_USR'] = str(opt['user'] + '@' + opt['case_mode'])
+                if opt.get('component') == COMP_OB_SEEKDB:
+                    test_env['OBMYSQL_USR'] = str(opt['user'])
+                else:
+                    test_env['OBMYSQL_USR'] = str(opt['user'] + '@' + opt['case_mode'])
             else:
                 test_env['OBMYSQL_USR'] = 'root'
         if 'java' in opt:
