@@ -35,7 +35,11 @@ def create_binlog(plugin_context, ob_deploy, tenant_name,  ob_cluster_repositori
     cluster_name = plugin_context.get_variable('cluster_name')
     obconfig_url = plugin_context.get_variable('obconfig_url')
     replicate_num = getattr(plugin_context.options, 'replicate_num')
-    sql = f"CREATE BINLOG FOR TENANT `{cluster_name}`.`{tenant_name}` TO USER `cdcro` PASSWORD `{ob_global_config.get('cdcro_password')}` WITH CLUSTER URL `{obconfig_url}`, REPLICATE NUM {replicate_num};"
+    if obconfig_url:
+        sql = f"CREATE BINLOG FOR TENANT `{cluster_name}`.`{tenant_name}` TO USER `cdcro` PASSWORD `{ob_global_config.get('cdcro_password')}` WITH CLUSTER URL `{obconfig_url}`, REPLICATE NUM {replicate_num};"
+    else:
+        root_service_list = plugin_context.get_variable('root_service_list')
+        sql = f"CREATE BINLOG FOR TENANT `{cluster_name}`.`{tenant_name}` TO USER `cdcro` PASSWORD `{ob_global_config.get('cdcro_password')}` WITH ROOTSERVER_LIST '{root_service_list}', REPLICATE NUM {replicate_num};"
     try:
         cursor.execute(sql, raise_exception=True)
     except Exception as e:

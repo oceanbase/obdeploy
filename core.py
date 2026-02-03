@@ -1798,11 +1798,38 @@ class ObdHome(object):
         if not components:
             self._call_stdio('error', 'Use `-c/--components` to set in the components to be deployed')
             return
-                
+
+        configs = OrderedDict()
         global_key = 'global'
         home_path_key = 'home_path'
-        global_config = {home_path_key: os.getenv('HOME')}
+        username = getattr(self.options, 'username', None)
+        if not username:
+            home_path_prefix = os.getenv('HOME')
+        elif username == 'root':
+            home_path_prefix = '/root'
+        else:
+            home_path_prefix = '/home/{}'.format(username)
+        global_config = {home_path_key: home_path_prefix}
         opt_config = {}
+        target_ip = getattr(self.options, 'server', None)
+        if target_ip:
+            configs['user'] = {}
+            user_config = configs['user']
+            target_ip_list = [target_ip]
+            if username:
+                user_config['username'] = username
+            password = getattr(self.options, 'password', None)
+            if password is not None:
+                user_config['password'] = password
+            port = getattr(self.options, 'port', 22)
+            if port:
+                user_config['port'] = port
+            key_file = getattr(self.options, 'key_file', '')
+            if key_file:
+                user_config['key_file'] = key_file
+        else:
+            target_ip_list = ['127.0.0.1']
+
         for key in self.options.__dict__:
             tmp = key.split('.', 1)
             if len(tmp) == 1:
@@ -1820,10 +1847,9 @@ class ObdHome(object):
                     _config = opt_config[component_name][global_key]
                 _config[tmp[1]] = self.options.__dict__[key]
 
-        configs = OrderedDict()
         for component_name in components:
             configs[component_name] = {
-                'servers': ['127.0.0.1'],
+                'servers': deepcopy(target_ip_list),
                 global_key: deepcopy(global_config)
             }
             configs[component_name][global_key][home_path_key] = os.path.join(configs[component_name][global_key][home_path_key], component_name)

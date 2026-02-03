@@ -201,6 +201,7 @@ def run_test(plugin_context, env, *args, **kwargs):
     auto_retry = env.get('auto_retry')
     is_retry = env.get('is_retry', False)
     reboot_cases = env.get('reboot_cases', [])
+    reboot_after_run_count = env.get('reboot_after_run_count', 0)
     need_reboot = env.get('need_reboot', False)
     collect_all = env.get('collect_all', False)
     collect_log = False
@@ -444,6 +445,8 @@ def run_test(plugin_context, env, *args, **kwargs):
             case_results.append(result)
             index += 1
             is_retry = False
+            if reboot_after_run_count > 0 and index % reboot_after_run_count == 0:
+                need_reboot = True
         elif is_retry or not auto_retry:
             # failed and no chance to retry
             case_results.append(result)
