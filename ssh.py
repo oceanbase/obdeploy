@@ -547,6 +547,9 @@ class SshClient(SafeStdio):
         self.stdio.verbose("current remote_transporter {}".format(self._remote_transporter))
         return self._remote_transporter
 
+    def set_remote_transporter(self, transporter, stdio=None):
+        self._remote_transporter = transporter
+
     def put_file(self, local_path, remote_path, stdio=None):
         if not os.path.isfile(local_path):
             stdio.error('path: %s is not file' % local_path)
@@ -555,7 +558,14 @@ class SshClient(SafeStdio):
             return LocalClient.put_file(local_path, remote_path, stdio=stdio)
         if not self._open_sftp(stdio=stdio):
             return False
-        return self._put_file(local_path, remote_path, stdio=stdio)
+        ret = self._put_file(local_path, remote_path, stdio=stdio)
+        if not ret:
+            if self.remote_transporter == RemoteTransporter.RSYNC:
+                COMMAND_ENV.set(ENV_DISABLE_RSYNC, '0', save=True)
+                self.set_remote_transporter(RemoteTransporter.CLIENT)
+                return self._put_file(local_path, remote_path, stdio=stdio)
+        else:
+            return True
 
     def write_file(self, content, file_path, mode='w', stdio=None):
         if self._is_local:

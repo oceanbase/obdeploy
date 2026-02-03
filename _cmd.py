@@ -872,6 +872,11 @@ class PrefCommand(ClusterMirrorCommand):
         self.parser.add_option('-c', '--components', type='string', help="List the components. Multiple components are separated with commas. [oceanbase-ce,obproxy-ce,obagent,prometheus,grafana,ob-configserver]\nExample: \nstart oceanbase-ce: obd demo -c oceanbase-ce\n"
          + "start -c oceanbase-ce V3.2.3: obd perf -c oceanbase-ce --oceanbase-ce.version=3.2.3\n"
          + "start oceanbase-ce and obproxy-ce: obd perf -c oceanbase-ce,obproxy-ce", default='oceanbase-ce,obproxy-ce,obagent,prometheus,grafana')
+        self.parser.add_option('--server', type='string', help="The IP address of the server to deploy on.")
+        self.parser.add_option('--username', type='string', help="The username for SSH connection.", default=None)
+        self.parser.add_option('--password', type='string', help="The password for SSH connection.", default='')
+        self.parser.add_option('--port', type='int', help="The port for SSH connection.", default=22)
+        self.parser.add_option('--key-file', type='string', help="The path to the private key file for SSH connection.", default='')
         self.parser.allow_undefine = True
         self.parser.undefine_warn = False
 
@@ -1733,7 +1738,7 @@ class MySQLTestCommand(TestMirrorCommand):
         self.parser.add_option('--slb-host', type='string', help='The host of soft load balance.')
         self.parser.add_option('--exec-id', type='string', help='The unique execute id.')
         self.parser.add_option('--case-filter', type='string', help='The case filter file for mysqltest.')
-        self.parser.add_option('--psmall-test', type='string', help='The file maintain psmall cases.', default='./mysql_test/psmalltest.py')
+        self.parser.add_option('--psmall-test', type='string', help='The file maintain psmall cases.', default='mysqltest_config.yaml')
         self.parser.add_option('--psmall-source', type='string', help='The file maintain psmall source control.', default='./mysql_test/psmallsource.py')
         self.parser.add_option('--ps', action='store_true', help='Run in ps mode.', default=False)
         self.parser.add_option('--test-tags', type='string', help='The file maintain basic tags.', default='./mysql_test/test_tags.py')
@@ -2564,6 +2569,7 @@ class BinlogCreateCommand(ObdCommand):
         self.parser.add_option('--replicate-num', type='int', help="Number of copies", default=1)
         self.parser.add_option('-d', '--obproxy-deployname', '--odp', type='string', help='Obproxy deploy name')
         self.parser.add_option('-p', '--cdcro-password', type='string', help='Password of user `cdcro`.If user already been created manually, you need to enter the password here.')
+        self.parser.add_option('--rs', '--root-server-list', type='string', help="The list of machines where the rootservice resides, in the format 'server_ip:server_rpc_port:server_sql_port'")
 
     def init(self, cmd, args):
         super(BinlogCreateCommand, self).init(cmd, args)

@@ -94,13 +94,28 @@ def create_env_check(plugin_context, ob_deploy, ob_cluster_repositories, *args, 
                 return plugin_context.return_false()
             ob_cluster_config.update_global_conf('cdcro_password', getattr(plugin_context.options, 'cdcro_password'), True)
     try:
+        rs_lists = []
+        rs_list = ''
+        for comp in const.COMPS_OB:
+            if comp in cluster_config.depends:
+                ob_servers = cluster_config.get_depend_servers(comp)
+                for ob_server in ob_servers:
+                    ob_server_conf = cluster_config.get_depend_config(comp, ob_server)
+                    rs_lists.append('{}:{}:{}'.format(ob_server.ip, ob_server_conf['rpc_port'], ob_server_conf['mysql_port']))
+        if rs_lists:
+            rs_list = ';'.join(rs_lists)
+
+        rs_list = rs_list if rs_list else (getattr(plugin_context.options, 'root_server_list', None) or getattr(plugin_context.options, 'rs', None))
         ret = cursor.fetchone("SHOW PARAMETERS LIKE 'obconfig_url';")
         obconfig_url = ret['value']
-        if not obconfig_url:
+        if not obconfig_url and not rs_list:
             stdio.error(EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER.format(target_oceanbase_deploy=ob_deploy.name))
             stdio.stop_loading('fail')
             return plugin_context.return_false()
-        plugin_context.set_variable('obconfig_url', obconfig_url)
+        if obconfig_url:
+            plugin_context.set_variable('obconfig_url', obconfig_url)
+        else:
+            plugin_context.set_variable('root_service_list', rs_list)
     except Exception as e:
         stdio.error(e)
     stdio.stop_loading('succeed')

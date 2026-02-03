@@ -18,6 +18,7 @@ from __future__ import absolute_import, division, print_function
 import os
 import sys
 import re
+import yaml
 from glob import glob
 
 import tool
@@ -86,8 +87,13 @@ def check_test(plugin_context, env, *args, **kwargs):
     if 'all' in opt and opt['all'] and os.path.isdir(os.path.realpath(opt['suite_dir'])):
         opt['suite'] = ','.join(os.listdir(os.path.realpath(opt['suite_dir'])))
     if 'psmall' in opt and opt['psmall']:
-        test_set = get_variable_from_python_file(
-            opt.get('psmall_test'), 'psmall_test', default_file='psmalltest.py', default_value=[], stdio=stdio)
+        if os.path.exists(opt.get('psmall_test')):
+            with open(opt.get('psmall_test'), 'r') as f:
+                config = yaml.safe_load(f)
+                test_set = config.get('runtime_configs', {}).get('psmall', {}).get('test-set', [])
+                opt['reboot_after_run_count'] = config.get('runtime_configs', {}).get('psmall', {}).get('reboot-after-run-count', 0)
+        else:
+            test_set = []
         opt['source_limit'] = get_variable_from_python_file(
             opt.get('psmall_source'), 'psmall_source', default_file='psmallsource.py', default_value={}, stdio=stdio)
         has_test_point = True
