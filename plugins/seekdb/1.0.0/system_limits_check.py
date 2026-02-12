@@ -14,9 +14,12 @@
 # limitations under the License.
 from __future__ import absolute_import, division, print_function
 
+import platform
 import re
 
 import _errno as err
+
+IS_DARWIN = platform.system() == 'Darwin'
 
 
 def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict_check=False,  *args, **kwargs):
@@ -40,62 +43,75 @@ def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict
         ip_servers = servers_memory[ip]['servers'].keys()
         server_num = len(ip_servers)
 
-        ret = client.execute_command('cat /proc/sys/fs/aio-max-nr /proc/sys/fs/aio-nr')
-        if not ret:
-            for server in ip_servers:
-                critical(server, 'aio', err.EC_FAILED_TO_GET_AIO_NR.format(ip=ip), [err.SUG_CONNECT_EXCEPT.format()])
+        if IS_DARWIN:
+            # macOS does not have /proc/sys/fs/aio-max-nr, skip AIO check
+            stdio.verbose('Skip AIO check on macOS')
         else:
-            try:
-                max_nr, nr = ret.stdout.strip().split('\n')
-                max_nr, nr = int(max_nr), int(nr)
-                need = server_num * 20000
-                RECD_AIO = 1048576
-                if need > max_nr - nr:
-                    for server in ip_servers:
-                        critical(server, 'aio', err.EC_AIO_NOT_ENOUGH.format(ip=ip, avail=max_nr - nr, need=need), [err.SUG_SYSCTL.format(var='fs.aio-max-nr', value=max(RECD_AIO, need), ip=ip)])
-                elif int(max_nr) < RECD_AIO:
-                    for server in ip_servers:
-                        alert(server, 'aio', err.WC_AIO_NOT_ENOUGH.format(ip=ip, current=max_nr), [err.SUG_SYSCTL.format(var='fs.aio-max-nr', value=RECD_AIO, ip=ip)])
-            except:
+            ret = client.execute_command('cat /proc/sys/fs/aio-max-nr /proc/sys/fs/aio-nr')
+            if not ret:
                 for server in ip_servers:
-                    alert(server, 'aio', err.EC_FAILED_TO_GET_AIO_NR.format(ip=ip), [err.SUG_UNSUPPORT_OS.format()])
-                stdio.exception('')
-
-        ret = client.execute_command('bash -c "ulimit -a"')
-        ulimits = {}
-        src_data = re.findall('\s?([a-zA-Z\s]+[a-zA-Z])\s+\([a-zA-Z\-,\s]+\)\s+([\d[a-zA-Z]+)', ret.stdout) if ret else []
-        for key, value in src_data:
-            ulimits[key] = value
-        for key in ulimits_min:
-            value = ulimits.get(key)
-            if value == 'unlimited':
-                continue
-            if not value or not (value.strip().isdigit()):
-                for server in ip_servers:
-                    alert(server, 'ulimit', '(%s) failed to get %s' % (ip, key), suggests=[err.SUG_UNSUPPORT_OS.format()])
+                    critical(server, 'aio', err.EC_FAILED_TO_GET_AIO_NR.format(ip=ip), [err.SUG_CONNECT_EXCEPT.format()])
             else:
-                value = int(value)
-                need = ulimits_min[key]['need'](server_num)
-                if need > value:
-                    if (strict_check or production_mode) and ulimits_min[key].get('below_recd_error_strict', True) and value < ulimits_min[key]['recd'](server_num):
-                        need = ulimits_min[key]['recd'](server_num)
-                    need = need if need != INF else 'unlimited'
+                try:
+                    max_nr, nr = ret.stdout.strip().split('\n')
+                    max_nr, nr = int(max_nr), int(nr)
+                    need = server_num * 20000
+                    RECD_AIO = 1048576
+                    if need > max_nr - nr:
+                        for server in ip_servers:
+                            critical(server, 'aio', err.EC_AIO_NOT_ENOUGH.format(ip=ip, avail=max_nr - nr, need=need), [err.SUG_SYSCTL.format(var='fs.aio-max-nr', value=max(RECD_AIO, need), ip=ip)])
+                    elif int(max_nr) < RECD_AIO:
+                        for server in ip_servers:
+                            alert(server, 'aio', err.WC_AIO_NOT_ENOUGH.format(ip=ip, current=max_nr), [err.SUG_SYSCTL.format(var='fs.aio-max-nr', value=RECD_AIO, ip=ip)])
+                except:
                     for server in ip_servers:
-                        if ulimits_min[key].get('below_need_error', True):
-                            critical(server, 'ulimit', err.EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), [err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
-                        else:
-                            alert(server, 'ulimit', err.EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), suggests=[err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                        alert(server, 'aio', err.EC_FAILED_TO_GET_AIO_NR.format(ip=ip), [err.SUG_UNSUPPORT_OS.format()])
+                    stdio.exception('')
+
+        if IS_DARWIN:
+            # macOS ulimit defaults are different and cannot be changed the same way as Linux.
+            # Skip ulimit checks on macOS to avoid false errors.
+            stdio.verbose('Skip ulimit check on macOS')
+        else:
+            ret = client.execute_command('bash -c "ulimit -a"')
+            ulimits = {}
+            src_data = re.findall('\s?([a-zA-Z\s]+[a-zA-Z])\s+\([a-zA-Z\-,\s]+\)\s+([\d[a-zA-Z]+)', ret.stdout) if ret else []
+            for key, value in src_data:
+                ulimits[key] = value
+            for key in ulimits_min:
+                value = ulimits.get(key)
+                if value == 'unlimited':
+                    continue
+                if not value or not (value.strip().isdigit()):
+                    for server in ip_servers:
+                        alert(server, 'ulimit', '(%s) failed to get %s' % (ip, key), suggests=[err.SUG_UNSUPPORT_OS.format()])
                 else:
-                    need = ulimits_min[key]['recd'](server_num)
+                    value = int(value)
+                    need = ulimits_min[key]['need'](server_num)
                     if need > value:
+                        if (strict_check or production_mode) and ulimits_min[key].get('below_recd_error_strict', True) and value < ulimits_min[key]['recd'](server_num):
+                            need = ulimits_min[key]['recd'](server_num)
                         need = need if need != INF else 'unlimited'
                         for server in ip_servers:
-                            if ulimits_min[key].get('below_recd_error_strict', True):
-                                alert(server, 'ulimit', err.WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), suggests=[err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                            if ulimits_min[key].get('below_need_error', True):
+                                critical(server, 'ulimit', err.EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), [err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
                             else:
-                                stdio.warn(err.WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value))
+                                alert(server, 'ulimit', err.EC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), suggests=[err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                    else:
+                        need = ulimits_min[key]['recd'](server_num)
+                        if need > value:
+                            need = need if need != INF else 'unlimited'
+                            for server in ip_servers:
+                                if ulimits_min[key].get('below_recd_error_strict', True):
+                                    alert(server, 'ulimit', err.WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value), suggests=[err.SUG_ULIMIT.format(name=ulimits_min[key]['name'], value=need, ip=ip)])
+                                else:
+                                    stdio.warn(err.WC_ULIMIT_CHECK.format(server=ip, key=key, need=need, now=value))
 
-        if kernel_check:
+        if IS_DARWIN:
+            # macOS sysctl params have different names than Linux kernel params.
+            # Skip kernel param check on macOS.
+            stdio.verbose('Skip kernel param check on macOS')
+        elif kernel_check:
             # check kernel params
             try:
                 for server in plugin_context.cluster_config.servers:

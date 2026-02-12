@@ -96,7 +96,7 @@ def start_pre(plugin_context, *args, **kwargs):
         remote_pid_path = '%s/run/seekdb.pid' % home_path
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid:
-            if client.execute_command('ls /proc/%s' % remote_pid):
+            if client.execute_command('ps -p %s' % remote_pid):
                 continue
 
         stdio.verbose('%s start command construction' % server)

@@ -15,9 +15,12 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import platform
 
 import _errno as err
 from _types import Capacity
+
+IS_DARWIN = platform.system() == 'Darwin'
 
 
 def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
@@ -109,7 +112,11 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
 
                 devname = server_config.get('devname')
                 if devname:
-                    if not client.execute_command("grep -e '^ *%s:' /proc/net/dev" % devname):
+                    if IS_DARWIN:
+                        devname_check_cmd = "ifconfig %s 2>/dev/null" % devname
+                    else:
+                        devname_check_cmd = "grep -e '^ *%s:' /proc/net/dev" % devname
+                    if not client.execute_command(devname_check_cmd):
                         suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                         suggest.auto_fix = 'devname' not in global_generate_config and 'devname' not in server_generate_config
                         critical(server, 'net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])

@@ -111,7 +111,7 @@ class InitDirFailedErrorMessage(object):
     PERMISSION_DENIED = ': {path} permission denied .'
 
 
-DOC_LINK = '<DOC_LINK>'
+DOC_LINK = ''
 DOC_LINK_MSG = 'See {}'.format(DOC_LINK if DOC_LINK else "https://www.oceanbase.com/product/ob-deployer/error-codes .")
 
 # generic error code

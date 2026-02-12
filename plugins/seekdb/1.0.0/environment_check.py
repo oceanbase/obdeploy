@@ -15,12 +15,15 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import platform
 import re
 
 import _errno as err
 from _arch import getBaseArch
 from _rpm import Version
 from tool import get_port_socket_inode, contains_duplicate_nodes
+
+IS_DARWIN = platform.system() == 'Darwin'
 
 
 def environment_check(plugin_context, work_dir_empty_check=True, generate_configs={}, *args, **kwargs):
@@ -140,7 +143,10 @@ def environment_check(plugin_context, work_dir_empty_check=True, generate_config
 
         basearch = getBaseArch()
         stdio.verbose("basearch: %s" % basearch)
-        if 'x86' in basearch and len(re.findall(r'(^avx\s+)|(\s+avx\s+)|(\s+avx$)', client.execute_command('lscpu | grep avx').stdout)) == 0:
+        if IS_DARWIN:
+            # macOS does not have lscpu; Apple Silicon natively supports atomics and AVX is N/A.
+            stdio.verbose('Skip CPU instruction set check on macOS')
+        elif 'x86' in basearch and len(re.findall(r'(^avx\s+)|(\s+avx\s+)|(\s+avx$)', client.execute_command('lscpu | grep avx').stdout)) == 0:
             if not (Version('4.2.5.6') <= repository.version < Version('4.3.0.0') or Version('4.3.5.4') <= repository.version < Version('4.4.0.0') or Version('4.4.1.0') <= repository.version):
                 critical(server, 'cpu', err.EC_CPU_NOT_SUPPORT_INSTRUCTION_SET.format(server=server, instruction_set='avx'), [err.SUG_CHANGE_SERVER.format()])
         elif ('arm' in basearch or 'aarch' in basearch) and len(re.findall(r'(^atomics\s+)|(\s+atomics\s+)|(\s+atomics$)', client.execute_command('lscpu | grep atomics').stdout)) == 0 and 'nonlse' not in repository.release:
