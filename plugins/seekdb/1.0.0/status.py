@@ -30,6 +30,6 @@ def status(plugin_context, *args, **kwargs):
             continue
         remote_pid_path = '%s/run/seekdb.pid' % server_config['home_path']
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
-        if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
+        if remote_pid and client.execute_command('ps -p %s' % remote_pid):
             cluster_status[server] = 1
     return plugin_context.return_true(cluster_status=cluster_status)

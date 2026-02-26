@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import platform
 import re
 
 from _plugin import InstallPlugin
@@ -158,7 +159,10 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
             for file_item in check_file_map.values():
                 if file_item.type == InstallPlugin.FileItemType.BIN:
                     remote_file_path = os.path.join(remote_home_path, file_item.target_path)
-                    ret = client.execute_command('ldd %s' % remote_file_path)
+                    if platform.system() == 'Darwin':
+                        ret = client.execute_command('otool -L %s' % remote_file_path)
+                    else:
+                        ret = client.execute_command('ldd %s' % remote_file_path)
                     libs = re.findall('(/?[\w+\-/]+\.\w+[\.\w]+)[\s\\n]*\=\>[\s\\n]*not found', ret.stdout)
                     if not libs:
                         libs = re.findall('(/?[\w+\-/]+\.\w+[\.\w]+)[\s\\n]*\=\>[\s\\n]*not found', ret.stderr)

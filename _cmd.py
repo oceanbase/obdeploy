@@ -3076,6 +3076,8 @@ There is NO WARRANTY, to the extent permitted by law.''' % (VERSION, REVISION, B
         self.parser._add_version_option()
 
 if __name__ == '__main__':
+    import multiprocessing
+    multiprocessing.freeze_support()
     defaultencoding = 'utf-8'
     if sys.getdefaultencoding() != defaultencoding:
         try:

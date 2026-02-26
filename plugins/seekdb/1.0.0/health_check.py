@@ -37,7 +37,7 @@ def health_check(plugin_context, *args, **kwargs):
         remote_pid_path = '%s/run/seekdb.pid' % home_path
         stdio.verbose('%s program health check' % server)
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
-        if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
+        if remote_pid and client.execute_command('ps -p %s' % remote_pid):
             stdio.verbose('%s seekdb[pid: %s] started', server, remote_pid)
         else:
             failed.append(EC_OBSERVER_FAIL_TO_START.format(server=server))

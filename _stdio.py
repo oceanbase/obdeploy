@@ -1150,7 +1150,11 @@ def safe_stdio_decorator(default_stdio=None):
             is_bond_method = True
             _type = type(func)
             func = func.__func__
-        all_parameters = inspect2.signature(func).parameters
+        try:
+            all_parameters = inspect2.signature(func).parameters
+        except (ValueError, TypeError):
+            # Builtin slot wrappers (e.g. object.__init__) can't be inspected on Python 3.13+
+            return _type(func) if is_bond_method else func
         if "stdio" in all_parameters:
             default_stdio_in_params = all_parameters["stdio"].default
             if not isinstance(default_stdio_in_params, Parameter.empty):
