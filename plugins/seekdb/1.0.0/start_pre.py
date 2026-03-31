@@ -16,11 +16,17 @@
 from __future__ import absolute_import, division, print_function
 import json
 import os.path
+import platform
+from copy import deepcopy
+
 from tool import FileUtil
 from collections import OrderedDict
+from const import PLATFORM_DARWIN
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
 
 
-def construct_opts(server_config, param_list,  cmd):
+def construct_opts(server_config, param_list,  cmd, primary_rpc_info):
 
     not_opt_lite_str = OrderedDict({
         'mysql_port': '--port',
@@ -41,20 +47,30 @@ def construct_opts(server_config, param_list,  cmd):
     opt_str = []
     for key in param_list:
         if key not in not_cmd_opt and key not in not_opt_lite_str and not key.startswith('ocp_meta_tenant_'):
+            if key == 'rpc_port' and not param_list.get('enable_rpc_service'):
+                continue
             value = get_value(key)
             opt_str.append('%s=%s' % (key, value))
+        if key == 'enable_rpc_service' and get_value(key):
+            opt_str.append('enable_rpc_tls=true')
 
     param_list['mysql_port'] = server_config['mysql_port']
     for key in not_opt_lite_str:
         if key in param_list:
             value = get_value(key)
             cmd.append('%s %s' % (not_opt_lite_str[key], value))
+    if primary_rpc_info:
+        cmd.append('--role=STANDBY')
+        log_restore_source = "'" + primary_rpc_info['primary_ip'] + ':' + str(primary_rpc_info['rpc_port']) + "'"
+        opt_str.append('log_restore_source=%s' % log_restore_source)
+
     if len(opt_str) > 0:
         cmd.append(' ' + ' '.join([f'--parameter {opt}' for opt in opt_str]))
 
 
 def start_pre(plugin_context, *args, **kwargs):
     new_cluster_config = plugin_context.get_variable('new_cluster_config')
+    primary_rpc_info = plugin_context.get_variable('primary_rpc_info')
     cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
@@ -68,6 +84,9 @@ def start_pre(plugin_context, *args, **kwargs):
         scale_out = False
         need_bootstrap = True
 
+    mock_primary_rpc_info = deepcopy(primary_rpc_info)
+    if mock_primary_rpc_info and mock_primary_rpc_info['primary_ip'] in [server.ip for server in cluster_config.servers]:
+        mock_primary_rpc_info = None
     for server in cluster_config.servers:
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
@@ -96,8 +115,12 @@ def start_pre(plugin_context, *args, **kwargs):
         remote_pid_path = '%s/run/seekdb.pid' % home_path
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
         if remote_pid:
-            if client.execute_command('ls /proc/%s' % remote_pid):
-                continue
+            if IS_DARWIN:
+                if client.execute_command('ps -p %s' % remote_pid):
+                    continue
+            else:
+                if client.execute_command('ls /proc/%s' % remote_pid):
+                    continue
 
         stdio.verbose('%s start command construction' % server)
         if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s/etc/seekdb.config.bin' % home_path):
@@ -107,7 +130,7 @@ def start_pre(plugin_context, *args, **kwargs):
 
         cmd = []
         if use_parameter:
-            construct_opts(server_config, param_config, cmd)
+            construct_opts(server_config, param_config, cmd, mock_primary_rpc_info)
         else:
             cmd.append('--port %s' % server_config['mysql_port'])
 

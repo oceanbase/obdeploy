@@ -636,7 +636,12 @@ export default function InstallConfig({
                           })}
                         </Tag>
                       ) : (
-                        <Tag className="blue-tag ml-8">单机版</Tag>
+                        <Tag className="blue-tag ml-8">
+                          {intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.StandaloneEdition',
+                            defaultMessage: '单机版',
+                          })}
+                        </Tag>
                       )}
 
                       {item?.type === 'local' ? (
@@ -1004,7 +1009,10 @@ export default function InstallConfig({
           <ProCard
             title={
               <span style={{ fontWeight: '400' }}>
-                部署模式
+                {intl.formatMessage({
+                  id: 'OBD.pages.Obdeploy.InstallConfig.DeploymentMode',
+                  defaultMessage: '部署模式',
+                })}
               </span>
             }
             headStyle={{ paddingTop: 0 }}
@@ -1027,11 +1035,20 @@ export default function InstallConfig({
                 overlayInnerStyle={{ width: 400 }}
                 title={
                   <div style={{ color: '#132039' }}>
-                    分布式集群是 OceanBase 的企业级原生分布式数据库架构，相较于集中式单机，分布式集群具备金融级高可用以及平滑扩缩容能力，高度兼容 Oracle（仅商业版）/MySQL 模式，适用于对数据安全要求较高的核心业务系统。
+                    {intl.formatMessage({
+                      id: 'OBD.pages.Obdeploy.InstallConfig.DistributedModeDesc',
+                      defaultMessage:
+                        '分布式集群是 OceanBase 的企业级原生分布式数据库架构，相较于集中式单机，分布式集群具备金融级高可用以及平滑扩缩容能力，高度兼容 Oracle（仅商业版）/MySQL 模式，适用于对数据安全要求较高的核心业务系统。',
+                    })}
                   </div>
                 }
               >
-                <Radio value="distributed">分布式</Radio>
+                <Radio value="distributed">
+                  {intl.formatMessage({
+                    id: 'OBD.pages.Obdeploy.InstallConfig.Distributed',
+                    defaultMessage: '分布式',
+                  })}
+                </Radio>
               </Tooltip>
               <Tooltip
                 color={'#fff'}
@@ -1039,11 +1056,20 @@ export default function InstallConfig({
                 overlayInnerStyle={{ width: 400 }}
                 title={
                   <div style={{ color: '#132039' }}>
-                    相较于分布式集群，单机集中式仅需一台主机，部署简单，即开即用。但无多副本及扩缩容能力，适用于开发测试以及数据安全要求不高的业务系统。
+                    {intl.formatMessage({
+                      id: 'OBD.pages.Obdeploy.InstallConfig.StandaloneModeDesc',
+                      defaultMessage:
+                        '相较于分布式集群，单机集中式仅需一台主机，部署简单，即开即用。但无多副本及扩缩容能力，适用于开发测试以及数据安全要求不高的业务系统。',
+                    })}
                   </div>
                 }
               >
-                <Radio value="standalone">单机</Radio>
+                <Radio value="standalone">
+                  {intl.formatMessage({
+                    id: 'OBD.pages.Obdeploy.InstallConfig.Standalone',
+                    defaultMessage: '单机',
+                  })}
+                </Radio>
               </Tooltip>
 
             </Radio.Group>
@@ -1184,9 +1210,11 @@ export default function InstallConfig({
                   </span>
 
                   <span className={styles.titleExtra}>
-                    负载类型主要影响 SQL
-                    类大查询判断时间（参数：large_query_threshold），对 OLTP
-                    类型业务的 RT 可能存在较大影响，请谨慎选择。
+                    {intl.formatMessage({
+                      id: 'OBD.pages.Obdeploy.InstallConfig.LoadTypeTip',
+                      defaultMessage:
+                        '负载类型主要影响 SQL 类大查询判断时间（参数：large_query_threshold），对 OLTP 类型业务的 RT 可能存在较大影响，请谨慎选择。',
+                    })}
                   </span>
                 </>
               }

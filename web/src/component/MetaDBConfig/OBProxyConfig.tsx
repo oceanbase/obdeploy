@@ -387,7 +387,7 @@ export default function OBProxyConfig({
           }}
         >
           {cluserMoreChange ? <CaretDownOutlined /> : <CaretRightOutlined />}
-          <span style={{ width: 150 }}>
+          <span >
             {intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.OBProxyConfig.MoreConfigurations',
               defaultMessage: '更多配置',

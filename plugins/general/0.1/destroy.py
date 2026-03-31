@@ -16,12 +16,18 @@
 from __future__ import absolute_import, division, print_function
 
 from _errno import EC_CLEAN_PATH_FAILED
+from const import PLATFORM_DARWIN
 
 global_ret = True
 
 def check_mount_path(client, path, stdio):
     stdio and getattr(stdio, 'verbose', print)('check mount: %s' % path)
     try:
+        import platform
+        if platform.system() == PLATFORM_DARWIN:
+            if client.execute_command("mount | grep 'on %s '" % path):
+                return True
+            return False
         if client.execute_command("grep '\\s%s\\s' /proc/mounts" % path):
             return True
         return False

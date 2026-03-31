@@ -705,9 +705,15 @@ export default function InstallConfig() {
 
     {
       title: <div>
-        CM 访问地址
+        {intl.formatMessage({
+          id: 'OBD.pages.Oms.ConnectionInfo.CmAccessAddress',
+          defaultMessage: 'CM 访问地址',
+        })}
         <span style={{ fontSize: 13 }}>
-          （非VIP/DNS时端口必须和CM端口必须一致)
+          {intl.formatMessage({
+            id: 'OBD.pages.Oms.InstallConfig.CmAccessAddressDescription',
+            defaultMessage: '（非VIP/DNS时端口必须和CM端口必须一致)',
+          })}
         </span>
 
       </div>,
@@ -1952,25 +1958,18 @@ export default function InstallConfig() {
                 })}
                 required={false}
                 extra={
-                  <>
+                  <div style={{ width: 304 }}>
                     {intl.formatMessage({
                       id: 'OBD.pages.Oms.InstallConfig.PleaseProvideHostUsernameForAutomatedConfiguration',
-                      defaultMessage: '请提供主机用户名用以自动化配置平台专用操作',
+                      defaultMessage: '请提供主机用户名用以自动化配置平台专用操作系统用户',
                     })}
-                    <div>
+                    <a href={DOCS_USER} target="_blank" style={{ marginLeft: '4px', display: 'inline' }}>
                       {intl.formatMessage({
-                        id: 'OBD.pages.Oms.InstallConfig.SystemUser',
-                        defaultMessage: '系统用户',
+                        id: 'OBD.component.MetaDBConfig.UserConfig.ViewHelpDocuments',
+                        defaultMessage: '查看帮助文档',
                       })}
-                      <a href={DOCS_USER} target="_blank" style={{ marginLeft: '4px', display: 'inline' }}>
-                        {intl.formatMessage({
-                          id: 'OBD.component.MetaDBConfig.UserConfig.ViewHelpDocuments',
-                          defaultMessage: '查看帮助文档',
-                        })}
-                      </a>
-                    </div>
-
-                  </>
+                    </a>
+                  </div>
                 }
                 rules={[
                   {

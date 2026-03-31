@@ -106,9 +106,9 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
     const configDataWithoutId: any = {
       ...configDataWithoutAppname,
       auth: {
-        ...auth,
         user: auth.username,
         password: auth.password ? encrypt(auth.password, publicKey) : encrypt('', publicKey),
+        port: auth.ssh_port
       },
       oms_meta_password: oms_meta_password ? encrypt(oms_meta_password, publicKey) : encrypt('', publicKey),
       regions: configData?.regions?.map(({ id, ...rest }: any) => {
@@ -473,7 +473,6 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
             })}
         style={{
           margin: '16px 0',
-          height: 54,
         }}
       />
       <ProCard className={mainStyles.pageCard} split="horizontal">
@@ -752,7 +751,6 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               style={{ backgroundColor: '#f8fafe' }}
             >
               <ProCard
-                colSpan={6}
                 style={{ backgroundColor: '#f8fafe' }}
               >
                 {

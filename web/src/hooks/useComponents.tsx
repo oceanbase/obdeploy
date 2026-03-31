@@ -100,7 +100,10 @@ export const useComponents = (extra?: boolean, standAlone?: boolean) => {
     params = [
       ...params,
       {
-        group: '工具',
+        group: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.Tools',
+          defaultMessage: '工具',
+        }),
         key: 'prometheusTool',
         onlyAll: true,
         content: [
@@ -118,7 +121,10 @@ export const useComponents = (extra?: boolean, standAlone?: boolean) => {
         ],
       },
       {
-        group: '工具',
+        group: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.Tools',
+          defaultMessage: '工具',
+        }),
         key: 'grafanaTool',
         onlyAll: true,
         content: [
@@ -136,7 +142,10 @@ export const useComponents = (extra?: boolean, standAlone?: boolean) => {
         ],
       },
       {
-        group: '工具',
+        group: intl.formatMessage({
+          id: 'OBD.pages.components.InstallConfig.Tools',
+          defaultMessage: '工具',
+        }),
         key: 'alertManagerTool',
         onlyAll: true,
         content: [

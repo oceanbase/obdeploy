@@ -21,19 +21,14 @@ import time
 def major_freeze(plugin_context, cursor, *args, **kwargs):
 
     stdio = plugin_context.stdio
-    tenant_name = kwargs.get('tenant')
-    tenant_id = cursor.fetchone("select TENANT_ID from oceanbase.DBA_OB_TENANTS where tenant_name = '%s'" % tenant_name)
-    if tenant_id is False:
-        return
-    tenant_id = tenant_id["TENANT_ID"]
     # Major freeze
     stdio.start_loading('Merge')
-    sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION where tenant_id = '%s'" % tenant_id
+    sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION"
     merge_version = cursor.fetchone(sql_frozen_scn)
     if merge_version is False:
         return
     merge_version = merge_version['FROZEN_SCN']
-    if cursor.execute("alter system major freeze tenant = %s" % tenant_name) is False:
+    if cursor.execute("alter system major freeze") is False:
         return
     while True:
         current_version = cursor.fetchone(sql_frozen_scn)

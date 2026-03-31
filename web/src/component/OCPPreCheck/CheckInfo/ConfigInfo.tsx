@@ -11,6 +11,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { leftCardStyle } from '.';
 import styles from './index.less';
 import type { ConnectInfoPropType, DBNodeType } from './type';
+import { divide } from 'lodash';
 interface BasicInfo {
   isNewDB: boolean;
   configInfoProp: ConnectInfoPropType;
@@ -123,7 +124,10 @@ export default function ConfigInfo({
           value: obConfigInfo?.rpc_port,
         },
         {
-          label: 'obshell 端口',
+          label: intl.formatMessage({
+            id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.ObshellPort',
+            defaultMessage: 'obshell 端口',
+          }),
           key: 'obshell_port',
           colSpan: 4,
           value: obConfigInfo?.obshell_port,
@@ -321,7 +325,10 @@ export default function ConfigInfo({
 
               <ProCard
                 style={leftCardStyle}
-                title={'密码'}
+                title={intl.formatMessage({
+                  id: 'OBD.OCPPreCheck.CheckInfo.ResourceInfo.Password',
+                  defaultMessage: '密码',
+                })}
               >
                 <PasswordCard password={userConfig.password} />
               </ProCard>
@@ -352,7 +359,15 @@ export default function ConfigInfo({
                     <ProCard
                       style={idx === 0 ? leftCardStyle : {}}
                       key={idx}
-                      title={`节点${idx + 1}`}
+                      title={
+                        <div>
+                          {intl.formatMessage({
+                            id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.Node{idx}',
+                            defaultMessage: '节点',
+                          })}
+                          {idx + 1}
+                        </div>
+                      }
                     >
                       {server}
                     </ProCard>

@@ -31,6 +31,7 @@ from copy import deepcopy
 from xml.etree import cElementTree
 
 import const
+from const import PLATFORM_DARWIN
 from _stdio import SafeStdio
 from ssh import LocalClient
 try:
@@ -50,6 +51,9 @@ arch = 'arm' if basearch.startswith('arm') or basearch.startswith('aarch') else 
 _NO_LSE = (arch=='arm') and (LocalClient.execute_command("lscpu | grep atomics").stdout.strip() == '')
 
 def get_use_centos_release(stdio=None):
+    import platform
+    if platform.system() == PLATFORM_DARWIN:
+        return '7', {'ID': 'darwin', 'VERSION_ID': platform.mac_ver()[0], 'releasever': '7'}
     _RELEASE = None
     SUP_MAP = {
         'ubuntu': {'16': 7},

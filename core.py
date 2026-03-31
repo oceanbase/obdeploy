@@ -808,6 +808,38 @@ class ObdHome(object):
         EDITOR = os.environ.get('EDITOR', 'vi')
         self._call_stdio('verbose', 'Get environment variable EDITOR=%s' % EDITOR)
         self._call_stdio('verbose', 'Create tmp yaml file')
+        # Check if /tmp directory has write permission and is accessible
+        tmp_dir = tempfile.gettempdir()
+        try:
+            tmp_stat = os.stat(tmp_dir)
+            # Check if it's a directory (0o040000 = S_IFDIR)
+            if not (tmp_stat.st_mode & 0o040000):
+                self._call_stdio('error', 'The /tmp directory is not a directory.')
+                return False
+            current_uid = os.getuid()
+            current_gid = os.getgid()
+            can_write = False
+            if tmp_stat.st_uid == current_uid and (tmp_stat.st_mode & 0o200):
+                can_write = True
+            elif tmp_stat.st_gid == current_gid and (tmp_stat.st_mode & 0o020):
+                can_write = True
+            elif tmp_stat.st_mode & 0o002:
+                can_write = True
+            if not can_write:
+                self._call_stdio('error', 'The /tmp directory does not have write permission for the current user. Please check the permissions.')
+                return False
+            test_file = os.path.join(tmp_dir, '.obd_test_write_%d' % os.getpid())
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+            except (OSError, IOError) as e:
+                self._call_stdio('error', 'Cannot write to /tmp directory: %s. Please check the permissions and security settings (e.g., SELinux, AppArmor, mount options).' % str(e))
+                return False
+        except (OSError, IOError) as e:
+            self._call_stdio('error', 'Failed to check /tmp directory permissions: %s' % str(e))
+            return False
+        
         tf = tempfile.NamedTemporaryFile(suffix=".yaml")
         tf.write(initial_config.encode())
         tf.flush()
@@ -1139,17 +1171,20 @@ class ObdHome(object):
         tf.close()
         return ret
 
-    def list_deploy(self):
+    def list_deploy(self, component_filter=None):
+        """List deployments. If component_filter is set (e.g. 'seekdb'), only list deploys that contain that component."""
         self._call_stdio('verbose', 'Get deploy list')
         deploys = self.deploy_manager.get_deploy_configs()
+        if component_filter:
+            deploys = [d for d in (deploys or []) if component_filter in d.deploy_config.components]
         if deploys:
             self._call_stdio('print_list', deploys,
                 ['Name', 'Configuration Path', 'Status (Cached)'],
                 lambda x: [x.name, x.config_dir, x.deploy_info.status.value],
-                title='Cluster List',
+                title='SeekDB Cluster List' if component_filter == const.COMP_OB_SEEKDB else 'Cluster List',
             )
         else:
-            self._call_stdio('print', 'Local deploy is empty')
+            self._call_stdio('print', 'Local deploy is empty' if not component_filter else 'No deploy with component "%s".' % component_filter)
         return True
 
     def get_install_plugin_and_install(self, repositories, pkgs):
@@ -2417,6 +2452,15 @@ class ObdHome(object):
             return False
         return True
 
+    def _require_seekdb_check(self, deploy, name):
+        """When options.require_seekdb_component is set (obd seekdb * commands), ensure deploy has seekdb component."""
+        if not getattr(self.options, 'require_seekdb_component', False):
+            return True
+        if not deploy or 'seekdb' not in deploy.deploy_config.components:
+            self._call_stdio('error', 'Deploy "%s" does not contain seekdb component. Only clusters with seekdb are supported by this command.' % name)
+            return False
+        return True
+
     def start_cluster(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
@@ -2424,7 +2468,9 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+        if not self._require_seekdb_check(deploy, name):
+            return False
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Deploy status judge')
         if deploy_info.status not in [DeployStatus.STATUS_DEPLOYED, DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_RUNNING]:
@@ -2437,6 +2483,9 @@ class ObdHome(object):
         if deploy_info.config_status != DeployConfigStatus.UNCHNAGE and deploy_info.status != DeployStatus.STATUS_STOPPED and getattr(self.options, 'with_parameter', False):
             self._call_stdio('error', 'Deploy %s.%s\nIf you still need to start the cluster, use the `obd cluster start %s ` option to start the cluster without loading parameters. ' % (deploy_info.config_status.value, deploy.effect_tip(), name))
             return False
+
+        if deploy_info.status == DeployStatus.STATUS_DEPLOYED:
+            setattr(self.options, 'with_parameter', True)
 
         self._call_stdio('start_loading', 'Get local repositories')
 
@@ -2883,7 +2932,9 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+        if not self._require_seekdb_check(deploy, name):
+            return False
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Deploy status judge')
         if deploy_info.status != DeployStatus.STATUS_RUNNING:
@@ -2928,7 +2979,9 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+        if not self._require_seekdb_check(deploy, name):
+            return False
+
         deploy_info = deploy.deploy_info
         self._call_stdio('verbose', 'Check the deploy status')
         status = [DeployStatus.STATUS_DEPLOYED, DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_RUNNING]
@@ -3007,7 +3060,9 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
-        
+        if not self._require_seekdb_check(deploy, name):
+            return False
+
         deploy_info = deploy.deploy_info
         status = [DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_RUNNING]
         if deploy_info.status not in status:
@@ -3242,6 +3297,8 @@ class ObdHome(object):
         if not deploy:
             self._call_stdio('error', 'No such deploy: %s.' % name)
             return False
+        if not self._require_seekdb_check(deploy, name):
+            return False
         if need_confirm and not self._call_stdio('confirm', FormatText.warning('Are you sure to destroy the "%s" cluster ?' % name)):
             return False
 
@@ -3321,6 +3378,320 @@ class ObdHome(object):
             self._call_stdio('print', '%s destroyed' % deploy.name)
             return True
         return False
+
+    def _seekdb_ensure_primary_log_disk_for_standby(self, primary_deploy_name, standby_memory_limit_str):
+        """Primary log_disk_size must be >= max(3*primary memory_limit, 3*standby memory_limit); else patch temp config and reload."""
+        stdio = self._call_stdio
+
+        def _fmt_cap_bytes(b):
+            if b >= 1024 ** 4:
+                return '%dT' % (b // (1024 ** 4))
+            if b >= 1024 ** 3:
+                return '%dG' % (b // (1024 ** 3))
+            if b >= 1024 ** 2:
+                return '%dM' % (b // (1024 ** 2))
+            return '%d' % b
+
+        if not primary_deploy_name:
+            return True
+        try:
+            ms = (standby_memory_limit_str or '').strip()
+            if not ms:
+                return True
+            standby_b = Capacity(ms).bytes
+        except Exception:
+            stdio('warn', 'Could not parse standby memory_limit; skipping primary log_disk_size adjustment.')
+            return True
+        deploy = self.deploy_manager.get_deploy_config(primary_deploy_name)
+        if not deploy or 'seekdb' not in (deploy.deploy_config.components or {}):
+            stdio('error', 'Primary deploy "%s" not found.' % primary_deploy_name)
+            return False
+        if deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            stdio('error', 'Primary "%s" must be RUNNING before standby install.' % primary_deploy_name)
+            return False
+        st = deploy.deploy_info.config_status
+        if st == DeployConfigStatus.NEED_RESTART:
+            stdio('error', 'Primary "%s" has pending config (NEED_RESTART). Restart the primary first, then retry standby install.' % primary_deploy_name)
+            return False
+        if st not in (DeployConfigStatus.UNCHNAGE, DeployConfigStatus.NEED_RELOAD):
+            stdio('error', 'Primary "%s" config status is %s. Resolve pending changes before standby install.' % (primary_deploy_name, st.value))
+            return False
+        g = deploy.deploy_config.components['seekdb'].get_global_conf()
+        try:
+            pm = Capacity(str(g.get('memory_limit') or '1G')).bytes
+        except Exception as e:
+            stdio('warn', 'Could not parse primary memory_limit: %s' % e)
+            return True
+        pl_raw = g.get('log_disk_size')
+        try:
+            if pl_raw is None or (isinstance(pl_raw, str) and not str(pl_raw).strip()):
+                pl = 0
+            else:
+                pl = Capacity(str(pl_raw).strip()).bytes
+        except Exception:
+            pl = 0
+        required = max(3 * pm, 3 * standby_b)
+        if pl >= required:
+            return True
+        new_log = _fmt_cap_bytes(required)
+        stdio('print', 'Primary log_disk_size (%s) < required %s (3x max(primary memory_limit, standby memory_limit)). Updating primary and reloading...' % (
+            pl_raw if pl_raw is not None else 'unset', new_log))
+        if deploy.deploy_info.config_status == DeployConfigStatus.UNCHNAGE:
+            src_path = Deploy.get_deploy_yaml_path(deploy.config_dir)
+        else:
+            src_path = Deploy.get_temp_deploy_yaml_path(deploy.config_dir)
+        try:
+            with open(src_path, 'r') as f:
+                initial_config = f.read()
+        except Exception as e:
+            stdio('error', 'Failed to read primary config: %s' % e)
+            return False
+        tf = tempfile.NamedTemporaryFile(suffix='.yaml', delete=False, mode='w')
+        try:
+            tf.write(initial_config)
+            tf.close()
+            new_deploy_config = DeployConfig(
+                tf.name,
+                yaml_loader=YamlLoader(self.stdio),
+                config_parser_manager=self.deploy_manager.config_parser_manager,
+                inner_config=deploy.deploy_config.inner_config if deploy.deploy_config else None,
+                config_encrypted=False,
+                stdio=self.stdio,
+            )
+            seekdb_cc = new_deploy_config.components.get('seekdb')
+            if not seekdb_cc:
+                stdio('error', 'SeekDB component not found in primary config.')
+                return False
+            if not seekdb_cc.update_global_conf('log_disk_size', new_log, save=True):
+                stdio('error', 'Failed to set log_disk_size in primary config copy.')
+                return False
+            target_src_path = Deploy.get_temp_deploy_yaml_path(deploy.config_dir)
+            if not FileUtil.copy(tf.name, target_src_path, self.stdio):
+                stdio('error', 'Failed to write temp deploy config.')
+                return False
+            if not deploy.update_deploy_config_status(DeployConfigStatus.NEED_RELOAD):
+                stdio('error', 'Failed to update deploy config status.')
+                return False
+        finally:
+            try:
+                os.unlink(tf.name)
+            except Exception:
+                pass
+        self.set_deploy(deploy)
+        ok = self.reload_cluster(primary_deploy_name)
+        self.set_deploy(None)
+        if not ok:
+            stdio('error', 'Primary reload failed after log_disk_size update. Fix primary deploy and retry.')
+            return False
+        stdio('print', 'Primary log_disk_size updated to %s and reloaded.' % new_log)
+        return True
+
+    def seekdb_install(self):
+        """Interactive SeekDB install: run workflow seekdb_install (interactive + seekdb plugins), then deploy. When primary RPC not enabled, handle revert/restart_later/restart_now in core."""
+        stdio = self._call_stdio
+        opts = self.options
+        standby = getattr(opts, 'standby', False)
+        primary = getattr(opts, 'primary', False)
+        if standby and primary:
+            stdio('error', 'Cannot specify both --standby and --primary.')
+            return False
+
+        interactive_repository = self.repository_manager.get_repository_allow_shadow('interactive', '1.0')
+        seekdb_repository = self.repository_manager.get_repository_allow_shadow('seekdb', '1.2.0.0')
+        self.set_repositories([interactive_repository, seekdb_repository])
+
+        workflows = self.get_workflows('seekdb_install')
+        if not self.run_workflow(workflows, **{'seekdb': {'deploy_manager': self.deploy_manager}}):
+            return False
+
+        ns_int = self.get_namespace('interactive')
+        ns_seekdb = self.get_namespace('seekdb')
+        need_rpc_choice = ns_seekdb.get_variable('need_rpc_choice')
+        rpc_action = ns_int.get_variable('rpc_action')
+        primary_deploy_name = ns_seekdb.get_variable('primary_deploy_name')
+
+        if need_rpc_choice and rpc_action:
+            if rpc_action == 'exit':
+                stdio('print', 'Exiting without changing primary config.')
+                return False
+            deploy = self.deploy_manager.get_deploy_config(primary_deploy_name)
+            if not deploy or 'seekdb' not in (deploy.deploy_config.components or {}):
+                stdio('error', 'Primary deploy "%s" or seekdb component not found.' % (primary_deploy_name or ''))
+                return False
+            # Do not modify the live config file directly. Copy to temp, modify the copy, write to tmp_config.yaml, set NEED_RESTART (same as edit-config).
+            if deploy.deploy_info.config_status == DeployConfigStatus.UNCHNAGE:
+                src_path = Deploy.get_deploy_yaml_path(deploy.config_dir)
+            else:
+                src_path = Deploy.get_temp_deploy_yaml_path(deploy.config_dir)
+            try:
+                with open(src_path, 'r') as f:
+                    initial_config = f.read()
+            except Exception as e:
+                stdio('error', 'Failed to read primary config: %s' % e)
+                return False
+            tf = tempfile.NamedTemporaryFile(suffix='.yaml', delete=False, mode='w')
+            try:
+                tf.write(initial_config)
+                tf.close()
+                new_deploy_config = DeployConfig(
+                    tf.name,
+                    yaml_loader=YamlLoader(self.stdio),
+                    config_parser_manager=self.deploy_manager.config_parser_manager,
+                    inner_config=deploy.deploy_config.inner_config if deploy.deploy_config else None,
+                    config_encrypted=False,
+                    stdio=self.stdio,
+                )
+                seekdb_cc = new_deploy_config.components.get('seekdb')
+                if not seekdb_cc:
+                    stdio('error', 'SeekDB component not found in primary config.')
+                    return False
+                if not seekdb_cc.update_global_conf('enable_rpc_service', True, save=True):
+                    stdio('error', 'Failed to set enable_rpc_service in config copy.')
+                    return False
+                target_src_path = Deploy.get_temp_deploy_yaml_path(deploy.config_dir)
+                if not FileUtil.copy(tf.name, target_src_path, self.stdio):
+                    stdio('error', 'Failed to write temp deploy config.')
+                    return False
+                if not deploy.update_deploy_config_status(DeployConfigStatus.NEED_RESTART):
+                    stdio('error', 'Failed to update deploy config status.')
+                    return False
+            finally:
+                try:
+                    os.unlink(tf.name)
+                except Exception:
+                    pass
+            if rpc_action == 'restart_now':
+                if not deploy.apply_temp_deploy_config():
+                    stdio('error', 'Failed to apply new deploy configuration.')
+                    return False
+                self.set_deploy(deploy)
+                if not self.stop_cluster(primary_deploy_name):
+                    return False
+                if not self.start_cluster(primary_deploy_name):
+                    return False
+                stdio('print', 'Primary cluster restarted with enable_rpc_service. Continuing standby install.')
+                self.set_deploy(None)
+
+        cfg = ns_int.get_variable('confirmed_config')
+        if not cfg:
+            stdio('error', 'No confirmed_config in namespace.')
+            return False
+        mode = ns_int.get_variable('install_mode')
+        base_info = ns_int.get_variable('base_info') or {}
+        password = base_info.get('password') or ''
+
+        ip = cfg.get('IP')
+        user = cfg.get('User')
+        home_path = cfg.get('home_path') or cfg.get('data_dir')
+        data_dir = cfg.get('data_dir')
+        redo_dir = cfg.get('redo_dir')
+        mysql_port = cfg.get('mysql_port') or '2881'
+        obshell_port = int(cfg.get('obshell_port') or 2886)
+        memory_limit_str = cfg.get('memory_limit')
+        memory_hard_limit_str = cfg.get('memory_hard_limit')
+        datafile_maxsize_str = cfg.get('datafile_maxsize')
+        max_syslog_file_count = int(cfg.get('max_syslog_file_count', 2))
+        log_disk_size_str = cfg.get('log_disk_size')
+        auto_start_raw = cfg.get('auto_start', False)
+
+        setattr(self.options, 'password', password)
+        if self.precheck_host(user, ip, dev=True) == 100:
+            while True:
+                if self._call_stdio('confirm', 'Do you want to modify the parameters above?', default_option=True):
+                    if self.init_host(user, ip, dev=True) == 101:
+                        if self._call_stdio('confirm',
+                                            'Do you want to quit the script and manually restart the machine to apply the optimizations?',
+                                            default_option=False):
+                            return False
+                break
+        if isinstance(auto_start_raw, bool):
+            enable_auto_start = auto_start_raw
+        else:
+            s = str(auto_start_raw).strip().lower()
+            enable_auto_start = s in ('true', '1', 'yes', 'on', 'y')
+        if not all([ip, user, home_path, data_dir, redo_dir, mysql_port, memory_limit_str, memory_hard_limit_str, datafile_maxsize_str, log_disk_size_str]):
+            stdio('error', 'Incomplete confirmed_config from namespace.')
+            return False
+
+        if mode == 'standby':
+            pdn = ns_seekdb.get_variable('primary_deploy_name')
+            if pdn and not self._seekdb_ensure_primary_log_disk_for_standby(pdn, memory_limit_str):
+                return False
+
+        enable_rpc = mode in ('primary', 'standby')
+        if enable_rpc and not cfg.get('rpc_port'):
+            stdio('error', 'rpc_port is required for primary/standby mode.')
+            return False
+        global_extra = {}
+        if enable_rpc:
+            global_extra['enable_rpc_service'] = True
+            global_extra['log_disk_utilization_threshold'] = 80
+            global_extra['rpc_port'] = int(cfg.get('rpc_port', 2882))
+        root_password = ''
+        if mode == 'standby':
+            primary_deploy_name = ns_seekdb.get_variable('primary_deploy_name')
+            if primary_deploy_name:
+                primary_deploy = self.deploy_manager.get_deploy_config(primary_deploy_name)
+                if primary_deploy and primary_deploy.deploy_config.components.get('seekdb'):
+                    seekdb_cc = primary_deploy.deploy_config.components['seekdb']
+                    root_password = (seekdb_cc.get_global_conf().get('root_password') or '')
+
+        run_mode = ns_int.get_variable('install_run_mode') or 'dev'
+        yaml_lines = [
+            '# Generated by obd seekdb install',
+            'seekdb:',
+            '  servers:',
+            '    - %s' % ip,
+            '  global:',
+            '    home_path: %s' % home_path,
+            '    data_dir: %s' % data_dir,
+            '    redo_dir: %s' % redo_dir,
+            '    mysql_port: %s' % mysql_port,
+            '    obshell_port: %s' % obshell_port,
+            '    memory_limit: %s' % memory_limit_str,
+            '    memory_hard_limit: %s' % memory_hard_limit_str,
+            '    datafile_maxsize: %s' % datafile_maxsize_str,
+            '    max_syslog_file_count: %d' % max_syslog_file_count,
+            '    log_disk_size: %s' % log_disk_size_str,
+            '    enable_auto_start: %s' % ('true' if enable_auto_start else 'false'),
+        ]
+        if run_mode == 'dev':
+            yaml_lines.append('    production_mode: false')
+        if root_password:
+            yaml_lines.append('    root_password: %s' % root_password)
+        if global_extra:
+            for k, v in global_extra.items():
+                if isinstance(v, bool):
+                    yaml_lines.append('    %s: %s' % (k, 'true' if v else 'false'))
+                else:
+                    yaml_lines.append('    %s: %s' % (k, v))
+        ssh_port_raw = cfg.get('ssh_port') if cfg.get('ssh_port') not in (None, '') else base_info.get('ssh_port')
+        try:
+            ssh_port = int(ssh_port_raw) if ssh_port_raw not in (None, '') else 22
+        except (ValueError, TypeError):
+            ssh_port = 22
+        if not (1 <= ssh_port <= 65535):
+            ssh_port = 22
+        yaml_lines.append('user:')
+        yaml_lines.append('  username: %s' % user)
+        if ssh_port != 22:
+            yaml_lines.append('  port: %d' % ssh_port)
+        if password:
+            yaml_lines.append('  password: %s' % password)
+        deploy_name = ns_seekdb.get_variable('cluster_name') or 'seekdb'
+        fd, path = tempfile.mkstemp(suffix='.yaml', prefix='obd_seekdb_')
+        try:
+            os.write(fd, '\n'.join(yaml_lines).encode('utf-8'))
+            os.close(fd)
+            setattr(self.options, 'config', path)
+            if not self.deploy_cluster(deploy_name):
+                return False
+            return self.start_cluster(deploy_name)
+        finally:
+            try:
+                os.unlink(path)
+            except Exception:
+                pass
 
     def prune_config(self, name, need_confirm=False):
         """Remove configuration files for destroyed or configured clusters."""
@@ -5509,6 +5880,106 @@ class ObdHome(object):
             return False
         return True
 
+    def seekdb_takeover(self, name):
+        """Take over a SeekDB instance not deployed by OBD. Reference: cluster takeover (OceanBase). home_path is queried via OBShell (ocs.all_agent)."""
+        host = getattr(self.options, 'host')
+        mysql_port = getattr(self.options, 'mysql_port')
+        root_password = getattr(self.options, 'root_password')
+        ssh_user = getattr(self.options, 'ssh_user')
+        ssh_password = getattr(self.options, 'ssh_password')
+        ssh_key_file = getattr(self.options, 'ssh_key_file')
+        ssh_port = getattr(self.options, 'ssh_port')
+        ssh_timeout = getattr(self.options, 'ssh_timeout')
+
+        self._call_stdio('verbose', 'Get Deploy by name')
+        deploy = self.deploy_manager.get_deploy_config(name)
+        if deploy:
+            deploy_info = deploy.deploy_info
+            if deploy_info.status not in [DeployStatus.STATUS_CONFIGURED, DeployStatus.STATUS_DESTROYED]:
+                self._call_stdio('error', 'The deployment {} already exists and is not in configured/destroyed state. Please use another deploy name.'.format(name))
+                return False
+
+        self._call_stdio('verbose', 'Get plugins by mocking a seekdb repository.')
+        mock_seekdb_repository = Repository(const.COMP_OB_SEEKDB, '/')
+        mock_seekdb_repository.version = '1.0.0'
+        configs = OrderedDict()
+        component_name = const.COMP_OB_SEEKDB
+        global_config = {
+            'mysql_port': mysql_port,
+            'root_password': root_password,
+        }
+        configs[component_name] = {'servers': [host], 'global': global_config}
+
+        user = dict()
+        if ssh_user:
+            user['username'] = ssh_user
+        if ssh_password:
+            user['password'] = ssh_password
+        if ssh_key_file:
+            user['key_file'] = ssh_key_file
+        if ssh_port:
+            user['port'] = ssh_port
+        if ssh_timeout:
+            user['timeout'] = ssh_timeout
+        if user:
+            configs['user'] = user
+
+        with tempfile.NamedTemporaryFile(suffix='.yaml', mode='w', delete=False) as tf:
+            try:
+                YamlLoader().dump(configs, tf)
+                tf.close()
+                deploy_config = DeployConfig(
+                    tf.name,
+                    yaml_loader=YamlLoader(self.stdio),
+                    config_parser_manager=self.deploy_manager.config_parser_manager,
+                    inner_config=None,
+                    stdio=self.stdio,
+                )
+                deploy_config.allow_include_error()
+                ssh_clients = self.get_clients(deploy_config, [mock_seekdb_repository])
+                workflow = self.get_workflows('takeover', repositories=[mock_seekdb_repository], no_found_act='ignore')
+                if not self.run_workflow(
+                    workflow,
+                    deploy_config=deploy_config,
+                    repositories=[mock_seekdb_repository],
+                    **{component_name: {
+                        'cluster_config': deploy_config.components[component_name],
+                        'clients': ssh_clients,
+                        'user_config': configs.get('user'),
+                        'obd_home': self.home_path,
+                    }},
+                ):
+                    return False
+            finally:
+                try:
+                    os.unlink(tf.name)
+                except Exception:
+                    pass
+
+        try:
+            self.deploy = self.deploy_manager.get_deploy_config(name)
+            if not self.deploy:
+                self._call_stdio('error', 'Takeover wrote config but deploy "%s" not found.' % name)
+                return False
+            self.deploy.deploy_info.status = DeployStatus.STATUS_RUNNING
+            self.deploy.dump_deploy_info()
+
+            repositories, _ = self.search_components_from_mirrors_and_install(self.deploy.deploy_config, raise_exception=False)
+            self.set_repositories(repositories)
+            display_workflow = self.get_workflows('display', repositories=repositories, no_found_act='ignore')
+
+            # display_workflow = self.get_workflows('display', repositories=[mock_seekdb_repository], no_found_act='ignore')
+            # self.set_repositories([mock_seekdb_repository])
+            if display_workflow:
+                self.run_workflow(display_workflow, repositories_map={repositories[0].name: repositories[0]}, no_found_act='ignore')
+            return True
+        except Exception as e:
+            self._call_stdio('exception', '')
+            if self.deploy_manager.get_deploy_config(name):
+                self.deploy_manager.remove_deploy_config(name)
+            self._call_stdio('error', 'Failed to takeover SeekDB.')
+            return False
+
     def takeover(self, name):
         host = getattr(self.options, 'host')
         mysql_port = getattr(self.options, 'mysql_port')
@@ -6601,4 +7072,39 @@ class ObdHome(object):
             self._call_stdio('print', FormatText.warning("If this cluster is for production use, please import a commercial license in time."))
         return True
 
+    def switchover_seekdb(self, standby_deploy_name):
+        deploy = self.deploy_manager.get_deploy_config(standby_deploy_name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % standby_deploy_name)
+            return False
+        self.set_deploy(deploy)
+        if deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" is %s' % (standby_deploy_name, deploy.deploy_info.status.value))
+            return False
+        standby_repositories = self.get_component_repositories(deploy.deploy_info, const.COMP_OB_SEEKDB)
+        self.set_repositories(standby_repositories)
+        self.search_param_plugin_and_apply(standby_repositories, deploy.deploy_config)
+        workflows = self.get_workflows("switchover_seekdb", no_found_act='ignore')
+        if not self.run_workflow(workflows, no_found_act='ignore'):
+            return False
+        return True
 
+
+    def failover_decouple_seekdb(self, standby_deploy_name, option_type='failover'):
+        deploy = self.deploy_manager.get_deploy_config(standby_deploy_name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % standby_deploy_name)
+            return False
+        self.set_deploy(deploy)
+        if deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" is %s' % (standby_deploy_name, deploy.deploy_info.status.value))
+            return False
+        standby_repositories = self.get_component_repositories(deploy.deploy_info, const.COMP_OB_SEEKDB)
+        self.set_repositories(standby_repositories)
+        workflows = self.get_workflows('failover_decouple_seekdb', no_found_act='ignore')
+        comp_kwargs = {}
+        if standby_repositories:
+            comp_kwargs = {standby_repositories[0].name: {'option_type': option_type}}
+        if not self.run_workflow(workflows, no_found_act='ignore', **comp_kwargs):
+            return False
+        return True

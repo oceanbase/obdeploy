@@ -7,6 +7,7 @@ import {
 import {
   clusterNameReg,
   getErrorInfo,
+  isEnglish,
   serverReg,
 } from '@/utils';
 import { getTailPath } from '@/utils/helper';
@@ -816,20 +817,12 @@ export default function DeployConfig({
                           })}
                           disabled={checkConnectionStatus === 'success' && !isEmpty(omsTakeoverData)}
                           extra={
-                            <>
-                              <div>{intl.formatMessage({
-                                id: 'OBD.pages.Oms.Update.Component.DeployConfig.ProvideOmsNodeAddress',
-                                defaultMessage: '请提供 OMS 服务任意一个 OMS 节点的访问地址和',
-                              })}</div>
-                              <div>{intl.formatMessage({
-                                id: 'OBD.pages.Oms.Update.Component.DeployConfig.AccessInformation',
-                                defaultMessage: '访问信息, 以便系统能够成功连接并获取 OMS 服务',
-                              })}</div>
-                              <div>{intl.formatMessage({
-                                id: 'OBD.pages.Oms.Update.Component.DeployConfig.RelevantData',
-                                defaultMessage: '的相关数据',
-                              })}</div>
-                            </>
+                            <div style={commonSelectStyle}>
+                              {intl.formatMessage({
+                                id: 'OBD.pages.Oms.Update.Component.DeployConfig.PleaseProvideOmsNodeAddressAndAccessInformation',
+                                defaultMessage: '请提供 OMS 服务任意一个 OMS 节点的访问地址和访问信息, 以便系统能够成功连接并获取 OMS 服务的相关数据',
+                              })}
+                            </div>
                           }
                           rules={[
                             {
@@ -864,6 +857,9 @@ export default function DeployConfig({
                               <br />
                               <br />
                               <br />
+                              {
+                                isEnglish() && <br />
+                              }
                             </>
                           }
                           rules={[
@@ -902,16 +898,12 @@ export default function DeployConfig({
 
                           ]}
                           extra={
-                            <>
-                              <div>{intl.formatMessage({
+                            <div style={commonSelectStyle}>
+                              {intl.formatMessage({
                                 id: 'OBD.pages.Oms.Update.Component.DeployConfig.ProvideHostUser',
-                                defaultMessage: '需提供主机操作系统的用户以便安装程序进行自动化',
-                              })}</div>
-                              <div>{intl.formatMessage({
-                                id: 'OBD.pages.Oms.Update.Component.DeployConfig.UserNeedsSudoPermission',
-                                defaultMessage: '配置，该用户名需具有 sudo 权限',
-                              })}</div>
-                            </>
+                                defaultMessage: '需提供主机操作系统的用户以便安装程序进行自动化配置，该用户名需具有 sudo 权限',
+                              })}
+                            </div>
                           }
                         />
                         <ProFormText
@@ -930,7 +922,9 @@ export default function DeployConfig({
                             <>
                               <br />
                               <br />
-                            </>
+                              {
+                                isEnglish() && <br />
+                              }                            </>
                           }
                         >
                           <Input.Password

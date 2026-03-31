@@ -84,20 +84,7 @@ def restart_pre(plugin_context, *args, **kwargs):
     restart_manager = RestartManager(plugin_context)
 
     if restart_manager.connect():
-        zones_servers = {}
         stdio.start_loading('Server check')
-        servers = restart_manager.execute_sql("select * from oceanbase.__all_server", one=False, error=False)
-        if isinstance(servers, list) and len(cluster_config.servers) == len(servers):
-            for server in servers:
-                if server['status'] != 'active' or server['stop_time'] > 0 or server['start_service_time'] == 0:
-                    break
-            else:
-                for server in cluster_config.servers:
-                    config = cluster_config.get_server_conf_with_default(server)
-                    zone = config['zone']
-                    if zone not in zones_servers:
-                        zones_servers[zone] = []
-                    zones_servers[zone].append(server)
         stdio.stop_loading('succeed')
     else:
         return plugin_context.return_false()
@@ -107,7 +94,6 @@ def restart_pre(plugin_context, *args, **kwargs):
     variables_dict = {
         "clients": plugin_context.clients,
         "restart_manager": restart_manager,
-        "zones_servers": zones_servers,
         "dir_list": ['home_path', 'data_dir', 'redo_dir', 'clog_dir', 'ilog_dir', 'slog_dir', '.meta', 'log_obshell'],
         "new_clients": new_clients,
         "new_deploy_config": new_deploy_config

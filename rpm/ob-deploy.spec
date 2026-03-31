@@ -1,3 +1,17 @@
+# Copyright (c) 2025 OceanBase.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 Name: ob-deploy
 Version: %(echo $VERSION)
 Release: %(echo $RELEASE)%{?dist}
@@ -134,9 +148,9 @@ if [ "$BUILD_CX_ORACLE" == "TRUE" ]; then
             tar -xzf u01/obclient/python/cx_Oracle-8.3.0.tar.gz
             cd cx_Oracle-8.3.0
             
-            # Install build dependencies
-            pip3 install setuptools wheel
-            pip3 install .  --target=$BUILD_DIR/SOURCES/site-packages
+            # cx_Oracle setup.py needs pkg_resources; newer setuptools(>=66) can break that. Use older setuptools + no build isolation.
+            pip3 install "setuptools>=45,<66" wheel  --no-build-isolation
+            pip3 install . --no-build-isolation --target=$BUILD_DIR/SOURCES/site-packages
         else
             echo "Error: cx_Oracle-8.3.0.tar.gz not found in RPM package"
             exit 1

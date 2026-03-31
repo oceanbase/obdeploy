@@ -206,12 +206,6 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
             stdio.exception("")
             global_ret = False
 
-    try:
-        raise_cursor.execute('alter system reload server')
-        raise_cursor.execute('alter system reload unit')
-    except:
-        stdio.exception("")
-        global_ret = False
     
     if global_ret:
         plugin_context.set_variable("change_conf", change_conf)

@@ -70,7 +70,7 @@ def run_test(plugin_context, *args, **kwargs):
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
-    password = get_option('password', '')
+    password = get_option('password', '') if repository.name != COMP_OB_SEEKDB else cluster_config.get_global_conf().get('root_password')
     ddl_path = get_option('ddl_path')
     tbl_path = get_option('tbl_path')
     sql_path = get_option('sql_path')
@@ -114,7 +114,10 @@ def run_test(plugin_context, *args, **kwargs):
             cpu_total += int(server_config.get('cpu_count', 0))
 
     try:
-        sql = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = 'secure_file_priv'" % tenant_id
+        if repository.name == COMP_OB_SEEKDB:
+            sql = "select value from oceanbase.__all_virtual_sys_variable where name = 'secure_file_priv'"
+        else:
+            sql = "select value from oceanbase.__all_virtual_sys_variable where tenant_id = %d and name = 'secure_file_priv'" % tenant_id
         ret = cursor.fetchone(sql)
         if ret is False:
             return
@@ -130,11 +133,14 @@ def run_test(plugin_context, *args, **kwargs):
         if input_parallel:
             parallel_num = input_parallel
         else:
-            if direct_load:
-                parallel_num = int(((memory_size) >> 20) * 0.001) / 2 if memory_size else 1
+            if repository.name != COMP_OB_SEEKDB:
+                if direct_load:
+                    parallel_num = int(((memory_size) >> 20) * 0.001) / 2 if memory_size else 1
+                else:
+                    parallel_num = int(max_cpu * unit_count)
+                parallel_num = max(parallel_num, 1)
             else:
-                parallel_num = int(max_cpu * unit_count)
-            parallel_num = max(parallel_num, 1)
+                parallel_num = 1
 
         if not_test_only:
             # 替换并发数
@@ -171,6 +177,8 @@ def run_test(plugin_context, *args, **kwargs):
             # Major freeze
             stdio.start_loading('Merge')
             sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION where tenant_id = %s" % tenant_id
+            if repository.name == COMP_OB_SEEKDB:
+                sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION"
             merge_version = cursor.fetchone(sql_frozen_scn)
             if merge_version is False:
                 return

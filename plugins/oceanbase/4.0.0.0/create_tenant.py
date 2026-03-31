@@ -290,16 +290,16 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
                         if key == 'ob_tcp_invited_nodes':
                             ob_tcp_invited_nodes_value = value
                             value = "'%'"
-                        
+
                         variables_map[key] = value
-                
+
                 variables_str = ','.join(['{}={}'.format(k, v) for k, v in variables_map.items()])
-                
+
                 if ob_tcp_invited_nodes_value:
                     tenant_whitelist = {}
                     tenant_whitelist[name] = ob_tcp_invited_nodes_value
                     plugin_context.set_variable('tenant_whitelist', tenant_whitelist)
-                
+
                 if variables_str:
                     sql += "set %s, %s" % (variables_str, set_mode)
                 else:

@@ -1,7 +1,7 @@
 import { intl } from '@/utils/intl';
 import { ProForm } from '@ant-design/pro-components';
 import { Button, message, Space } from 'antd';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useModel } from 'umi';
 
 import { getTailPath } from '@/utils/helper';
@@ -307,7 +307,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
       log_dir: ocpserver?.log_dir || log_dir,
       soft_dir: ocpserver?.soft_dir || soft_dir,
       port: ocpserver?.port || 8080,
-      ocp_site_url: ocpserver?.ocp_site_url || undefined,
+      ocp_site_url: ocpserver?.ocp_site_url,
       admin_password: ocpserver?.admin_password || undefined,
       memory_size: ocpserver?.memory_size || 4,
       meta_tenant: ocpserver?.meta_tenant || {
@@ -360,6 +360,68 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
       ],
     );
   }
+
+  // 当组件挂载或从其他步骤返回时，同步表单值，确保用户修改的值能正确显示
+  useEffect(() => {
+    // 构建要更新的表单值
+    const updateValues: any = {
+      ocpserver: {},
+    };
+
+    // 对于 home_path、log_dir、soft_dir、ocp_site_url，优先使用保存的值
+    // 如果保存的值存在（包括空字符串），则使用保存的值；否则使用默认值
+    updateValues.ocpserver.home_path = ocpserver?.home_path !== undefined
+      ? ocpserver.home_path
+      : home_path;
+
+    updateValues.ocpserver.log_dir = ocpserver?.log_dir !== undefined
+      ? ocpserver.log_dir
+      : log_dir;
+
+    updateValues.ocpserver.soft_dir = ocpserver?.soft_dir !== undefined
+      ? ocpserver.soft_dir
+      : soft_dir;
+
+    // ocp_site_url 必须明确设置，即使它是 undefined 或空字符串
+    // 直接设置值，确保表单能正确更新
+    updateValues.ocpserver.ocp_site_url = ocpserver?.ocp_site_url;
+
+    // 其他字段也同步更新
+    if (ocpserver?.port !== undefined) {
+      updateValues.ocpserver.port = ocpserver.port;
+    }
+    if (ocpserver?.admin_password !== undefined) {
+      updateValues.ocpserver.admin_password = ocpserver.admin_password;
+    }
+    if (ocpserver?.memory_size !== undefined) {
+      updateValues.ocpserver.memory_size = ocpserver.memory_size;
+    }
+    if (ocpserver?.meta_tenant !== undefined) {
+      updateValues.ocpserver.meta_tenant = ocpserver.meta_tenant;
+    }
+    if (ocpserver?.monitor_tenant !== undefined) {
+      updateValues.ocpserver.monitor_tenant = ocpserver.monitor_tenant;
+    }
+    if (ocpserver?.manage_info !== undefined) {
+      updateValues.ocpserver.manage_info = ocpserver.manage_info;
+    }
+
+    if (!isUseNewDBRef.current) {
+      if (ocpserver?.servers !== undefined) {
+        updateValues.ocpserver.servers = ocpserver.servers;
+      }
+      if (auth?.user !== undefined || auth?.password !== undefined || auth?.port !== undefined) {
+        updateValues.auth = {
+          user: auth?.user,
+          password: auth?.password,
+          port: auth?.port,
+        };
+      }
+    }
+
+    // 更新表单值
+    form.setFieldsValue(updateValues);
+  }, [current, ocpserver?.home_path, ocpserver?.log_dir, ocpserver?.soft_dir, ocpserver?.ocp_site_url]); // 监听关键字段变化，确保值能正确同步
 
   return (
     <ProForm

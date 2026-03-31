@@ -1286,7 +1286,10 @@ export default function NodeConfig({
                   <ProFormSelect
                     mode="tags"
                     name={['prometheus', 'servers']}
-                    label={'Prometheus 节点'}
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.PrometheusNodes',
+                      defaultMessage: 'Prometheus 节点',
+                    })}
                     fieldProps={{ style: commonServerStyle, maxTagCount: 3 }}
                     placeholder={intl.formatMessage({
                       id: 'OBD.pages.components.NodeConfig.PleaseSelect',
@@ -1309,7 +1312,10 @@ export default function NodeConfig({
                   <ProFormSelect
                     mode="tags"
                     name={['grafana', 'servers']}
-                    label={'Grafana 节点'}
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.GrafanaNodes',
+                      defaultMessage: 'Grafana 节点',
+                    })}
                     fieldProps={{ style: commonServerStyle, maxTagCount: 3 }}
                     placeholder={intl.formatMessage({
                       id: 'OBD.pages.components.NodeConfig.PleaseSelect',
@@ -1331,7 +1337,10 @@ export default function NodeConfig({
                 <Col span={8}>
                   <ProFormSelect
                     name={['alertmanager', 'servers']}
-                    label={'AlertManager 节点'}
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.AlertManagerNodes',
+                      defaultMessage: 'AlertManager 节点',
+                    })}
                     mode="tags"
                     fieldProps={{
                       style: commonServerStyle,
@@ -1408,9 +1417,15 @@ export default function NodeConfig({
           className={styles.pageCard}
           title={
             <>
-              部署连接配置
+              {intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.DeploymentConnectionConfiguration',
+                defaultMessage: '部署连接配置',
+              })}
               <span className={styles.titleExtra}>
-                请确保您选择的用户名和密码在如上所有主机上保持一致
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.PleaseEnsureTheUsernameAndPasswordAreConsistentOnAllHosts',
+                  defaultMessage: '请确保您选择的用户名和密码在如上所有主机上保持一致',
+                })}
               </span>
             </>
           }

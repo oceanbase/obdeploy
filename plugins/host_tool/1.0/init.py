@@ -58,7 +58,7 @@ def init(plugin_context, host_clients, need_change_servers_vars, machine_check_i
         if not machine_check_items[ip]['transparent_hugepage']:
             transparent_hugepage = False
             stdio.start_loading("disable transparent_hugepage")
-            if client.execute_command(f"echo never | {sudo_prefix} tee /sys/kernel/mm/transparent_hugepage/enabled"):
+            if client.execute_command(f"echo never | {sudo_prefix} tee /sys/kernel/mm/transparent_hugepage/enabled") and client.execute_command(f'{sudo_prefix} sh -c "echo \'echo never > /sys/kernel/mm/transparent_hugepage/enabled\' >> /etc/rc.local"') and client.execute_command(f"{sudo_prefix} chmod +x /etc/rc.d/rc.local"):
                 transparent_hugepage = True
             stdio.stop_loading('succeed' if transparent_hugepage else 'fail')
         if not machine_check_items[ip]['network_card']:

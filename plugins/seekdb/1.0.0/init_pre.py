@@ -15,6 +15,12 @@
 
 from __future__ import absolute_import, division, print_function
 
+import platform
+
+from const import PLATFORM_DARWIN
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
+
 
 def init_pre(plugin_context, *args, **kwargs):
     data_dir_same_redo_dir_keys = ['home_path', 'data_dir', 'clog_dir', 'slog_dir']
@@ -48,11 +54,12 @@ def init_pre(plugin_context, *args, **kwargs):
     def same_disk_check(stdio, client, server_config, critical, EC_FAIL_TO_INIT_PATH, server, *args, **kwargs):
         stdio.verbose("check slog dir in the same disk with data dir")
         slog_disk = data_disk = None
-        ret = client.execute_command("df --block-size=1024 %s | awk 'NR == 2 { print $1 }'" % server_config['slog_dir'])
+        df_cmd = 'df -Pk' if IS_DARWIN else 'df --block-size=1024'
+        ret = client.execute_command("%s %s | awk 'NR == 2 { print $1 }'" % (df_cmd, server_config['slog_dir']))
         if ret:
             slog_disk = ret.stdout.strip()
             stdio.verbose('slog disk is {}'.format(slog_disk))
-        ret = client.execute_command("df --block-size=1024 %s | awk 'NR == 2 { print $1 }'" % server_config['data_dir'])
+        ret = client.execute_command("%s %s | awk 'NR == 2 { print $1 }'" % (df_cmd, server_config['data_dir']))
         if ret:
             data_disk = ret.stdout.strip()
             stdio.verbose('data disk is {}'.format(data_disk))

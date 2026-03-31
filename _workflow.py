@@ -218,6 +218,9 @@ class WorkflowLoader(ComponentWorkflowLoader):
         self.workflow_name = workflow_name
 
     def _create_(self, workflow_name):
+        # Use an explicit namespace dict for exec() because Python 3.12+ (PEP 667)
+        # changed locals() to return a snapshot, so exec() results won't appear in locals().
+        _ns = {}
         exec('''
 class %s(PyScriptPlugin):
 
@@ -237,8 +240,8 @@ class %s(PyScriptPlugin):
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs):
         pass
-        ''' % (self.PLUGIN_TYPE.value, workflow_name, workflow_name, self.PLUGIN_TYPE.value, self.PLUGIN_TYPE.value, workflow_name))
-        clz = locals()[self.PLUGIN_TYPE.value]
+        ''' % (self.PLUGIN_TYPE.value, workflow_name, workflow_name, self.PLUGIN_TYPE.value, self.PLUGIN_TYPE.value, workflow_name), globals(), _ns)
+        clz = _ns[self.PLUGIN_TYPE.value]
         setattr(sys.modules[__name__], self.PLUGIN_TYPE.value, clz)
         clz.set_plugin_type(self.PLUGIN_TYPE)
         return clz

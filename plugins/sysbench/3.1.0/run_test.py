@@ -62,6 +62,7 @@ def run_test(plugin_context, *args, **kwargs):
     db, cursor = get_db_and_cursor(sys_namespace)
     port = db.port if db else 2881
     repository = kwargs.get("repository")
+    cluster_config = plugin_context.cluster_config
 
 
     host = get_option('host', '127.0.0.1')
@@ -69,6 +70,8 @@ def run_test(plugin_context, *args, **kwargs):
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
     password = get_option('password', '')
+    if repository.name == COMP_OB_SEEKDB:
+        password = cluster_config.get_global_conf().get('root_password')
     table_size = get_option('table_size', 10000)
     tables = get_option('tables', 32)
     threads = get_option('threads', 150)

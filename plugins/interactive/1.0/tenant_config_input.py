@@ -70,8 +70,8 @@ def tenant_config_input(plugin_context, *args, **kwargs):
             stdio.print(FormatText.error("The tenant mode is invalid. Only '1' and '2' are allowed."))
             continue
     while True:
-        tenant_password_first = getpass('Enter the tenant password: ').strip()
-        tenant_password_second = getpass('Confirm the tenant password: ').strip()
+        tenant_password_first = getpass('Enter the tenant root password: ').strip()
+        tenant_password_second = getpass('Confirm the tenant root password: ').strip()
         if tenant_password_first != tenant_password_second:
             stdio.print(FormatText.error('The two passwords do not match. Please try again.'))
             continue

@@ -71,7 +71,7 @@ def resource_check(plugin_context, work_dir_check=False, *args, **kwargs):
 
         data_dir = server_config.get('data_dir')
         if Capacity(client.execute_command(f"df -BG {data_dir} | awk 'NR==2 {{print $4}}'").stdout.strip()).bytes < 50 << 30:
-            critical(server, 'path', err.EC_MAAS_NOT_ENOUGH_DISK.format(server=ip, disk=data_dir, need='50G'))
+            critical(server, 'path', err.EC_MAAS_NOT_ENOUGH_DISK.format(ip=ip, disk=data_dir, need='50G'))
         else:
             check_pass(server, 'path')
 

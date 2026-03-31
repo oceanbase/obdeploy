@@ -23,7 +23,7 @@ test:
   - name: secure_file_priv
     value: '/'
   - name: parallel_servers_target
-    value: int(max_cpu * server_num * 8)
+    value: int(server_num * 8)
     expression: true
   exec_sql:
   - name: clean_cache

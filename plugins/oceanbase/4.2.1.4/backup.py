@@ -54,9 +54,7 @@ def backup(plugin_context, tenant_name, obshell_clients,  *args, **kwargs):
     for obshell_client in obshell_clients.values():
         break
 
-    plus_archive = getattr(plugin_context.options, "plus_archive")
-    if plus_archive is not None:
-        plus_archive = str2bool(plus_archive)
+    plus_archive = getattr(plugin_context.options, "plus_archive", False)
 
     try:
         ret = obshell_client.v1.start_tenant_backup(

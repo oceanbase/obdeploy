@@ -74,7 +74,7 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     host = get_option('host', '127.0.0.1')
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
-    password = get_option('password', '')
+    password = get_option('password', '') if repository.name != COMP_OB_SEEKDB else cluster_config.get_global_conf().get('root_password')
 
     connect_cursor = plugin_context.get_return('connect')
     cursor = connect_cursor.get_return("cursor") if not cursor else cursor
@@ -111,29 +111,32 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     stdio.verbose('set tmp_dir: %s' % tmp_dir)
     setattr(options, 'tmp_dir', tmp_dir)
 
-    query_tenant_sql = plugin_context.get_variable('tenant_sql')
-    stdio.verbose('execute sql: %s' % (query_tenant_sql % tenant_name))
-    tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
-    if not tenant_meta:
-        stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
-        return
-    tenant_id = plugin_context.get_variable('tenant_id')
-    sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta[tenant_id]
-    pool = cursor.fetchone(sql)
-    if pool is False:
-        return
-    sql = "select * from oceanbase.__all_unit_config where unit_config_id = %d" % pool['unit_config_id']
-    tenant_unit = cursor.fetchone(sql)
-    if tenant_unit is False:
-        return
-    max_cpu = tenant_unit['max_cpu']
-    memory_size = plugin_context.get_variable('memory_size', None)
-    if memory_size:
-        memory_size = tenant_unit['memory_size']
-    min_memory = plugin_context.get_variable('min_memory', default=tenant_unit.get('min_memory'))
-    unit_count = pool['unit_count']
+    if repository.name != COMP_OB_SEEKDB:
+        query_tenant_sql = plugin_context.get_variable('tenant_sql')
+        stdio.verbose('execute sql: %s' % (query_tenant_sql % tenant_name))
+        tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
+        if not tenant_meta:
+            stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
+            return
+        tenant_id = plugin_context.get_variable('tenant_id')
+        sql = "select * from oceanbase.__all_resource_pool where tenant_id = %d" % tenant_meta[tenant_id]
+        pool = cursor.fetchone(sql)
+        if pool is False:
+            return
+        sql = "select * from oceanbase.__all_unit_config where unit_config_id = %d" % pool['unit_config_id']
+        tenant_unit = cursor.fetchone(sql)
+        if tenant_unit is False:
+            return
+        max_cpu = tenant_unit['max_cpu']
+        memory_size = plugin_context.get_variable('memory_size', None)
+        if memory_size:
+            memory_size = tenant_unit['memory_size']
+        min_memory = plugin_context.get_variable('min_memory', default=tenant_unit.get('min_memory'))
+        unit_count = pool['unit_count']
     server_num = len(cluster_config.servers)
     sql = "select count(1) server_num from oceanbase.__all_server where status = 'active'"
+    if repository.name == COMP_OB_SEEKDB:
+        sql = "select count(1) server_num from oceanbase.V$OB_SERVER_STAT where START_SERVICE_TIME > 0"
     ret = cursor.fetchone(sql)
     if ret is False:
         return
@@ -142,10 +145,15 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     format_size = plugin_context.get_variable('format_size')
 
     if get_option('test_only'):
-        return plugin_context.return_true(
-            max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
-            tenant_id=tenant_meta[tenant_id], format_size=format_size if format_size else Capacity
-        )
+        if repository.name != COMP_OB_SEEKDB:
+            return plugin_context.return_true(
+                max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
+                tenant_id=tenant_meta[tenant_id], format_size=format_size if format_size else Capacity
+            )
+        else:
+            return plugin_context.return_true(
+                server_num=server_num, tenant=tenant_name,format_size=format_size if format_size else Capacity
+            )
 
     if not remote_tbl_dir:
         stdio.error('Please use --remote-tbl-dir to set a dir for remote tbl files')
@@ -205,10 +213,15 @@ def pre_test(plugin_context, cursor, *args, **kwargs):
     stdio.verbose('set tbl_path: %s' % tbl_path)
     setattr(options, 'tbl_path', tbl_path)
 
+    if repository.name != COMP_OB_SEEKDB:
+        return plugin_context.return_true(
+            obclient_bin=obclient_bin, host=host, port=port, user=user, password=password, database=mysql_db,
+            max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
+            tenant_id=tenant_meta[tenant_id], format_size=format_size if format_size else Capacity, memory_size=memory_size
+        )
     return plugin_context.return_true(
         obclient_bin=obclient_bin, host=host, port=port, user=user, password=password, database=mysql_db,
-        max_cpu=max_cpu, min_memory=min_memory, unit_count=unit_count, server_num=server_num, tenant=tenant_name,
-        tenant_id=tenant_meta[tenant_id], format_size=format_size if format_size else Capacity, memory_size=memory_size
+        server_num=server_num, tenant=tenant_name, format_size=format_size if format_size else Capacity
     )
 
 

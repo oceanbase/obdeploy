@@ -15,12 +15,16 @@
 
 from __future__ import absolute_import, division, print_function
 
+import platform
 import re
 import os
 
 from _types import Capacity
 from _errno import EC_OBSERVER_NOT_ENOUGH_MEMORY_ALAILABLE, EC_OBSERVER_NOT_ENOUGH_MEMORY_CACHED, EC_OBSERVER_GET_MEMINFO_FAIL
 import _errno as err
+from const import PLATFORM_DARWIN
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
 
 
 def get_system_memory(memory_limit):
@@ -102,22 +106,44 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
         min_pool_memory = server_config['__min_full_resource_pool_memory']
         min_memory = max(system_memory, MIN_MEMORY)
         if ip not in ip_server_memory_info:
-            ret = client.execute_command('cat /proc/meminfo')
-            if ret:
-                ip_server_memory_info[ip] = server_memory_stats = {}
-                memory_key_map = {
-                    'MemTotal': 'total',
-                    'MemFree': 'free',
-                    'MemAvailable': 'available',
-                    'Buffers': 'buffers',
-                    'Cached': 'cached'
-                }
-                for key in memory_key_map:
-                    server_memory_stats[memory_key_map[key]] = 0
-                for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
-                    if k in memory_key_map:
-                        key = memory_key_map[k]
-                        server_memory_stats[key] = Capacity(str(v)).bytes
+            if IS_DARWIN:
+                ret = client.execute_command('sysctl hw.memsize')
+                if ret:
+                    try:
+                        total_mem = int(re.findall(r'hw\.memsize:\s*(\d+)', ret.stdout)[0])
+                        vm_ret = client.execute_command('vm_stat')
+                        page_size = 16384
+                        ps_match = re.search(r'page size of (\d+) bytes', vm_ret.stdout) if vm_ret else None
+                        if ps_match:
+                            page_size = int(ps_match.group(1))
+                        free_pages = int(re.findall(r'Pages free:\s+(\d+)', vm_ret.stdout)[0]) if vm_ret else 0
+                        inactive_pages = int(re.findall(r'Pages inactive:\s+(\d+)', vm_ret.stdout)[0]) if vm_ret else 0
+                        ip_server_memory_info[ip] = server_memory_stats = {
+                            'total': total_mem,
+                            'free': free_pages * page_size,
+                            'available': (free_pages + inactive_pages) * page_size,
+                            'buffers': 0,
+                            'cached': inactive_pages * page_size
+                        }
+                    except Exception:
+                        stdio.exception('Failed to parse macOS memory info')
+            else:
+                ret = client.execute_command('cat /proc/meminfo')
+                if ret:
+                    ip_server_memory_info[ip] = server_memory_stats = {}
+                    memory_key_map = {
+                        'MemTotal': 'total',
+                        'MemFree': 'free',
+                        'MemAvailable': 'available',
+                        'Buffers': 'buffers',
+                        'Cached': 'cached'
+                    }
+                    for key in memory_key_map:
+                        server_memory_stats[memory_key_map[key]] = 0
+                    for k, v in re.findall('(\w+)\s*:\s*(\d+\s*\w+)', ret.stdout):
+                        if k in memory_key_map:
+                            key = memory_key_map[k]
+                            server_memory_stats[key] = Capacity(str(v)).bytes
 
         if user_server_config.get('memory_limit_percentage'):
             if ip in ip_server_memory_info:
@@ -180,7 +206,10 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
 
         # cpu
         if not server_config.get('cpu_count'):
-            ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
+            if IS_DARWIN:
+                ret = client.execute_command("sysctl -n hw.ncpu")
+            else:
+                ret = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l")
             if ret and ret.stdout.strip().isdigit():
                 cpu_num = int(ret.stdout)
                 server_config['cpu_count'] = max(MIN_CPU_COUNT, int(cpu_num - 2))
@@ -191,12 +220,14 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
             update_server_conf(server, 'cpu_count', MIN_CPU_COUNT)
             stdio.warn('(%s): automatically adjust the cpu_count %s' % (server, MIN_CPU_COUNT))
 
-        # disk
-        datafile_size = Capacity(server_config.get('datafile_size', 0)).bytes
+        # disk (datafile_maxsize replaces datafile_size in config; same sizing rules)
+        _df_raw = server_config.get('datafile_maxsize') or server_config.get('datafile_size')
+        datafile_size = Capacity(_df_raw or 0).bytes
         log_disk_size = Capacity(server_config.get('log_disk_size', 0)).bytes
-        if not server_config.get('datafile_size') or not server_config.get('log_disk_size'):
+        if not _df_raw or not server_config.get('log_disk_size'):
             disk = {'/': 0}
-            ret = client.execute_command('df --block-size=1024')
+            df_cmd = 'df -Pk' if IS_DARWIN else 'df --block-size=1024'
+            ret = client.execute_command(df_cmd)
             if ret:
                 for total, used, avail, puse, path in re.findall('(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
                     disk[path] = {
@@ -206,7 +237,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
                     }
             for include_dir in dirs.values():
                 while include_dir not in disk:
-                    ret = client.execute_command('df --block-size=1024 %s' % include_dir)
+                    ret = client.execute_command('%s %s' % (df_cmd, include_dir))
                     if ret:
                         for total, used, avail, puse, path in re.findall('(\d+)\s+(\d+)\s+(\d+)\s+(\d+%)\s+(.+)', ret.stdout):
                             disk[path] = {
@@ -245,9 +276,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
                     datafile_size = data_dir_disk['total'] * datafile_disk_percentage / 100
                 elif generate_config_mini:
                     datafile_size = MINI_DATA_FILE_SIZE
-                    update_server_conf(server, 'datafile_size', str(Capacity(datafile_size, 0)))
-                    if 'datafile_maxsize' not in user_server_config:
-                        update_server_conf(server, 'datafile_maxsize', str(Capacity(MINI_DATA_FILE_MAX_SIZE, 0)))
+                    update_server_conf(server, 'datafile_maxsize', str(Capacity(datafile_size, 0)))
                     if 'datafile_next' not in user_server_config:
                         update_server_conf(server, 'datafile_next', str(Capacity(MINI_DATA_FILE_NEXT, 0)))
 
@@ -350,9 +379,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
                         stdio.error("%s %s not enough disk space." % (ip, data_dir_mount))
                         success = False
                         continue
-                    update_server_conf(server, 'datafile_size', str(Capacity(datafile_size, 0)))
-                    if 'datafile_maxsize' not in user_server_config:
-                        update_server_conf(server, 'datafile_maxsize', str(Capacity(datafile_maxsize, 0)))
+                    update_server_conf(server, 'datafile_maxsize', str(Capacity(datafile_size, 0)))
                     if 'datafile_next' not in user_server_config:
                         update_server_conf(server, 'datafile_next', str(Capacity(datafile_next, 0)))
                 if auto_set_log_disk_size:
@@ -408,14 +435,12 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
                         update_server_conf(server, 'system_memory', system_memory)
 
                 if auto_set_datafile_size:
-                    update_server_conf(server, 'datafile_size', str(Capacity(datafile_size, 0)))
+                    update_server_conf(server, 'datafile_maxsize', str(Capacity(datafile_size, 0)))
                     if datafile_size < MINI_DATA_FILE_SIZE:
                         stdio.error("%s %s not enough disk space." % (ip, data_dir_mount))
                         success = False
                         continue
                     if datafile_maxsize > datafile_size:
-                        if 'datafile_maxsize' not in user_server_config:
-                            update_server_conf(server, 'datafile_maxsize', str(Capacity(datafile_maxsize, 0)))
                         if 'datafile_next' not in user_server_config:
                             update_server_conf(server, 'datafile_next', str(Capacity(datafile_next, 0)))
                 if auto_set_log_disk_size:
@@ -439,7 +464,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
     if generate_consistent_config:
         generate_global_config = generate_configs['global']
         server_num = len(cluster_config.servers)
-        keys = ['memory_limit', 'datafile_size', 'system_memory', 'log_disk_size', 'cpu_count', 'production_mode']
+        keys = ['memory_limit', 'datafile_maxsize', 'system_memory', 'log_disk_size', 'cpu_count', 'production_mode']
         for key in keys:
             servers = []
             values = []

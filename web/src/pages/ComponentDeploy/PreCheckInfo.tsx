@@ -231,7 +231,10 @@ export default function PreCheckInfo() {
 
     if (selectedConfig.includes(grafanaComponent)) {
       content = content.concat({
-        label: 'Grafana 服务端口',
+        label: intl.formatMessage({
+          id: 'OBD.Obdeploy.ClusterConfig.GrafanaServicePort',
+          defaultMessage: 'Grafana 服务端口',
+        }),
         value: grafana?.port,
       });
       grafana?.parameters?.length &&
@@ -242,7 +245,10 @@ export default function PreCheckInfo() {
     }
     if (selectedConfig.includes(prometheusComponent)) {
       content = content.concat({
-        label: 'Prometheus 服务端口',
+        label: intl.formatMessage({
+          id: 'OBD.Obdeploy.ClusterConfig.PrometheusServicePort',
+          defaultMessage: 'Prometheus 服务端口',
+        }),
         value: prometheus?.port,
       });
       prometheus?.parameters?.length &&
@@ -253,7 +259,10 @@ export default function PreCheckInfo() {
     }
     if (selectedConfig.includes(alertManagerComponent)) {
       content = content.concat({
-        label: 'AlertManager 服务端口',
+        label: intl.formatMessage({
+          id: 'OBD.Obdeploy.ClusterConfig.AlertManagerPort',
+          defaultMessage: 'AlertManager 服务端口',
+        }),
         value: alertmanager?.port,
       });
       alertmanager?.parameters?.length &&

@@ -203,7 +203,10 @@ export const METADB_OMS_UPDATE = [
     key: 3,
   },
   {
-    title: '数据备份',
+    title:  intl.formatMessage({
+      id: 'OBD.pages.Oms.Update.Component.Backup.DataBackup',
+      defaultMessage: '数据备份',
+    }),
     key: 4,
   },
   {

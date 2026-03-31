@@ -1,0 +1,2 @@
+- src_path: ./usr/libexec/seekdb/lib/libaio.so.1.0.1
+  target_path: libaio.so.1

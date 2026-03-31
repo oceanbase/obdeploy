@@ -19,5 +19,5 @@ import const
 
 
 def stop(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'stop')
+    workflow.add(const.STAGE_FIRST, 'seekdb_standby_detect', 'stop', 'obshell_stop')
     plugin_context.return_true()

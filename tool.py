@@ -703,6 +703,208 @@ class NetUtil(object):
         return ips
 
 
+class InteractiveUI(object):
+    """
+    Terminal interactive UI (no curses): single-choice menu, prompt with default.
+    Reusable for obd seekdb install and other interactive flows.
+    """
+    R = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    ORANGE = "\033[38;5;208m"
+    GREEN = "\033[32m"
+    GREEN_BOLD = "\033[1m\033[32m"
+    CLS = "\033[2J"
+    HOME = "\033[H"
+    HIDE = "\033[?25l"
+    SHOW = "\033[?25h"
+    BOX_TL, BOX_TR = "\u250c", "\u2510"
+    BOX_BL, BOX_BR = "\u2514", "\u2518"
+    BOX_H, BOX_V = "\u2500", "\u2502"
+    BOX_L, BOX_R = "\u251c", "\u2524"
+
+    @staticmethod
+    def read_key():
+        """Read a single key. Returns 'UP','DOWN','ENTER','Q' or character. None if not TTY or error."""
+        if not sys.stdin.isatty():
+            return None
+        try:
+            if os.name == "nt":
+                import msvcrt
+                ch = msvcrt.getch()
+                if ch in (b"\x00", b"\xe0"):
+                    ch2 = msvcrt.getch()
+                    if ch2 == b"H":
+                        return "UP"
+                    if ch2 == b"P":
+                        return "DOWN"
+                if ch in (b"\r", b"\n"):
+                    return "ENTER"
+                if ch == b"q":
+                    return "Q"
+                return ch.decode("utf-8", errors="replace") if isinstance(ch, bytes) else ch
+            else:
+                import tty
+                import termios
+                fd = sys.stdin.fileno()
+                old = termios.tcgetattr(fd)
+                try:
+                    tty.setraw(fd)
+                    ch = sys.stdin.read(1)
+                    if ch == "\x1b":
+                        more = sys.stdin.read(2)
+                        if more == "[A":
+                            return "UP"
+                        if more == "[B":
+                            return "DOWN"
+                        return "ESC"
+                    if ch in ("\r", "\n"):
+                        return "ENTER"
+                    if ch == "q":
+                        return "Q"
+                    return ch
+                finally:
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _box_width(title, options):
+        return max(len(title), max(len(str(o)) for o in options)) + 8
+
+    @classmethod
+    def _menu_line_count(cls, options, hint=None):
+        """Number of lines drawn by _draw_menu (for cursor-up on redraw)."""
+        return 4 + len(options) + (1 if hint else 0)
+
+    @classmethod
+    def _draw_menu(cls, title, options, selected, disabled_indices=None, hint=None):
+        """Draw menu at current cursor position (no clear screen). Returns line count."""
+        disabled_indices = disabled_indices or set()
+        w = cls._box_width(title, options)
+        line = cls.BOX_H * (w - 2)
+        out = []
+        out.append(cls.DIM + cls.BOX_TL + line + cls.BOX_TR + cls.R + "\n")
+        out.append(cls.BOX_V + " " + cls.ORANGE + cls.BOLD + title.center(w - 4) + cls.R + " " + cls.BOX_V + "\n")
+        out.append(cls.DIM + cls.BOX_L + line + cls.BOX_R + cls.R + "\n")
+        for i, opt in enumerate(options):
+            pad = " " * (w - 8 - len(str(opt)))
+            if i == selected:
+                if i in disabled_indices:
+                    out.append(cls.BOX_V + " " + cls.DIM + " ▸  " + str(opt) + pad + cls.R + " " + cls.DIM + cls.BOX_V + cls.R + "\n")
+                else:
+                    out.append(cls.BOX_V + " " + cls.GREEN_BOLD + " ▸  " + str(opt) + pad + cls.R + " " + cls.DIM + cls.BOX_V + cls.R + "\n")
+            else:
+                if i in disabled_indices:
+                    out.append(cls.DIM + cls.BOX_V + cls.R + " " + cls.DIM + " ○  " + str(opt) + pad + cls.R + " " + cls.DIM + cls.BOX_V + cls.R + "\n")
+                else:
+                    out.append(cls.DIM + cls.BOX_V + cls.R + " " + cls.DIM + " ○  " + str(opt) + pad + cls.R + " " + cls.DIM + cls.BOX_V + cls.R + "\n")
+        out.append(cls.DIM + cls.BOX_BL + line + cls.BOX_BR + cls.R + "\n")
+        if hint:
+            out.append(cls.DIM + "  " + hint + cls.R + "\n")
+        sys.stdout.write("".join(out))
+        sys.stdout.flush()
+        return cls._menu_line_count(options, hint)
+
+    @classmethod
+    def single_choice(cls, title, options, default_index=0, disabled_indices=None, hint=None):
+        """
+        Show a single-choice menu. Returns selected index or -1 if user quits.
+        options: list of strings. disabled_indices: set of indices that are shown but not selectable (grayed).
+        When an option is disabled, user can still move to it but Enter will not select it (treat as invalid).
+        """
+        if not sys.stdin.isatty():
+            return None
+        disabled_indices = disabled_indices or set()
+        n = len(options)
+        selected = max(0, min(default_index, n - 1))
+        while selected in disabled_indices and selected < n - 1:
+            selected += 1
+        if selected in disabled_indices:
+            selected = 0
+        hint = hint or "↑↓ 移动   Enter 确认   q 退出"
+        try:
+            sys.stdout.write(cls.HIDE)
+            line_count = cls._draw_menu(title, options, selected, disabled_indices, hint)
+            while True:
+                key = cls.read_key()
+                if key is None:
+                    return None
+                if key == "UP" and selected > 0:
+                    selected -= 1
+                    sys.stdout.write("\033[%dA" % line_count)
+                    cls._draw_menu(title, options, selected, disabled_indices, hint)
+                elif key == "DOWN" and selected < n - 1:
+                    selected += 1
+                    sys.stdout.write("\033[%dA" % line_count)
+                    cls._draw_menu(title, options, selected, disabled_indices, hint)
+                elif key == "ENTER":
+                    if selected in disabled_indices:
+                        continue
+                    return selected
+                elif key == "Q":
+                    return -1
+        finally:
+            sys.stdout.write(cls.SHOW)
+            sys.stdout.flush()
+
+    @staticmethod
+    def prompt(prompt_text, default=""):
+        """Read a line from stdin with optional default. Returns stripped string."""
+        if default != "":
+            line = input("%s [%s]: " % (prompt_text, default)).strip()
+            return line if line else default
+        return input("%s: " % prompt_text).strip()
+
+    @staticmethod
+    def prompt_password(prompt_text, default=""):
+        """Read a line with hidden input (no echo). Returns stripped string. Use for passwords."""
+        try:
+            import getpass
+            line = getpass.getpass("%s: " % prompt_text)
+            line = line.strip() if line else default
+            return line
+        except Exception:
+            return InteractiveUI.prompt(prompt_text, default)
+
+    @staticmethod
+    def format_size_g(size_bytes):
+        """Format byte size for display in G. Returns e.g. '2G', '20G'."""
+        if size_bytes is None or size_bytes < 0:
+            return "0G"
+        g = size_bytes // (1024 ** 3)
+        return "%dG" % g if g > 0 else "0G"
+
+    YES_VALUES = frozenset(('y', 'yes', 'true', '1', 't'))
+    NO_VALUES = frozenset(('n', 'no', 'false', '0', 'f'))
+
+    @classmethod
+    def parse_yes_no(cls, raw_value, default_yes=True):
+        """Parse yes/no from user input. Accepts y, yes, n, no, true, false, 1, 0, t, f. Empty uses default_yes. Returns bool."""
+        if raw_value is None:
+            return default_yes
+        s = (raw_value or "").strip().lower()
+        if not s:
+            return default_yes
+        if s in cls.YES_VALUES:
+            return True
+        if s in cls.NO_VALUES:
+            return False
+        return default_yes
+
+    @staticmethod
+    def normalize_size_input(value):
+        """If value is only digits (e.g. '20'), append 'G' so Capacity can parse it. Return unchanged otherwise."""
+        if value is None:
+            return value
+        s = str(value).strip()
+        if not s:
+            return value
+        if s.isdigit():
+            return s + "G"
+        return value
+
+
 COMMAND_ENV=CommandEnv()
 
 

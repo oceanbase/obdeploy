@@ -15,6 +15,11 @@
 
 from __future__ import absolute_import, division, print_function
 
+import platform
+from const import PLATFORM_DARWIN
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
+
 
 def status(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
@@ -30,6 +35,11 @@ def status(plugin_context, *args, **kwargs):
             continue
         remote_pid_path = '%s/run/seekdb.pid' % server_config['home_path']
         remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
-        if remote_pid and client.execute_command('ls /proc/%s' % remote_pid):
-            cluster_status[server] = 1
+        if remote_pid:
+            if IS_DARWIN:
+                is_running = client.execute_command('ps -p %s' % remote_pid)
+            else:
+                is_running = client.execute_command('ls /proc/%s' % remote_pid)
+            if is_running:
+                cluster_status[server] = 1
     return plugin_context.return_true(cluster_status=cluster_status)

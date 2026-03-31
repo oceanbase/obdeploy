@@ -83,9 +83,6 @@ export const DNSNode = ({ cfg }: any) => {
     // 清理域名值，确保没有换行符和特殊字符
     const domainValue = String(domain).trim().replace(/[\r\n\t]/g, '').replace(/\s+/g, ' ')
 
-    // 组合域名文本
-    const domainText = `域名  ${domainValue}`;
-
     return (
         <Group>
             <Rect

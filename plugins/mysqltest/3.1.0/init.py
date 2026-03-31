@@ -23,13 +23,18 @@ import hashlib
 from ssh import LocalClient
 from tool import FileUtil
 from _errno import EC_MYSQLTEST_FAILE_NOT_FOUND, EC_MYSQLTEST_PARSE_CMD_FAILED
+from const import COMP_OB_SEEKDB
 from _types import Capacity
+from const import COMP_OB_SEEKDB
 
 
 def init(plugin_context, env=None, *args, **kwargs):
+    repository = kwargs.get("repository")
     def get_root_server(cursor):
         while True:
             try:
+                if repository.name == COMP_OB_SEEKDB:
+                    return cursor.fetchone('select * from oceanbase.V$OB_SERVER_STAT where START_SERVICE_TIME > 0')
                 return cursor.fetchone('select * from oceanbase.__all_server where status = \'active\' and with_rootserver=1', raise_exception=True)
             except:
                 if load_snap:
@@ -68,14 +73,19 @@ def init(plugin_context, env=None, *args, **kwargs):
             return None
 
     stdio = plugin_context.stdio
+    repository = kwargs.get('repository')
     env = plugin_context.options.__dict__ if not env else env
     load_snap = env.get('load_snap', False)
     cursor = plugin_context.get_return('connect').get_return('cursor')
     obclient_bin = env['obclient_bin']
     root_server = get_root_server(cursor)
     if root_server:
-        port = root_server['inner_port']
-        host = root_server['svr_ip']
+        if repository.name == COMP_OB_SEEKDB:
+            port = root_server['SQL_PORT']
+            host = root_server['SVR_IP']
+        else:
+            port = root_server['inner_port']
+            host = root_server['svr_ip']
     else:
         stdio.error('Failed to get root server.')
         return plugin_context.return_false()

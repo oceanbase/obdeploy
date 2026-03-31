@@ -305,7 +305,10 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
       </Row>
       <InputPort
         name={['oceanbase', 'obshell_port']}
-        label={'obshell 端口'}
+        label={intl.formatMessage({
+          id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.ObshellPort',
+          defaultMessage: 'obshell 端口',
+        })}
         fieldProps={{ style: commonPortStyle }}
       />
       <div className={styles.moreSwitch}>
@@ -320,7 +323,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
           }}
         >
           {showMoreConfig ? <CaretDownOutlined /> : <CaretRightOutlined />}
-          <span style={{ width: 150 }}>
+          <span>
             {intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.ClusterConfig.MoreConfigurations',
               defaultMessage: '更多配置',
