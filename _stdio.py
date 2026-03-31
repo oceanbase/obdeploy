@@ -932,10 +932,15 @@ class IO(object):
             if pwd_pattern.search(msg):
                 return pwd_pattern.sub(r"\1******\3", msg)
 
-            opts_regex = r'(\'password\':\s*\')([^\']+)(\')'
+            opts_regex = r"('[\w]*password'\s*:\s*')([^']*)(')"
             opts_pattern = re.compile(opts_regex)
             if opts_pattern.search(msg):
-                return opts_pattern.sub(r"\1******\3", msg)
+                msg = opts_pattern.sub(r"\1******\3", msg)
+
+            get_opt_regex = r"(?i)(get option:\s*[\w]*password\s*value\s+)([^\s]+)"
+            get_opt_pattern = re.compile(get_opt_regex)
+            if get_opt_pattern.search(msg):
+                msg = get_opt_pattern.sub(r"\1******", msg)
 
         return msg
 
@@ -1014,10 +1019,15 @@ class IO(object):
             if pwd_pattern.search(msg):
                 return pwd_pattern.sub(r"\1******\3", msg)
 
-            opts_regex = r'(\'password\':\s*\')([^\']+)(\')'
+            opts_regex = r"('[\w]*password'\s*:\s*')([^']*)(')"
             opts_pattern = re.compile(opts_regex)
             if opts_pattern.search(msg):
-                return opts_pattern.sub(r"\1******\3", msg)
+                msg = opts_pattern.sub(r"\1******\3", msg)
+
+            get_opt_regex = r"(?i)(get option:\s*[\w]*password\s*value\s+)([^\s]+)"
+            get_opt_pattern = re.compile(get_opt_regex)
+            if get_opt_pattern.search(msg):
+                msg = get_opt_pattern.sub(r"\1******", msg)
 
         if ip_masking:
             ipv4_pattern = r'\b(?:\d{1,3}\.){2}\d{1,3}\.\d{1,3}\b'
@@ -1150,7 +1160,11 @@ def safe_stdio_decorator(default_stdio=None):
             is_bond_method = True
             _type = type(func)
             func = func.__func__
-        all_parameters = inspect2.signature(func).parameters
+        try:
+            all_parameters = inspect2.signature(func).parameters
+        except (ValueError, TypeError):
+            # Builtin slot wrappers (e.g. object.__init__) can't be inspected on Python 3.13+
+            return _type(func) if is_bond_method else func
         if "stdio" in all_parameters:
             default_stdio_in_params = all_parameters["stdio"].default
             if not isinstance(default_stdio_in_params, Parameter.empty):

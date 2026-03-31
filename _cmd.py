@@ -763,11 +763,11 @@ class ClusterMirrorCommand(ObdCommand):
         return data
 
 
-    def background_telemetry_task(self, obd, demploy_name=None):
-        if demploy_name is None:
-            demploy_name = self.cmds[0]
+    def background_telemetry_task(self, obd, deploy_name=None):
+        if deploy_name is None:
+            deploy_name = self.cmds[0]
         data = json.dumps(self.get_obd_namespaces_data(obd))
-        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' >/dev/null 2>&1 &" % (demploy_name, data))
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' >/dev/null 2>&1 &" % (deploy_name, data))
 
 
 class ClusterConfigStyleChange(ClusterMirrorCommand):
@@ -1157,6 +1157,7 @@ class ClusterRedeployCommand(ClusterMirrorCommand):
         self.parser.add_option('-f', '--force-kill', action='store_true', help="Force kill the running observer process in the working directory.")
         self.parser.add_option('--confirm', action='store_true', help='Confirm to redeploy.')
         self.parser.add_option('--ignore-standby', '--igs', action='store_true', help="Force kill the observer while standby tenant in others cluster exists.")
+        self.parser.add_option('-S', '--strict-check', action='store_true', help="Throw errors instead of warnings when check fails.")
 
     def _do_command(self, obd):
         if self.cmds:
@@ -1482,7 +1483,7 @@ class ClusterTenantBackupCommand(ClusterMirrorCommand):
         super(ClusterTenantBackupCommand, self).__init__('backup', 'Backup the specified tenant.')
         self.parser.add_option('-m', '--backup_mode', type='string', help="The backup mode: 'incremental' for incremental backup or 'full' for a full backup. Defaults: 'full'.")
         self.parser.add_option('-e', '--encryption', type='string', help='The password for encrypting the backup set.')
-        self.parser.add_option('-P', '--plus_archive', type='string', help='Whether to include archive logs within the backup process for a combined data and log backup.')
+        self.parser.add_option('-P', '--plus_archive', action='store_true', help='Whether to include archive logs within the backup process for a combined data and log backup.')
 
     def init(self, cmd, args):
         super(ClusterTenantBackupCommand, self).init(cmd, args)
@@ -2927,22 +2928,44 @@ class SeekdbMirrorCommand(ObdCommand):
 
     def init(self, cmd, args, need_deploy_name=True):
         super(SeekdbMirrorCommand, self).init(cmd, args)
-        if need_deploy_name and not self.cmds:
-            return self._show_help()
+        usage = '%s <deploy name> [options]'
+        if not need_deploy_name:
+            usage = '%s [options]'
+        self.parser.set_usage(usage % self.prev_cmd)
         return self
+
+    def get_obd_namespaces_data(self, obd):
+        data = {
+            "component": {},
+            "error_messages": ''
+        }
+        comp_data = data['component']
+        for component, _ in obd.namespaces.items():
+            comp_data[component] = _.get_variable('run_result')
+        error = obd.stdio.get_error_buffer().read()
+        data['error_messages'] = error
+        return data
+
+    def background_telemetry_task(self, obd, deploy_name=None):
+        if deploy_name is None:
+            deploy_name = self.cmds[0]
+        data = json.dumps(self.get_obd_namespaces_data(obd))
+        LocalClient.execute_command_background("nohup obd telemetry post %s --data='%s' >/dev/null 2>&1 &" % (deploy_name, data))
 
 
 class SeekdbDeployCommand(SeekdbMirrorCommand):
 
     def __init__(self):
-        super(SeekdbDeployCommand, self).__init__('deploy', 'Deploy a seekdb cluster.')
+        super(SeekdbDeployCommand, self).__init__('deploy', 'Deploy a seekdb cluster by using the current deploy configuration or a deploy yaml file.')
+        self.parser.add_option('-c', '--config', type='string', help="Path to the configuration yaml file.")
         self.parser.add_option('-f', '--force', action='store_true', help="Force deploy, clear the working directory.")
         self.parser.add_option('-C', '--clean', action='store_true', help="Clean deploy, clear the working directory if it belongs to the current user.")
         self.parser.add_option('-U', '--ulp', '--unuselibrepo', action='store_true', help="Disable automatic dependency handling.")
-        self.parser.add_option('-A', '--act', '--auto-create-tenant', action='store_true', help="Auto create tenant during bootstrap.")
 
     def _do_command(self, obd):
         if self.cmds:
+            if getattr(self.opts, 'force', False) or getattr(self.opts, 'clean', False):
+                setattr(self.opts, 'skip_cluster_status_check', True)
             obd.set_options(self.opts)
             res = obd.deploy_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
@@ -2954,13 +2977,14 @@ class SeekdbDeployCommand(SeekdbMirrorCommand):
 class SeekdbStartCommand(SeekdbMirrorCommand):
 
     def __init__(self):
-        super(SeekdbStartCommand, self).__init__('start', 'Start a deployed seekdb cluster.')
-        self.parser.add_option('-s', '--servers', type='string', help="List of servers to be started. Multiple servers are separated with commas.")
+        super(SeekdbStartCommand, self).__init__('start', 'Start a deployed seekdb cluster (only clusters with seekdb component).')
         self.parser.add_option('-S', '--strict-check', action='store_true', help="Throw errors instead of warnings when check fails.")
         self.parser.add_option('--without-parameter', '--wop', action='store_true', help='Start without parameters.')
 
     def _do_command(self, obd):
         if self.cmds:
+            obd.set_options(self.opts)
+            setattr(obd.options, 'require_seekdb_component', True)
             obd.set_cmds(self.cmds[1:])
             res = obd.start_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
@@ -2972,11 +2996,12 @@ class SeekdbStartCommand(SeekdbMirrorCommand):
 class SeekdbStopCommand(SeekdbMirrorCommand):
 
     def __init__(self):
-        super(SeekdbStopCommand, self).__init__('stop', 'Stop a started seekdb cluster.')
-        self.parser.add_option('-s', '--servers', type='string', help="List of servers to be stopped. Multiple servers are separated with commas.")
+        super(SeekdbStopCommand, self).__init__('stop', 'Stop a started seekdb cluster (only clusters with seekdb component).')
 
     def _do_command(self, obd):
         if self.cmds:
+            obd.set_options(self.opts)
+            setattr(obd.options, 'require_seekdb_component', True)
             obd.set_cmds(self.cmds[1:])
             res = obd.stop_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
@@ -2988,13 +3013,13 @@ class SeekdbStopCommand(SeekdbMirrorCommand):
 class SeekdbRestartCommand(SeekdbMirrorCommand):
 
     def __init__(self):
-        super(SeekdbRestartCommand, self).__init__('restart', 'Restart a started seekdb cluster.')
-        self.parser.add_option('-s', '--servers', type='string', help="List of servers to be restarted. Multiple servers are separated with commas.")
+        super(SeekdbRestartCommand, self).__init__('restart', 'Restart a started seekdb cluster (only clusters with seekdb component).')
         self.parser.add_option('--with-parameter', '--wp', action='store_true', help='Restart with parameters.')
 
     def _do_command(self, obd):
         if self.cmds:
             obd.set_options(self.opts)
+            setattr(obd.options, 'require_seekdb_component', True)
             res = obd.restart_cluster(self.cmds[0])
             self.background_telemetry_task(obd)
             return res
@@ -3005,12 +3030,15 @@ class SeekdbRestartCommand(SeekdbMirrorCommand):
 class SeekdbDestroyCommand(SeekdbMirrorCommand):
 
     def __init__(self):
-        super(SeekdbDestroyCommand, self).__init__('destroy', 'Destroy a deployed seekdb cluster.')
+        super(SeekdbDestroyCommand, self).__init__('destroy', 'Destroy a deployed seekdb cluster (only clusters with seekdb component).')
         self.parser.add_option('-f', '--force-kill', action='store_true', help="Force kill the running seekdb process in the working directory.")
         self.parser.add_option('--confirm', action='store_true', help='Confirm to destroy.')
+        self.parser.add_option('--igs', '--ignore-standby', action='store_true', dest='ignore_standby', help='Ignore standby cluster check.')
 
     def _do_command(self, obd):
         if self.cmds:
+            obd.set_options(self.opts)
+            setattr(obd.options, 'require_seekdb_component', True)
             res = obd.destroy_cluster(self.cmds[0], need_confirm=not getattr(self.opts, 'confirm', False))
             return res
         else:
@@ -3020,14 +3048,129 @@ class SeekdbDestroyCommand(SeekdbMirrorCommand):
 class SeekdbDisplayCommand(SeekdbMirrorCommand):
 
     def __init__(self):
-        super(SeekdbDisplayCommand, self).__init__('display', 'Display the information for a seekdb cluster.')
+        super(SeekdbDisplayCommand, self).__init__('display', 'Display the information for a seekdb cluster (only clusters with seekdb component).')
         self.parser.add_option('--encryption-passkey', '--epk', type='string', help="Encryption passkey.")
+        self.parser.add_option('-g', '--graph', action='store_true', help="Show topology graph.")
 
     def _do_command(self, obd):
         if self.cmds:
+            obd.set_options(self.opts)
+            setattr(obd.options, 'require_seekdb_component', True)
             return obd.display_cluster(self.cmds[0])
         else:
             return self._show_help()
+
+
+class SeekdbListCommand(SeekdbMirrorCommand):
+
+    def __init__(self):
+        super(SeekdbListCommand, self).__init__('list', 'List all deployments that contain seekdb component.')
+
+    def init(self, cmd, args, need_deploy_name=False):
+        return super(SeekdbListCommand, self).init(cmd, args, need_deploy_name)
+
+    @property
+    def lock_mode(self):
+        return LockMode.NO_LOCK
+
+    def _do_command(self, obd):
+        if self.cmds:
+            return self._show_help()
+        obd.set_options(self.opts)
+        return obd.list_deploy(component_filter=const.COMP_OB_SEEKDB)
+
+
+class SeekdbInstallCommand(ObdCommand):
+
+    def __init__(self):
+        super(SeekdbInstallCommand, self).__init__('install', 'Interactive install of a seekdb instance (standalone / primary / standby).')
+        self.parser.add_option('--standby', action='store_true', help='Install as standby cluster; will prompt for primary connection info.')
+        self.parser.add_option('--primary', action='store_true', help='Install as primary cluster (enable RPC for standby sync).')
+
+    def init(self, cmd, args):
+        super(SeekdbInstallCommand, self).init(cmd, args)
+        return self
+
+    def _do_command(self, obd):
+        obd.set_options(self.opts)
+        return obd.seekdb_install()
+
+
+class SeekdbTakeoverCommand(ObdCommand):
+
+    def __init__(self):
+        super(SeekdbTakeoverCommand, self).__init__('takeover', 'Take over a SeekDB instance not deployed by OBD.')
+        self.parser.remove_option('-h')
+        self.parser.add_option('--help', action='callback', callback=self._show_help, help='Show help and exit.')
+        self.parser.add_option('-h', '--host', type='string', help='SeekDB connection host, default: 127.0.0.1', default='127.0.0.1')
+        self.parser.add_option('-P', '--mysql-port', type='int', help='MySQL port, default: 2881', default=2881)
+        self.parser.add_option('-p', '--root-password', type='string', help="Password of root user, default: ''", default='')
+        self.parser.add_option('--ssh-user', type='string', help='SSH user, default: current user')
+        self.parser.add_option('--ssh-password', type='string', help='SSH password, default: ""', default='')
+        self.parser.add_option('--ssh-port', type='int', help='SSH port, default: 22')
+        self.parser.add_option('-t', '--ssh-timeout', type='int', help='SSH connection timeout (seconds), default: 30')
+        self.parser.add_option('--ssh-key-file', type='string', help='SSH key file')
+
+    def init(self, cmd, args):
+        super(SeekdbTakeoverCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if self.cmds:
+            obd.set_options(self.opts)
+            return obd.seekdb_takeover(self.cmds[0])
+        return self._show_help()
+
+
+class SeekdbSwitchoverCommand(SeekdbMirrorCommand):
+    def __init__(self):
+        super(SeekdbSwitchoverCommand, self).__init__('switchover', 'Switchover primary-standby seekdb cluster.')
+
+    def init(self, cmd, args):
+        super(SeekdbSwitchoverCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name> [options]' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 1:
+            return obd.switchover_seekdb(self.cmds[0])
+        else:
+            return self._show_help()
+
+
+class SeekdbFailoverCommand(SeekdbMirrorCommand):
+    def __init__(self):
+        super(SeekdbFailoverCommand, self).__init__('failover', 'Failover primary-standby seekdb cluster.')
+
+    def init(self, cmd, args):
+        super(SeekdbFailoverCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 1:
+            self.cmds.append('failover')
+            return obd.failover_decouple_seekdb(self.cmds[0], 'failover')
+        else:
+            return self._show_help()
+
+class SeekdbDecoupleCommand(SeekdbMirrorCommand):
+    def __init__(self):
+        super(SeekdbDecoupleCommand, self).__init__('decouple', 'Decouple primary-standby seekdb cluster.')
+
+    def init(self, cmd, args):
+        super(SeekdbDecoupleCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name>' % self.prev_cmd)
+        return self
+
+    def _do_command(self, obd):
+        if len(self.cmds) == 1:
+            self.cmds.append('decouple')
+            return obd.failover_decouple_seekdb(self.cmds[0], 'decouple')
+        else:
+            return self._show_help()
+
 
 
 class SeekdbMajorCommand(MajorCommand):
@@ -3035,11 +3178,17 @@ class SeekdbMajorCommand(MajorCommand):
     def __init__(self):
         super(SeekdbMajorCommand, self).__init__('seekdb', 'Deploy and manage a seekdb cluster.')
         self.register_command(SeekdbDeployCommand())
+        self.register_command(SeekdbInstallCommand())
+        self.register_command(SeekdbTakeoverCommand())
         self.register_command(SeekdbStartCommand())
         self.register_command(SeekdbStopCommand())
         self.register_command(SeekdbRestartCommand())
+        self.register_command(SeekdbListCommand())
         self.register_command(SeekdbDestroyCommand())
         self.register_command(SeekdbDisplayCommand())
+        self.register_command(SeekdbSwitchoverCommand())
+        self.register_command(SeekdbFailoverCommand())
+        self.register_command(SeekdbDecoupleCommand())
 
 
 class MainCommand(MajorCommand):
@@ -3076,6 +3225,10 @@ There is NO WARRANTY, to the extent permitted by law.''' % (VERSION, REVISION, B
         self.parser._add_version_option()
 
 if __name__ == '__main__':
+    import platform
+    if platform.system() == const.PLATFORM_DARWIN:
+        import multiprocessing
+        multiprocessing.freeze_support()
     defaultencoding = 'utf-8'
     if sys.getdefaultencoding() != defaultencoding:
         try:

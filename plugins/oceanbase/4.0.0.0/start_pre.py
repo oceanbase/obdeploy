@@ -19,7 +19,7 @@ import os.path
 from tool import FileUtil
 from collections import OrderedDict
 
-def construct_opts(server_config, param_list, rs_list_opt, cfg_url, cmd, need_bootstrap):
+def construct_opts(server_config, param_list, rs_list_opt, cfg_url, cmd, need_bootstrap, home_path=None):
     not_opt_str = OrderedDict({
                 'mysql_port': '-p',
                 'rpc_port': '-P',
@@ -55,7 +55,11 @@ def construct_opts(server_config, param_list, rs_list_opt, cfg_url, cmd, need_bo
     param_list['mysql_port'] = server_config['mysql_port']
     for key in not_opt_str:
         if key in param_list:
-            value = get_value(key)
+            # If -d parameter (data_dir) is present, use home_path + '/store'
+            if key == 'data_dir' and home_path:
+                value = "'%s/store'" % home_path
+            else:
+                value = get_value(key)
             cmd.append('%s %s' % (not_opt_str[key], value))
     if len(opt_str) > 0:
         cmd.append('-o %s' % ','.join(opt_str))
@@ -120,7 +124,7 @@ def start_pre(plugin_context, *args, **kwargs):
             use_parameter = True
         cmd = []
         if use_parameter:
-            construct_opts(server_config, start_parameters, rs_list_opt, cfg_url, cmd, need_bootstrap)
+            construct_opts(server_config, start_parameters, rs_list_opt, cfg_url, cmd, need_bootstrap, home_path)
         else:
             cmd.append('-p %s' % server_config['mysql_port'])
 

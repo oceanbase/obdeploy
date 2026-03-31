@@ -181,7 +181,7 @@ export default function MoreConfigTable({
           }}
         >
           {show ? <CaretDownOutlined /> : <CaretRightOutlined />}
-          <div style={{ width: 150 }}>
+          <div>
             {intl.formatMessage({
               id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
               defaultMessage: '更多配置',

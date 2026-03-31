@@ -27,18 +27,21 @@ def get_deployment_connections(plugin_context, relation_deploy_names=[], cursors
     if not_connect_act not in ["ignore", "raise"]:
         stdio.error(err.EC_INVALID_PARAMETER.format('not_connect_act', not_connect_act))
     deploy_name = plugin_context.cluster_config.deploy_name
-    cmds = plugin_context.cmds
-    if kwargs.get('option_mode') == 'create_standby_tenant':
-        relation_deploy_names = [cmds[1], cmds[0]]
+    
     if deploy_name not in relation_deploy_names:
         relation_deploy_names.append(deploy_name)
+        
     cluster_configs[plugin_context.cluster_config.deploy_name] = plugin_context.cluster_config
     plugin_manager = kwargs.get('plugin_manager')
     repository = kwargs.get('repository')
     connect_plugin = plugin_manager.get_best_py_script_plugin('connect', repository.name, repository.version)
+    
     for deploy_name in relation_deploy_names:
         if not cursors.get(deploy_name):
-            cluster_config = cluster_configs[deploy_name]
+            cluster_config = cluster_configs.get(deploy_name)
+            if not cluster_config:
+                continue
+                
             ret = call_plugin(connect_plugin, cluster_config, retry_times=retry_times)
             if ret:
                 cursor = ret.get_return('cursor')

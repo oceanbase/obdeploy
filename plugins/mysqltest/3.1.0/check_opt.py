@@ -60,7 +60,7 @@ def check_opt(plugin_context, env, *args, **kwargs):
 
     if 'suite_dir' not in opt or not os.path.exists(opt['suite_dir']):
         opt['suite_dir'] = os.path.join(os.path.split(__file__)[0], 'test_suite')
-        
+
     if 'all' in opt and opt['all']:
         opt['suite'] = ','.join(os.listdir(opt['suite_dir']))
     elif 'suite' in opt and opt['suite']:

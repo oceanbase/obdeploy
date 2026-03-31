@@ -50,6 +50,7 @@ def build(plugin_context, *args, **kwargs):
     options = plugin_context.options
     pre_test_ret = plugin_context.get_return("pre_test")
     repository = kwargs.get("repository")
+    cluster_config = plugin_context.cluster_config
 
     server_state = plugin_context.get_variable('server_state')
     merge = plugin_context.get_variable('merge')
@@ -60,7 +61,7 @@ def build(plugin_context, *args, **kwargs):
     host = get_option(options, 'host', '127.0.0.1')
     db_name = get_option(options, 'database', 'test')
     user = get_option(options, 'user', 'root')
-    password = get_option(options, 'password', '')
+    password = get_option(options, 'password', '') if repository.name != COMP_OB_SEEKDB else cluster_config.get_global_conf().get('root_password')
     tenant_name = get_option(options, 'tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
     obclient_bin = get_option(options, 'obclient_bin', 'obclient')
     java_bin = get_option(options, 'java_bin', 'java')

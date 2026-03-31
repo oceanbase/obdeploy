@@ -23,7 +23,7 @@ import resource
 import hashlib
 
 from tool import NetUtil, COMMAND_ENV
-from const import VERSION, REVISION, TELEMETRY_COMPONENT
+from const import VERSION, REVISION, TELEMETRY_COMPONENT, PLATFORM_DARWIN
 from _environ import ENV_TELEMETRY_REPORTER, ENV_OBD_ID, ENV_CUSTOM_CLUSTER_ID
 
 shell_command_map = {
@@ -39,6 +39,22 @@ shell_command_map = {
     "os_name": 'cat /etc/os-release | grep "^ID=" | cut -f2 -d=',
     "os_release": 'cat /etc/os-release | grep "^VERSION_ID=" | cut -f2 -d='
 }
+
+import platform
+if platform.system() == PLATFORM_DARWIN:
+    shell_command_map = {
+        "host_type": 'echo "physical"', # Mac is usually physical or VM, but systemd-detect-virt doesn't exist
+        "_cpu_physical_core_num": 'sysctl -n hw.physicalcpu',
+        "_per_physical_core_num": 'echo 1', # Simplified
+        "cpu_logical_cores": 'sysctl -n hw.logicalcpu',
+        "cpu_model_name": 'sysctl -n machdep.cpu.brand_string',
+        "cpu_frequency": 'sysctl -n hw.cpufrequency',
+        "memory_total": 'sysctl -n hw.memsize',
+        "memory_free": 'vm_stat | grep "Pages free" | awk \'{print $3}\' | sed "s/\.//"', # Approximate
+        "memory_avaiable": 'vm_stat | grep "Pages free" | awk \'{print $3}\' | sed "s/\.//"', # Approximate
+        "os_name": 'sw_vers -productName',
+        "os_release": 'sw_vers -productVersion'
+    }
 current_client = None
 
 

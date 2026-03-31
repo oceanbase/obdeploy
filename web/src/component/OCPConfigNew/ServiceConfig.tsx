@@ -87,7 +87,9 @@ export default function ServiceConfig({
   };
 
   useEffect(() => {
-    if (ip.length) {
+    // 只有在没有保存的 ocp_site_url 值时才设置默认值
+    // 避免覆盖用户已经保存的值
+    if (ip.length && !ocpserver.ocp_site_url) {
       let url = `http://${ip[0]}:8080`;
       setSiteUrl(url);
       form.setFieldValue(['ocpserver', 'ocp_site_url'], url);

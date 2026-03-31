@@ -11,6 +11,19 @@
   description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be set according to sysconf; otherwise, this parameter is used.
   description_local: 系统CPU总数，如果设置为0，将自动检测
 - name: memory_limit
+  name_local: 运行软内存
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: NULL
+  max_value: NULL
+  modify_limit: decrease
+  section: OBSERVER
+  need_restart: false
+  description_en: Available soft memory size. Please enter an capacity, such as 8G
+  description_local: 可用总内存大小。请输入带容量带单位的整数，如8G
+- name: memory_hard_limit
   name_local: 最大运行内存
   require: false
   essential: true
@@ -877,6 +890,66 @@
   need_restart: false
   description_en: the time during which a RPC request is permitted to execute before it is terminated
   description_local: 集群内部请求的超时时间
+- name: rpc_port
+  name_local: 内部通信端口
+  require: true
+  essential: true
+  type: INT
+  default: 2882
+  min_value: 1025
+  max_value: 65535
+  modify_limit: modify
+  need_restart: true
+  description_en: the port number for RPC protocol.
+  description_local: 集群内部通信的端口号
+- name: enable_rpc_service
+  name_local: rpc网络服务
+  require: false
+  essential: true
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: RPC
+  need_restart: true
+  description_en: Enable RPC network service. Must be enabled when using RPC-dependent features such as standby replication.
+  description_local: rpc网络服务。部署指定，动态修改无效；重启生效。备库等场景必须开启。
+- name: log_restore_source
+  name_local: 备库日志同步上游
+  require: false
+  essential: true
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  section: OBSERVER
+  need_restart: false
+  description_en: Upstream for standby log synchronization, format ip:rpc_port. Can be the primary or another standby.
+  description_local: 备库同步的上游，格式 ip:rpc_port，可为主库或另一备库。动态生效；备库场景必须设置。
+- name: log_disk_utilization_threshold
+  name_local: Redo 回收触发阈值
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: 100
+  section: OBSERVER
+  need_restart: false
+  description_en: Threshold to trigger redo recycling, as percentage. 0 recycles redo as fast as possible; non-zero recycles only when log usage exceeds this value times log_disk_size (small-portion semantics). Suggested around 80 in some deployments; if primary recycles logs too aggressively, standby sync may disconnect.
+  description_local: 触发 redo 回收的阈值（百分比）。0 表示尽快回收；非 0 表示当日志用量超过该值与 log_disk_size 的乘积时才回收。可参考 80；主库日志回收过快时备库异步同步有断开风险。
+- name: enable_rpc_tls
+  name_local: 启用 RPC TLS
+  require: false
+  essential: true
+  type: BOOL
+  default: false
+  min_value: NULL
+  max_value: NULL
+  section: RPC
+  need_restart: true
+  description_en: Whether to enable TLS for RPC connections. Static effective (restart required).
+  description_local: 控制是否启用 RPC 的 TLS。静态生效，需重启。
 - name: tenant_task_queue_size
   require: false
   type: INT

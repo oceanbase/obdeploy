@@ -121,6 +121,8 @@ DISABLE_SWAGGER = '<DISABLE_SWAGGER>'
 PKG_RPM_FILE = 'rpm'
 PKG_REPO_FILE = 'repository'
 
+PLATFORM_DARWIN = 'Darwin'
+
 RSA_KEY_SIZE = 512
 
 # test tool

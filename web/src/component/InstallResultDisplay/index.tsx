@@ -175,7 +175,13 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                   data-aspm-param={``}
                   data-aspm-expo
                 >
-                  {`${installType} 升级成功`}
+                  {intl.formatMessage(
+                    {
+                      id: 'OBD.component.InsstallResult.InstallTypeUpgradeSuccessful',
+                      defaultMessage: '{installType} 升级成功',
+                    },
+                    { installType },
+                  )}
                 </span>
               ) : (
                 <span>
@@ -244,7 +250,13 @@ const InstallResultDisplay: React.FC<InstallResultDisplayProps> = ({
                   data-aspm-param={``}
                   data-aspm-expo
                 >
-                  {`${installType} 升级失败`}
+                  {intl.formatMessage(
+                    {
+                      id: 'OBD.component.InsstallResult.InstallTypeUpgradeFailed',
+                      defaultMessage: '{installType} 升级失败',
+                    },
+                    { installType },
+                  )}
                 </div>
               ) : (
                 <div>

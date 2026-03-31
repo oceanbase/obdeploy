@@ -152,7 +152,10 @@ export default function ComponentsPort({
         <Col span={6}>
           <InputPort
             name={['alertmanager', 'port']}
-            label={'AlertManager 服务端口'}
+            label={intl.formatMessage({
+              id: 'OBD.Obdeploy.ClusterConfig.AlertManagerPort',
+              defaultMessage: 'AlertManager 服务端口',
+            })}
             fieldProps={{ style: commonStyle }}
             initialValue={9093}
           />

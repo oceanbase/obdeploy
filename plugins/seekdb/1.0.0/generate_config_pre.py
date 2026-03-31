@@ -108,7 +108,7 @@ def generate_config_pre(plugin_context, auto_depend=False, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
     generate_base_keys = [
-        'memory_limit', 'datafile_size', 'log_disk_size', 'system_memory', 'cpu_count', 'production_mode',
+        'memory_limit', 'datafile_maxsize', 'log_disk_size', 'system_memory', 'cpu_count', 'production_mode',
         'syslog_level', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size',
         'datafile_next', 'datafile_maxsize'
     ]

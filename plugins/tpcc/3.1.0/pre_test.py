@@ -68,6 +68,7 @@ def pre_test(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     options = plugin_context.options
     repository = kwargs.get("repository")
+    cluster_config = plugin_context.cluster_config
 
     tmp_dir = os.path.abspath(get_option(options, 'tmp_dir', './tmp'))
     tenant_name = get_option(options, 'tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
@@ -203,36 +204,38 @@ def pre_test(plugin_context, *args, **kwargs):
         create_table_sql = os.path.join(bmsql_sql_path, 'tableCreates.sql')
         LocalClient.execute_command("sed -i 's/{{partition_num}}/%d/g' %s" % (cpu_total, create_table_sql), stdio=stdio)
 
-    query_tenant_sql = plugin_context.get_variable('tenant_sql')
-    tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
-    if not tenant_meta:
-        stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
-        return
+    max_memory = 0
+    if repository.name != COMP_OB_SEEKDB:
+        query_tenant_sql = plugin_context.get_variable('tenant_sql')
+        tenant_meta = cursor.fetchone(query_tenant_sql, [tenant_name])
+        if not tenant_meta:
+            stdio.error('Tenant %s not exists. Use `obd cluster tenant create` to create tenant.' % tenant_name)
+            return
 
-    query_resource_sql = plugin_context.get_variable('resource_sql')
-    tenant_id = plugin_context.get_variable('tenant_id')
+        query_resource_sql = plugin_context.get_variable('resource_sql')
+        tenant_id = plugin_context.get_variable('tenant_id')
 
-    sql = query_resource_sql % tenant_meta[tenant_id]
-    pool = cursor.fetchone(sql)
-    if pool is False:
-        return
+        sql = query_resource_sql % tenant_meta[tenant_id]
+        pool = cursor.fetchone(sql)
+        if pool is False:
+            return
 
-    query_unit_sql = plugin_context.get_variable('unit_sql')
-    unit_config_id = plugin_context.get_variable('unit_config_id')
+        query_unit_sql = plugin_context.get_variable('unit_sql')
+        unit_config_id = plugin_context.get_variable('unit_config_id')
 
-    sql = query_unit_sql % pool[unit_config_id]
-    tenant_unit = cursor.fetchone(sql)
-    if tenant_unit is False:
-        return
+        sql = query_unit_sql % pool[unit_config_id]
+        tenant_unit = cursor.fetchone(sql)
+        if tenant_unit is False:
+            return
 
-    max_memory = tenant_unit[plugin_context.get_variable('max_memory')]
-    max_cpu = int(tenant_unit[plugin_context.get_variable('max_cpu')])
+        max_memory = tenant_unit[plugin_context.get_variable('max_memory')]
+        max_cpu = int(tenant_unit[plugin_context.get_variable('max_cpu')])
 
     host = get_option(options, 'host', '127.0.0.1')
     port = db.port if db else 2881
     db_name = get_option(options, 'database', 'test')
     user = get_option(options, 'user', 'root')
-    password = get_option(options, 'password', '')
+    password = get_option(options, 'password', '') if repository.name != COMP_OB_SEEKDB else cluster_config.get_global_conf().get('root_password')
     warehouses = get_option(options, 'warehouses', cpu_total * 20)
     load_workers = get_option(options, 'load_workers', int(max(min(min_cpu, (max_memory >> 30) / 2), 1)))
     terminals = get_option(options, 'terminals', min(cpu_total * 15, warehouses * 10))
@@ -297,7 +300,8 @@ def pre_test(plugin_context, *args, **kwargs):
         return
 
     stdio.stop_loading('succeed')
-    return plugin_context.return_true(
+    if repository.name == COMP_OB_SEEKDB:
+        return plugin_context.return_true(
         bmsql_prop_path=bmsql_prop_path,
         bmsql_classpath=bmsql_classpath,
         run_path=run_path,
@@ -305,8 +309,6 @@ def pre_test(plugin_context, *args, **kwargs):
         warehouses=warehouses,
         cpu_total=cpu_total,
         max_memory=max_memory,
-        max_cpu=max_cpu,
-        tenant_id=tenant_meta[tenant_id],
         tenant=tenant_name,
         tmp_dir=tmp_dir,
         server_num=server_num,
@@ -317,3 +319,24 @@ def pre_test(plugin_context, *args, **kwargs):
         password=password,
         database=db_name
     )
+    else:
+        return plugin_context.return_true(
+            bmsql_prop_path=bmsql_prop_path,
+            bmsql_classpath=bmsql_classpath,
+            run_path=run_path,
+            bmsql_sql_path=bmsql_sql_path,
+            warehouses=warehouses,
+            cpu_total=cpu_total,
+            max_memory=max_memory,
+            max_cpu=max_cpu,
+            tenant_id=tenant_meta[tenant_id],
+            tenant=tenant_name,
+            tmp_dir=tmp_dir,
+            server_num=server_num,
+            obclient_bin=obclient_bin,
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=db_name
+        )

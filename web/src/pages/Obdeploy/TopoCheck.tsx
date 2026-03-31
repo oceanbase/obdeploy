@@ -20,14 +20,20 @@ export default function TopoCheck(
     const items: TabsProps['items'] = [
         {
             key: 'checkInfo',
-            label: '配置信息',
+            label: intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.ConfigurationInformation',
+                defaultMessage: '配置信息',
+            }),
             children: <CheckInfo
                 deployMode={deployMode}
             />,
         },
         {
             key: 'topo',
-            label: '拓扑图',
+            label: intl.formatMessage({
+                id: 'OBD.pages.components.TopoComponent.Topology',
+                defaultMessage: '拓扑图',
+            }),
             children: <TopoComponent />,
         },
     ];

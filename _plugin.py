@@ -283,7 +283,10 @@ def pyScriptPluginExec(func):
             namespace_vars.update(kwargs)
             if arg:
                 idx = 0
-                params = list(inspect2.signature(method).parameters.keys())[1:-2]
+                try:
+                    params = list(inspect2.signature(method).parameters.keys())[1:-2]
+                except (ValueError, TypeError):
+                    params = []
                 num = min(len(arg), len(params))
                 while idx < num:
                     key = params[idx]
@@ -871,6 +874,9 @@ class PyScriptPluginLoader(ComponentPluginLoader):
         super(PyScriptPluginLoader, self).__init__(home_path, dev_mode=dev_mode, stdio=stdio)
 
     def _create_(self, script_name):
+        # Use an explicit namespace dict for exec() because Python 3.12+ (PEP 667)
+        # changed locals() to return a snapshot, so exec() results won't appear in locals().
+        _ns = {}
         exec('''
 class %s(PyScriptPlugin):
 
@@ -890,8 +896,8 @@ class %s(PyScriptPlugin):
         repositories, components, clients, cluster_config, cmd,
         options, stdio, *arg, **kwargs):
         pass
-        ''' % (self.PLUGIN_TYPE.value, script_name, script_name, self.PLUGIN_TYPE.value, self.PLUGIN_TYPE.value, script_name))
-        clz = locals()[self.PLUGIN_TYPE.value]
+        ''' % (self.PLUGIN_TYPE.value, script_name, script_name, self.PLUGIN_TYPE.value, self.PLUGIN_TYPE.value, script_name), globals(), _ns)
+        clz = _ns[self.PLUGIN_TYPE.value]
         setattr(sys.modules[__name__], self.PLUGIN_TYPE.value, clz)
         clz.set_plugin_type(self.PLUGIN_TYPE)
         return clz

@@ -856,7 +856,10 @@ export default function DeployConfig({
 
   const cluserNameProps = {
     name: 'appname',
-    label: '部署名称',
+    label: intl.formatMessage({
+      id: 'OBD.component.DeployConfig.DeploymentName',
+      defaultMessage: '部署名称',
+    }),
     rules: clusterNameRules,
     placeholder: intl.formatMessage({
       id: 'OBD.component.DeployConfig.PleaseEnter',

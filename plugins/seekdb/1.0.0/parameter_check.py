@@ -15,9 +15,13 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import platform
 
 import _errno as err
 from _types import Capacity
+from const import PLATFORM_DARWIN
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
 
 
 def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
@@ -93,9 +97,10 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
             if not client.execute_command('ls %s/sstable/block_file' % data_path):
                 disk[data_path] = {'server': server}
                 clog_mount[clog_dir] = {'server': server}
-                if 'datafile_size' in server_config and server_config['datafile_size'] and server_config['datafile_size']:
-                    # if need is string, it means use datafile_size
-                    disk[data_path]['need'] = server_config['datafile_size']
+                _df = server_config.get('datafile_maxsize') or server_config.get('datafile_size')
+                if _df:
+                    # if need is string, it means use datafile_maxsize (or legacy datafile_size)
+                    disk[data_path]['need'] = _df
                 elif 'datafile_disk_percentage' in server_config and server_config['datafile_disk_percentage']:
                     # if need is integer, it means use datafile_disk_percentage
                     disk[data_path]['need'] = int(server_config['datafile_disk_percentage'])
@@ -109,7 +114,11 @@ def parameter_check(plugin_context, generate_configs={}, *args, **kwargs):
 
                 devname = server_config.get('devname')
                 if devname:
-                    if not client.execute_command("grep -e '^ *%s:' /proc/net/dev" % devname):
+                    if IS_DARWIN:
+                        devname_check_cmd = "ifconfig %s 2>/dev/null" % devname
+                    else:
+                        devname_check_cmd = "grep -e '^ *%s:' /proc/net/dev" % devname
+                    if not client.execute_command(devname_check_cmd):
                         suggest = err.SUG_NO_SUCH_NET_DEVIC.format(ip=ip)
                         suggest.auto_fix = 'devname' not in global_generate_config and 'devname' not in server_generate_config
                         critical(server, 'net', err.EC_NO_SUCH_NET_DEVICE.format(server=server, devname=devname), suggests=[suggest])

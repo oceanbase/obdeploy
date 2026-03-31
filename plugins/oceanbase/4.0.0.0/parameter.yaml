@@ -1969,7 +1969,7 @@
 - name: zone_region
   require: false
   type: STRING
-  default: 'deault_region'
+  default: 'default_region'
   min_value: NULL
   max_value: NULL
   need_reload: true

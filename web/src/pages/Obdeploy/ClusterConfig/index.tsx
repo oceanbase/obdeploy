@@ -17,7 +17,6 @@ import { ProCard, ProForm, ProFormRadio } from '@ant-design/pro-components';
 import { Password } from '@oceanbase/ui';
 import { useUpdateEffect } from 'ahooks';
 import { Form, message, Row, Space } from 'antd';
-import { isEmpty } from 'lodash';
 import { useEffect, useState } from 'react';
 import { getLocale, useModel } from 'umi';
 import {
@@ -106,19 +105,38 @@ export default function ClusterConfig() {
     form,
   );
   // 密码校验是否通过
-  const [grafanaPassed, setGrafanaPassed] = useState<boolean>(true);
-  const [prometheusPassed, setPrometheusPassed] = useState<boolean>(true);
-  const [alertmanagerPassed, setAlertmanagerPassed] = useState<boolean>(true);
-  const [prometheusPwd, setPrometheusPwd] = useState<string>(
-    prometheus?.basic_auth_users?.admin || '',
-  );
+  const [grafanaPassed, setGrafanaPassed] = useState<MsgInfoType>();
+  const [prometheusPassed, setPrometheusPassed] = useState<MsgInfoType>();
+  const [alertmanagerPassed, setAlertmanagerPassed] = useState<MsgInfoType>();
+  const prometheusV = prometheus?.basic_auth_users?.admin
+  const [prometheusPwd, setPrometheusPwd] = useState<string>();
   // 从 configData 中获取原始的未加密密码值
-  const [alertmanagerPwd, setAlertmanagerPwd] = useState<string>(
-    alertmanager?.basic_auth_users?.admin || '',
-  );
-  const [grafanaPwd, setGrafanaPwd] = useState<string>(
-    grafana?.login_password || '',
-  );
+  const alertmanagerV = alertmanager?.basic_auth_users?.admin
+  const grafanaV = grafana?.login_password
+  const [alertmanagerPwd, setAlertmanagerPwd] = useState<string>();
+  const [grafanaPwd, setGrafanaPwd] = useState<string>();
+
+  useEffect(() => {
+    if (grafanaV?.includes('==')) {
+      setGrafanaPwd('')
+    } else {
+      setGrafanaPwd(grafanaV)
+    }
+  }, [grafanaV,])
+  useEffect(() => {
+    if (alertmanagerV?.includes('==')) {
+      setAlertmanagerPwd('')
+    } else {
+      setAlertmanagerPwd(alertmanagerV)
+    }
+  }, [alertmanagerV,])
+  useEffect(() => {
+    if (prometheusV?.includes('==')) {
+      setPrometheusPwd('')
+    } else {
+      setPrometheusPwd(prometheusV)
+    }
+  }, [prometheusV,])
 
   const [show, setShow] = useState<boolean>(clusterMore);
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
@@ -126,6 +144,7 @@ export default function ClusterConfig() {
   const [obRootPwd, setRootPwd] = useState<string>(
     oceanbase?.root_password || '',
   );
+  console.log('oceanbase?.root_password', prometheusV)
 
   const [obPwdMsgInfo, setObPwdMsgInfo] = useState<MsgInfoType>();
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
@@ -428,12 +447,12 @@ export default function ClusterConfig() {
   }, [componentsMore]);
 
   // 确保 alertmanagerPwd 从 configData 中获取原始的未加密密码值
-  useEffect(() => {
-    const originalPwd = alertmanager?.basic_auth_users?.admin;
-    if (originalPwd) {
-      setAlertmanagerPwd(originalPwd);
-    }
-  }, [alertmanager?.basic_auth_users?.admin]);
+  // useEffect(() => {
+  //   const originalPwd = alertmanager?.basic_auth_users?.admin;
+  //   if (originalPwd) {
+  //     setAlertmanagerPwd(originalPwd);
+  //   }
+  // }, [alertmanager?.basic_auth_users?.admin]);
 
   const initialValues = {
     oceanbase: {
@@ -514,7 +533,6 @@ export default function ClusterConfig() {
   if (!lowVersion) {
   }
 
-  const singleItemStyle = { width: 448 };
   const initDir = `${home_path}/oceanbase/store`;
   return (
     <ProForm
@@ -671,7 +689,10 @@ export default function ClusterConfig() {
             </Row>
             <InputPort
               name={['oceanbase', 'obshell_port']}
-              label={'obshell 端口'}
+              label={intl.formatMessage({
+                id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.ObshellPort',
+                defaultMessage: 'obshell 端口',
+              })}
               fieldProps={{ style: commonPortStyle }}
             />
             <div className={styles.moreSwitch}>
@@ -714,94 +735,55 @@ export default function ClusterConfig() {
               })}
             >
               {selectedConfig.includes(grafanaComponent) && (
-                <Form.Item
+                <CustomPasswordInput
+                  msgInfo={grafanaPassed}
+                  setMsgInfo={setGrafanaPassed}
+                  form={form}
+                  onChange={grafanaPwdChange}
+                  useFor="ob"
+                  value={grafanaPwd}
+                  name={['grafana', 'login_password']}
                   label={intl.formatMessage({
                     id: 'OBD.pages.components.ClusterConfig.DKFFMK27',
                     defaultMessage: 'Grafana 密码',
                   })}
-                  name={['grafana', 'login_password']}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.DKFFMK28',
-                        defaultMessage: '请输入或随机生成 Grafana 密码',
-                      }),
-                    },
-                    {
-                      validator: validatePassword(grafanaPassed),
-                    },
-                  ]}
-                  initialValue={grafanaPwd}
-                >
-                  <Password
-                    generatePasswordRegex={PASSWORD_REGEX}
-                    onValidate={(value) => {
-                      setGrafanaPassed(value);
-                    }}
-                    style={{ width: 388, borderColor: '#CDD5E4' }}
-                    onChange={grafanaPwdChange}
-                  />
-                </Form.Item>
+                  style={{ height: 86, ...commonInputStyle }}
+                  innerInputStyle={{ width: 388 }}
+                />
               )}
               {selectedConfig.includes(prometheusComponent) && (
-                <Form.Item
+                <CustomPasswordInput
+                  msgInfo={prometheusPassed}
+                  setMsgInfo={setPrometheusPassed}
+                  form={form}
+                  onChange={prometheusPwdChange}
+                  useFor="ob"
+                  value={prometheusPwd}
+                  name={['prometheus', 'basic_auth_users', 'admin']}
                   label={intl.formatMessage({
                     id: 'OBD.pages.components.ClusterConfig.DKFFMK29',
                     defaultMessage: 'Prometheus 密码',
                   })}
-                  name={['prometheus', 'basic_auth_users', 'admin']}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.DKFFMK26',
-                        defaultMessage: '请输入或随机生成 Prometheus 密码',
-                      }),
-                    },
-                    {
-                      validator: validatePassword(prometheusPassed),
-                    },
-                  ]}
-                  initialValue={prometheusPwd}
-                >
-                  <Password
-                    generatePasswordRegex={PASSWORD_REGEX}
-                    onValidate={(value) => {
-                      setPrometheusPassed(value);
-                    }}
-                    style={{ width: 388, borderColor: '#CDD5E4' }}
-                    onChange={prometheusPwdChange}
-                  />
-                </Form.Item>
+                  style={{ height: 86, ...commonInputStyle }}
+                  innerInputStyle={{ width: 388 }}
+                />
               )}
               {selectedConfig.includes(alertManagerComponent) && (
-                <Form.Item
-                  label={'AlertManager 密码'}
+                <CustomPasswordInput
+                  msgInfo={alertmanagerPassed}
+                  setMsgInfo={setAlertmanagerPassed}
+                  form={form}
+                  onChange={alertmanagerPwdChange}
+                  useFor="ob"
+                  value={alertmanagerPwd}
                   name={['alertmanager', 'basic_auth_users', 'admin']}
-                  rules={[
-                    {
-                      required: true,
-                      message: intl.formatMessage({
-                        id: 'OBD.pages.components.ClusterConfig.DKFFMK26',
-                        defaultMessage: '请输入或随机生成 AlertManager 密码',
-                      }),
-                    },
-                    {
-                      validator: validatePassword(alertmanagerPassed),
-                    },
-                  ]}
-                  initialValue={alertmanagerPwd}
-                >
-                  <Password
-                    generatePasswordRegex={PASSWORD_REGEX}
-                    onValidate={(value) => {
-                      setAlertmanagerPassed(value);
-                    }}
-                    style={{ width: 388, borderColor: '#CDD5E4' }}
-                    onChange={alertmanagerPwdChange}
-                  />
-                </Form.Item>
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.CheckInfo.AlertManagerPassword',
+                    defaultMessage: 'AlertManager 密码',
+                  })}
+                  style={{ height: 86, ...commonInputStyle }}
+                  innerInputStyle={{ width: 388 }}
+                />
               )}
 
               <ComponentsPort

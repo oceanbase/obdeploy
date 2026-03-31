@@ -10,7 +10,6 @@ import InstallProcessNew from '@/component/InstallProcessNew';
 import InstallResult from '@/component/InstallResult';
 import MetaDBConfig from '@/component/MetaDBConfig';
 import OCPConfigNew from '@/component/OCPConfigNew';
-import OCPPreCheck from '@/component/OCPPreCheck';
 import Steps from '@/component/Steps';
 import {
   NEW_METADB_OCP_INSTALL,

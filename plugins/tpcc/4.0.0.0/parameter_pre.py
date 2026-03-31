@@ -16,10 +16,14 @@
 import os
 
 from tool import set_plugin_context_variables
+from const import COMP_OB_SEEKDB
 
 
 def parameter_pre(plugin_context, *args, **kwargs):
+    repository = kwargs.get("repository")
     active_sql = "select b.CPU_CAPACITY from oceanbase.DBA_OB_SERVERS a join oceanbase.GV$OB_SERVERS b on a.SVR_IP=b.SVR_IP and a.SVR_PORT = b.SVR_PORT where a.STATUS = 'ACTIVE' and a.STOP_TIME is NULL  and a.START_SERVICE_TIME > 0"
+    if repository.name == COMP_OB_SEEKDB:
+        active_sql = "select CPU_CAPACITY from oceanbase.V$OB_SERVER_STAT where START_SERVICE_TIME > 0"
     tenant_sql = "select * from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s"
     resource_sql = "select * from oceanbase.DBA_OB_RESOURCE_POOLS where TENANT_ID = %d"
     unit_sql = "select * from oceanbase.DBA_OB_UNIT_CONFIGS where UNIT_CONFIG_ID = %d"

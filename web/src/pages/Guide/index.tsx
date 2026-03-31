@@ -168,7 +168,10 @@ export default function Guide() {
           className={buttonStyle}
           style={locale === 'zh-CN' ? { width: 63, marginBottom: 58 } : { width: 100, marginBottom: 58 }}
         >
-          <span style={{ marginBottom: 50 }}>升级</span>
+          <span style={{ marginBottom: 50 }}>{intl.formatMessage({
+            id: 'OBD.pages.Guide.Upgrade',
+            defaultMessage: '升级',
+          })}</span>
         </Button>
       ),
     },
@@ -269,7 +272,10 @@ export default function Guide() {
           }
         >
           {
-            isUpgrade ? '升级' : intl.formatMessage({
+            isUpgrade ? intl.formatMessage({
+              id: 'OBD.pages.Guide.Upgrade',
+              defaultMessage: '升级',
+            }) : intl.formatMessage({
               id: 'OBD.pages.Guide.Installation',
               defaultMessage: '安装',
             })
@@ -341,11 +347,14 @@ export default function Guide() {
       <div style={{ height: '32px' }}>
         <span style={{ color: '#132039' }}>
           {
-            isUpgrade ? '请选择升级的产品' : intl.formatMessage({
+            isUpgrade ? intl.formatMessage({
+              id: 'OBD.pages.components.InstallFinishe',
+              defaultMessage: '请选择升级的产品',
+            }) : intl.formatMessage({
               id: 'OBD.pages.Guide.SelectInstallProductOrComponent',
               defaultMessage: '请选择安装产品或组件管理',
             })}
-        </span>{' '}
+        </span>
         <span style={{ ...textStyle, color: '#E2E8F3' }}>|</span>{' '}
         <a
           href={DOCS_PRODUCTION}

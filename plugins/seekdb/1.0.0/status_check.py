@@ -15,7 +15,11 @@
 
 from __future__ import absolute_import, division, print_function
 
+import platform
 from tool import set_plugin_context_variables
+from const import PLATFORM_DARWIN
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
 
 
 success = False
@@ -51,7 +55,11 @@ def status_check(plugin_context, work_dir_check=False, precheck=False, source_op
             remote_pid_path = '%s/run/seekdb.pid' % home_path
             remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
             if remote_pid:
-                if client.execute_command('ls /proc/%s' % remote_pid):
+                if IS_DARWIN:
+                    is_running = client.execute_command('ps -p %s' % remote_pid)
+                else:
+                    is_running = client.execute_command('ls /proc/%s' % remote_pid)
+                if is_running:
                     stdio.verbose('%s is runnning, skip' % server)
                     wait_2_pass(server)
                     work_dir_check = False

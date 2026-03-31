@@ -16,11 +16,15 @@
 from __future__ import absolute_import, division, print_function
 
 import json
+import platform
 import time
 import requests
 from urllib.parse import urlparse
 
 from tool import NetUtil
+from const import PLATFORM_DARWIN
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
 
 
 def is_ob_configserver(obconfig_url, stdio):
@@ -52,6 +56,8 @@ def config_url(ocp_config_server, appname, cid):
 
 
 def get_port_socket_inode(client, port):
+    if IS_DARWIN:
+        return []
     port = hex(port)[2:].zfill(4).upper()
     cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{print $2,$10}' | grep '00000000:%s' | awk -F' ' '{print $2}' | uniq" % port
     res = client.execute_command(cmd)
@@ -61,6 +67,13 @@ def get_port_socket_inode(client, port):
 
 
 def port_release_check(client, pid, port, count):
+    if IS_DARWIN:
+        # On macOS, use lsof to check if the port is still held by the process
+        ret = client.execute_command('lsof -nP -iTCP:%s -sTCP:LISTEN 2>/dev/null | grep -w %s' % (port, pid))
+        if ret and ret.stdout.strip():
+            return False
+        # Check if process still exists
+        return not client.execute_command('ps -p %s -o pid=' % pid).stdout.strip()
     socket_inodes = get_port_socket_inode(client, port)
     if not socket_inodes:
         return True
@@ -136,9 +149,14 @@ def stop(plugin_context, *args, **kwargs):
                     data = servers[server]
                     server_config = cluster_config.get_server_conf(server)
                     client = clients[server]
-                    client.execute_command(
-                        "if [[ -d /proc/%s ]]; then pkill -9 -u `whoami` -f '%s/bin/seekdb -p %s';fi" %
-                        (data['pid'], server_config['home_path'], server_config['mysql_port']))
+                    if IS_DARWIN:
+                        client.execute_command(
+                            "if ps -p %s > /dev/null 2>&1; then pkill -9 -u `whoami` -f '%s/bin/seekdb -p %s'; fi" %
+                            (data['pid'], server_config['home_path'], server_config['mysql_port']))
+                    else:
+                        client.execute_command(
+                            "if [[ -d /proc/%s ]]; then pkill -9 -u `whoami` -f '%s/bin/seekdb -p %s';fi" %
+                            (data['pid'], server_config['home_path'], server_config['mysql_port']))
             time.sleep(3)
 
     if servers:

@@ -18,10 +18,14 @@ from __future__ import absolute_import, division, print_function
 import time
 
 from tool import set_plugin_context_variables
+from const import COMP_OB_SEEKDB
 
 
 def build_pre(plugin_context, *args, **kwargs):
+    repository = kwargs.get("repository")
     server_status_sql = "select * from oceanbase.DBA_OB_SERVERS where STATUS != 'ACTIVE' or STOP_TIME is not NULL or START_SERVICE_TIME is NULL"
+    if repository.name == COMP_OB_SEEKDB:
+        server_status_sql = "select * from oceanbase.V$OB_SERVER_STAT where START_SERVICE_TIME is NULL"
     server_state = ['DETECT_ALIVE', 'ACTIVE']
 
     def merge(plugin_context, stdio, cursor, tenant_name):
@@ -30,7 +34,10 @@ def build_pre(plugin_context, *args, **kwargs):
 
         # Major freeze
         stdio.start_loading('Merge')
-        sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION where tenant_id = %s" % tenant_id
+        if repository.name == COMP_OB_SEEKDB:
+            sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION"
+        else:
+            sql_frozen_scn = "select FROZEN_SCN, LAST_SCN from oceanbase.CDB_OB_MAJOR_COMPACTION where tenant_id = %s" % tenant_id
         merge_version = cursor.fetchone(sql_frozen_scn)
         if merge_version is False:
             return False

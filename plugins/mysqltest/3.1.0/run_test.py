@@ -19,14 +19,15 @@ import re
 import os
 import time
 import shlex
+import platform
 import requests
 import urllib
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, TimeoutExpired
 from copy import deepcopy
 from ssh import LocalClient
 from tool import DirectoryUtil
 from _stdio import FormatText
-from const import COMP_OB_SEEKDB
+from const import COMP_OB_SEEKDB, PLATFORM_DARWIN
 
 inner_dir = os.path.split(__file__)[0]
 inner_test_dir = os.path.join(inner_dir, 't')
@@ -380,20 +381,42 @@ def run_test(plugin_context, env, *args, **kwargs):
                 LocalClient.execute_command('%s "alter system set _enable_static_typing_engine = %s;select sleep(2);"' % (exec_sql_cmd, opt['_enable_static_typing_engine']), stdio=stdio)
 
         start_time = time.time()
-        cmd = 'timeout %s %s %s' % (case_timeout, mysqltest_bin, str(Arguments(opt)))
+        IS_DARWIN = platform.system() == PLATFORM_DARWIN
+        if IS_DARWIN:
+            # macOS does not have GNU timeout; use Python subprocess timeout instead
+            cmd = '%s %s' % (mysqltest_bin, str(Arguments(opt)))
+        else:
+            cmd = 'timeout %s %s %s' % (case_timeout, mysqltest_bin, str(Arguments(opt)))
         try:
             stdio.verbose('local execute: %s ' % cmd)
             p = Popen(shlex.split(cmd), env=test_env, stdout=PIPE, stderr=PIPE)
-            output, errput = p.communicate()
-            retcode = p.returncode
-            if retcode == 124:
-                output = ''
-                if 'source_limit' in opt and 'g.buffer' in opt['source_limit']:
-                    errput = "%s secs out of soft limit (%s secs), sql may be hung, please check" % (opt['source_limit']['g.buffer'], case_timeout)
+            if IS_DARWIN:
+                try:
+                    output, errput = p.communicate(timeout=case_timeout)
+                except TimeoutExpired:
+                    p.kill()
+                    output, errput = p.communicate()
+                    retcode = 124  # mimic GNU timeout exit code
+                    output = ''
+                    if 'source_limit' in opt and 'g.buffer' in opt['source_limit']:
+                        errput = "%s secs out of soft limit (%s secs), sql may be hung, please check" % (opt['source_limit']['g.buffer'], case_timeout)
+                    else:
+                        errput = "%s seconds timeout, sql may be hung, please check" % case_timeout
                 else:
-                    errput = "%s seconds timeout, sql may be hung, please check" % case_timeout
-            elif isinstance(errput, bytes):
-                errput = errput.decode(errors='replace')
+                    retcode = p.returncode
+                    if isinstance(errput, bytes):
+                        errput = errput.decode(errors='replace')
+            else:
+                output, errput = p.communicate()
+                retcode = p.returncode
+                if retcode == 124:
+                    output = ''
+                    if 'source_limit' in opt and 'g.buffer' in opt['source_limit']:
+                        errput = "%s secs out of soft limit (%s secs), sql may be hung, please check" % (opt['source_limit']['g.buffer'], case_timeout)
+                    else:
+                        errput = "%s seconds timeout, sql may be hung, please check" % case_timeout
+                elif isinstance(errput, bytes):
+                    errput = errput.decode(errors='replace')
         except Exception as e:
             errput = str(e)
             output = ''

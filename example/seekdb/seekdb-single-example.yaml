@@ -1,0 +1,48 @@
+## SeekDB deploy example (single node, standalone)
+##
+## Usage:
+##   obd seekdb deploy <cluster_name> -c example/seekdb/seekdb-single-example.yaml
+##
+## Configure SSH only when the target host is remote:
+# user:
+#   username: your_username
+#   password: your_password_if_needed
+#   key_file: your_ssh_private_key_path_if_needed
+#   port: 22
+#   timeout: 30
+##
+## Replace the server IP and paths below to match your environment.
+## Do not use hostnames for servers; use IP addresses only.
+
+seekdb:
+  servers:
+    - 192.168.1.10
+  global:
+    home_path: /root/seekdb # Working directory; SeekDB runs under this path (required).
+    data_dir: /data/seekdb/store # Data directory for SSTable and related data.
+    redo_dir: /data/seekdb/redo # Redo / clog directory; ensure enough free space (see log_disk_size).
+    mysql_port: 2881
+    obshell_port: 2886
+    memory_limit: 1G # Soft / hard memory limits; use capacity units such as 1G, 8G.
+    memory_hard_limit: 4G
+    # datafile_size: 16G  # Size of the data file.
+    # datafile_next_size: 2G  # Size of the next data file.
+    datafile_maxsize: 20G # Upper bound for data file auto-extend.
+    cpu_count: 8
+    max_syslog_file_count: 2
+    log_disk_size: 2G # Redo log disk quota; for primary/standby, interactive install uses about 3 * memory_limit.
+    enable_auto_start: false # Whether to register systemd auto-start (true/false).
+    production_mode: false  # Dev-like deployment; set to true for production-style tuning.
+    # root_password: ''
+
+    # --- Optional: RPC / replication (primary or standby). Uncomment and adjust as needed. ---
+    # For primary: expose RPC for standbys (also set rpc_port).
+    # enable_rpc_service: true
+    # rpc_port: 2882
+    # When non-zero, redo recycling triggers when usage exceeds this percentage of log_disk_size (suggested ~80 in some setups).
+    # log_disk_utilization_threshold: 80
+
+    # For standby: upstream primary or cascade standby, format "ip:rpc_port" (required for standby sync).
+    # log_restore_source: '192.168.1.1:2882'
+    # TLS for RPC (requires restart after change).
+    # enable_rpc_tls: false

@@ -413,7 +413,12 @@ export default function ComponentConfig() {
                       id: 'OBD.pages.ComponentDeploy.ComponentConfig.ObproxyNodes',
                       defaultMessage: 'OBProxy 节点',
                     })}
-                    placeholder="请选择或输入 OBProxy 节点"
+                    placeholder={
+                      intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.SelectOrEnterObproxyNodes',
+                        defaultMessage: '请选择或输入 OBProxy 节点',
+                      })
+                    }
                     mode="tags"
                     rules={[
                       {
@@ -435,7 +440,12 @@ export default function ComponentConfig() {
                       id: 'OBD.pages.ComponentDeploy.ComponentConfig.ObconfigserverNodes',
                       defaultMessage: 'obconfigserver 节点',
                     })}
-                    placeholder="请选择或输入 OBConfigServer 节点"
+                    placeholder={
+                      intl.formatMessage({
+                        id: 'OBD.pages.components.NodeConfig.ObconfigserverNodes',
+                        defaultMessage: '请选择或输入 OBConfigServer 节点',
+                      })
+                    }
                     mode="tags"
                     rules={[
                       {
@@ -453,8 +463,14 @@ export default function ComponentConfig() {
                 <Col span={8}>
                   <ProFormSelect
                     name={['grafana', 'servers']}
-                    label={'Grafana 节点'}
-                    placeholder="请选择或输入 Grafana 节点"
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.GrafanaNodes',
+                      defaultMessage: 'Grafana 节点',
+                    })}
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.SelectOrEnterGrafanaNodes',
+                      defaultMessage: '请选择或输入 Grafana 节点',
+                    })}
                     mode="tags"
                     rules={[
                       {
@@ -472,8 +488,14 @@ export default function ComponentConfig() {
                 <Col span={8}>
                   <ProFormSelect
                     name={['prometheus', 'servers']}
-                    label={'Prometheus 节点'}
-                    placeholder="请选择或输入 Prometheus 节点"
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.PrometheusNodes',
+                      defaultMessage: 'Prometheus 节点',
+                    })}
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.SelectOrEnterPrometheusNodes',
+                      defaultMessage: '请选择或输入 Prometheus 节点',
+                    })}
                     mode="tags"
                     rules={[
                       {
@@ -491,9 +513,15 @@ export default function ComponentConfig() {
                 <Col span={8}>
                   <ProFormSelect
                     name={['alertmanager', 'servers']}
-                    label={'AlertManager 节点'}
                     mode="tags"
-                    placeholder="请选择或输入 AlertManager 节点"
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.AlertManagerNodes',
+                      defaultMessage: 'AlertManager 节点',
+                    })}
+                    placeholder={intl.formatMessage({
+                      id: 'OBD.pages.ComponentDeploy.ComponentConfig.SelectOrEnterAlertManagerNodes',
+                      defaultMessage: '请选择或输入 AlertManager 节点',
+                    })}
                     rules={[
                       {
                         validator: (_: any, value: string[]) =>
@@ -643,7 +671,10 @@ export default function ComponentConfig() {
               )}
               {selectedConfig.includes(alertManagerComponent) && (
                 <Form.Item
-                  label={'AlertManager 密码'}
+                  label={intl.formatMessage({
+                    id: 'OBD.pages.components.CheckInfo.AlertManagerPassword',
+                    defaultMessage: 'AlertManager 密码',
+                  })}
                   name={['alertmanager', 'basic_auth_users', 'admin']}
                   rules={[
                     {

@@ -64,7 +64,7 @@ def run_test(plugin_context, *args, **kwargs):
     mysql_db = get_option('database', 'test')
     user = get_option('user', 'root')
     tenant_name = get_option('tenant', 'test') if repository.name != COMP_OB_SEEKDB else 'sys'
-    password = get_option('password', '')
+    password = get_option('password', '') if repository.name != COMP_OB_SEEKDB else cluster_config.get_global_conf().get('root_password')
     ddl_path = get_option('ddl_path')
     tbl_path = get_option('tbl_path')
     sql_path = get_option('sql_path')

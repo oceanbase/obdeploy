@@ -187,6 +187,9 @@ EC_CPU_CORE_NOT_ENOUGH = OBDErrorCodeTemplate(2022, "({server}) Insufficient CPU
 
 WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_memory too large. system_memory should be less than {factor} * memory_limit/memory_limit_percentage.')
 
+# seekdb
+EC_SEEKDB_NOT_ENOUGH_MEMORY_TOTAL = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Total: {total}, Need: {need})')
+
 # error code for test commands
 EC_MYSQLTEST_PARSE_CMD_FAILED = OBDErrorCodeTemplate(3000, 'parse cmd failed: {path}')
 EC_MYSQLTEST_FAILE_NOT_FOUND = OBDErrorCodeTemplate(3001, '{file} not found in {path}')
@@ -351,3 +354,4 @@ SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_passw
 SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)
 SUB_OBSERVER_UNKONE_SCENARIO = OBDErrorSuggestionTemplate('Please select a valid scenario from the options: {scenarios}')
 SUG_CHECK_CONNECT_INFO = OBDErrorSuggestionTemplate('Please check {db} connection information')
+

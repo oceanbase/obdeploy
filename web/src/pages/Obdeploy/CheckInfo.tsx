@@ -323,7 +323,10 @@ export default function CheckInfo({
           value: oceanbase?.rpc_port,
         },
         {
-          label: 'obshell 端口',
+          label: intl.formatMessage({
+            id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.ObshellPort',
+            defaultMessage: 'obshell 端口',
+          }),
           colSpan: 3,
           value: oceanbase?.obshell_port,
         },
@@ -377,7 +380,10 @@ export default function CheckInfo({
     }
     if (selectedConfig.includes(grafanaComponent)) {
       content = content.concat({
-        label: 'Grafana 服务端口',
+        label: intl.formatMessage({
+          id: 'OBD.Obdeploy.ClusterConfig.GrafanaServicePort',
+          defaultMessage: 'Grafana 服务端口',
+        }),
         value: grafana?.port,
       });
       grafana?.parameters?.length &&
@@ -388,7 +394,10 @@ export default function CheckInfo({
     }
     if (selectedConfig.includes(prometheusComponent)) {
       content = content.concat({
-        label: 'Prometheus 服务端口',
+        label: intl.formatMessage({
+          id: 'OBD.Obdeploy.ClusterConfig.PrometheusServicePort',
+          defaultMessage: 'Prometheus 服务端口',
+        }),
         value: prometheus?.port,
       });
       prometheus?.parameters?.length &&
@@ -399,7 +408,10 @@ export default function CheckInfo({
     }
     if (selectedConfig.includes(alertManagerComponent)) {
       content = content.concat({
-        label: 'AlertManager 服务端口',
+        label: intl.formatMessage({
+          id: 'OBD.Obdeploy.ClusterConfig.AlertManagerPort',
+          defaultMessage: 'AlertManager 服务端口',
+        }),
         value: alertmanager?.port,
       });
       alertmanager?.parameters?.length &&
@@ -456,7 +468,7 @@ export default function CheckInfo({
       content,
       more,
     });
-
+    console.log('prometheus checkinfo', prometheus?.basic_auth_users?.admin)
     clusterConfigInfo.map((item) => {
       if (item.key === 'cluster') {
         if (selectedConfig.includes(prometheusComponent)) {
