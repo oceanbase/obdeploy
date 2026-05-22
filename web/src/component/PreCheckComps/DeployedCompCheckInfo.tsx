@@ -11,7 +11,8 @@ interface DeployedCompCheckInfoProps {
 
 export default function DeployedCompCheckInfo({
   componentsList,
-  className
+  className,
+  deployMode
 }: DeployedCompCheckInfoProps) {
   return (
     <ProCard
@@ -40,7 +41,7 @@ export default function DeployedCompCheckInfo({
                   defaultMessage: '组件',
                 })}
               >
-                {item?.showComponentName}
+                {deployMode === 'seekdb' && item.key === 'oceanbase' ? 'seekdb' : item?.showComponentName || item?.name}
               </ProCard>
               <ProCard
                 colSpan={7}

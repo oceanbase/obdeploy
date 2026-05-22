@@ -68,6 +68,8 @@ COMP_OB_CE = "oceanbase-ce"
 COMP_OB_STANDALONE = "oceanbase-standalone"
 COMP_OB_SEEKDB = 'seekdb'
 COMPS_OB = [COMP_OB, COMP_OB_CE, COMP_OB_STANDALONE]
+# Database components obagent / obshell registration treat as OB-compatible targets
+COMPS_OB_AND_SEEKDB = COMPS_OB + [COMP_OB_SEEKDB]
 
 # obproxy
 COMP_ODP = "obproxy"
@@ -182,3 +184,7 @@ NOT_SUPPORT_MODIFY_SUB_PARAMETERS = [
 
 # only single server component
 SINGLE_SERVER_COMPONENTS = [COMP_PRAG, COMP_MAAS]
+
+MAX_PERFORMANCE = "MAXIMUM PERFORMANCE"
+MAX_PROTECTION = "MAXIMUM PROTECTION"
+MAX_AVAILABILITY = "MAXIMUM AVAILABILITY"

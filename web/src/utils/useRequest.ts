@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import { useRequest } from 'umi';
+import { useRequest } from '@umijs/max';
 import type {
   CombineService,
   BaseOptions,

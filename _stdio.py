@@ -765,7 +765,7 @@ class IO(object):
         print_msg = str(print_msg)
         if "PASSWORD" in print_msg and "IP_LIST=" not in print_msg:
             print_msg = self._format(print_msg, *args)
-            pk_regex = r'(?i)(password([:|=]))(?! \S)(.*?)(,|\s)'
+            pk_regex = r'(?i)((password|passwd)\s*[:=]\s*[\'"]?)([^,\s\'"]+)([\'"]?)'
             pattern = re.compile(pk_regex)
             is_match = pattern.search(print_msg)
             if is_match:
@@ -868,7 +868,7 @@ class IO(object):
         log_regex = [
             r"((-P\s*\S+\s+.*?)-p\s*['\"]?)([^\s'\"']+)(['\"]*)",
             r"(_PASSWORD\s*(=|to)\s*['\"]*)([^\s'\"']+)(['\"]*)",
-            r'(?i)(password([:|=]))(?! \S)(.*?)(,|\s)'
+            r'(?i)((password|passwd)\s*[:=]\s*[\'"]?)([^,\s\'"]+)([\'"]?)'
         ]
         patterns = []
         is_match = False
@@ -917,10 +917,10 @@ class IO(object):
             if arg_pattern.search(msg):
                 return arg_pattern.sub(r"\1******\3", msg)
 
-            passwd_regex = r'(?i)((password|passwd)[:|=]\s*)(.*)'
+            passwd_regex = r'(?i)((password|passwd)\s*[:=]\s*[\'"]?)([^,\s\'"]+)([\'"]?)(.*)'
             pwd_pattern = re.compile(passwd_regex)
             if pwd_pattern.search(msg):
-                return pwd_pattern.sub(r"\1******", msg)
+                return pwd_pattern.sub(r"\1******\4\5", msg)
 
             http_regex = r'(?i)((password)\s*\":\s*\")(.*?)(\")'
             http_pattern = re.compile(http_regex)
@@ -948,7 +948,7 @@ class IO(object):
         log_regex = [
             r"((-P\s*\S+\s+.*?)-p\s*['\"]?)([^\s'\"']+)(['\"]*)",
             r"(_PASSWORD\s*(=|to)\s*['\"]*)([^\s'\"']+)(['\"]*)",
-            r'(?i)(password([:|=]))(?! \S)(.*?)(,|\s)'
+            r'(?i)((password|passwd)\s*[:=]\s*[\'"]?)([^,\s\'"]+)([\'"]?)'
         ]
         patterns = []
         is_match = False
@@ -1004,10 +1004,10 @@ class IO(object):
             if arg_pattern.search(msg):
                 return arg_pattern.sub(r"\1******\3", msg)
 
-            passwd_regex = r'(?i)((password|passwd)[:|=]\s*)(.*)'
+            passwd_regex = r'(?i)((password|passwd)\s*[:=]\s*[\'"]?)([^,\s\'"]+)([\'"]?)(.*)'
             pwd_pattern = re.compile(passwd_regex)
             if pwd_pattern.search(msg):
-                return pwd_pattern.sub(r"\1******", msg)
+                return pwd_pattern.sub(r"\1******\4\5", msg)
 
             http_regex = r'(?i)((password)\s*\":\s*\")(.*?)(\")'
             http_pattern = re.compile(http_regex)

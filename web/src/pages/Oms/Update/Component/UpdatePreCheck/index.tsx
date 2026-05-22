@@ -21,12 +21,12 @@ const UpdatePreCheck: React.FC<UpdatePreCheckProps> = ({
   refreshPrecheckOmsUpgrade,
   precheckOmsUpgradeLoading
 }) => {
-  const [omsUpgradePrecheckResult, setomsUpgradePrecheckResult] = useState(
+  const [omsUpgradePrecheckResult, setOmsUpgradePrecheckResult] = useState(
     omsUpgradePrecheckTask?.precheck_result,
   );
 
   useEffect(() => {
-    setomsUpgradePrecheckResult(omsUpgradePrecheckTask?.precheck_result);
+    setOmsUpgradePrecheckResult(omsUpgradePrecheckTask?.precheck_result);
   }, [omsUpgradePrecheckTask]);
 
   const columns = [

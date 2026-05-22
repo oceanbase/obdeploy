@@ -11,7 +11,7 @@ import {
 import { QuestionCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useRequest } from 'ahooks';
 import { getPublicKey } from '@/services/ob-deploy-web/Common';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import * as Metadb from '@/services/ocp_installer_backend/Metadb';
 import { encrypt } from '@/utils/encrypt';

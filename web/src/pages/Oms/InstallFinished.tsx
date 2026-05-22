@@ -25,7 +25,7 @@ import { Alert, Descriptions, Modal, Row, } from 'antd';
 import type { ResultProps } from 'antd/es/result';
 import { isEmpty } from 'lodash';
 import React, { useEffect, useState } from 'react';
-import { history, useModel } from 'umi';
+import { history, useModel } from '@umijs/max';
 import CustomFooter from '@/component/CustomFooter';
 import ExitBtn from '@/component/ExitBtn';
 import styles from './index.less';
@@ -51,7 +51,7 @@ const InstallFinished: React.FC<InstallResultProps> = ({ type, setCurrent }) => 
     configData = {},
     setCurrentStep,
     selectedOmsType,
-    ocpConfigData,
+    omsConfigData,
     omsTakeoverData,
   } = useModel('global');
   const {
@@ -445,7 +445,7 @@ const InstallFinished: React.FC<InstallResultProps> = ({ type, setCurrent }) => 
               installResult === 'SUCCESSFUL' && type === 'update' &&
               <>
                 {
-                  ocpConfigData?.backup_method === 'data_backup' && <Alert
+                  omsConfigData?.backup_method === 'data_backup' && <Alert
                     type="info"
                     showIcon={true}
                     style={{
@@ -464,9 +464,9 @@ const InstallFinished: React.FC<InstallResultProps> = ({ type, setCurrent }) => 
                           备份文件保存地址：
                         </div>
                         <Text
-                          copyable={{ text: ocpConfigData?.backup_path }}
+                          copyable={{ text: omsConfigData?.backup_path }}
                         >
-                          {ocpConfigData?.backup_path}
+                          {omsConfigData?.backup_path}
                         </Text>
                         <div>
                           ，可根据需要对备份文件进行维护管理。
@@ -484,8 +484,8 @@ const InstallFinished: React.FC<InstallResultProps> = ({ type, setCurrent }) => 
                         defaultMessage: '升级前版本：',
                       })}
                       {
-                        ocpConfigData?.current_version ?
-                          <span>V {ocpConfigData?.current_version?.split('feature_')[1]?.toUpperCase()}</span>
+                        omsConfigData?.current_version ?
+                          <span>V {omsConfigData?.current_version?.split('feature_')[1]?.toUpperCase()}</span>
                           :
                           <span>V {omsTakeoverData?.version?.split('feature_')[1]?.toUpperCase()} </span>
                       }
@@ -506,7 +506,7 @@ const InstallFinished: React.FC<InstallResultProps> = ({ type, setCurrent }) => 
                         defaultMessage: '升级后版本：',
                       })}
                       <span>
-                        V {ocpConfigData?.version?.split('feature_')[1]?.toUpperCase()}{' '}
+                        V {omsConfigData?.version?.split('feature_')[1]?.toUpperCase()}{' '}
                         <NewIcon
                           size={36}
                           className={styles.newVersionIcon}

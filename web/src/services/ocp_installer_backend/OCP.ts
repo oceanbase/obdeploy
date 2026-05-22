@@ -1,6 +1,6 @@
 /* eslint-disable */
 // 该文件由 OneAPI 自动生成，请勿手动修改！
-import { request } from 'umi';
+import { request } from '@umijs/max';
 
 /** get_installed_ocp_info get_installed_ocp_info GET /api/v1/ocp/info/${param0} */
 export async function getInstalledOcpInfo(

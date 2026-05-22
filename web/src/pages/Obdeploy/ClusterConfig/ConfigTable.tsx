@@ -1,9 +1,9 @@
 import { pathReg } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { ProCard } from '@ant-design/pro-components';
-import { Form, Space, Spin, Table, Tooltip } from 'antd';
+import { Form, Spin, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 import Parameter from './Parameter';
@@ -27,6 +27,8 @@ interface ConfigTableProps {
   loading: boolean;
   customParameter?: JSX.Element;
   parameterRules?: RulesDetail[] | RulesDetail;
+  isSeekdb?: boolean;
+  isNewDB?: boolean;
 }
 
 export const parameterValidator = (_: any, value?: API.ParameterValue) => {
@@ -149,16 +151,21 @@ export default function ConfigTable({
   parameterRules,
   isNewDB,
   showMetaPassword,
+  isSeekdb = false,
 }: ConfigTableProps) {
   return (
     <>
       {showVisible ? (
         <Spin spinning={loading}>
-          <Space
-            className={styles.spaceWidth}
-            direction="vertical"
-            size="middle"
-            style={{ minHeight: 50, marginTop: 16 }}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 16,
+              minHeight: 50,
+              marginTop: 16,
+              fontWeight: 500,
+            }}
           >
             {/* moreItem表示某一个组件,如 obproxy */}
             {dataSource.map((moreItem) => {
@@ -174,17 +181,21 @@ export default function ConfigTable({
                 }
               }
 
+              // seekdb 模式下过滤掉不需要的字段
+              const fieldsToFilter = isSeekdb ? ['data_dir', 'home_path', 'mysql_port'] : [];
               const realDataSource =
                 isNewDB || showMetaPassword
                   ? (moreItem.configParameter || [])?.filter(
-                    (item) => item.name !== 'ocp_meta_password',
+                    (item) => item.name !== 'ocp_meta_password' && item.name && !fieldsToFilter.includes(item.name),
                   )
-                  : moreItem.configParameter;
+                  : (moreItem.configParameter || [])?.filter(
+                    (item) => item.name && !fieldsToFilter.includes(item.name),
+                  );
 
               return (
                 <ProCard
                   className={styles.infoSubCard}
-                  style={{ border: '1px solid #e2e8f3' }}
+                  style={{ border: '1px solid #e2e8f3', flex: 1, minWidth: 0 }}
                   split="vertical"
                   key={moreItem.component}
                 >
@@ -203,7 +214,7 @@ export default function ConfigTable({
                 </ProCard>
               );
             })}
-          </Space>
+          </div>
         </Spin>
       ) : null}
     </>

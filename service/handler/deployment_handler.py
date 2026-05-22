@@ -27,7 +27,7 @@ from _deploy import DeployStatus, DeployConfigStatus
 from _errno import CheckStatus, FixEval
 from _plugin import PluginType
 from _rpm import Version
-from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMP_OB_CE
+from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMPS_OB_AND_SEEKDB, COMP_OB_CE
 from service.api.v1.deployments import DeploymentInfo
 from service.handler.base_handler import BaseHandler
 from service.handler.rsa_handler import RSAHandler
@@ -42,7 +42,7 @@ from service.common.task import Serial as serial
 from service.common.task import AutoRegister as auto_register
 from service.model.task import TaskInfo as Task_info
 from ssh import LocalClient
-from tool import COMMAND_ENV
+from tool import COMMAND_ENV, ConfigUtil
 from const import TELEMETRY_COMPONENT_OB, ALERTMANAGER_DEFAULT_RECEIVER, ALERTMANAGER_DEFAULT_RECEIVER_CONF
 from _environ import ENV_TELEMETRY_REPORTER
 
@@ -58,7 +58,7 @@ class DeploymentHandler(BaseHandler):
         deployment_info.config_path = deployment.config_dir
         deployment_info.status = deployment.deploy_info.status.value.upper()
         repositories = self.obd.load_local_repositories(deployment.deploy_info)
-        if len(repositories) == 1 and repositories[0].name in COMPS_OB:
+        if len(repositories) == 1 and repositories[0].name in COMPS_OB_AND_SEEKDB:
             origin_deploy = self.obd.deploy
             origin_repositories = self.obd.repositories
             self.obd.set_deploy(deployment)
@@ -87,6 +87,14 @@ class DeploymentHandler(BaseHandler):
             for parameter in deployment_info_copy.config.components.obagent.parameters:
                 if parameter.key == 'http_basic_auth_password':
                     parameter.value = ''
+        if deployment_info_copy.config and deployment_info_copy.config.components and deployment_info_copy.config.components.seekdb:
+            sk = deployment_info_copy.config.components.seekdb
+            if sk.root_password:
+                sk.root_password = ''
+            if sk.parameters:
+                for parameter in sk.parameters:
+                    if parameter.key.endswith('_password'):
+                        parameter.value = ''
         return deployment_info_copy
         
     def get_deployment_detail_by_name(self, name):
@@ -232,11 +240,15 @@ class DeploymentHandler(BaseHandler):
 
     def generate_deployment_config(self, name: str, config: DeploymentConfig):
         log.get_logger().debug('generate cluster config')
+        if config.components.oceanbase is None and config.components.seekdb is None:
+            raise Exception('components must include at least one of oceanbase or seekdb')
         cluster_config = {}
         if config.auth is not None:
             self.generate_auth_config(cluster_config, config.auth)
         if config.components.oceanbase is not None:
             self.generate_oceanbase_config(cluster_config, config, name, config.components.oceanbase)
+        if config.components.seekdb is not None:
+            self.generate_oceanbase_config(cluster_config, config, name, config.components.seekdb)
         if config.components.obproxy is not None:
             cluster_config[config.components.obproxy.component] = self.generate_component_config(config, const.OBPROXY, ['cluster_name', 'prometheus_listen_port', 'listen_port', 'rpc_listen_port', 'vip_address', 'vip_port', 'dns'])
         if config.components.obagent is not None:
@@ -252,6 +264,7 @@ class DeploymentHandler(BaseHandler):
             cluster_config[config.components.grafana.component] = self.generate_component_config(config, const.GRAFANA, ['port', 'login_password'])
         if config.components.alertmanager is not None:
             cluster_config[config.components.alertmanager.component] = self.generate_component_config(config, const.ALERTMANAGER, ['port', 'basic_auth_users'])
+        self._apply_monitor_stack_depends(cluster_config, config)
         cluster_config_yaml_path = ''
         log.get_logger().info('dump config from path: %s' % cluster_config_yaml_path)
         with tempfile.NamedTemporaryFile(delete=False, prefix="obd", suffix="yaml", mode="w", encoding="utf-8") as f:
@@ -309,7 +322,9 @@ class DeploymentHandler(BaseHandler):
             if config_dict[key] and key in {'version', 'release', 'package_hash'}:
                 oceanbase_config[key] = config_dict[key]
         servers = []
-        if oceanbase.topology:
+        if getattr(oceanbase, 'servers', None):
+            servers = oceanbase.servers
+        elif oceanbase.topology:
             for zone in oceanbase.topology:
                 root_service = zone.rootservice
                 servers.append(root_service)
@@ -359,9 +374,35 @@ class DeploymentHandler(BaseHandler):
             cluster_config[const.OCEANBASE] = oceanbase_config
         elif oceanbase.component == const.OCEANBASE_STANDALONE:
             cluster_config[const.OCEANBASE_STANDALONE] = oceanbase_config
+        elif oceanbase.component == const.SEEKDB:
+            cluster_config[const.SEEKDB] = oceanbase_config
         else:
             log.get_logger().error('oceanbase component : %s not exist' % oceanbase.component)
             raise Exception('oceanbase component : %s not exist' % oceanbase.component)
+
+    def _apply_monitor_stack_depends(self, cluster_config, config: DeploymentConfig):
+        """Wire obagent → DB, prometheus → obagent, grafana/alertmanager → prometheus (same as typical OB stacks)."""
+        primary = None
+        if config.components.oceanbase is not None:
+            primary = config.components.oceanbase.component
+        elif config.components.seekdb is not None:
+            primary = 'seekdb'
+        if not primary:
+            return
+        ag = config.components.obagent
+        if ag is not None and ag.component in cluster_config:
+            cluster_config[ag.component]['depends'] = [primary]
+        prom = config.components.prometheus
+        prom_comp = prom.component if prom else None
+        if prom is not None and prom_comp in cluster_config:
+            cluster_config[prom_comp]['depends'] = [const.OBAGENT]
+        gr = config.components.grafana
+        if gr is not None and prom_comp and gr.component in cluster_config:
+            cluster_config[gr.component]['depends'] = [prom_comp]
+        am = config.components.alertmanager
+        if am is not None and prom_comp and am.component in cluster_config:
+            cluster_config[am.component]['depends'] = [prom_comp]
+
 
     def generate_auth_config(self, cluster_config, auth):
         if 'user' not in cluster_config.keys():
@@ -415,13 +456,17 @@ class DeploymentHandler(BaseHandler):
         connect_check_status_flag = True
 
         task_info = task.get_task_manager().get_task_info(name, task_type="precheck")
-        if task_info is not None:
-            if task_info.status == TaskStatus.FINISHED:
-                precheck_result.status = task_info.result
-                if task_info.result == TaskResult.FAILED:
-                    precheck_result.message = '{}'.format(task_info.exception)
-            else:
-                precheck_result.status = TaskResult.RUNNING
+        treat_wait_as_pass = False
+        # NOTE: TaskManager may mark the precheck task as SUCCESSFUL even when some
+        # check items remain WAIT (e.g. precheck returned early). Status should be
+        # derived from the aggregated item states to avoid "task finished but items running".
+        if task_info is not None and task_info.status == TaskStatus.FINISHED:
+            if task_info.result == TaskResult.FAILED:
+                precheck_result.message = '{}'.format(task_info.exception)
+            elif task_info.result == TaskResult.SUCCESSFUL:
+                # Many start_check implementations only set FAIL explicitly; PASS may remain WAIT.
+                # When the precheck task has completed successfully, interpret remaining WAIT as PASS.
+                treat_wait_as_pass = True
 
         for component in components:
             namespace_union = {}
@@ -441,7 +486,9 @@ class DeploymentHandler(BaseHandler):
                     if result is None:
                         log.get_logger().warn("precheck for server: {} is None".format(server.ip))
                         continue
-                    all_passed, finished, total = self.parse_precheck_result(all_passed, component, finished, info, server, total, result)
+                    all_passed, finished, total = self.parse_precheck_result(
+                        all_passed, component, finished, info, server, total, result, treat_wait_as_pass=treat_wait_as_pass
+                    )
         info.sort(key=lambda p: p.status)
 
         precheck_result.info = info
@@ -449,10 +496,16 @@ class DeploymentHandler(BaseHandler):
         if total == 0:
             all_passed = False
         precheck_result.all_passed = all_passed
-        precheck_result.finished = total if precheck_result.status == TaskResult.SUCCESSFUL else finished
+        precheck_result.finished = finished
+
+        # Derive overall status from items.
+        if total > 0 and finished < total:
+            precheck_result.status = TaskResult.RUNNING
+        else:
+            precheck_result.status = TaskResult.SUCCESSFUL if all_passed else TaskResult.FAILED
         return precheck_result
 
-    def parse_precheck_result(self, all_passed, component, finished, info, server, total, result):
+    def parse_precheck_result(self, all_passed, component, finished, info, server, total, result, treat_wait_as_pass=False):
         for k, v in result.items():
             total += 1
             check_info = PreCheckInfo(name='{}:{}'.format(component, k), server=server.ip)
@@ -474,8 +527,13 @@ class DeploymentHandler(BaseHandler):
 
                 finished += 1
             elif v.status == v.WAIT:
-                check_info.status = TaskStatus.PENDING
-                all_passed = False
+                if treat_wait_as_pass:
+                    check_info.result = PrecheckTaskResult.PASSED
+                    check_info.status = TaskStatus.FINISHED
+                    finished += 1
+                else:
+                    check_info.status = TaskStatus.PENDING
+                    all_passed = False
             info.append(check_info)
         return all_passed, finished, total
 
@@ -537,7 +595,7 @@ class DeploymentHandler(BaseHandler):
             component_kwargs = {}
             if repository.name == const.PROMETHEUS:
                 component_kwargs = {repository.name: {"obagent_repo": obagent_repository}}
-            elif repository.name in COMPS_OB:
+            elif repository.name in COMPS_OB_AND_SEEKDB:
                 component_kwargs[repository.name] = {"source_type": "obd_web"}
             ret = self.obd._start_cluster(self.obd.deploy, repositories=[repository], components_kwargs=component_kwargs)
             if not ret:
@@ -738,7 +796,7 @@ class DeploymentHandler(BaseHandler):
         ob_repository = None
         obshell_dashboard_info = None
         for repository in repositories:
-            if repository.name in COMPS_OB:
+            if repository.name in COMPS_OB_AND_SEEKDB:
                 ob_repository = repository
                 break
         if ob_repository:
@@ -819,9 +877,15 @@ class DeploymentHandler(BaseHandler):
         self.obd.search_param_plugin_and_apply(repositories, deploy_config)
         self.obd.set_repositories(repositories)
 
-        if 'deployment' in self.context.keys() and self.context['deployment'][name] is not None and self.context['deployment'][name].components.oceanbase is not None and self.context['deployment'][name].components.oceanbase.mode == DeployMode.DEMO.value:
-            for repository in repositories:
-                self.obd.get_namespace(repository.name).set_variable('generate_config_mini', True)
+        if 'deployment' in self.context.keys() and self.context['deployment'][name] is not None:
+            components = self.context['deployment'][name].components
+            demo_mode = (
+                (components.oceanbase is not None and components.oceanbase.mode == DeployMode.DEMO.value)
+                or (components.seekdb is not None and components.seekdb.mode == DeployMode.DEMO.value)
+            )
+            if demo_mode:
+                for repository in repositories:
+                    self.obd.get_namespace(repository.name).set_variable('generate_config_mini', True)
 
         self._precheck(name, repositories, init_check_status=True)
         info = task_manager.get_task_info(name, task_type="precheck")
@@ -919,8 +983,8 @@ class DeploymentHandler(BaseHandler):
                     if len(self.obd.search_images(jre_name, version=version, min_version=min_version, max_version=max_version)) > 0:
                         java_check = False
                 component_kwargs[repository.name]["java_check"] = java_check
-            if repository.name in COMPS_OB:
-                component_kwargs[repository.name] = {"source_type": "obd_web"}
+            if repository.name in COMPS_OB_AND_SEEKDB:
+                component_kwargs[repository.name]["source_type"] = "obd_web"
         workflows = self.obd.get_workflows('start_check', repositories=repositories)
         if not self.obd.run_workflow(workflows, repositories=repositories, error_exit=False, **component_kwargs):
             for repository in repositories:

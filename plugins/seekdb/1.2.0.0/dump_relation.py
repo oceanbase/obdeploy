@@ -54,6 +54,8 @@ def dump_relation(plugin_context, *args, **kwargs):
     # Add standby if not present (Primary config stores Standby names)
     if standby_name not in primary_relation_list:
         primary_relation_list.append(standby_name)
+    else:
+        return plugin_context.return_true()
     
     # Update primary config
     primary_cluster_config.update_component_attr('_cluster_standby_relation', primary_relation_list, save=True)
@@ -61,7 +63,7 @@ def dump_relation(plugin_context, *args, **kwargs):
     # 2. Update Standby Cluster Config
     # Standby config stores Primary names (usually just one, but list for consistency/future)
     
-    standby_cluster_config.update_component_attr('_cluster_primary', primary_name, save=True)
+    standby_cluster_config.update_component_attr('_cluster_primary', primary_name, save=False)
 
     stdio.verbose('Successfully dumped standby relation.')
     return plugin_context.return_true()

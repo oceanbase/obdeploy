@@ -42,7 +42,7 @@ export default function ServiceConfig({
   const [checkStatus, setCheckStatus] = useState<
     'unchecked' | 'fail' | 'success'
   >('unchecked');
-  const { ocpConfigData } = useModel('global');
+  const { ocpConfigData, setOcpConfigData } = useModel('global');
   const { isSingleOcpNode, ocpVersionInfo, deployUser, useRunningUser } =
     useModel('ocpInstallData');
 
@@ -69,9 +69,8 @@ export default function ServiceConfig({
     form.validateFields([['ocpserver', 'admin_password']]);
     setAdminPassword(password);
   };
-
   const handleCheckSystemUser = () => {
-    let site = form.getFieldValue(['ocpserver', 'ocp_site_url']);
+    let site = form.getFieldValue(['ocpserver', 'ocp_site_url']) || siteUrl;
     if (siteReg.test(site)) {
       setCheckStatus('success');
     } else {
@@ -93,27 +92,68 @@ export default function ServiceConfig({
       let url = `http://${ip[0]}:8080`;
       setSiteUrl(url);
       form.setFieldValue(['ocpserver', 'ocp_site_url'], url);
+      setOcpConfigData({
+        ...ocpConfigData,
+        components: {
+          ...ocpConfigData.components,
+          ocpserver: {
+            ...ocpConfigData.components.ocpserver,
+            ocp_site_url: url,
+          },
+        },
+      });
+    } else if (defaultSiteUrl !== '') {
+      setSiteUrl(defaultSiteUrl);
+      form.setFieldValue(['ocpserver', 'ocp_site_url'], defaultSiteUrl);
+      setOcpConfigData({
+        ...ocpConfigData,
+        components: {
+          ...ocpConfigData.components,
+          ocpserver: {
+            ...ocpConfigData.components.ocpserver,
+            ocp_site_url: defaultSiteUrl,
+          },
+        },
+      });
     }
-  }, []);
+  }, [defaultSiteUrl, siteUrl]);
 
   useEffect(() => {
-    form.setFieldsValue({
-      ocpserver: {
-        home_path:
-          !useRunningUser && deployUser === 'root'
-            ? `/${deployUser}`
-            : `/home/${deployUser}`,
-        log_dir:
-          deployUser === 'root'
-            ? `/${deployUser}/logs`
-            : `/home/${deployUser}/logs`,
-        soft_dir:
-          deployUser === 'root'
-            ? `/${deployUser}/software`
-            : `/home/${deployUser}/software`,
-      },
-    });
-  }, [deployUser]);
+    // 只有在 deployUser 有值时才设置路径
+    if (deployUser) {
+      const homePath = !useRunningUser && deployUser === 'root'
+        ? `/${deployUser}`
+        : `/home/${deployUser}`;
+      const logDir = deployUser === 'root'
+        ? `/${deployUser}/logs`
+        : `/home/${deployUser}/logs`;
+      const softDir = deployUser === 'root'
+        ? `/${deployUser}/software`
+        : `/home/${deployUser}/software`;
+
+      form.setFieldsValue({
+        ocpserver: {
+          home_path: homePath,
+          log_dir: logDir,
+          soft_dir: softDir,
+        },
+      });
+
+      // 同步更新到 ocpConfigData，避免父组件的 useEffect 覆盖这些值
+      setOcpConfigData({
+        ...ocpConfigData,
+        components: {
+          ...ocpConfigData.components,
+          ocpserver: {
+            ...ocpConfigData.components.ocpserver,
+            home_path: homePath,
+            log_dir: logDir,
+            soft_dir: softDir,
+          },
+        },
+      });
+    }
+  }, [deployUser, useRunningUser]);
 
   return (
     <ProCard
@@ -244,15 +284,6 @@ export default function ServiceConfig({
             </Tooltip>
           </>
         }
-        rules={[
-          {
-            required: true,
-            message: intl.formatMessage({
-              id: 'OBD.component.OCPConfigNew.ServiceConfig.EnterOcpSiteUrl',
-              defaultMessage: '请输入ocp.site.url',
-            }),
-          },
-        ]}
       >
         <div>
           <div style={{ display: 'flex' }}>
@@ -263,7 +294,6 @@ export default function ServiceConfig({
                 onBlur={() => {
                   form.validateFields([['ocpserver', 'ocp_site_url']]);
                 }}
-                // placeholder="例如：http://localhost:8080"
                 style={{ width: 412 }}
               />
 

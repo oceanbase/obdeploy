@@ -32,6 +32,6 @@ def create_standby_tenant(plugin_context, workflow, *args, **kwargs):
     else:
         workflow.add(const.STAGE_THIRD, 'obshell_client', 'obshell_health_check')
         workflow.add_with_kwargs(const.STAGE_THIRD, {"version": Version("4.2.4.0"), "comparison_operators": ">="}, 'obshell_version_check')
-        workflow.add_with_kwargs(const.STAGE_THIRD, {'option_mode': 'create_standby_tenant'}, 'standby_uri_check')
+        workflow.add_with_kwargs(const.STAGE_THIRD, {'option_mode': 'create_standby_tenant'}, 'create_location_standby_tenant_pre', 'standby_uri_check')
         workflow.add(const.STAGE_THIRD, 'create_standby_tenant_check', 'create_standby_resource', 'restore_standby_tenant', 'dump_standby_relation', 'list_tenant', 'restore_standby_post')
     plugin_context.return_true()

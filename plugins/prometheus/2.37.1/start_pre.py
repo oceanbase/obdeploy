@@ -19,6 +19,7 @@ import bcrypt
 from tool import YamlLoader, FileUtil
 from _rpm import Version
 from copy import deepcopy
+from const import COMP_OB_SEEKDB
 
 def hashed_with_bcrypt(content):
     content_bytes = content.encode('utf-8')
@@ -33,10 +34,19 @@ def load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server
     address = server_config['address']
     obagent_servers = cluster_config.get_depend_servers('obagent')
     prometheus_conf_dir = os.path.join(obagent_repo.repository_dir, 'conf/prometheus_config')
-    prometheus_conf_path = os.path.join(prometheus_conf_dir, 'prometheus.yaml')
+    deploy_components = cluster_config._deploy_config.components if cluster_config._deploy_config else {}
+    is_seekdb_deploy = COMP_OB_SEEKDB in deploy_components
+    if is_seekdb_deploy:
+        prometheus_conf_path = os.path.join(prometheus_conf_dir, 'prometheus_seekdb.yaml')
+        if not os.path.exists(prometheus_conf_path):
+            stdio.verbose('prometheus_seekdb.yaml not found, fallback to prometheus.yaml')
+            prometheus_conf_path = os.path.join(prometheus_conf_dir, 'prometheus.yaml')
+    else:
+        prometheus_conf_path = os.path.join(prometheus_conf_dir, 'prometheus.yaml')
     local_dir, _ = os.path.split(__file__)
-    rules_path = os.path.join(local_dir, 'prometheus_rules.yaml')
+    rules_path = os.path.join(local_dir, 'prometheus_rules_seekdb.yaml' if is_seekdb_deploy else 'prometheus_rules.yaml')
     remote_rules_path = os.path.join(server_home_path, 'rules', 'prometheus_rules.yaml')
+    remote_targets_dir = os.path.join(server_home_path, 'targets')
 
     obagent_targets = []
     http_basic_auth_user = None
@@ -65,6 +75,9 @@ def load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server
             http_basic_auth_password=http_basic_auth_password,
             target=targets
         )
+        # Ensure rule/targets directories exist before referencing them.
+        client.execute_command('mkdir -p {}'.format(os.path.dirname(remote_rules_path)))
+        client.execute_command('mkdir -p {}'.format(remote_targets_dir))
         if not client.put_file(rules_path, remote_rules_path):
             raise Exception('failed to put {} to {} {}'.format(rules_path, client, remote_rules_path))
         prometheus_conf_from_obagent = yaml.loads(content)
@@ -83,6 +96,14 @@ def load_config_from_obagent(cluster_config, obagent_repo, stdio, client, server
                     scrape_config["static_configs"] = [{"targets": [prometheus_address]}]
                 else:
                     scrape_config['file_sd_configs'] = [{"files": ["targets/*.yaml"]}]
+                    # SeekDB mode: obagent exposes SeekDB metrics under /metrics/seekdb/*.
+                    # Keep job_name unchanged (ob_basic/ob_extra) for Grafana dashboard compatibility.
+                    if is_seekdb_deploy:
+                        job_name = scrape_config.get('job_name')
+                        if job_name == 'ob_basic':
+                            scrape_config['metrics_path'] = '/metrics/seekdb/basic'
+                        elif job_name == 'ob_extra':
+                            scrape_config['metrics_path'] = '/metrics/seekdb/extra'
                 scrape_configs.append(scrape_config)
         prometheus_conf_from_obagent['scrape_configs'] = scrape_configs
         return prometheus_conf_from_obagent

@@ -2,7 +2,7 @@ import { TIME_REFRESH } from '@/pages/constants';
 import { PathType } from '@/pages/type';
 import queryString from 'query-string';
 import { useEffect } from 'react';
-import { history } from 'umi';
+import { history } from '@umijs/max';
 
 export default function ExitPageWrapper(props: {
   target?: PathType;
@@ -13,9 +13,9 @@ export default function ExitPageWrapper(props: {
   path = target
     ? target
     : //@ts-ignore
-      (queryString.parse(history.location.search)?.path as
-        | PathType
-        | undefined);
+    (queryString.parse(history.location.search)?.path as
+      | PathType
+      | undefined);
 
   const PATH_HANDLES = [
     {

@@ -1,5 +1,5 @@
 import { Space, Button, Tooltip } from 'antd';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 
 import { intl } from '@/utils/intl';
 import { handleQuit } from '@/utils';

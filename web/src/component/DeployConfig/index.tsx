@@ -39,7 +39,7 @@ import copy from 'copy-to-clipboard';
 import { isEmpty } from 'lodash';
 import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale, history, useModel } from 'umi';
+import { getLocale, history, useModel } from '@umijs/max';
 import EnStyles from '../../pages/Obdeploy/indexEn.less';
 import ZhStyles from '../../pages/Obdeploy/indexZh.less';
 import CustomFooter from '../CustomFooter';

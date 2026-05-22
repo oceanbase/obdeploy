@@ -1,7 +1,7 @@
 import { CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { Space } from 'antd';
 import { useEffect, useState } from 'react';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from '../../pages/Obdeploy/indexEn.less';
 import ZhStyles from '../../pages/Obdeploy/indexZh.less';
 
@@ -30,9 +30,8 @@ export default function Steps({
       <CheckCircleOutlined className={styles.stepIcon} />
     ) : (
       <ClockCircleOutlined
-        className={`${styles.stepIcon} ${styles.stepWaitIcon} ${
-          currentStep === key ? styles.stepCurrentIcon : ''
-        }`}
+        className={`${styles.stepIcon} ${styles.stepWaitIcon} ${currentStep === key ? styles.stepCurrentIcon : ''
+          }`}
       />
     );
   };
@@ -74,9 +73,8 @@ export default function Steps({
               <div
                 className={styles.stepsBackgroundProgress}
                 style={{
-                  width: `${
-                    ((currentStep - 1) / (showStepsKeys.length - 1)) * 100
-                  }%`,
+                  width: `${((currentStep - 1) / (showStepsKeys.length - 1)) * 100
+                    }%`,
                 }}
               ></div>
             </div>
@@ -85,9 +83,8 @@ export default function Steps({
                 <span className={styles.stepItem} key={item.key}>
                   {getIcon(item.key)}
                   <span
-                    className={`${styles.stepTitle} ${
-                      currentStep === item.key ? styles.stepCurrentTitle : ''
-                    } ${currentStep > item.key ? styles.stepAlreadyTitle : ''}`}
+                    className={`${styles.stepTitle} ${currentStep === item.key ? styles.stepCurrentTitle : ''
+                      } ${currentStep > item.key ? styles.stepAlreadyTitle : ''}`}
                   >
                     {item.title}
                   </span>

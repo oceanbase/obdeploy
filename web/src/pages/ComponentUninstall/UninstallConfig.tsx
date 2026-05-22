@@ -178,9 +178,9 @@ export default function UninstallConfig() {
 
       if (record.component_name === 'obagent') {
         // 如果选择obagent，则prometheus、grafana、alertmanager自动选择
-        const prometheusComp = componentsList?.find(comp => comp.component_name === 'prometheus');
-        const grafanaComp = componentsList?.find(comp => comp.component_name === 'grafana');
-        const alertmanagerComp = componentsList?.find(comp => comp.component_name === 'alertmanager');
+        const prometheusComp = componentsList?.find(comp => comp.deployed && comp.component_name === 'prometheus');
+        const grafanaComp = componentsList?.find(comp => comp.deployed && comp.component_name === 'grafana');
+        const alertmanagerComp = componentsList?.find(comp => comp.deployed && comp.component_name === 'alertmanager');
 
         if (prometheusComp && !newSelectedComponents.some(comp => comp.component_name === 'prometheus')) {
           newSelectedComponents.push({

@@ -12,7 +12,7 @@ import { ProCard } from '@ant-design/pro-components';
 import lottie from 'lottie-web';
 import NP from 'number-precision';
 import { useEffect, useState } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 import CustomFooter from '../CustomFooter';

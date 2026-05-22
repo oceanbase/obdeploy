@@ -1,6 +1,6 @@
 import { intl } from '@/utils/intl';
 import { Card, Empty } from 'antd';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 

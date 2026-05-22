@@ -178,16 +178,35 @@ class Grafana(BaseModel):
     port: int = Body(..., description='server port')
     login_password: str = Body(..., description='login password')
 
+
+class Seekdb(BaseModel):
+    """SeekDB cluster section (obd deploy yaml `seekdb:`); can be combined with obproxy/obagent/etc."""
+    component: str = Body(..., description='seekdb')
+    version: Optional[str] = Body(None, description='SeekDB package version / tag from mirror')
+    servers: List[str] = Body(..., description="Server IPs, e.g. ['192.168.1.10']")
+    home_path: str = Body('', description='SeekDB working directory; empty uses global home_path/seekdb')
+    mode: DeployMode = Body(..., description='deploy mode ex:DEMO,PRODUCTION')
+    root_password: str = Body(..., description='root password')
+    data_dir: str = Body(..., description='Data directory')
+    redo_dir: str = Body(..., description='Redo / clog directory')
+    mysql_port: int = Body(2881, description='MySQL protocol port')
+    obshell_port: int = Body(2886, description='OBShell port')
+    parameters: List[Parameter] = Body(None, description='config parameter')
+
+
 class ComponentConfig(BaseModel):
-    oceanbase: OceanBase
-    obproxy: Optional[ObProxy]
-    ocpexpress: Optional[OcpExpress]
-    obagent: Optional[ObAgent]
-    obclient: Optional[ObClient]
-    obconfigserver: Optional[ObConfigserver]
-    prometheus: Optional[Prometheus]
-    grafana: Optional[Grafana]
-    alertmanager: Optional[Alertmanager]
+    """At least one of `oceanbase` or `seekdb` should be set (enforced when generating yaml)."""
+
+    oceanbase: Optional[OceanBase] = None
+    seekdb: Optional[Seekdb] = None
+    obproxy: Optional[ObProxy] = None
+    ocpexpress: Optional[OcpExpress] = None
+    obagent: Optional[ObAgent] = None
+    obclient: Optional[ObClient] = None
+    obconfigserver: Optional[ObConfigserver] = None
+    prometheus: Optional[Prometheus] = None
+    grafana: Optional[Grafana] = None
+    alertmanager: Optional[Alertmanager] = None
 
 
 class DeploymentConfig(BaseModel):

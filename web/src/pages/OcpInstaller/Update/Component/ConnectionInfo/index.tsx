@@ -13,7 +13,7 @@ import { Alert, Button, Input, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { FormInstance } from 'antd/lib/form';
 import React from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import styles from './index.less';
 export interface ConnectionInfoProps {
   form: FormInstance<any>;
@@ -341,7 +341,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               type="inner"
               className={`${styles.componentCard}`}
               style={{ border: '1px solid #e2e8f3' }}
-              //   key={oceanBaseInfo.group}
+            //   key={oceanBaseInfo.group}
             >
               <Table
                 className={`${styles.componentTable} ob-table`}

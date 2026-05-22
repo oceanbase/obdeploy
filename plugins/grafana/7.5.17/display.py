@@ -15,6 +15,7 @@
 from __future__ import absolute_import, division, print_function
 
 from tool import NetUtil
+from const import COMP_OB_SEEKDB
 
 
 stdio = None
@@ -42,7 +43,9 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
         user = api_cursor.user
         protocol = api_cursor.protocol
         if 'prometheus' in cluster_config.depends:
-            url = '%s://%s:%s/d/oceanbase' % (protocol, ip, server_config['port'])
+            deploy_components = cluster_config._deploy_config.components if getattr(cluster_config, '_deploy_config', None) else {}
+            is_seekdb_deploy = COMP_OB_SEEKDB in deploy_components
+            url = '%s://%s:%s/d/%s' % (protocol, ip, server_config['port'], 'seekdb' if is_seekdb_deploy else 'oceanbase')
         else:
             url = '%s://%s:%s' % (protocol, ip, server_config['port'])
         password = api_cursor.password if not display_encrypt_password else display_encrypt_password

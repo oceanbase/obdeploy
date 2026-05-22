@@ -41,7 +41,7 @@ import {
   Tooltip,
 } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import validator from 'validator';
 import {
   alertManagerComponent,
@@ -117,10 +117,12 @@ export default function NodeConfig({
   // 当前 OB 环境是否为单机版
   const standAlone = deployMode === 'standalone';
 
+  const seekdb = deployMode === 'seekdb';
+
   const initDBConfigData = oceanbase?.topology?.length
     ? (() => {
       // 单机版模式下，如果 topology 大于 1，只取第一条
-      const topologyData = standAlone && oceanbase.topology.length > 1
+      const topologyData = (standAlone || seekdb) && oceanbase.topology.length > 1
         ? [oceanbase.topology[0]]
         : oceanbase.topology;
       return topologyData.map((item: API.Zone, index: number) => ({
@@ -131,7 +133,7 @@ export default function NodeConfig({
     })()
     : [];
 
-  const homePathSuffix = `/${oceanbase.appname}`;
+  const homePathSuffix = `/${oceanbase.appname || 'oceanbase'}`;
 
   const initHomePath = home_path
     ? home_path.substring(0, home_path.length - homePathSuffix.length)
@@ -145,7 +147,7 @@ export default function NodeConfig({
 
   useEffect(() => {
     // 单机版模式下，如果 topology 大于 1，只取第一条
-    const topologyData = standAlone && oceanbase?.topology?.length > 1
+    const topologyData = (standAlone || seekdb) && oceanbase?.topology?.length > 1
       ? [oceanbase.topology[0]]
       : oceanbase?.topology || [];
 
@@ -162,7 +164,7 @@ export default function NodeConfig({
       setDBConfigData(init);
       setEditableRowKeys(init?.map((item) => item.id));
     } else {
-      if (standAlone) {
+      if (standAlone || seekdb) {
         const mock = [
           {
             id: (Date.now() + 1).toString(),
@@ -198,7 +200,7 @@ export default function NodeConfig({
         setEditableRowKeys(mock?.map((item) => item.id));
       }
     }
-  }, [standAlone]);
+  }, [standAlone, seekdb]);
 
   // all servers
   const [allOBServer, setAllOBServer] = useState<string[]>([]);
@@ -688,60 +690,72 @@ export default function NodeConfig({
   };
 
   const columns: ProColumns<API.DBConfig>[] = [
+
+    ...(!seekdb ? [
+      {
+        title: (
+          <>
+            {intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.ZoneName',
+              defaultMessage: 'Zone 名称',
+            })}
+
+            <Tooltip
+              title={intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.AZoneThatRepresentsA',
+                defaultMessage:
+                  '可用区，表示集群内具有相似硬件可用性的一组节点，通常为同一个机架、机房或地域。',
+              })}
+            >
+              <QuestionCircleOutlined className="ml-10" />
+            </Tooltip>
+          </>
+        ),
+
+        dataIndex: 'name',
+        ...(standAlone ? { width: '30%' } : { width: 224 }),
+        formItemProps: {
+          rules: [
+            {
+              required: true,
+              whitespace: false,
+              message: intl.formatMessage({
+                id: 'OBD.pages.components.NodeConfig.ThisItemIsRequired',
+                defaultMessage: '此项是必填项',
+              }),
+            },
+            { validator: nameValidator },
+          ],
+        },
+      }
+    ] : [])
+    ,
     {
       title: (
         <>
-          {intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.ZoneName',
-            defaultMessage: 'Zone 名称',
-          })}
-
-          <Tooltip
-            title={intl.formatMessage({
-              id: 'OBD.pages.components.NodeConfig.AZoneThatRepresentsA',
-              defaultMessage:
-                '可用区，表示集群内具有相似硬件可用性的一组节点，通常为同一个机架、机房或地域。',
-            })}
-          >
-            <QuestionCircleOutlined className="ml-10" />
-          </Tooltip>
-        </>
-      ),
-
-      dataIndex: 'name',
-
-      ...(standAlone ? { width: '30%' } : { width: 224 }),
-      formItemProps: {
-        rules: [
           {
-            required: true,
-            whitespace: false,
-            message: intl.formatMessage({
-              id: 'OBD.pages.components.NodeConfig.ThisItemIsRequired',
-              defaultMessage: '此项是必填项',
-            }),
-          },
-          { validator: nameValidator },
-        ],
-      },
-    },
-    {
-      title: (
-        <>
-          {intl.formatMessage({
-            id: 'OBD.pages.components.NodeConfig.ObserverNodes',
-            defaultMessage: 'OBServer 节点',
-          })}
+            seekdb ? intl.formatMessage({
+              id: 'OBD.pages.components.NodeConfig.IpAddress',
+              defaultMessage: 'IP 地址',
+            }) :
+              <>
+                {intl.formatMessage({
+                  id: 'OBD.pages.components.NodeConfig.ObserverNodes',
+                  defaultMessage: 'OBServer 节点',
+                })}
 
-          <Tooltip
-            title={intl.formatMessage({
-              id: 'OBD.pages.components.NodeConfig.TheNodeWhereDatabaseService',
-              defaultMessage:
-                '数据库服务（OBServer）所在节点，包含 SQL 引擎、事务引擎和存储引擎，并服务多个数据分区。',
-            })}
-          >
-            <QuestionCircleOutlined className="ml-10" />
-          </Tooltip>
+                <Tooltip
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.NodeConfig.TheNodeWhereDatabaseService',
+                    defaultMessage:
+                      '数据库服务（OBServer）所在节点，包含 SQL 引擎、事务引擎和存储引擎，并服务多个数据分区。',
+                  })}
+                >
+                  <QuestionCircleOutlined className="ml-10" />
+                </Tooltip>
+              </>
+          }
+
         </>
       ),
       ...(standAlone ? { width: '30%' } : {}),
@@ -791,12 +805,12 @@ export default function NodeConfig({
           <ServerTags
             name={record.id}
             setLastDeleteServer={setLastDeleteServer}
-            standAlone={standAlone}
+            standAlone={seekdb ? true : standAlone}
           />
         ) : null;
       },
     },
-    ...(!standAlone
+    ...(!standAlone && !seekdb
       ? [
         {
           title: (
@@ -932,6 +946,7 @@ export default function NodeConfig({
         >
           <EditableProTable<API.DBConfig>
             className={styles.nodeEditabletable}
+            style={seekdb ? { width: 300 } : undefined}
             columns={columns}
             rowKey="id"
             value={dbConfigData}
@@ -939,7 +954,7 @@ export default function NodeConfig({
             onChange={setDBConfigData}
             recordCreatorProps={
               // 单机版，关闭默认的新建按钮
-              !standAlone
+              (!standAlone && !seekdb)
                 ? {
                   newRecordType: 'dataSource',
                   record: () => ({
@@ -1105,7 +1120,7 @@ export default function NodeConfig({
             })}
             bodyStyle={{ paddingBottom: '0', paddingLeft: '8px' }}
           >
-            {selectedConfig.includes(obproxyComponent) && (
+            {selectedConfig.includes(obproxyComponent) && components?.obproxy && (
               <div style={{ paddingLeft: '16px' }}>
                 <ProFormSelect
                   mode="tags"

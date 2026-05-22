@@ -10,7 +10,7 @@ import lottie from 'lottie-web';
 import videojs from 'video.js';
 import NP from 'number-precision';
 import 'video.js/dist/video-js.css';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import styles from './index.less';
 import InstallResultDisplay from '@/component/InstallResultDisplay';
 

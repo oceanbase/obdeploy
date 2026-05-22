@@ -24,7 +24,7 @@ import {
 } from 'antd';
 import NP from 'number-precision';
 import { useEffect, useState } from 'react';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import CustomFooter from '../CustomFooter';
 
 interface PreCehckComponentProps {

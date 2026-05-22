@@ -23,7 +23,7 @@ from copy import deepcopy
 
 from tool import YamlLoader
 from _errno import *
-from const import COMPS_OB
+from const import COMPS_OB_AND_SEEKDB, COMP_OB_SEEKDB
 
 
 stdio = None
@@ -84,8 +84,10 @@ def start(plugin_context, *args, **kwargs):
                         key = list(key.keys())[0]
                         need_encrypted.append(key)
 
-    for comp in COMPS_OB:
-        if cluster_config.get_depend_config(comp) and plugin_context.get_return('start', comp).get_return('need_bootstrap'):
+    for comp in COMPS_OB_AND_SEEKDB:
+        start_ret = plugin_context.get_return('start', comp)
+        need_bootstrap = start_ret.get_return('need_bootstrap') if start_ret else False
+        if cluster_config.get_depend_config(comp) and need_bootstrap:
             error_servers_list = []
             for server in cluster_config.servers:
                 if not cluster_config.get_depend_config(comp, server):
@@ -115,9 +117,11 @@ def start(plugin_context, *args, **kwargs):
             use_parameter = True
 
         if use_parameter:
-            for comp in COMPS_OB:
+            depend_comp = None
+            for comp in COMPS_OB_AND_SEEKDB:
                 obs_config = cluster_config.get_depend_config(comp, server)
                 if obs_config is not None:
+                    depend_comp = comp
                     break
 
             if obs_config is None:
@@ -125,8 +129,14 @@ def start(plugin_context, *args, **kwargs):
 
             for key in config_map:
                 k = config_map[key]
+                if depend_comp == COMP_OB_SEEKDB and key in ('cluster_name', 'zone_name'):
+                    continue
                 if not server_config.get(key):
                     server_config[key] = obs_config.get(k, default_server_config.get(key))
+
+            if obs_config.get('seekdb_monitor_password'):
+                server_config['monitor_password'] = obs_config['seekdb_monitor_password']
+                server_config['monitor_user'] = obs_config.get('seekdb_monitor_user', 'seekdb_monitor')
 
             for key in default_server_config:
                 if not server_config.get(key):

@@ -17,7 +17,7 @@ import { useUpdateEffect } from 'ahooks';
 import { Button, Row, Space } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import InputPort from '../InputPort';
 import styles from './index.less';
 
@@ -43,6 +43,9 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   );
   const [showMoreConfig, setShowMoreConfig] = useState<boolean>(ocpClusterMore);
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
+  const { componentsVersionInfo } = useModel('global');
+  const seekdbComponent = 'seekdb';
+  const seekdb = (components as any)?.seekdb;
   const getInitialParameters = (
     currentComponent: string,
     dataSource: API.MoreParameter[],
@@ -98,20 +101,18 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   const getClusterMoreParamsters = async () => {
     setClusterMoreLoading(true);
     try {
-      const { success, data } = await getMoreParamsters(
-        {},
-        {
-          filters: [
-            {
-              component: oceanbase?.component,
-              version: oceanbase?.version,
-              is_essential_only: true,
-            },
-          ],
-        },
-      );
+      // filters 必须作为请求体（body）传入，不能作为 options 传入
+      const { success, data } = await getMoreParamsters({
+        filters: [
+          {
+            component: oceanbase?.component,
+            version: oceanbase?.version,
+            is_essential_only: true,
+          },
+        ],
+      });
       if (success) {
-        const newClusterMoreConfig = formatMoreConfig(data?.items, false);
+        const newClusterMoreConfig = formatMoreConfig(data?.items);
         setOcpClusterMoreConfig(newClusterMoreConfig);
         form.setFieldsValue({
           oceanbase: {

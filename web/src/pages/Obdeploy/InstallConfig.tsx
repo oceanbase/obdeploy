@@ -43,7 +43,7 @@ import copy from 'copy-to-clipboard';
 import { divide, isNull } from 'lodash';
 import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale, history, useModel } from 'umi';
+import { getLocale, history, useModel } from '@umijs/max';
 import {
   alertManagerComponent,
   allComponentsName,
@@ -55,6 +55,7 @@ import {
   oceanbaseComponent,
   oceanbaseStandaloneComponent,
   prometheusComponent,
+  seekdbComponent,
 } from '../constants';
 import { getParamstersHandler } from './ClusterConfig/helper';
 import DeleteDeployModal from './DeleteDeployModal';
@@ -104,6 +105,7 @@ export default function InstallConfig({
     aliveTokenTimer,
     OBD_DOCS,
     OBD_STANDALONE_DOCS,
+    SEEKDB_DOCS,
     setScenarioParam,
     loadTypeVisible,
     setLoadTypeVisible,
@@ -132,8 +134,10 @@ export default function InstallConfig({
   // 当前 OB 环境是否为单机版
   // const standAlone = deployMode === 'standalone';
   const standAlone = oceanbaseType === 'standalone';
+  // 当前是否为 seekdb 模式
+  const seekdb = deployMode === 'seekdb';
 
-  const componentsGroupInfo = useComponents(true, standAlone);
+  const componentsGroupInfo = useComponents(true, standAlone || deployMode === 'seekdb');
 
   const oceanBaseInfo = {
     group: intl.formatMessage({
@@ -142,17 +146,36 @@ export default function InstallConfig({
     }),
     key: 'database',
     content: [
-      {
-        key: standAlone ? oceanbaseStandaloneComponent : oceanbaseComponent,
-        name: 'OceanBase Database',
-        onlyAll: false,
-        desc: intl.formatMessage({
-          id: 'OBD.pages.components.InstallConfig.ItIsAFinancialLevel',
-          defaultMessage:
-            '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
-        }),
-        doc: standAlone ? OBD_STANDALONE_DOCS : OBD_DOCS,
-      },
+      ...(deployMode !== 'seekdb'
+        ? [
+          {
+            key: standAlone ? oceanbaseStandaloneComponent : oceanbaseComponent,
+            name: 'OceanBase Database',
+            onlyAll: false,
+            desc: intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.ItIsAFinancialLevel',
+              defaultMessage:
+                '是金融级分布式数据库，具备数据强一致、高扩展、高可用、高性价比、稳定可靠等特征。',
+            }),
+            doc: standAlone ? OBD_STANDALONE_DOCS : OBD_DOCS,
+          },
+        ]
+        : []),
+      ...(deployMode === 'seekdb'
+        ? [
+          {
+            key: 'seekdb',
+            name: 'seekdb',
+            onlyAll: false,
+            desc: intl.formatMessage({
+              id: 'OBD.pages.Obdeploy.InstallConfig.SeekdbDescription',
+              defaultMessage:
+                'seekdb 是一款 AI 原生混合搜索数据库，在一个数据库中融合向量、文本、结构化与半结构化数据能力，并通过内置 AI Functions 支持多模混合搜索与智能推理。',
+            }),
+            doc: SEEKDB_DOCS,
+          },
+        ]
+        : []),
     ],
   };
 
@@ -217,16 +240,41 @@ export default function InstallConfig({
                 const initVersionInfo = item?.info[0] || {};
                 if (
                   item.name === oceanbaseComponent ||
-                  item.name === oceanbaseStandaloneComponent
+                  item.name === oceanbaseStandaloneComponent ||
+                  item.name === seekdbComponent
                 ) {
-                  setOceanbaseType(currentOceanbaseVersionInfo?.version_type);
-                  setOBVersionValue(
-                    `${currentOceanbaseVersionInfo?.version}-${currentOceanbaseVersionInfo?.release}-${currentOceanbaseVersionInfo?.md5}`,
-                  );
-                  newComponentsVersionInfo[item.name] = {
-                    ...currentOceanbaseVersionInfo,
-                    dataSource: item.info || [],
-                  };
+                  // seekdb 模式使用 seekdb 版本信息
+                  if (deployMode === 'seekdb' && item.name === seekdbComponent) {
+                    // 过滤出 1.3 及以上的版本
+                    const validSeekdbVersions = item?.info?.filter((versionInfo) => {
+                      if (!versionInfo?.version) return false;
+                      const versionParts = versionInfo.version.split('.');
+                      if (versionParts.length < 2) return false;
+                      const major = parseInt(versionParts[0], 10);
+                      const minor = parseInt(versionParts[1], 10);
+                      return major > 1 || (major === 1 && minor >= 3);
+                    }) || [];
+
+                    // 使用第一个 >= 1.3 的版本，如果没有则使用第一个版本（会在 UI 中显示提示）
+                    const currentSeekdbVersionInfo = validSeekdbVersions[0] || item?.info?.[0] || {};
+                    setOceanbaseType(currentSeekdbVersionInfo?.version_type || '');
+                    setOBVersionValue(
+                      `${currentSeekdbVersionInfo?.version}-${currentSeekdbVersionInfo?.release}-${currentSeekdbVersionInfo?.md5}`,
+                    );
+                    (newComponentsVersionInfo as any)[item.name] = {
+                      ...currentSeekdbVersionInfo,
+                      dataSource: item.info || [],
+                    };
+                  } else {
+                    setOceanbaseType(currentOceanbaseVersionInfo?.version_type || '');
+                    setOBVersionValue(
+                      `${currentOceanbaseVersionInfo?.version}-${currentOceanbaseVersionInfo?.release}-${currentOceanbaseVersionInfo?.md5}`,
+                    );
+                    (newComponentsVersionInfo as any)[item.name] = {
+                      ...currentOceanbaseVersionInfo,
+                      dataSource: item.info || [],
+                    };
+                  }
                 } else if (item.name === obproxyComponent) {
                   let currentObproxyVersionInfo = {};
                   item?.info?.some((subItem) => {
@@ -365,10 +413,12 @@ export default function InstallConfig({
     sessionStorage.removeItem('componentSelect');
   };
 
+  // seekdb 模式下默认名称为 myseekdb
+  const defaultAppName = deployMode === 'seekdb' ? 'myseekdb' : initAppName;
   const nextStep = () => {
     if (form.getFieldsError(['appname'])[0].errors.length) return;
     form.validateFields().then((values) => {
-      const lastAppName = oceanbase?.appname || initAppName;
+      const lastAppName = oceanbase?.appname || defaultAppName;
       let newHomePath = home_path;
       if (values?.appname !== lastAppName && home_path) {
         const firstHalfHomePath = home_path.split(`/${lastAppName}`)[0];
@@ -388,26 +438,36 @@ export default function InstallConfig({
         oceanbase: {
           ...(components?.oceanbase || {}),
           component:
-            componentsVersionInfo?.[oceanbaseComponent]?.version_type === 'ce'
-              ? 'oceanbase-ce'
-              : componentsVersionInfo?.[oceanbaseComponent]?.version_type ===
-                'business'
-                ? 'oceanbase'
-                : 'oceanbase-standalone',
+            deployMode === 'seekdb'
+              ? seekdbComponent
+              : componentsVersionInfo?.[oceanbaseComponent]?.version_type === 'ce'
+                ? 'oceanbase-ce'
+                : componentsVersionInfo?.[oceanbaseComponent]?.version_type === 'business'
+                  ? 'oceanbase'
+                  : 'oceanbase-standalone',
           appname: values?.appname,
-          version: standAlone
-            ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.version
-            : componentsVersionInfo?.[oceanbaseComponent]?.version,
-          release: standAlone
-            ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.release
-            : componentsVersionInfo?.[oceanbaseComponent]?.release,
-          package_hash: standAlone
-            ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.md5
-            : componentsVersionInfo?.[oceanbaseComponent]?.md5,
+          version:
+            deployMode === 'seekdb'
+              ? componentsVersionInfo?.[seekdbComponent]?.version
+              : standAlone
+                ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.version
+                : componentsVersionInfo?.[oceanbaseComponent]?.version,
+          release:
+            deployMode === 'seekdb'
+              ? componentsVersionInfo?.[seekdbComponent]?.release
+              : standAlone
+                ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.release
+                : componentsVersionInfo?.[oceanbaseComponent]?.release,
+          package_hash:
+            deployMode === 'seekdb'
+              ? componentsVersionInfo?.[seekdbComponent]?.md5
+              : standAlone
+                ? componentsVersionInfo?.[oceanbaseStandaloneComponent]?.md5
+                : componentsVersionInfo?.[oceanbaseComponent]?.md5,
         },
       };
 
-      if (selectedConfig.includes(obproxyComponent) && !standAlone) {
+      if (selectedConfig.includes(obproxyComponent) && !standAlone && deployMode !== 'seekdb') {
         newComponents.obproxy = {
           ...(components?.obproxy || {}),
           component:
@@ -456,7 +516,7 @@ export default function InstallConfig({
         };
       }
 
-      if (selectedConfig.includes(configServerComponent) && !standAlone) {
+      if (selectedConfig.includes(configServerComponent) && !standAlone && deployMode !== 'seekdb') {
         newComponents.obconfigserver = {
           ...(components?.obconfigserver || {}),
           component: configServerComponent,
@@ -466,7 +526,7 @@ export default function InstallConfig({
         };
       }
       const anc = [configServerComponent, obproxyComponent];
-      if (standAlone && selectedConfig) {
+      if ((standAlone || seekdb) && selectedConfig) {
         setSelectedConfig(selectedConfig.filter((item) => !anc.includes(item)));
       }
       if (
@@ -512,7 +572,21 @@ export default function InstallConfig({
     const newSelectedVersionInfo = dataSource.filter(
       (item) => item.md5 === md5,
     )[0];
-    setOceanbaseType(newSelectedVersionInfo?.version_type);
+    setOceanbaseType(newSelectedVersionInfo?.version_type || '');
+
+    // seekdb 模式更新 seekdbComponent 版本信息
+    if (deployMode === 'seekdb') {
+      setComponentsVersionInfo({
+        ...componentsVersionInfo,
+        [seekdbComponent]: {
+          ...componentsVersionInfo[seekdbComponent],
+          ...newSelectedVersionInfo,
+          dataSource: componentsVersionInfo[seekdbComponent]?.dataSource || [],
+        },
+      });
+      return;
+    }
+
     let currentObproxyVersionInfo = {};
     componentsVersionInfo?.[obproxyComponent]?.dataSource?.some(
       (item: API.service_model_components_ComponentInfo) => {
@@ -558,10 +632,38 @@ export default function InstallConfig({
   };
 
   // 根据部署模式选择部署类型
-  const deployComponent = deployMode === 'distributed' ? [oceanbaseComponent] : [oceanbaseStandaloneComponent, oceanbaseComponent];
-  const combinedDataSources = deployComponent
-    .flatMap((component) => componentsVersionInfo[component]?.dataSource || [])
-    .filter((dataSource) => dataSource !== undefined);
+  const deployComponent = deployMode === 'distributed'
+    ? [oceanbaseComponent]
+    : deployMode === 'seekdb'
+      ? [seekdbComponent]
+      : [oceanbaseStandaloneComponent, oceanbaseComponent];
+
+  // seekdb 版本过滤：只保留 1.3 及以上版本
+  const filterSeekdbVersions = (dataSources: API.service_model_components_ComponentInfo[]) => {
+    if (deployMode !== 'seekdb') return dataSources;
+
+    return dataSources.filter((item) => {
+      if (!item?.version) return false;
+      // 解析版本号，比较是否 >= 1.3
+      const versionParts = item.version.split('.');
+      if (versionParts.length < 2) return false;
+
+      const major = parseInt(versionParts[0], 10);
+      const minor = parseInt(versionParts[1], 10);
+
+      // 版本号 >= 1.3
+      return major > 1 || (major === 1 && minor >= 3);
+    });
+  };
+
+  const combinedDataSources = deployMode === 'seekdb'
+    ? filterSeekdbVersions(componentsVersionInfo[seekdbComponent]?.dataSource || [])
+    : deployComponent
+      .flatMap((component) => componentsVersionInfo[component]?.dataSource || [])
+      .filter((dataSource) => dataSource !== undefined);
+
+  // seekdb 模式下，检查是否有 >= 1.3 的版本（用于禁用下一步按钮）
+  const seekdbHasNoValidVersion = deployMode === 'seekdb' && combinedDataSources?.length === 0;
 
   const getColumns = (group: string, supportCheckbox: boolean) => {
     const columns: ColumnsType<API.TableComponentInfo> = [
@@ -600,19 +702,24 @@ export default function InstallConfig({
 
           if (
             record?.key === oceanbaseComponent ||
-            record?.key === oceanbaseStandaloneComponent
+            record?.key === oceanbaseStandaloneComponent ||
+            record?.key === seekdbComponent
           ) {
-            return (
+            // seekdb 模式下，检查是否有 >= 1.3 的版本
+            const hasValidSeekdbVersion = deployMode === 'seekdb' && combinedDataSources?.length === 0;
+
+            const selectComponent = (
               <Select
-                value={obVersionValue}
+                value={hasValidSeekdbVersion ? undefined : obVersionValue}
                 optionLabelProp="data_value"
                 style={{ width: 100, marginTop: '-4px' }}
                 onChange={(value) =>
                   onVersionChange(value, combinedDataSources)
                 }
                 popupClassName={styles?.popupClassName}
+                disabled={hasValidSeekdbVersion}
               >
-                {combinedDataSources?.map(
+                {combinedDataSources?.length > 0 && combinedDataSources?.map(
                   (item: API.service_model_components_ComponentInfo) => (
                     <Select.Option
                       value={`${item?.version}-${item?.release}-${item?.md5}`}
@@ -660,6 +767,22 @@ export default function InstallConfig({
                 )}
               </Select>
             );
+
+            // 如果没有可用版本，用 Tooltip 包裹
+            if (hasValidSeekdbVersion) {
+              return (
+                <Tooltip
+                  title={intl.formatMessage({
+                    id: 'OBD.pages.components.InstallConfig.SeekdbVersionRequired',
+                    defaultMessage: 'seekdb 需要 1.3 及以上版本',
+                  })}
+                >
+                  {selectComponent}
+                </Tooltip>
+              );
+            }
+
+            return selectComponent;
           } else {
             return versionInfo?.version ? (
               <>
@@ -892,7 +1015,10 @@ export default function InstallConfig({
 
   useEffect(() => {
     let deployMemory: number = 0;
-    if (standAlone) {
+    if (deployMode === 'seekdb') {
+      deployMemory +=
+        componentsVersionInfo?.[seekdbComponent]?.estimated_size || 0;
+    } else if (standAlone) {
       deployMemory +=
         componentsVersionInfo?.[oceanbaseStandaloneComponent]?.estimated_size ||
         0;
@@ -903,25 +1029,33 @@ export default function InstallConfig({
 
     let componentsMemory: number = 0;
     const keys = Object.keys(componentsVersionInfo);
+    // 主数据库组件（oceanbase/seekdb/standalone）已计入 deployMemory，不重复累加
+    const mainComponents = [oceanbaseComponent, seekdbComponent, oceanbaseStandaloneComponent];
     keys.forEach((key) => {
-      if (key !== oceanbaseComponent && selectedConfig.includes(key)) {
+      // seekdb 模式下，如果没有选中任何可选组件，componentsMemory 应为 0
+      if (!mainComponents.includes(key) && selectedConfig.includes(key)) {
         componentsMemory += componentsVersionInfo[key]?.estimated_size || 0;
       }
     });
+    // 确保 seekdb 模式下，未选中可选组件时显示为 0
+    if (deployMode === 'seekdb' && selectedConfig.length === 0) {
+      componentsMemory = 0;
+    }
+
     setDeployMemory(deployMemory);
     setComponentsMemory(componentsMemory);
-  }, [componentsVersionInfo, selectedConfig]);
+  }, [componentsVersionInfo, selectedConfig, deployMode]);
 
   useEffect(() => {
     form.setFieldsValue({
-      appname: configData?.components?.oceanbase?.appname || initAppName,
+      appname: configData?.components?.oceanbase?.appname || defaultAppName,
     });
   }, [configData]);
 
 
   useEffect(() => {
     if (obVersionValue) {
-      getScenarioType(obVersionValue).then((res) => {
+      getScenarioType({ version: obVersionValue }).then((res) => {
         if (res.success) {
           setScenarioTypeList(res.data?.items);
         }
@@ -933,23 +1067,20 @@ export default function InstallConfig({
     if (!scenarioTypeList?.length && loadTypeVisible) {
       setLoadTypeVisible(false);
     }
-    if (scenarioTypeList?.length && !loadTypeVisible) {
+    if (scenarioTypeList?.length && !loadTypeVisible && deployMode !== 'seekdb') {
       setLoadTypeVisible(true);
     }
   }, [scenarioTypeList]);
 
   useEffect(() => {
-    const componentSelect = sessionStorage.getItem('componentSelect');
-    if (isNull(componentSelect)) {
-      if (!standAlone) {
-        // 分布式，默认勾选项，只取 obproxy
-        setSelectedConfig(['obproxy']);
-      } else {
-        setSelectedConfig([]);
-      }
+    if (deployMode === 'distributed') {
+      // 分布式，默认勾选项，只取 obproxy
+      setSelectedConfig(['obproxy']);
+    } else {
+      // 单机版或 seekdb 模式，不默认选择 obproxy，如果已包含也要移除
+      setSelectedConfig((prev) => prev.filter((item) => item !== 'obproxy'));
     }
-  }, []);
-
+  }, [deployMode]);
   return (
     <Spin spinning={loading || componentLoading}>
       <Space className={styles.spaceWidth} direction="vertical" size="middle">
@@ -966,19 +1097,19 @@ export default function InstallConfig({
               form={form}
               submitter={false}
               initialValues={{
-                appname: oceanbase?.appname || initAppName,
+                appname: oceanbase?.appname || defaultAppName,
               }}
             >
               <ProFormText
                 name="appname"
                 label={intl.formatMessage({
                   id: 'OBD.pages.components.InstallConfig.ClusterName',
-                  defaultMessage: '集群名称',
+                  defaultMessage: '名称',
                 })}
                 fieldProps={{ style: commonStyle }}
                 placeholder={intl.formatMessage({
                   id: 'OBD.pages.components.InstallConfig.EnterAClusterName',
-                  defaultMessage: '请输入集群名称',
+                  defaultMessage: '请输入名称',
                 })}
                 validateTrigger={['onBlur', 'onChange']}
                 disabled={isDraft}
@@ -987,7 +1118,7 @@ export default function InstallConfig({
                     required: true,
                     message: intl.formatMessage({
                       id: 'OBD.pages.components.InstallConfig.EnterAClusterName',
-                      defaultMessage: '请输入集群名称',
+                      defaultMessage: '请输入名称',
                     }),
                     validateTrigger: 'onChange',
                   },
@@ -1023,11 +1154,20 @@ export default function InstallConfig({
               optionType='button'
               value={deployMode}
               onChange={(e) => {
-                setDeployMode(e.target.value)
+                const newMode = e.target.value;
+                setDeployMode(newMode);
                 setOceanbaseType('');
                 setOBVersionValue(undefined);
-              }
-              }
+                // 切换模式时同步更新默认名称
+                if (!configData?.components?.oceanbase?.appname) {
+                  form.setFieldsValue({
+                    appname: newMode === 'seekdb' ? 'myseekdb' : initAppName,
+                  });
+                }
+                if (newMode === 'seekdb') {
+                  setLoadTypeVisible(false);
+                }
+              }}
             >
               <Tooltip
                 color={'#fff'}
@@ -1071,9 +1211,27 @@ export default function InstallConfig({
                   })}
                 </Radio>
               </Tooltip>
-
+              <Tooltip
+                color={'#fff'}
+                placement='bottom'
+                overlayInnerStyle={{ width: 400 }}
+                title={
+                  <div style={{ color: '#132039' }}>
+                    功能说明
+                    <div style={{ color: '#5c6b8a', fontSize: '12px' }}>
+                      · seekdb 将向量检索、全文检索与结构化/半结构化数据存储统一到单一引擎中，支持混合检索与在库内执行 AI 工作流。
+                    </div>
+                    <div style={{ color: '#5c6b8a', fontSize: '12px' }}>
+                      · SeekDB 旨在为需要低延迟、高并发的检索场景提供可扩展、生产级的解决方案，同时保持对关系型查询与分析能力的兼容。
+                    </div>
+                  </div>
+                }
+              >
+                <Radio value="seekdb">
+                  seekdb
+                </Radio>
+              </Tooltip>
             </Radio.Group>
-
           </ProCard>
           <ProCard
             title={
@@ -1109,11 +1267,17 @@ export default function InstallConfig({
                   <Alert
                     message={
                       <>
-                        {intl.formatMessage({
-                          id: 'OBD.pages.components.InstallConfig.IfTheCurrentEnvironmentCannot',
-                          defaultMessage:
-                            '如当前环境无法正常访问外网，建议使用 OceanBase 离线安装包进行安装部署。',
-                        })}
+                        {deployMode === 'seekdb'
+                          ? intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.NoSeekdbVersionAvailable',
+                            defaultMessage:
+                              'seekdb 需要 1.3 及以上版本，当前无可用版本。请检查安装程序配置或更新镜像仓库。',
+                          })
+                          : intl.formatMessage({
+                            id: 'OBD.pages.components.InstallConfig.IfTheCurrentEnvironmentCannot',
+                            defaultMessage:
+                              '如当前环境无法正常访问外网，建议使用 OceanBase 离线安装包进行安装部署。',
+                          })}
                         <a
                           href="https://open.oceanbase.com/softwareCenter/community"
                           target="_blank"
@@ -1352,7 +1516,7 @@ export default function InstallConfig({
               <Button
                 type="primary"
                 onClick={nextStep}
-                disabled={lowVersion || versionLoading || componentLoading}
+                disabled={lowVersion || versionLoading || componentLoading || seekdbHasNoValidVersion}
                 data-aspm-click="c307507.d317280"
                 data-aspm-desc={intl.formatMessage({
                   id: 'OBD.pages.components.InstallConfig.DeploymentConfigurationNextStep',
@@ -1370,15 +1534,17 @@ export default function InstallConfig({
             </Space>
           </div>
         </footer>
-        {deleteLoadingVisible && (
-          <DeleteDeployModal
-            visible={deleteLoadingVisible}
-            name={deleteName}
-            onCancel={() => setDeleteLoadingVisible(false)}
-            setOBVersionValue={setOBVersionValue}
-          />
-        )}
-      </Space>
-    </Spin>
+        {
+          deleteLoadingVisible && (
+            <DeleteDeployModal
+              visible={deleteLoadingVisible}
+              name={deleteName}
+              onCancel={() => setDeleteLoadingVisible(false)}
+              setOBVersionValue={setOBVersionValue}
+            />
+          )
+        }
+      </Space >
+    </Spin >
   );
 }

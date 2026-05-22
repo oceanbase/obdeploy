@@ -1,6 +1,6 @@
 /* eslint-disable */
 // 该文件由 OneAPI 自动生成，请勿手动修改！
-import { request } from 'umi';
+import { request } from '@umijs/max';
 
 /** get system user GET /api/v1/get/user */
 export async function user(options?: { [key: string]: any }) {

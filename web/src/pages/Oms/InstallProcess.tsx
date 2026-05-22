@@ -2,12 +2,12 @@ import InstallProcessComp from '@/component/InstallProcessComp';
 import {
   queryInstallLogOms,
   queryInstallStatusOms,
-} from '@/services/ob-deploy-web/Deployments';
+} from '@/services/ob-deploy-web/oms';
 import { getErrorInfo } from '@/utils';
 import useRequest, { requestPipeline } from '@/utils/useRequest';
 import NP from 'number-precision';
 import { useEffect, useRef, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import 'video.js/dist/video-js.css';
 import * as OCP from '@/services/ocp_installer_backend/OCP';
 
@@ -23,7 +23,7 @@ export default function InstallProcess({
     setErrorVisible,
     setErrorsList,
     errorsList,
-    ocpConfigData,
+    omsConfigData,
   } = useModel('global');
 
   const {
@@ -38,7 +38,7 @@ export default function InstallProcess({
     installTaskId: task_id
   } = useModel('ocpInstallData');
 
-  const name = type === "update" ? ocpConfigData?.cluster_name : configData?.appname;
+  const name = type === "update" ? omsConfigData?.cluster_name : configData?.appname;
   const [progress, setProgress] = useState(0);
   const [showProgress, setShowProgress] = useState(0);
   const [currentPage, setCurrentPage] = useState(true);
@@ -332,7 +332,7 @@ export default function InstallProcess({
         twoMinuteTimerRef.current = null;
       }
     };
-  }, [ocpConfigData?.cluster_name, id, type, getInstallTask, getInstallTaskLog]);
+  }, [omsConfigData?.cluster_name, id, type, getInstallTask, getInstallTaskLog]);
 
   return (
     <InstallProcessComp

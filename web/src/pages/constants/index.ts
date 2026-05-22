@@ -5,6 +5,7 @@ export const STABLE_OCP_VERSION = '421';
 export const oceanbaseComponent = 'oceanbase';
 export const oceanbaseCeComponent = 'oceanbase-ce';
 export const oceanbaseStandaloneComponent = 'oceanbase-standalone';
+export const seekdbComponent = 'seekdb';
 export const obproxyComponent = 'obproxy';
 export const obproxyCeComponent = 'obproxy-ce';
 export const ocpComponent = 'ocpserver';
@@ -68,6 +69,7 @@ export const allComponentsName = [
   obproxyCeComponent,
   oceanbaseCeComponent,
   oceanbaseStandaloneComponent,
+  seekdbComponent,
 ];
 
 export const componentsConfig = {
@@ -192,6 +194,16 @@ export const componentsConfig = {
   [`obshell Dashboard`]: {
     name: `obshell Dashboard`,
     showComponentName: `obshell Dashboard`,
+  },
+  [seekdbComponent]: {
+    name: 'SeekDB',
+    showComponentName: 'seekdb',
+    type: intl.formatMessage({
+      id: 'OBD.pages.constants.Database',
+      defaultMessage: '数据库',
+    }),
+    componentKey: seekdbComponent,
+    labelName: 'seekdb 参数名称',
   },
 };
 

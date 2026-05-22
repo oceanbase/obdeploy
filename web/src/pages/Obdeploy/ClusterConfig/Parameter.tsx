@@ -4,7 +4,7 @@ import { CONFIGSERVER_LOG_LEVEL } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { Input, InputNumber, Select, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
 
@@ -285,17 +285,20 @@ export default function Parameter(props: ParameterProps) {
         // className={styles.paramterSelect}
         onChange={(isAuto) => {
           if (isAuto) {
+            // 切换到自动分配时，保留当前值（如果有），否则使用默认值
             setParameterValue({
               ...parameterValue,
               adaptive: isAuto,
-              value: defaultValue,
+              value: parameterValue?.value || defaultValue,
               isChanged: true,
             });
             setUnit(defaultUnit.current);
           } else {
+            // 切换到自定义时，保留当前的 value（包括自动生成的密码）
             setParameterValue({
               ...parameterValue,
               adaptive: isAuto,
+              value: parameterValue?.value || defaultValue,
               isChanged: true,
             });
           }

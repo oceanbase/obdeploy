@@ -189,6 +189,8 @@ WC_OBSERVER_SYS_MEM_TOO_LARGE = OBDErrorCodeTemplate(2010, '({server}): system_m
 
 # seekdb
 EC_SEEKDB_NOT_ENOUGH_MEMORY_TOTAL = OBDErrorCodeTemplate(2000, '({ip}) not enough memory. (Total: {total}, Need: {need})')
+EC_SEEKDB_FS_MIN_AVAIL = OBDErrorCodeTemplate(2023, '({ip}) filesystem mounted at {mount} has insufficient free space for SeekDB. (Available: {avail}, Minimum required: {min})')
+SUG_SEEKDB_FS_MIN_AVAIL = OBDErrorSuggestionTemplate('Use a disk or partition with at least {min} free space for home_path, data_dir, and redo_dir.')
 
 # error code for test commands
 EC_MYSQLTEST_PARSE_CMD_FAILED = OBDErrorCodeTemplate(3000, 'parse cmd failed: {path}')
@@ -275,6 +277,7 @@ EC_OMS_SERVER_CONNECT_METADB = OBDErrorCodeTemplate(4701, 'failed to connect met
 EC_OMS_SERVER_CONNECT_INFLUXDB = OBDErrorCodeTemplate(4702, 'failed to connect influxdb')
 EC_OMS_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4703, '({ip}) {disk} not enough disk space. (Need: {need})')
 EC_OMS_UPDATE_NOT_DISABLE_HA = OBDErrorCodeTemplate(4704, 'HA is enabled, please disable it before upgrade.')
+EC_OMS_DATA_DIR_ACCESS = OBDErrorCodeTemplate(4705, '{server}: OMS path `{path}` is not a directory, does not exist, or current user lacks read/write/execute permission.')
 
 #maas
 EC_MAAS_NOT_ENOUGH_DISK = OBDErrorCodeTemplate(4703, '({ip}) {disk} not enough disk space. (Need: {need})')
@@ -354,4 +357,5 @@ SUG_OB_SYS_PASSWORD = OBDErrorSuggestionTemplate('''Please set the "ob_sys_passw
 SUG_OBAGENT_EDIT_HTTP_BASIC_AUTH_PASSWORD = OBDErrorSuggestionTemplate('Please edit the `http_basic_auth_password`, cannot contain characters other than uppercase letters, lowercase characters, digits, special characters:~^*{{}}[]_-+', fix_eval=[FixEval(FixEval.DEL, 'http_basic_auth_password')], auto_fix=True)
 SUB_OBSERVER_UNKONE_SCENARIO = OBDErrorSuggestionTemplate('Please select a valid scenario from the options: {scenarios}')
 SUG_CHECK_CONNECT_INFO = OBDErrorSuggestionTemplate('Please check {db} connection information')
+SUG_OMS_DATA_DIR_PERMISSION = OBDErrorSuggestionTemplate('Create an empty directory on the host if missing, grant the deploy user write permission (e.g. mkdir -p; chown or chmod), and ensure the directory has no files or subdirectories before deploy (same as OceanBase work dir check).')
 

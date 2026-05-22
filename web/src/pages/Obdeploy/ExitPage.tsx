@@ -2,7 +2,7 @@ import { intl } from '@/utils/intl';
 import { message, Card, Empty } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import copy from 'copy-to-clipboard';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import ExitPageWrapper from '@/component/ExitPageWrapper';
 import { OBD_COMMAND } from '@/constant/configuration';
 import EnStyles from './indexEn.less';

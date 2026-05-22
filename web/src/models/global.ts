@@ -17,6 +17,7 @@ export default () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [configData, setConfigData] = useState<any>({});
   const [ocpConfigData, setOcpConfigData] = useState<any>({});
+  const [omsConfigData, setOmsConfigData] = useState<any>({});
   const [checkOK, setCheckOK] = useState<boolean>(false);
   const [installStatus, setInstallStatus] = useState('RUNNING');
   const [lowVersion, setLowVersion] = useState<boolean>(false);
@@ -35,6 +36,7 @@ export default () => {
   const [scenarioParam, setScenarioParam] = useState<any>();
   const [selectedLoadType, setSelectedLoadType] = useState<string>('htap');
   const [selectedOmsType, setSelectedOmsType] = useState<string>('');
+  const [deployMode, setDeployMode] = useState<string>('distributed');
   const [clusterMoreConfig, setClusterMoreConfig] = useState<
     API.NewParameterMeta[]
   >([]);
@@ -78,6 +80,8 @@ export default () => {
     setConfigData,
     ocpConfigData,
     setOcpConfigData,
+    omsConfigData,
+    setOmsConfigData,
     checkOK,
     setCheckOK,
     installStatus,
@@ -131,6 +135,8 @@ export default () => {
     setSelectedLoadType,
     selectedOmsType,
     setSelectedOmsType,
+    deployMode,
+    setDeployMode,
     timerProgress,
     omsDockerData, 
     setOmsDockerData,

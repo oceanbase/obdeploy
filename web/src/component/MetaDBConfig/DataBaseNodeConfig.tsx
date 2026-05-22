@@ -7,7 +7,7 @@ import type {
 import { EditableProTable, ProForm } from '@ant-design/pro-components';
 import { message, Popconfirm, Select, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import ServerTags from '@/pages/Obdeploy/ServerTags';
 import { hasDuplicateIPs } from '@/utils';

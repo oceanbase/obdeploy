@@ -37,7 +37,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { FormInstance } from 'antd/lib/form';
 import { isEmpty } from 'lodash';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale, history, useModel } from 'umi';
+import { getLocale, history, useModel } from '@umijs/max';
 import EnStyles from '../../../indexEn.less';
 import ZhStyles from '../../../indexZh.less';
 import CustomFooter from '@/component/CustomFooter';
@@ -64,8 +64,8 @@ export default function DeployConfig({
     setErrorVisible,
     errorsList,
     setErrorsList,
-    ocpConfigData,
-    setOcpConfigData,
+    omsConfigData,
+    setOmsConfigData,
     OMS_DOCS,
     setOmsTakeoverData,
     omsTakeoverData,
@@ -75,7 +75,7 @@ export default function DeployConfig({
 
   const [form] = ProForm.useForm();
   const [installType, setInstallType] = useState('obd_install');
-  const [updateType, setUpdateType] = useState(ocpConfigData?.upgrade_mode || 'offline');
+  const [updateType, setUpdateType] = useState(omsConfigData?.upgrade_mode || 'offline');
   const [nextLoading, setNextLoading] = useState(false);
   const [checkConnectionStatus, setCheckConnectionStatus] = useState<
     'unchecked' | 'fail' | 'success'
@@ -163,15 +163,15 @@ export default function DeployConfig({
           // 获取当前选中的值，格式为 version 字符串
           const getCurrentValue = () => {
             // 如果 version 明确设置为 null，说明被清空了，返回 undefined
-            if (ocpConfigData?.version === null) {
+            if (omsConfigData?.version === null) {
               return undefined;
             }
-            if (ocpConfigData?.version) {
+            if (omsConfigData?.version) {
               // 如果 configData.version 存在，直接使用
-              return ocpConfigData.version;
+              return omsConfigData.version;
             }
-            // 如果 ocpConfigData 不存在或为空对象，且版本列表有数据，默认使用第一个版本
-            if (versionList.length > 0 && (!ocpConfigData || Object.keys(ocpConfigData).length === 0)) {
+            // 如果 omsConfigData 不存在或为空对象，且版本列表有数据，默认使用第一个版本
+            if (versionList.length > 0 && (!omsConfigData || Object.keys(omsConfigData).length === 0)) {
               return versionList[0].version;
             }
             return undefined;
@@ -218,8 +218,8 @@ export default function DeployConfig({
                   value: currentValue,
                 } : undefined}
                 onChange={(option) => {
-                  setOcpConfigData({
-                    ...ocpConfigData,
+                  setOmsConfigData({
+                    ...omsConfigData,
                     version: option.value,
                   })
                 }}
@@ -423,7 +423,7 @@ export default function DeployConfig({
     defaultParams: [{}],
     onSuccess: ({ data }) => {
       if (data) {
-        setOcpConfigData((prev) => ({
+        setOmsConfigData((prev) => ({
           ...prev,
           currentUser: data,
         }));
@@ -439,14 +439,14 @@ export default function DeployConfig({
     if (currentUser && updateType === 'online') {
       // 延迟设置，确保表单字段已渲染
       const timer = setTimeout(() => {
-        // 只有当 ocpConfigData.path 没有值时才设置默认值
-        const currentPath = ocpConfigData?.path || form.getFieldValue('path');
+        // 只有当 omsConfigData.path 没有值时才设置默认值
+        const currentPath = omsConfigData?.path || form.getFieldValue('path');
         if (!currentPath) {
           form.setFieldsValue({
             path: defaultPath,
           });
-          // 同时更新 ocpConfigData
-          setOcpConfigData((prev) => ({
+          // 同时更新 omsConfigData
+          setOmsConfigData((prev) => ({
             ...prev,
             path: defaultPath,
           }));
@@ -480,7 +480,7 @@ export default function DeployConfig({
   };
 
   const prevStep = () => {
-    setOcpConfigData({});
+    setOmsConfigData({});
     setErrorVisible(false);
     setErrorsList([]);
     history.push('/guide?update');
@@ -495,7 +495,7 @@ export default function DeployConfig({
       try {
         const allFormValues = form.getFieldsValue();
         const isObdInstall = (allFormValues?.install_type || installType) === 'obd_install';
-        const baseConfig = ocpConfigData || {};
+        const baseConfig = omsConfigData || {};
 
         // 获取目标版本号（优先级：baseConfig > 表单值 > omsUpgradeInfo 第一个版本）
         const targetVersion = baseConfig?.version
@@ -520,7 +520,7 @@ export default function DeployConfig({
         };
 
         // 构建配置数据：先合并 baseConfig 和表单值，再设置关键字段
-        const newOcpConfigData: any = {
+        const newomsConfigData: any = {
           ...baseConfig,
           ...allFormValues,
           // 核心字段（优先级：表单值 > 状态值 > baseConfig值）
@@ -535,7 +535,7 @@ export default function DeployConfig({
 
         // 非 OBD 部署的字段
         if (!isObdInstall) {
-          Object.assign(newOcpConfigData, {
+          Object.assign(newomsConfigData, {
             host: allFormValues?.host ?? baseConfig?.host,
             container_name: allFormValues?.container_name ?? baseConfig?.container_name,
             user: allFormValues?.user ?? baseConfig?.user,
@@ -545,11 +545,11 @@ export default function DeployConfig({
         }
 
         // online 模式需要 path 字段
-        if (newOcpConfigData.upgrade_mode === 'online') {
-          newOcpConfigData.path = allFormValues?.path ?? baseConfig?.path;
+        if (newomsConfigData.upgrade_mode === 'online') {
+          newomsConfigData.path = allFormValues?.path ?? baseConfig?.path;
         }
         // 更新状态
-        setOcpConfigData(newOcpConfigData);
+        setOmsConfigData(newomsConfigData);
         setCurrent(current + 1);
         setErrorVisible(false);
         setErrorsList([]);
@@ -619,7 +619,7 @@ export default function DeployConfig({
       setCheckConnectionStatus('success');
       const firstItem = omsDockerData[0];
       if (firstItem?.version) {
-        setOcpConfigData((prev: any) => ({ ...prev, version: firstItem.version }));
+        setOmsConfigData((prev: any) => ({ ...prev, version: firstItem.version }));
         // 同时更新表单值
         form.setFieldsValue({
           version: firstItem.version,
@@ -634,7 +634,7 @@ export default function DeployConfig({
   useEffect(() => {
     if (omsUpgradeInfo?.dest_versions && Array.isArray(omsUpgradeInfo.dest_versions) && omsUpgradeInfo.dest_versions.length > 0 && obdInstall) {
       // 如果还没有设置 image，则默认选择第一个版本
-      setOcpConfigData((prevConfigData) => {
+      setOmsConfigData((prevConfigData) => {
         if (!prevConfigData?.version) {
           const firstVersion = omsUpgradeInfo.dest_versions[0]?.version;
           if (firstVersion) {
@@ -647,10 +647,10 @@ export default function DeployConfig({
   }, [omsUpgradeInfo?.dest_versions]);
 
   useEffect(() => {
-    if (ocpConfigData?.install_type) {
-      setInstallType(ocpConfigData?.install_type);
+    if (omsConfigData?.install_type) {
+      setInstallType(omsConfigData?.install_type);
     }
-  }, [ocpConfigData?.install_type]);
+  }, [omsConfigData?.install_type]);
 
   return (
     <>
@@ -659,17 +659,17 @@ export default function DeployConfig({
           <ProForm
             form={form}
             initialValues={{
-              install_type: ocpConfigData?.install_type || 'obd_install',
-              upgrade_mode: ocpConfigData?.upgrade_mode || 'offline',
-              obd_cluster_name: ocpConfigData?.cluster_name,
-              not_obd_cluster_name: ocpConfigData?.cluster_name,
-              path: ocpConfigData?.path || defaultPath,
-              host: ocpConfigData?.host,
-              container_name: ocpConfigData?.container_name,
-              user: ocpConfigData?.user,
-              password: ocpConfigData?.password,
-              port: ocpConfigData?.port,
-              version: ocpConfigData?.version,
+              install_type: omsConfigData?.install_type || 'obd_install',
+              upgrade_mode: omsConfigData?.upgrade_mode || 'offline',
+              obd_cluster_name: omsConfigData?.cluster_name,
+              not_obd_cluster_name: omsConfigData?.cluster_name,
+              path: omsConfigData?.path || defaultPath,
+              host: omsConfigData?.host,
+              container_name: omsConfigData?.container_name,
+              user: omsConfigData?.user,
+              password: omsConfigData?.password,
+              port: omsConfigData?.port,
+              version: omsConfigData?.version,
             }}
             layout="vertical"
             submitter={false}
@@ -1058,15 +1058,15 @@ export default function DeployConfig({
                       // 获取当前选中的值，格式为 version 字符串
                       const getCurrentValue = () => {
                         // 如果 version 明确设置为 null，说明被清空了，返回 undefined
-                        if (ocpConfigData?.version === null) {
+                        if (omsConfigData?.version === null) {
                           return undefined;
                         }
-                        if (ocpConfigData?.version) {
+                        if (omsConfigData?.version) {
                           // 如果 configData.version 存在，直接使用
-                          return ocpConfigData.version;
+                          return omsConfigData.version;
                         }
-                        // 如果 ocpConfigData 不存在或为空对象，且版本列表有数据，默认使用第一个版本
-                        if (versionList.length > 0 && (!ocpConfigData || Object.keys(ocpConfigData).length === 0)) {
+                        // 如果 omsConfigData 不存在或为空对象，且版本列表有数据，默认使用第一个版本
+                        if (versionList.length > 0 && (!omsConfigData || Object.keys(omsConfigData).length === 0)) {
                           return versionList[0]?.version;
                         }
                         return undefined;
@@ -1116,8 +1116,8 @@ export default function DeployConfig({
                               value: currentValue,
                             } : undefined}
                             onChange={(option) => {
-                              setOcpConfigData({
-                                ...ocpConfigData,
+                              setOmsConfigData({
+                                ...omsConfigData,
                                 version: option.value,
                               });
                               // 同时更新表单值
@@ -1180,8 +1180,8 @@ export default function DeployConfig({
                       upgrade_mode: e.target.value,
                       path: '',
                     });
-                    setOcpConfigData({
-                      ...ocpConfigData,
+                    setOmsConfigData({
+                      ...omsConfigData,
                       path: '',
                     })
                   }}

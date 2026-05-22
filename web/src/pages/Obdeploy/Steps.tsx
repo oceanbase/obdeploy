@@ -1,8 +1,8 @@
 import { intl } from '@/utils/intl';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import { Space } from 'antd';
 import { ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
@@ -10,7 +10,10 @@ const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 import { useEffect, useState } from 'react';
 
-export default function Steps() {
+export default function Steps({
+  deployMode,
+}) {
+
   const { currentStep } = useModel('global');
   const [showBorder, setShowBorder] = useState(false);
 
@@ -25,7 +28,7 @@ export default function Steps() {
     );
   };
 
-  const getStepsItems = () => {
+  const getStepsItems = ({ deployMode }) => {
     return [
       {
         title: intl.formatMessage({
@@ -44,7 +47,10 @@ export default function Steps() {
         icon: getIcon(2),
       },
       {
-        title: intl.formatMessage({
+        title: deployMode === 'seekdb' ? intl.formatMessage({
+          id: 'OBD.pages.components.Steps.InstanceConfiguration',
+          defaultMessage: '实例配置',
+        }) : intl.formatMessage({
           id: 'OBD.pages.components.Steps.ClusterConfiguration',
           defaultMessage: '集群配置',
         }),
@@ -113,7 +119,7 @@ export default function Steps() {
               ></div>
             </div>
             <Space size={locale === 'zh-CN' ? 100 : 0} wrap={false}>
-              {getStepsItems().map((item) => (
+              {getStepsItems({ deployMode }).map((item) => (
                 <span className={styles.stepItem} key={item.key}>
                   {item.icon}
                   <span

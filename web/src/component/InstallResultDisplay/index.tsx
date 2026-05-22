@@ -22,7 +22,7 @@ import { useRequest } from 'ahooks';
 import { Alert } from 'antd';
 import type { ResultProps } from 'antd/es/result';
 import { isEmpty } from 'lodash';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import styles from './index.less';
 
 const { Paragraph, Text } = Typography;

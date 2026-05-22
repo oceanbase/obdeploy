@@ -3,7 +3,7 @@ import type { EditableFormInstance } from '@ant-design/pro-components';
 import { ProCard, ProForm } from '@ant-design/pro-components';
 import { Button, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import { PARAMETER_TYPE } from '@/constant/configuration';
 import type { RulesDetail } from '@/pages/Obdeploy/ClusterConfig/ConfigTable';

@@ -21,13 +21,14 @@ MINIMAL_CONFIG = '''
 '''
 
 PKG_ESTIMATED_SIZE = defaultdict(lambda:0)
-PKG_ESTIMATED_SIZE.update({"oceanbase-ce": 347142720, "oceanbase": 358142928, "obproxy-ce": 45424640, "obproxy": 56428687, "obagent": 76124864, "ocp-express": 95924680, "ocp-server-ce": 622854144})
+PKG_ESTIMATED_SIZE.update({"oceanbase-ce": 347142720, "oceanbase": 358142928, "obproxy-ce": 45424640, "obproxy": 56428687, "obagent": 76124864, "ocp-express": 95924680, "ocp-server-ce": 622854144, "seekdb": 380000000})
 
 
 OCEANBASE_CE = 'oceanbase-ce'
 OCEANBASE = 'oceanbase'
 OCEANBASE_STANDALONE = 'oceanbase-standalone'
 COMPS_OCEANBASE = ['oceanbase-ce', 'oceanbase', 'oceanbase-standalone']
+SEEKDB = 'seekdb'
 
 CE = "ce"
 BUSINESS = "business"
@@ -46,6 +47,7 @@ GRAFANA = 'grafana'
 ALERTMANAGER = 'alertmanager'
 OMS = 'oms'
 OMS_CE = 'oms-ce'
+SEEKDB = 'seekdb'
 
 ALERTMANAGER_DEFAULT_RECEIVER = {
     "receivers": ["mock_webhook"]

@@ -80,6 +80,13 @@ def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *a
     if not primary_cluster_config:
         stdio.error('No such deploy: %s.' % primary_deploy_name)
         return False
+    
+    ob_repository = kwargs.get('ob_repository')
+    if ob_repository.version >= '4.4.2.0':
+        sync_mode = get_option('sync_mode', 'performance')
+        if sync_mode not in ['performance', 'availability', 'protection']:
+            error("Invalid mode: %s. Supported modes: performance, availability, protection." % sync_mode)
+            return False
 
     root_password = get_option('tenant_root_password', '')
     standbyro_password_input = get_option('standbyro_password', None)

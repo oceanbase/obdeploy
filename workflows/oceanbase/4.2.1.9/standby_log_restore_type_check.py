@@ -20,8 +20,6 @@ from _rpm import Version
 
 def standby_log_restore_type_check(plugin_context, workflow, *args, **kwargs):
     options = plugin_context.options
-    workflow.add(const.STAGE_FIRST, 'obshell_client', 'obshell_health_check')
-    workflow.add_with_kwargs(const.STAGE_FIRST, {"version": Version("4.2.4.0"), "comparison_operators": ">="}, 'obshell_version_check')
 
     if not getattr(options, 'skip_cluster_status_check', False):
         workflow.add(const.STAGE_SECOND, 'status')

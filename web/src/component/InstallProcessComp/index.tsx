@@ -20,6 +20,7 @@ interface InstallProcessCompProps {
 
   type: string;
   progressCoverWidth?: number;
+  deployMode?: string;
 }
 let timerLogScroll: NodeJS.Timer | null = null;
 export default function InstallProcessComp({
@@ -30,6 +31,7 @@ export default function InstallProcessComp({
   showProgress,
   progressCoverWidth,
   type,
+  deployMode,
 }: InstallProcessCompProps) {
   const tenantType = type === 'tenant';
   const progressCoverInitWidth = tenantType ? progressCoverWidth : 282;
@@ -146,7 +148,7 @@ export default function InstallProcessComp({
       { name: name },
     );
   };
- 
+
   return (
     <ProCard direction="column" className="card-padding-bottom-24">
       <ProCard>
@@ -156,7 +158,10 @@ export default function InstallProcessComp({
               id: 'OBD.pages.components.InstallProces.87DB05E2',
               defaultMessage: '租户创建中',
             }) :
-              type === 'install' ? 'OMS 部署中' : type === 'OMS_UPDATE' ? 'OMS 升级中' : intl.formatMessage({
+              type === 'install' ? 'OMS 部署中' : type === 'OMS_UPDATE' ? 'OMS 升级中' : deployMode === 'seekdb' ? intl.formatMessage({
+                id: 'OBD.component.InstallProcessComp.SeekdbDeploying',
+                defaultMessage: 'seekdb 部署中',
+              }) : intl.formatMessage({
                 id: 'OBD.pages.components.InstallProcess.Deploying',
                 defaultMessage: '部署中...',
               })

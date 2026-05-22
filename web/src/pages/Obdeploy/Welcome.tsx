@@ -1,11 +1,11 @@
 import { intl } from '@/utils/intl';
 import { useEffect } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import { Button } from 'antd';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 import NP from 'number-precision';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 

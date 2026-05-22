@@ -4,7 +4,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { ProCard } from '@ant-design/pro-components';
 import { Button, Card, Col, Dropdown, Row, Space, Tag, Tooltip } from 'antd';
 import React from 'react';
-import { getLocale, history, useModel } from 'umi';
+import { getLocale, history, useModel } from '@umijs/max';
 import compManageGuideIcon from '../../../public/assets/welcome/component-manage.svg';
 import obGuideIcon from '../../../public/assets/welcome/ob-guide.png';
 import ocpGuideIcon from '../../../public/assets/welcome/ocp-guide.png';;

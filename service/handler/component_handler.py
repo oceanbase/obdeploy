@@ -14,7 +14,7 @@
 # limitations under the License.
 import uuid
 import tempfile
-from const import COMPS_OB
+from const import COMPS_OB_AND_SEEKDB
 from service.handler.base_handler import BaseHandler
 from service.model.components import Component, ComponentInfo, ConfigParameter, ParameterMeta
 from service.common import log
@@ -123,6 +123,8 @@ class ComponentHandler(BaseHandler):
             componentInfo.version_type = const.CE
         for componentInfo in component_dict[const.OCP_SERVER]:
             componentInfo.version_type = const.BUSINESS
+        for componentInfo in component_dict.get(const.SEEKDB, []):
+            componentInfo.version_type = const.CE
 
         if const.OCEANBASE in component_dict.keys() and const.OCEANBASE_CE in component_dict.keys():
             component_dict[const.OCEANBASE].extend(component_dict[const.OCEANBASE_CE])
@@ -188,7 +190,7 @@ class ComponentHandler(BaseHandler):
                     self.obd.deploy_manager.remove_deploy_config(name)
                     raise Exception("genconfig failed for component: {0}".format(parameter_filter.component))
                 else:
-                    if repository.name in COMPS_OB:
+                    if repository.name in COMPS_OB_AND_SEEKDB:
                         auto_keys = self.obd.get_namespace(spacename).get_return("generate_password").kwargs.get('generate_keys', [])
                     else:
                         auto_keys = self.obd.get_namespace(spacename).get_return("generate_config").kwargs.get('generate_keys', [])

@@ -18,7 +18,7 @@ import {
 } from 'antd';
 import { find } from 'lodash';
 import React, { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import styles from './index.less';
 
 export interface UpdatePreCheckProps {

@@ -4,9 +4,12 @@ export const getParamstersHandler = async (
   oceanbase: any,
   errorhandle: any,
 ) => {
+  // component 或 version 为空时跳过请求，避免 422 错误
+  if (!oceanbase?.component || !oceanbase?.version) {
+    return null;
+  }
   try {
     const { success, data } = await run(
-      {},
       {
         filters: [
           {

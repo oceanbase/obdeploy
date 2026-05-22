@@ -41,6 +41,7 @@ def restart(plugin_context, workflow, *args, **kwargs):
     if new_clients:
         clients = new_clients
 
+    workflow.add(const.STAGE_SECOND, 'obshell_client', 'obshell_health_check', 'obshell_dashboard')
     workflow.add_with_kwargs(const.STAGE_FIRST, {"clients": clients, "cluster_config": cluster_config, "new_cluster_config": new_cluster_config, "cursor": None, "repository_dir": kwargs.get('repository').repository_dir}, *finally_plugins)
 
     return plugin_context.return_true()

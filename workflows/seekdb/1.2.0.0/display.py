@@ -21,7 +21,8 @@ import const
 def display(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'status')
     workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
-    workflow.add(const.STAGE_SECOND, 'connect', 'display')
+    workflow.add(const.STAGE_SECOND, 'connect', 'display', 'seekdb_standby_detect')
+    workflow.add(const.STAGE_SECOND, 'obshell_client', 'obshell_health_check', 'obshell_dashboard')
     workflow.add(const.STAGE_THIRD, 'get_relation_clusters')
     workflow.add(const.STAGE_THIRD, 'show_topology')
     plugin_context.return_true()

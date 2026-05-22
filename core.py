@@ -43,7 +43,7 @@ from _lock import LockManager, LockMode
 from _optimize import OptimizeManager
 from _environ import ENV_REPO_INSTALL_MODE, ENV_BASE_DIR
 from _types import Capacity
-from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE, TPCC_PATH, TPCH_PATH, COMP_JRE, LOCATION_MODE, SERVICE_MODE, COMP_OB_SEEKDB
+from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_OB_AND_SEEKDB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE, TPCC_PATH, TPCH_PATH, COMP_JRE, LOCATION_MODE, SERVICE_MODE, COMP_OB_SEEKDB
 from ssh import LocalClient
 
 
@@ -154,7 +154,7 @@ class ObdHome(object):
         if not self.repositories:
             return None
         for repository in self.repositories:
-            if repository.name in const.COMPS_OB:
+            if repository.name in const.COMPS_OB_AND_SEEKDB:
                 return repository
         else:
             return None
@@ -377,7 +377,7 @@ class ObdHome(object):
             cluster_config = deploy_config.components[repository.name]
             errors += cluster_config.check_param()[1]
             skip_keys = []
-            if repository.name in COMPS_OB:
+            if repository.name in COMPS_OB_AND_SEEKDB:
                 ret = self.get_namespace(repository.name).get_return("generate_password")
             else:
                 ret = self.get_namespace(repository.name).get_return("generate_config")
@@ -403,7 +403,7 @@ class ObdHome(object):
             skip_keys = []
             ret = self.get_namespace(repository.name).get_return('get_generate_keys')
             if ret:
-                if const.COMP_OB == repository.name:
+                if repository.name in COMPS_OB_AND_SEEKDB:
                     skip_keys = self.get_namespace(repository.name).get_return('generate_password').kwargs.get('generate_keys', [])
                 else:
                     skip_keys = self.get_namespace(repository.name).get_return('generate_config').kwargs.get('generate_keys', [])
@@ -2737,6 +2737,25 @@ class ObdHome(object):
             return False
         return True
 
+    def set_sync_mode(self, standby_deploy_name, tenant_name):
+        deploy = self.deploy_manager.get_deploy_config(standby_deploy_name)
+        if not deploy:
+            self._call_stdio('error', 'No such deploy: %s.' % standby_deploy_name)
+            return False
+        self.set_deploy(deploy)
+        if deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            self._call_stdio('error', 'Deploy "%s" is %s' % (standby_deploy_name, deploy.deploy_info.status.value))
+            return False
+        standby_repositories = self.get_component_repositories(deploy.deploy_info, const.COMPS_OB)
+        self.set_repositories(standby_repositories)
+        self.search_param_plugin_and_apply(standby_repositories, deploy.deploy_config)
+        setattr(self.options, 'tenant_name', tenant_name)
+
+        workflows = self.get_workflows('set_sync_mode', no_found_act='ignore')
+        if not self.run_workflow(workflows, no_found_act='ignore'):
+            return False
+        return True
+
     def drop_tenant(self, name):
         self._call_stdio('verbose', 'Get Deploy by name')
         deploy = self.deploy_manager.get_deploy_config(name)
@@ -2966,7 +2985,10 @@ class ObdHome(object):
 
         components_kwargs = {}
         for repository in repositories:
-            components_kwargs[repository.name] = {"display_encrypt_password": display_encrypt_password}
+            components_kwargs[repository.name] = {
+                "display_encrypt_password": display_encrypt_password,
+                "source_type": "display"
+            }
         # Get the client
         self.get_clients(deploy_config, repositories)
         workflows = self.get_workflows('display')
@@ -5218,8 +5240,11 @@ class ObdHome(object):
         self.search_param_plugin_and_apply(repositories, deploy_config)
         self._call_stdio('stop_loading', 'succeed')
 
-
         repository = repositories[0]
+        for r in repositories:
+            if r.name in COMPS_OB_AND_SEEKDB:
+                repository = r
+                break
         template = self.get_workflow(repository, 'check_opt', 'commands', '0.1')
         workflow = Workflows('check_opt')
         workflow[repository.name] = template

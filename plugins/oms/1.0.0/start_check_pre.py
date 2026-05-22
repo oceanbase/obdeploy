@@ -79,6 +79,7 @@ def start_check_pre(plugin_context, init_check_status=False, first_start=False, 
         production_mode = server_config.get('production_mode', False)
         check_status[server] = {
             'port': err.CheckStatus(),
+            'dir_perm': err.CheckStatus(),
             'connect_db': err.CheckStatus(),
         }
 

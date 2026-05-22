@@ -25,7 +25,7 @@ from _rpm import Version
 from _plugin import PluginType
 from _errno import CheckStatus, FixEval
 from collections import defaultdict
-from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMPS_ODP, COMP_ODP_CE, COMP_OB_CONFIGSERVER, COMP_PROMETHEUS, COMP_ALERTMANAGER, COMP_OB_CONFIGSERVER
+from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB_AND_SEEKDB, COMPS_ODP, COMP_ODP_CE, COMP_OB_CONFIGSERVER, COMP_PROMETHEUS, COMP_ALERTMANAGER, COMP_OB_CONFIGSERVER
 from ssh import LocalClient
 from _mirror import MirrorRepositoryType
 from _deploy import DeployStatus, DeployConfigStatus
@@ -622,7 +622,7 @@ class ComponentChangeHandler(BaseHandler):
         oceanbase_repo = None
         current_obproxy_repo = None
         for repository in self.context['origin_repository'][name]:
-            if repository.name in COMPS_OB:
+            if repository.name in COMPS_OB_AND_SEEKDB:
                 oceanbase_repo = repository
             elif repository.name in COMPS_ODP:
                 current_obproxy_repo = repository
@@ -653,6 +653,7 @@ class ComponentChangeHandler(BaseHandler):
         succeed_repositories = []
         for repository in self.obd.sort_repositories_by_depends(deploy_config, self.context['new_obd'][name].repositories):
             opt = Values()
+            setattr(opt, 'with_parameter', True)
             self.obd.set_options(opt)
             trace_id = str(uuid())
             self.context['component_trace'][repository.name] = trace_id
@@ -896,7 +897,7 @@ class ComponentChangeHandler(BaseHandler):
         oceanbase_repo = None
         current_obproxy_repo = None
         for repository in self.obd.repositories:
-            if repository.name in COMPS_OB:
+            if repository.name in COMPS_OB_AND_SEEKDB:
                 oceanbase_repo = repository
             elif repository.name in COMPS_ODP:
                 current_obproxy_repo = repository

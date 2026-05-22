@@ -4,7 +4,7 @@ import { ProCard, ProFormDigit, ProFormText } from '@ant-design/pro-components';
 import { Row, Space } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import CustomAlert from '../CustomAlert';
 
 import { resourceMap } from '@/pages/constants';
