@@ -16,7 +16,7 @@ import { useUpdateEffect } from 'ahooks';
 import { Col, Input, message, Row, Space, Tooltip } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import { obproxyAddonAfter, PARAMETER_TYPE } from '@/constant/configuration';
 import ConfigTable from '@/pages/Obdeploy/ClusterConfig/ConfigTable';
@@ -111,7 +111,6 @@ export default function OBProxyConfig({
     setProxyMoreLoading(true);
     try {
       const { success, data } = await getMoreParamsters(
-        {},
         {
           filters: [
             {

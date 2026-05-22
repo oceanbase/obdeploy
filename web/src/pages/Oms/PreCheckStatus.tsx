@@ -2,7 +2,7 @@ import { errorHandler, getErrorInfo } from '@/utils';
 import { intl } from '@/utils/intl';
 import { message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import PreCehckComponent from '@/component/PreCheck/preCheck';
 import useRequest from '@/utils/useRequest';
 import NP from 'number-precision';

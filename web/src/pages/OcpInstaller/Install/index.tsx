@@ -1,7 +1,7 @@
 import { intl } from '@/utils/intl';
 import { PageContainer } from '@oceanbase/ui';
 import React, { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import CustomAlert from '@/component/CustomAlert';
 import AlertMetadb from '@/component/CustomAlert/AlertMetadb';

@@ -1,4 +1,4 @@
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import CheckInfo from './CheckInfo';
 import { Alert, Tabs, TabsProps } from 'antd';
 import TopoComponent from './TopoComponent';

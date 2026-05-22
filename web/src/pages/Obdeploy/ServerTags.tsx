@@ -107,7 +107,7 @@ export default ({
   useEffect(() => {
     setOverValues(getOverValues([...(currentValues || [])]));
     if (onChange && currentValues?.length !== values?.length) {
-      onChange(currentValues);
+      onChange(currentValues?.length ? currentValues : undefined);
     }
   }, [currentValues]);
 

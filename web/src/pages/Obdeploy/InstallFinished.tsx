@@ -3,6 +3,7 @@ import {
   queryConnectionInfo,
   queryDeploymentReport,
   queryInstallLog,
+  queryInstallStatus,
 } from '@/services/ob-deploy-web/Deployments';
 import { getErrorInfo, handleQuit } from '@/utils';
 import { connectInfoForPwd, handleCopy } from '@/utils/helper';
@@ -16,7 +17,7 @@ import {
 import { Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import {
   componentsConfig,
   componentVersionTypeToComponent,
@@ -312,10 +313,13 @@ export default function InstallProcess() {
     setErrorVisible,
     setErrorsList,
     errorsList,
+    deployMode,
   } = useModel('global');
+  const seekdb = deployMode === 'seekdb';
   const [logs, setLogs] = useState({});
   const name = configData?.components?.oceanbase?.appname;
   const [connectInfo, setConnectInfo] = useState<API.ConnectionInfo[]>([]);
+  const [installInfoItems, setInstallInfoItems] = useState<API.DeploymentReport[]>([]);
   const { run: fetchReportInfo, data: reportInfo } = useRequest(
     queryDeploymentReport,
     {
@@ -326,6 +330,44 @@ export default function InstallProcess() {
       },
     },
   );
+  // seekdb 模式下额外获取 install_status 接口的所有组件信息作为展示底据
+  const { run: fetchInstallStatus } = useRequest(queryInstallStatus, {
+    onSuccess: ({ success, data }: any) => {
+      if (success) {
+        const infoList = data?.info;
+        if (infoList?.length) {
+          // install_status 返回了 info 数据，直接用
+          setInstallInfoItems(
+            infoList.map((item: any) => ({
+              name: item.component,
+              version: '',
+              servers: [],
+              status: item.result || item.status,
+            }))
+          );
+        } else {
+          // info 为空时，从 configData.components 构建底据，状态未知
+          const comps = configData?.components || {};
+          // seekdb 模式组件列表：先加 seekdb，再加其余已选组件
+          const compNames: string[] = [];
+          if (comps.oceanbase) compNames.push('seekdb');
+          ['obagent', 'prometheus', 'grafana', 'alertmanager', 'obconfigserver'].forEach((k) => {
+            if (comps[k]) compNames.push(k);
+          });
+          if (compNames.length) {
+            setInstallInfoItems(
+              compNames.map((n) => ({
+                name: n,
+                version: comps[n === 'seekdb' ? 'oceanbase' : n]?.version || '',
+                servers: comps[n === 'seekdb' ? 'oceanbase' : n]?.servers || [],
+                status: installStatus === 'SUCCESSFUL' ? 'SUCCESSFUL' : 'FAILED',
+              }))
+            );
+          }
+        }
+      }
+    },
+  });
   const { run: fetchConnectInfo, } = useRequest(
     queryConnectionInfo,
     {
@@ -373,13 +415,26 @@ export default function InstallProcess() {
   useEffect(() => {
     fetchReportInfo({ name });
     fetchConnectInfo({ name });
+    if (seekdb) {
+      fetchInstallStatus({ name });
+    }
   }, []);
+
+  // seekdb 模式下，用 install_status 的所有组件补充 report 数据，确保展示完整
+  const mergedReportInfo: API.DeploymentReport[] | undefined = seekdb
+    ? (() => {
+      const reportItems = reportInfo?.items || [];
+      const reportNames = new Set(reportItems.map((r) => r.name));
+      const extra = installInfoItems.filter((i) => !reportNames.has(i.name));
+      return [...reportItems, ...extra];
+    })()
+    : reportInfo?.items;
 
   return (
     <InstallResultComp
       installStatus={installStatus}
       connectInfo={connectInfo}
-      reportInfo={reportInfo?.items}
+      reportInfo={mergedReportInfo}
       type={ResultType.OBInstall}
       logs={logs}
       handleInstallLog={handleInstallLog}

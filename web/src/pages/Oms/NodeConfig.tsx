@@ -31,7 +31,7 @@ import {
   Tooltip,
 } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import {
   commonSelectStyle,
 } from '../constants';
@@ -455,14 +455,14 @@ export default function NodeConfig() {
                     {
                       required: true,
                       message: intl.formatMessage({
-                        id: 'OBD.pages.Oms.ConnectionInfo.AccessAddress',
-                        defaultMessage: '访问地址',
+                        id: 'OBD.pages.Oms.NodeConfig.PleaseEnterAccessAddress',
+                        defaultMessage: '请输入访问地址',
                       }),
                     }, {
                       pattern: serverReg,
                       message: intl.formatMessage({
-                        id: 'OBD.pages.Oms.ConnectionInfo.AccessAddress',
-                        defaultMessage: '访问地址',
+                        id: 'OBD.pages.Oms.NodeConfig.PleaseEnterCorrectAccessAddress',
+                        defaultMessage: '请输入正确的访问地址',
                       }),
                     }
                   ]}
@@ -482,8 +482,8 @@ export default function NodeConfig() {
                     {
                       required: true,
                       message: intl.formatMessage({
-                        id: 'OBD.pages.Oms.ConnectionInfo.Port',
-                        defaultMessage: '端口',
+                        id: 'OBD.pages.Oms.NodeConfig.PleaseEnterPort',
+                        defaultMessage: '请输入端口',
                       }),
                     },
                   ]}
@@ -507,8 +507,8 @@ export default function NodeConfig() {
                     {
                       required: true,
                       message: intl.formatMessage({
-                        id: 'OBD.pages.Oms.ConnectionInfo.AccessAccount',
-                        defaultMessage: '访问账号',
+                        id: 'OBD.pages.Oms.NodeConfig.PleaseEnterAccessAccount',
+                        defaultMessage: '请输入访问账号',
                       }),
                     },
                     {
@@ -540,8 +540,8 @@ export default function NodeConfig() {
                     {
                       required: true,
                       message: intl.formatMessage({
-                        id: 'OBD.pages.Oms.ConnectionInfo.Password',
-                        defaultMessage: '密码',
+                        id: 'OBD.pages.Oms.NodeConfig.PleaseEnterPassword',
+                        defaultMessage: '请输入密码',
                       }),
                     },
                   ]}
@@ -630,14 +630,14 @@ export default function NodeConfig() {
                         {
                           required: true,
                           message: intl.formatMessage({
-                            id: 'OBD.pages.Oms.ConnectionInfo.InfluxDbAddress',
-                            defaultMessage: 'InfluxDB 地址',
+                            id: 'OBD.pages.Oms.NodeConfig.PleaseEnterInfluxDbAddress',
+                            defaultMessage: '请输入 InfluxDB 地址',
                           }),
                         }, {
                           pattern: serverReg,
                           message: intl.formatMessage({
-                            id: 'OBD.pages.Oms.ConnectionInfo.InfluxDbAddress',
-                            defaultMessage: 'InfluxDB 地址',
+                            id: 'OBD.pages.Oms.NodeConfig.PleaseEnterCorrectInfluxDbAddress',
+                            defaultMessage: '请输入正确的 InfluxDB 地址',
                           }),
                         }
                       ]}
@@ -657,8 +657,8 @@ export default function NodeConfig() {
                         {
                           required: true,
                           message: intl.formatMessage({
-                            id: 'OBD.pages.Oms.ConnectionInfo.Port',
-                            defaultMessage: '端口',
+                            id: 'OBD.pages.Oms.NodeConfig.PleaseEnterPort',
+                            defaultMessage: '请输入端口',
                           }),
                         },
                       ]}
@@ -682,8 +682,8 @@ export default function NodeConfig() {
                         {
                           required: true,
                           message: intl.formatMessage({
-                            id: 'OBD.pages.Oms.ConnectionInfo.Username',
-                            defaultMessage: '用户名',
+                            id: 'OBD.pages.Oms.NodeConfig.PleaseEnterUsername',
+                            defaultMessage: '请输入用户名',
                           }),
                         }
                       ]}
@@ -702,8 +702,8 @@ export default function NodeConfig() {
                         {
                           required: true,
                           message: intl.formatMessage({
-                            id: 'OBD.pages.Oms.ConnectionInfo.Password',
-                            defaultMessage: '密码',
+                            id: 'OBD.pages.Oms.NodeConfig.PleaseEnterPassword',
+                            defaultMessage: '请输入密码',
                           }),
                         },
                       ]}

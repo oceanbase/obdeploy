@@ -1,7 +1,7 @@
 import { intl } from '@/utils/intl';
 import { message } from 'antd';
 import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import PreCehckComponent from '@/component/PreCheck/preCheck';
 import * as OCP from '@/services/ocp_installer_backend/OCP';

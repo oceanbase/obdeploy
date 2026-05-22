@@ -1,0 +1,94 @@
+groups:
+- name: host-rule
+  rules:
+  - alert: ob_host_disk_percent_over_threshold
+    expr: 100 * (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 97
+    for: 1m
+    labels:
+      instance_type: observer
+      rule_name: ob_host_disk_percent_over_threshold
+      rule_type: builtin
+      severity: warning
+    annotations:
+      summary: "{{ $labels.svr_ip }} {{ $labels.mountpoint }} used percent over threshold "
+      description: "{{ $labels.svr_ip }} {{ $labels.mountpoint }} used percent > {{ $value }}"
+  - alert: ob_host_cpu_percent
+    expr: 100 * (1 - sum(rate(node_cpu_seconds_total{mode="idle"}[60s])) by (instance) / sum(rate(node_cpu_seconds_total[60s])) by (instance)) > 90
+    for: 1m
+    labels:
+      instance_type: observer
+      rule_name: ob_host_cpu_percent
+      rule_type: builtin
+      severity: warning
+    annotations:
+      summary: "{{ $labels.svr_ip }} cpu used percent over threshold "
+      description: "{{ $labels.svr_ip }} cpu_percent > {{ $value }}"
+  - alert: ob_host_mem_percent_over_threshold
+    expr: (1 - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes) / node_memory_MemTotal_bytes) * 100 > 90
+    for: 1m
+    labels:
+      instance_type: observer
+      rule_name: ob_host_mem_percent_over_threshold
+      rule_type: builtin
+      severity: warning
+    annotations:
+      summary: "{{ $labels.svr_ip }} memory used percent over threshold "
+      description: "{{ $labels.svr_ip }} memory_used_percent > {{ $value }}"
+- name: seekdb-rule
+  rules:
+  - alert: seekdb_compaction_error
+    expr: max(seekdb_compaction_is_error{app="seekdb"}) by (svr_ip, svr_port) > 0
+    for: 1m
+    labels:
+      instance_type: seekdb
+      rule_name: seekdb_compaction_error
+      rule_type: builtin
+      severity: critical
+    annotations:
+      description: 'SeekDB compaction error on {{ $labels.svr_ip }}:{{ $labels.svr_port }}.'
+      summary: 'SeekDB compaction error.'
+  - alert: seekdb_log_stream_degraded
+    expr: max(seekdb_log_stream_degraded_count{app="seekdb"}) by (svr_ip, svr_port) > 0
+    for: 1m
+    labels:
+      instance_type: seekdb
+      rule_name: seekdb_log_stream_degraded
+      rule_type: builtin
+      severity: warning
+    annotations:
+      description: 'SeekDB log stream degraded on {{ $labels.svr_ip }}:{{ $labels.svr_port }}.'
+      summary: 'SeekDB log stream degraded.'
+  - alert: seekdb_index_error
+    expr: max(seekdb_index_error_num{app="seekdb"}) by (svr_ip, svr_port) > 0
+    for: 1m
+    labels:
+      instance_type: seekdb
+      rule_name: seekdb_index_error
+      rule_type: builtin
+      severity: warning
+    annotations:
+      description: 'SeekDB has index errors on {{ $labels.svr_ip }}:{{ $labels.svr_port }}.'
+      summary: 'SeekDB index error detected.'
+  - alert: seekdb_active_session_over_threshold
+    expr: sum(seekdb_active_session_num{app="seekdb"}) by (svr_ip, svr_port) > 10000
+    for: 1m
+    labels:
+      instance_type: seekdb
+      rule_name: seekdb_active_session_over_threshold
+      rule_type: builtin
+      severity: warning
+    annotations:
+      description: 'SeekDB has {{ $value }} active sessions on {{ $labels.svr_ip }}:{{ $labels.svr_port }}.'
+      summary: 'Too much active sessions on {{ $labels.svr_ip }}.'
+  - alert: seekdb_disk_percent_over_threshold
+    expr: 100 * avg(seekdb_disk_used_bytes{app="seekdb"}) by (svr_ip, svr_port) / avg(seekdb_disk_total_bytes{app="seekdb"}) by (svr_ip, svr_port) > 95
+    for: 1m
+    labels:
+      instance_type: seekdb
+      rule_name: seekdb_disk_percent_over_threshold
+      rule_type: builtin
+      severity: warning
+    annotations:
+      description: 'SeekDB disk used percent is {{ $value }}% on {{ $labels.svr_ip }}:{{ $labels.svr_port }}.'
+      summary: 'High disk usage detected on {{ $labels.svr_ip }}.'
+

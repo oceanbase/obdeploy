@@ -16,7 +16,7 @@ import {
 } from '@ant-design/pro-components';
 import { Button, Space, Row, Col, Form } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import {
   configServerComponent,
   grafanaComponent,
@@ -213,7 +213,7 @@ export default function ComponentConfig() {
     });
     setComponentsMoreLoading(true);
     try {
-      const { success, data } = await getMoreParamsters({}, { filters });
+      const { success, data } = await getMoreParamsters({ filters });
       if (success) {
         const newComponentsMoreConfig = formatMoreConfig(data?.items);
         setComponentsMoreConfig(newComponentsMoreConfig);
@@ -280,6 +280,8 @@ export default function ComponentConfig() {
         version: components.obagent?.version || obagentComponent,
         release: components.obagent?.release,
         package_hash: components.obagent?.package_hash,
+        // 确保 servers 不被表单空值覆盖
+        servers: components.obagent?.servers || dataSource?.obagent?.servers,
       };
     }
     if (selectedConfig.includes(configServerComponent)) {

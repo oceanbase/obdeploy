@@ -16,7 +16,7 @@ import { PageContainer } from '@oceanbase/ui';
 import { useRequest } from 'ahooks';
 import { find } from 'lodash';
 import React, { useEffect, useState } from 'react';
-import { history, useLocation, useModel } from 'umi';
+import { history, useLocation, useModel } from '@umijs/max';
 import { encrypt } from '@/utils/encrypt';
 import { getPublicKey } from '@/services/ob-deploy-web/Common';
 import ConnectionInfo from './Component/ConnectionInfo';

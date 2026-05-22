@@ -3,7 +3,7 @@ import { Spin, Button, Space } from 'antd';
 import { ZoomInOutlined, ZoomOutOutlined, CompressOutlined, ExpandOutlined, FullscreenOutlined } from '@ant-design/icons';
 import _ from 'lodash';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import { config, registerConfigDataNodes } from './G6register';
 import { createDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
 import { appenAutoShapeListener, addServerIconsToOBProxy, addIconsToZone, addIconsToCluster } from './helper';

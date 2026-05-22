@@ -1319,6 +1319,9 @@ class ClusterTenantCreateStandByCommand(ClusterTenantCreateCommand):
         self.parser.add_option('-d', '--data_backup_uri', type='string',help='The path to the directory where the backups are stored.')
         self.parser.add_option('-a', '--archive_log_uri', type='string',help='The Path to the directory where archive logs are stored.')
         self.parser.add_option('-D', '--decryption', type='string', help='The decryption password for all backups. example: key1,key2,key3')
+        self.parser.add_option('--sync-mode', type='string', help="Primary and backup tenant synchronization mode. Supports 'performance' and 'availability' and 'protection' modes. Defaults: 'performance'.", default='performance')
+        self.parser.add_option('--net-timeout', type='int', help='The maximum available automatic downgrade time, measured in seconds, is set to a default value of 30 seconds, with a range of [10, 1200].')
+        self.parser.add_option('--health-check-time', type='int', help='The maximum available automatic upgrade time, measured in seconds, is set to a default value of 60s.')
 
 
     def init(self, cmd, args):
@@ -1635,6 +1638,25 @@ class ClusterTenantSwitchLogSourceCommand(ClusterMirrorCommand):
             return self._show_help()
 
 
+class ClusterTenantSetSyncModeCommand(ClusterMirrorCommand):
+    def __init__(self):
+        super(ClusterTenantSetSyncModeCommand, self).__init__('set-sync-mode', 'Set primary and standby tenant protection mode')
+        self.parser.add_option('--sync-mode', type='string', help="Primary and standby tenant protection mode. Supports 'performance' and 'availability' and 'protection' modes. Defaults: 'performance'.", default='performance')
+        self.parser.add_option('--net-timeout', type='int', help='The maximum available automatic downgrade time, measured in seconds, is set to a default value of 30 seconds, with a range of [10, 1200].')
+        self.parser.add_option('--health-check-time', type='int', help='The maximum available automatic upgrade time, measured in seconds, is set to a default value of 60s.')
+    
+    def init(self, cmd, args):
+        super(ClusterTenantSetSyncModeCommand, self).init(cmd, args)
+        self.parser.set_usage('%s <standby deploy name> <standby tenant name>' % self.prev_cmd)
+        return self
+    
+    def _do_command(self, obd):
+        if len(self.cmds) == 2:
+            return obd.set_sync_mode(self.cmds[0], self.cmds[1])
+        else:
+            return self._show_help()
+
+
 class ClusterTenantCommand(MajorCommand):
 
     def __init__(self):
@@ -1656,6 +1678,8 @@ class ClusterTenantCommand(MajorCommand):
         self.register_command(ClusterTenantCancelRestoreTaskCommand())
         self.register_command(ClusterTenantRecoverCommand())
         self.register_command(ClusterTenantSwitchLogSourceCommand())
+        self.register_command(ClusterTenantSetSyncModeCommand())
+
 
 
 class ClusterMajorCommand(MajorCommand):

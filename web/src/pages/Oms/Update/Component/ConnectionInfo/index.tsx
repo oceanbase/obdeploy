@@ -6,13 +6,13 @@ import { useRequest } from 'ahooks';
 import { Alert, Button, Col, Input, Table, Tag, Typography } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
 import React, { useEffect } from 'react';
-import { useModel } from 'umi';
-import { getLocale } from 'umi';
+import { useModel } from '@umijs/max';
+import { getLocale } from '@umijs/max';
 import EnStyles from '../../../indexEn.less';
 import ZhStyles from '../../../indexZh.less';
 import CustomFooter from '@/component/CustomFooter';
 import ExitBtn from '@/component/ExitBtn';
-import { creatOmsDeploymentConfig } from '@/services/ob-deploy-web/Deployments';
+import { creatOmsDeploymentConfig } from '@/services/ob-deploy-web/oms';
 import { getErrorInfo } from '@/utils';
 import { encrypt } from '@/utils/encrypt';
 import { getPublicKey } from '@/services/ob-deploy-web/Common';
@@ -44,7 +44,7 @@ export interface ConnectionInfoProps {
   >;
 
   updateInfo: API.connectMetaDB | undefined;
-  upgraadeHosts?: Array<string>;
+  upgradeHosts?: Array<string>;
   allowInputUser: boolean;
 }
 
@@ -59,7 +59,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
     setErrorsList,
     selectedOmsType,
     errorsList,
-    ocpConfigData,
+    omsConfigData,
     omsTakeoverData
   } = useModel('global');
 
@@ -73,7 +73,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
 
 
   // 当前为 OBD ，适用于 oms 升级
-  const OBDUpdate = ocpConfigData?.install_type === 'obd_install'
+  const OBDUpdate = omsConfigData?.install_type === 'obd_install'
 
   const { run: handleCreateConfig, loading: createConfigLoading } = useRequest(
     creatOmsDeploymentConfig,
@@ -192,7 +192,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               defaultMessage: '用户名',
             })}
           >
-            {type === 'install' ? configData?.auth?.username : ocpConfigData?.user}
+            {type === 'install' ? configData?.auth?.username : omsConfigData?.user}
           </ProCard>
           <ProCard
             colSpan={6}
@@ -202,9 +202,9 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
             })}
           >
             {
-              (configData?.auth?.password || ocpConfigData?.password) ?
+              (configData?.auth?.password || omsConfigData?.password) ?
                 <Input.Password
-                  value={configData?.auth?.password || ocpConfigData?.password}
+                  value={configData?.auth?.password || omsConfigData?.password}
                   visibilityToggle={true}
                   readOnly
                   bordered={false}
@@ -220,7 +220,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               defaultMessage: 'SSH 端口',
             })}
           >
-            {type === 'install' ? configData?.auth?.ssh_port : ocpConfigData?.port}
+            {type === 'install' ? configData?.auth?.ssh_port : omsConfigData?.port}
           </ProCard>
           <ProCard
             colSpan={6}
@@ -375,7 +375,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 defaultMessage: 'OMS 访问地址',
               })}
             >
-              {ocpConfigData?.host}
+              {omsConfigData?.host}
             </ProCard>
             <ProCard
               colSpan={18}
@@ -384,7 +384,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 defaultMessage: 'OMS 容器名称',
               })}
             >
-              {ocpConfigData?.container_name}
+              {omsConfigData?.container_name}
             </ProCard>
 
           </ProCard>
@@ -401,7 +401,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 defaultMessage: '访问账号',
               })}
             >
-              {ocpConfigData?.user}
+              {omsConfigData?.user}
             </ProCard>
             <ProCard
               colSpan={6}
@@ -411,7 +411,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
               })}
             >
               <Input.Password
-                value={ocpConfigData?.password}
+                value={omsConfigData?.password}
                 visibilityToggle={true}
                 readOnly
                 bordered={false}
@@ -425,7 +425,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 defaultMessage: '端口',
               })}
             >
-              {ocpConfigData?.port}
+              {omsConfigData?.port}
             </ProCard>
           </ProCard>
         </Col>
@@ -517,7 +517,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                   defaultMessage: '部署名称',
                 })}
               >
-                {type === 'install' ? configData?.appname : ocpConfigData?.cluster_name}
+                {type === 'install' ? configData?.appname : omsConfigData?.cluster_name}
               </ProCard>
             </ProCard>
           </Col>
@@ -677,7 +677,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 })}
               >
                 OMS
-                <Tag style={{ marginLeft: 6 }}>{(type == 'install' ? selectedOmsType?.includes('ce') : ocpConfigData?.version?.includes('ce')) ? intl.formatMessage({
+                <Tag style={{ marginLeft: 6 }}>{(type == 'install' ? selectedOmsType?.includes('ce') : omsConfigData?.version?.includes('ce')) ? intl.formatMessage({
                   id: 'OBD.pages.Oms.ConnectionInfo.CommunityEdition',
                   defaultMessage: '社区版',
                 }) : intl.formatMessage({
@@ -698,8 +698,8 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 <span style={{ whiteSpace: 'nowrap' }}>
                   {
                     type == 'install' ? selectedOmsType?.toUpperCase()
-                      : ocpConfigData?.current_version ?
-                        `V ${ocpConfigData?.current_version?.split('feature_')[1]?.toUpperCase()}` :
+                      : omsConfigData?.current_version ?
+                        `V ${omsConfigData?.current_version?.split('feature_')[1]?.toUpperCase()}` :
                         `V ${omsTakeoverData?.version?.split('feature_')[1]?.toUpperCase()}`}
                 </span>
               </ProCard>
@@ -711,12 +711,12 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                     defaultMessage: '目标版本',
                   })}
                 >
-                  V {ocpConfigData?.version?.split('feature_')[1]?.toUpperCase()}
+                  V {omsConfigData?.version?.split('feature_')[1]?.toUpperCase()}
                 </ProCard>
               }
               {
-                type === 'update' && ocpConfigData?.path &&
-                ocpConfigData?.upgrade_mode === 'online' &&
+                type === 'update' && omsConfigData?.path &&
+                omsConfigData?.upgrade_mode === 'online' &&
                 <ProCard
                   colSpan={6}
                   title={intl.formatMessage({
@@ -727,10 +727,10 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 >
                   <Text
                     ellipsis={{
-                      tooltip: ocpConfigData?.path,
+                      tooltip: omsConfigData?.path,
                     }}
                   >
-                    {ocpConfigData?.path}
+                    {omsConfigData?.path}
                   </Text>
                 </ProCard>
               }
@@ -754,7 +754,7 @@ const ConnectionInfo: React.FC<ConnectionInfoProps> = ({
                 style={{ backgroundColor: '#f8fafe' }}
               >
                 {
-                  ocpConfigData?.upgrade_mode === 'online' ?
+                  omsConfigData?.upgrade_mode === 'online' ?
                     intl.formatMessage({
                       id: 'OBD.pages.Oms.ConnectionInfo.OnlineUpgrade',
                       defaultMessage: '在线升级',

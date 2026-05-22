@@ -1,5 +1,5 @@
 
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import ExitPage from './ExitPage';
 import styles from './index.less';
 import InstallConfig from './InstallConfig';

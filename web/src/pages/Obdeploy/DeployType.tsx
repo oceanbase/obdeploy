@@ -1,7 +1,7 @@
 import { intl } from '@/utils/intl';
 import { useEffect, useState } from 'react';
 import { Space, Card, Tag } from 'antd';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
@@ -69,17 +69,15 @@ export default function DeployType({ value, onChange }: Props) {
       {optionConfig.map((item) => (
         <div className={styles.deployTypeCardContailer} key={item.value}>
           <Card
-            className={`${styles.deployTypeCard} ${
-              value === item.value ? styles.selectedDeployTypeCard : ''
-            }`}
+            className={`${styles.deployTypeCard} ${value === item.value ? styles.selectedDeployTypeCard : ''
+              }`}
             onClick={() => setSelectValue(item.value)}
           >
             {item.label}
           </Card>
           <span
-            className={`${styles.typeDesc} ${
-              value === item.value ? styles.selectedTypeDesc : ''
-            }`}
+            className={`${styles.typeDesc} ${value === item.value ? styles.selectedTypeDesc : ''
+              }`}
           >
             {item.desc}
           </span>

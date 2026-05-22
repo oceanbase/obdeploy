@@ -162,7 +162,8 @@ export default function InstallResultComp({
     });
   };
 
-  const { ocpConfigData } = useModel('global');
+  const { ocpConfigData, deployMode } = useModel('global');
+  const isSeekdb = deployMode === 'seekdb';
   const { components = {} } = ocpConfigData;
   const { oceanbase = {} } = components;
 
@@ -196,7 +197,7 @@ export default function InstallResultComp({
   });
 
   const obConnect = connectInfo?.find((item) =>
-    item.component.includes('oceanbase'),
+    isSeekdb ? item.component === 'seekdb' : item.component.includes('oceanbase'),
   );
 
   const obConnectUrl = obConnect?.connect_url;
@@ -229,10 +230,15 @@ export default function InstallResultComp({
               data-aspm-expo
             >
               {type === ResultType.OBInstall
-                ? intl.formatMessage({
-                  id: 'OBD.pages.components.InstallFinished.OceanbaseSuccessfullyDeployed',
-                  defaultMessage: 'OceanBase 部署成功!',
-                })
+                ? isSeekdb
+                  ? intl.formatMessage({
+                    id: 'OBD.pages.components.InstallFinished.SeekdbDeploymentSucceeded',
+                    defaultMessage: 'seekdb 部署成功!',
+                  })
+                  : intl.formatMessage({
+                    id: 'OBD.pages.components.InstallFinished.OceanbaseSuccessfullyDeployed',
+                    defaultMessage: 'OceanBase 部署成功!',
+                  })
                 : type === ResultType.OmsInstall
                   ? 'OMS 部署成功!'
                   : intl.formatMessage({
@@ -251,10 +257,15 @@ export default function InstallResultComp({
               data-aspm-expo
             >
               {type === ResultType.OBInstall
-                ? intl.formatMessage({
-                  id: 'OBD.pages.components.InstallFinished.OceanbaseDeploymentFailed',
-                  defaultMessage: 'OceanBase 部署失败',
-                })
+                ? isSeekdb
+                  ? intl.formatMessage({
+                    id: 'OBD.pages.components.InstallFinished.SeekdbDeploymentFailed',
+                    defaultMessage: 'seekdb 部署失败',
+                  })
+                  : intl.formatMessage({
+                    id: 'OBD.pages.components.InstallFinished.OceanbaseDeploymentFailed',
+                    defaultMessage: 'OceanBase 部署失败',
+                  })
                 : type === ResultType.OmsInstall
                   ? 'OMS 部署失败'
                   : intl.formatMessage({
@@ -273,11 +284,18 @@ export default function InstallResultComp({
           })}
         >
           <Alert
-            message={intl.formatMessage({
-              id: 'OBD.pages.components.InstallFinished.PleaseKeepTheFollowingAccess',
-              defaultMessage:
-                '请妥善保存以下访问地址及账密信息，OceanBase 未保存账密信息，丢失后无法找回',
-            })}
+            message={
+              isSeekdb && type === ResultType.OBInstall
+                ? intl.formatMessage({
+                  id: 'OBD.pages.components.InstallFinished.SeekdbPleaseKeepAccess',
+                  defaultMessage: '请妥善保存以下访问地址及账密信息，seekdb 未保存账密信息，丢失后无法找回',
+                })
+                : intl.formatMessage({
+                  id: 'OBD.pages.components.InstallFinished.PleaseKeepTheFollowingAccess',
+                  defaultMessage:
+                    '请妥善保存以下访问地址及账密信息，OceanBase 未保存账密信息，丢失后无法找回',
+                })
+            }
             type="info"
             icon={<ExclamationCircleFilled className={styles.alertContent} />}
             showIcon
@@ -384,7 +402,7 @@ export default function InstallResultComp({
               icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
             >
               <Button
-                type="default"
+                type="primary"
                 data-aspm-click="c307514.d317297"
                 data-aspm-desc={intl.formatMessage({
                   id: 'OBD.pages.components.InstallFinished.DeploymentResultDeploymentCompleted',
@@ -393,13 +411,10 @@ export default function InstallResultComp({
                 data-aspm-param={``}
                 data-aspm-expo
               >
-                {intl.formatMessage({
-                  id: 'OBD.pages.components.InstallFinished.B444903C',
-                  defaultMessage: '退出',
-                })}
+                完成
               </Button>
             </Popconfirm>
-            {installStatus === 'SUCCESSFUL' && (
+            {installStatus === 'SUCCESSFUL' && !isSeekdb && (
               <Button type="primary" onClick={() => setOpen(true)}>
                 {intl.formatMessage({
                   id: 'OBD.pages.components.InstallFinished.15AD4E27',

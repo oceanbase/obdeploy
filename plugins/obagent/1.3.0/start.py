@@ -20,7 +20,7 @@ import re
 
 from _errno import WC_OBAGENT_SERVER_NAME_ERROR
 from tool import YamlLoader, FileUtil
-from const import COMPS_OB
+from const import COMPS_OB_AND_SEEKDB, COMP_OB_SEEKDB
 
 stdio = None
 
@@ -43,10 +43,17 @@ def start(plugin_context, is_reinstall=False, *args, **kwargs):
             break
     with FileUtil.open(os.path.join(repository_dir, 'conf/obd_agent_mapper.yaml')) as f:
         config_mapper = yaml.load(f).get('config_mapper', {})
+    if COMP_OB_SEEKDB in cluster_config.depends:
+        config_mapper['monitor_password'] = 'monagent.seekdb.password'
+        config_mapper['monitor_user'] = 'monagent.seekdb.user'
+        if 'seekdb_monitor_status' not in config_mapper:
+            config_mapper['seekdb_monitor_status'] = 'monagent.pipeline.seekdb.status'
     stdio.start_loading('Start obagent')
 
-    for comp in COMPS_OB:
-        if cluster_config.get_depend_config(comp) and plugin_context.get_return('start', comp).get_return('need_bootstrap'):
+    for comp in COMPS_OB_AND_SEEKDB:
+        start_ret = plugin_context.get_return('start', comp)
+        need_bootstrap = start_ret.get_return('need_bootstrap') if start_ret else False
+        if cluster_config.get_depend_config(comp) and need_bootstrap:
             error_servers_list = []
             for server in cluster_config.servers:
                 if not cluster_config.get_depend_config(comp, server):

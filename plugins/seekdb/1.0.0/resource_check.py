@@ -25,6 +25,9 @@ from const import PLATFORM_DARWIN
 
 IS_DARWIN = platform.system() == PLATFORM_DARWIN
 
+# Minimum free space on SeekDB data/clog mounts (start_check / resource_check).
+MIN_SEEKDB_DISK_AVAIL_BYTES = 4 << 30
+
 
 def get_disk_info_by_path(path, client, stdio):
     disk_info = {}
@@ -246,7 +249,23 @@ def resource_check(plugin_context, generate_configs={}, strict_check=False, *arg
             disk[mount_path]['need'] += log_disk_size
             disk[mount_path]['is_clog_disk'] = True
         for p in disk:
+            total_sz = disk[p].get('total') or 0
             avail = disk[p]['avail']
+            if total_sz > 0 and avail < MIN_SEEKDB_DISK_AVAIL_BYTES and (
+                disk[p].get('is_data_disk') or disk[p].get('is_clog_disk')
+            ):
+                for server in ip_servers:
+                    critical(
+                        server,
+                        'disk',
+                        err.EC_SEEKDB_FS_MIN_AVAIL.format(
+                            ip=ip,
+                            mount=p,
+                            avail=str(Capacity(avail)),
+                            min=str(Capacity(MIN_SEEKDB_DISK_AVAIL_BYTES)),
+                        ),
+                        [err.SUG_SEEKDB_FS_MIN_AVAIL.format(min=str(Capacity(MIN_SEEKDB_DISK_AVAIL_BYTES)))],
+                    )
             need = disk[p]['need']
             suggests = []
             if disk[p].get('is_data_disk') and disk[p].get('is_clog_disk'):

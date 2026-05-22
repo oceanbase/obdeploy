@@ -20,7 +20,7 @@ def sync_cluster_config(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
 
-    for comp in ['oceanbase', 'oceanbase-ce']:
+    for comp in ['oceanbase', 'oceanbase-ce', 'seekdb']:
         if comp in cluster_config.depends:
             root_servers = {}
             ob_config = cluster_config.get_depend_config(comp)

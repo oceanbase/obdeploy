@@ -46,6 +46,11 @@ export function getDocs(getLocale) {
   const OBD_STANDALONE_DOCS =
     getLocale() === 'zh-CN' ? OBD_STANDALONE_DOCS_CN : OBD_STANDALONE_DOCS_EN;
 
+  // OBD SEEKDB
+  const SEEKDB_DOCS_CN = 'https://docs.seekdb.ai/seekdb/zh-CN/seekdb-overview/';
+  const SEEKDB_DOCS_EN = 'https://docs.seekdb.ai/seekdb/seekdb-overview/';
+  const SEEKDB_DOCS = getLocale() === 'zh-CN' ? SEEKDB_DOCS_CN : SEEKDB_DOCS_EN;
+
   // OMS
   const OMS_DOCS_CN = 'https://www.oceanbase.com/docs/oms-cn';
   const OMS_DOCS_EN = 'https://en.oceanbase.com/docs/oms-en';
@@ -126,6 +131,7 @@ export function getDocs(getLocale) {
     DOCS_GRAFANA,
     DOCS_PROMETHEUS,
     OBD_STANDALONE_DOCS,
+    SEEKDB_DOCS,
     OMS_DOCS,
   };
 }

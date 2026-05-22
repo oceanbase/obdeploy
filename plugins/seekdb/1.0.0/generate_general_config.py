@@ -59,7 +59,7 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
     generate_random_password = plugin_context.get_variable('generate_random_password')
 
     global_config = cluster_config.get_global_conf()
-    max_syslog_file_count_default = 16
+    max_syslog_file_count_default = 2 if generate_config_mini else 16
     if global_config.get('enable_syslog_wf') is None:
         update_global_conf('enable_syslog_wf', False)
     if global_config.get('max_syslog_file_count') is None:
@@ -71,7 +71,11 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
     MIN_CPU_COUNT = 8
     START_NEED_MEMORY = 3 << 30
 
-    MINI_MEMORY_SIZE = MIN_MEMORY
+    MINI_MEMORY_SIZE = 1 << 30
+    MINI_MEMORY_HARD_LIMIT_BYTES = 4 << 30
+    MINI_DATAFILE_MAXSIZE_BYTES = 20 << 30
+    MINI_LOG_DISK_SIZE_BYTES = 2 << 30
+    # NOTE: keep legacy MINI_* constants for non-mini sizing logic below.
     MINI_DATA_FILE_SIZE = 2 << 30
     MINI_DATA_FILE_NEXT = 2 << 30
     MINI_DATA_FILE_MAX_SIZE = 8 << 30
@@ -93,6 +97,17 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
         dirs["redo_dir"] = server_config['redo_dir'] if server_config.get('redo_dir') else dirs["data_dir"]
         dirs["clog_dir"] = server_config['clog_dir'] if server_config.get('clog_dir') else os.path.join(dirs["redo_dir"], 'clog')
 
+        # mini mode: use fixed minimal disk sizing and avoid generating datafile_size/datafile_next
+        if generate_config_mini:
+            if not user_server_config.get('log_disk_size') and not server_config.get('log_disk_size'):
+                _mini_log_disk_size = str(Capacity(MINI_LOG_DISK_SIZE_BYTES, 0))
+                update_server_conf(server, 'log_disk_size', _mini_log_disk_size)
+                server_config['log_disk_size'] = _mini_log_disk_size
+            if not user_server_config.get('datafile_maxsize') and not server_config.get('datafile_maxsize'):
+                _mini_datafile_maxsize = str(Capacity(MINI_DATAFILE_MAXSIZE_BYTES, 0))
+                update_server_conf(server, 'datafile_maxsize', _mini_datafile_maxsize)
+                server_config['datafile_maxsize'] = _mini_datafile_maxsize
+
         # memory
         auto_set_memory = False
         auto_set_system_memory = False
@@ -104,7 +119,8 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
         if generate_config_mini and '__min_full_resource_pool_memory' not in user_server_config:
             auto_set_min_pool_memory = True
         min_pool_memory = server_config['__min_full_resource_pool_memory']
-        min_memory = max(system_memory, MIN_MEMORY)
+        floor_mem = MINI_MEMORY_SIZE if generate_config_mini else MIN_MEMORY
+        min_memory = max(system_memory, floor_mem)
         if ip not in ip_server_memory_info:
             if IS_DARWIN:
                 ret = client.execute_command('sysctl hw.memsize')
@@ -199,13 +215,16 @@ def generate_general_config(plugin_context, generate_config_mini=False, auto_dep
         else:
             memory_limit = Capacity(server_config.get('memory_limit')).bytes
 
-        if system_memory == 0:
-            auto_set_system_memory = True
-            system_memory = get_system_memory(memory_limit)
-            update_server_conf(server, 'system_memory', str(Capacity(system_memory, 0)))
+        if generate_config_mini and not user_server_config.get('memory_hard_limit'):
+            update_server_conf(
+                server, 'memory_hard_limit', str(Capacity(MINI_MEMORY_HARD_LIMIT_BYTES, 0)))
+
 
         # cpu
-        if not server_config.get('cpu_count'):
+        if generate_config_mini:
+            update_server_conf(server, 'cpu_count', MIN_CPU_COUNT)
+            server_config['cpu_count'] = MIN_CPU_COUNT
+        elif not server_config.get('cpu_count'):
             if IS_DARWIN:
                 ret = client.execute_command("sysctl -n hw.ncpu")
             else:

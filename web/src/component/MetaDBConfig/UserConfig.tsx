@@ -5,7 +5,7 @@ import { ProForm, ProFormDigit } from '@ant-design/pro-components';
 import { Checkbox, Input, Tooltip } from 'antd';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import type { FormInstance } from 'antd/lib/form';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import { nameReg } from '@/utils';
 import { useEffect } from 'react';

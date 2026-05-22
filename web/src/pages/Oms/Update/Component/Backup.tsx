@@ -12,12 +12,11 @@ import {
 import * as OCP from '@/services/ocp_installer_backend/OCP';
 import { CloseCircleOutlined, CheckCircleFilled, ExclamationCircleFilled, InfoCircleOutlined, CheckCircleOutlined, CloseCircleFilled } from '@ant-design/icons';
 import { useRequest } from 'ahooks';;
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import CustomFooter from '@/component/CustomFooter';
 import ExitBtn from '@/component/ExitBtn';
 import { pathRule } from '@/pages/constants';
 import { useEffect, useState } from 'react';
-import { use } from 'i18next';
 
 export default function Backup({
     setCurrent,
@@ -25,12 +24,11 @@ export default function Backup({
     setBackupStatus,
     backupStatus,
     openBackupModal,
-    setOpenBackupModal,
     checkErrorInfo,
     setCheckErrorInfo,
     backupOmsLoading
 }: API.StepProp) {
-    const { ocpConfigData, setOcpConfigData, setErrorVisible, setErrorsList } =
+    const { omsConfigData, setOmsConfigData, setErrorVisible, setErrorsList } =
         useModel('global');
 
     const [form] = ProForm.useForm();
@@ -55,8 +53,8 @@ export default function Backup({
     });
 
     const nextStep = () => {
-        setOcpConfigData({
-            ...ocpConfigData,
+        setOmsConfigData({
+            ...omsConfigData,
             backup_method: backupMethod,
             backup_path: backupPath,
         });
@@ -64,7 +62,7 @@ export default function Backup({
         setCurrent(current + 1);
         setErrorVisible(false);
         setErrorsList([]);
-        setCheckErrorInfo('')
+        setCheckErrorInfo('');
         window.scrollTo(0, 0);
     };
 
@@ -85,7 +83,6 @@ export default function Backup({
                 id: 'OBD.pages.Oms.Update.Component.Backup.WillAutomaticallyEnterUpgrade',
                 defaultMessage: '将自动进入升级',
             }),
-
         },
         {
             status: 'FAILED',
@@ -95,7 +92,6 @@ export default function Backup({
                 defaultMessage: '数据备份失败',
             }),
             progressColor: 'exception',
-            // desc: '网络请求出错，请检查网络。这里显示失败原因,这里显示失败原因这里显示失败原因',
             desc: checkErrorInfo ? checkErrorInfo : intl.formatMessage({
                 id: 'OBD.pages.Oms.Update.Component.Backup.NetworkRequestError',
                 defaultMessage: '网络请求出错，请检查网络。这里显示失败原因,这里显示失败原因这里显示失败原因',
@@ -112,10 +108,12 @@ export default function Backup({
                 id: 'OBD.pages.Oms.Update.Component.Backup.WillAutomaticallyEnterUpgradeAfterBackup',
                 defaultMessage: '备份完成后将自动进入升级, 请耐心等待',
             }),
+        },
+    ];
 
-        }
-    ]
-    const defaultPath = ocpConfigData?.currentUser === 'root' ? '/root/meta_backup_data' : `/home/${ocpConfigData?.currentUser}/oms/meta_backup_data`;
+    const defaultPath = omsConfigData?.currentUser === 'root'
+        ? '/root/meta_backup_data'
+        : `/home/${omsConfigData?.currentUser}/oms/meta_backup_data`;
 
     return (
         <Space style={{ width: '100%' }} direction="vertical" size="middle">
@@ -129,9 +127,7 @@ export default function Backup({
                 style={{ height: 54 }}
             />
             <ProCard>
-                <p
-                    style={{ fontSize: 16, fontWeight: 500 }}
-                >
+                <p style={{ fontSize: 16, fontWeight: 500 }}>
                     {intl.formatMessage({
                         id: 'OBD.pages.Oms.Update.Component.Backup.DataBackup',
                         defaultMessage: '数据备份',
@@ -141,8 +137,8 @@ export default function Backup({
                     form={form}
                     submitter={false}
                     initialValues={{
-                        backup_method: ocpConfigData?.backup_method || 'data_backup',
-                        backup_path: ocpConfigData?.backup_path || defaultPath,
+                        backup_method: omsConfigData?.backup_method || 'data_backup',
+                        backup_path: omsConfigData?.backup_path || defaultPath,
                     }}
                 >
                     <ProForm.Item
@@ -154,21 +150,24 @@ export default function Backup({
                         style={{ width: 343 }}
                         extra={
                             <>
-                                {backupMethod === 'not_backup' ?
+                                {backupMethod === 'not_backup' ? (
                                     <div style={{ color: '#ffac33' }}>
                                         <ExclamationCircleFilled style={{ marginRight: 4 }} />
-                                        <span>{intl.formatMessage({
-                                            id: 'OBD.pages.Oms.Update.Component.Backup.NotRecommendedNoBackup',
-                                            defaultMessage: '不推荐"不备份"，如果 OMS 升级过程异常，可能导致 OMS 服务不可恢复',
-                                        })}</span>
+                                        <span>
+                                            {intl.formatMessage({
+                                                id: 'OBD.pages.Oms.Update.Component.Backup.NotRecommendedNoBackup',
+                                                defaultMessage: '不推荐"不备份"，如果 OMS 升级过程异常，可能导致 OMS 服务不可恢复',
+                                            })}
+                                        </span>
                                     </div>
-                                    :
+                                ) : (
                                     <div>
                                         {intl.formatMessage({
                                             id: 'OBD.pages.Oms.Update.Component.Backup.OnlyBackupKeyMetadata',
                                             defaultMessage: '仅备份影响 OMS 运行的关键元信息数据，该备份方式可能导致 OMS 平台的监控及运维历史数据丢失',
                                         })}
-                                    </div>}
+                                    </div>
+                                )}
                             </>
                         }
                     >
@@ -191,11 +190,11 @@ export default function Backup({
                                         defaultMessage: '不备份',
                                     }),
                                     value: 'not_backup',
-                                }
+                                },
                             ]}
                             onChange={(e) => {
-                                setOcpConfigData({
-                                    ...ocpConfigData,
+                                setOmsConfigData({
+                                    ...omsConfigData,
                                     backup_method: e,
                                 });
                                 form.setFieldsValue({
@@ -204,98 +203,91 @@ export default function Backup({
                             }}
                         />
                     </ProForm.Item>
-                    {
-                        backupMethod === 'data_backup' && (
-                            <div style={{ display: 'flex' }}>
-                                <ProForm.Item
-                                    name={'backup_path'}
-                                    label={intl.formatMessage({
-                                        id: 'OBD.pages.Oms.Update.Component.Backup.BackupPath',
-                                        defaultMessage: '备份路径',
-                                    })}
-                                    style={{ width: 343, marginRight: 8 }}
-                                    rules={[
-                                        {
-                                            required: true,
-                                            message: intl.formatMessage({
-                                                id: 'OBD.pages.Oms.Update.Component.Backup.PleaseEnterBackupPath',
-                                                defaultMessage: '请输入备份路径',
-                                            }),
-                                        },
-                                        pathRule,
-                                    ]}
-                                    extra={
-                                        <>
-                                            {
-
-                                                backupStatus === 'SUCCESSFUL' ?
-                                                    <CheckCircleFilled style={{ color: '#0ac185' }} />
-                                                    : backupStatus === 'FAILED' &&
-                                                    <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
-                                            }
-
-                                            <span
-                                                style={{
-                                                    marginLeft: 4,
-                                                    color: backupStatus === 'FAILED' ? '#ff4d4f' : undefined
-                                                }}>
-                                                {
-                                                    backupStatus === 'SUCCESSFUL' ?
-                                                        intl.formatMessage({
-                                                            id: 'OBD.pages.Oms.Update.Component.Backup.TestPassed',
-                                                            defaultMessage: '校验通过',
-                                                        })
-                                                        : backupStatus === 'FAILED' ?
-                                                            (checkErrorInfo ? checkErrorInfo : intl.formatMessage({
-                                                                id: 'OBD.pages.Oms.Update.Component.Backup.InsufficientPathPermissions',
-                                                                defaultMessage: '当前路径权限不足，请检查路径配置',
-                                                            })) :
-                                                            intl.formatMessage({
-                                                                id: 'OBD.pages.Oms.Update.Component.Backup.SpecifyLocalPath',
-                                                                defaultMessage: '请指定当前 OBD 所在节点的本地路径，保证可用空间至少 2 GiB 以上',
-                                                            })}
-                                            </span>
-                                        </>
-                                    }
-                                >
-                                    <Input
-                                        placeholder={intl.formatMessage({
+                    {backupMethod === 'data_backup' && (
+                        <div style={{ display: 'flex' }}>
+                            <ProForm.Item
+                                name={'backup_path'}
+                                label={intl.formatMessage({
+                                    id: 'OBD.pages.Oms.Update.Component.Backup.BackupPath',
+                                    defaultMessage: '备份路径',
+                                })}
+                                style={{ width: 343, marginRight: 8 }}
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: intl.formatMessage({
                                             id: 'OBD.pages.Oms.Update.Component.Backup.PleaseEnterBackupPath',
                                             defaultMessage: '请输入备份路径',
-                                        })}
-                                    />
-                                </ProForm.Item>
-                                <ProForm.Item label={<br />}>
-                                    <Button
-
-                                        onClick={() => {
-                                            setCheckErrorInfo('')
-                                            backupOms({ backup_path: backupPath, pre_check: true });
-                                            setOcpConfigData({
-                                                ...ocpConfigData,
-                                                backup_method: backupMethod,
-                                                backup_path: backupPath,
-                                            })
-                                        }}
-                                    >
-                                        {intl.formatMessage({
-                                            id: 'OBD.pages.Oms.Update.Component.Backup.Test',
-                                            defaultMessage: '校验',
-                                        })}
-                                    </Button>
-                                </ProForm.Item>
-                            </div>
-                        )
-                    }
-
+                                        }),
+                                    },
+                                    pathRule,
+                                ]}
+                                extra={
+                                    <>
+                                        {backupStatus === 'SUCCESSFUL' ? (
+                                            <CheckCircleFilled style={{ color: '#0ac185' }} />
+                                        ) : backupStatus === 'FAILED' && (
+                                            <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                                        )}
+                                        <span
+                                            style={{
+                                                marginLeft: 4,
+                                                color: backupStatus === 'FAILED' ? '#ff4d4f' : undefined,
+                                            }}
+                                        >
+                                            {backupStatus === 'SUCCESSFUL'
+                                                ? intl.formatMessage({
+                                                    id: 'OBD.pages.Oms.Update.Component.Backup.TestPassed',
+                                                    defaultMessage: '校验通过',
+                                                })
+                                                : backupStatus === 'FAILED'
+                                                    ? (checkErrorInfo ? checkErrorInfo : intl.formatMessage({
+                                                        id: 'OBD.pages.Oms.Update.Component.Backup.InsufficientPathPermissions',
+                                                        defaultMessage: '当前路径权限不足，请检查路径配置',
+                                                    }))
+                                                    : intl.formatMessage({
+                                                        id: 'OBD.pages.Oms.Update.Component.Backup.SpecifyLocalPath',
+                                                        defaultMessage: '请指定当前 OBD 所在节点的本地路径，保证可用空间至少 2 GiB 以上',
+                                                    })}
+                                        </span>
+                                    </>
+                                }
+                            >
+                                <Input
+                                    placeholder={intl.formatMessage({
+                                        id: 'OBD.pages.Oms.Update.Component.Backup.PleaseEnterBackupPath',
+                                        defaultMessage: '请输入备份路径',
+                                    })}
+                                />
+                            </ProForm.Item>
+                            <ProForm.Item label={<br />}>
+                                <Button
+                                    onClick={() => {
+                                        setCheckErrorInfo('');
+                                        backupOms({ backup_path: backupPath, pre_check: true });
+                                        setOmsConfigData({
+                                            ...omsConfigData,
+                                            backup_method: backupMethod,
+                                            backup_path: backupPath,
+                                        });
+                                    }}
+                                >
+                                    {intl.formatMessage({
+                                        id: 'OBD.pages.Oms.Update.Component.Backup.Test',
+                                        defaultMessage: '校验',
+                                    })}
+                                </Button>
+                            </ProForm.Item>
+                        </div>
+                    )}
                 </ProForm>
             </ProCard>
             <Modal
                 title={
                     <>
                         <Space style={{ fontSize: 16, fontWeight: 500 }}>
-                            {backupStatusList.find(item => item.status === backupStatus)?.icon}
-                            <span> {backupStatusList.find(item => item.status === backupStatus)?.text}</span>
+                            {backupStatusList.find((item) => item.status === backupStatus)?.icon}
+                            <span> {backupStatusList.find((item) => item.status === backupStatus)?.text}</span>
                         </Space>
                     </>
                 }
@@ -305,7 +297,7 @@ export default function Backup({
                 width={424}
             >
                 <div style={{ color: '#5c6b8a', marginBottom: 8, marginLeft: 24 }}>
-                    {backupStatusList.find(item => item.status === backupStatus)?.desc}
+                    {backupStatusList.find((item) => item.status === backupStatus)?.desc}
                 </div>
                 <Spin
                     spinning={backupOmsLoading}
@@ -320,7 +312,7 @@ export default function Backup({
                         defaultMessage: '上一步',
                     })}
                 </Button>
-                <Button type="primary" onClick={nextStep} >
+                <Button type="primary" onClick={nextStep}>
                     {intl.formatMessage({
                         id: 'OBD.component.ConnectConfig.NextStep',
                         defaultMessage: '下一步',

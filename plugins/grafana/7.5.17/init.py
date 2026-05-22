@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function
 import os
 from tool import OrderedDict
 from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
+from const import COMP_OB_SEEKDB
 
 stdio = None
 force = False
@@ -112,9 +113,11 @@ def init(plugin_context, source_option=None, *args, **kwargs):
 
         dashboard_template_path = os.path.join(home_path, 'conf/provisioning/dashboards/templates')
         if client.execute_command('bash -c "mkdir -p %s"' % dashboard_template_path):
-            file_name = 'oceanbase-metrics_rev1.json'
-            ob_dashboard = os.path.join(os.path.split(__file__)[0], file_name)
-            client.put_file(ob_dashboard, os.path.join(dashboard_template_path, file_name))
+            deploy_components = cluster_config._deploy_config.components if getattr(cluster_config, '_deploy_config', None) else {}
+            is_seekdb_deploy = COMP_OB_SEEKDB in deploy_components
+            file_name = 'seekdb-metrics_rev1.json' if is_seekdb_deploy else 'oceanbase-metrics_rev1.json'
+            dashboard = os.path.join(os.path.split(__file__)[0], file_name)
+            client.put_file(dashboard, os.path.join(dashboard_template_path, file_name))
         else:
             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='conf/provisioning/dashboards/templates', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=dashboard_template_path)))
             continue

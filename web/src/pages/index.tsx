@@ -1,4 +1,4 @@
-import { getLocale, history } from 'umi';
+import { getLocale, history } from '@umijs/max';
 import { intl } from '@/utils/intl';
 import NP from 'number-precision';
 import videojs from 'video.js';

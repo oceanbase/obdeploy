@@ -297,6 +297,17 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
       });
       if (tempConfig.obagent) {
         tempConfig.obagent.servers = selectedCluster?.ob_servers || [];
+        // 如果 obagent 的 release 为空，从 componentsList 中找到对应记录进行兼容
+        if (!tempConfig.obagent.release) {
+          const obagentInfo = componentsList?.component_list?.find(
+            (item) => item.component_name === obagentComponent,
+          );
+          if (obagentInfo?.component_info?.[0]?.release) {
+            tempConfig.obagent.release = obagentInfo.component_info[0].release;
+            tempConfig.obagent.version = obagentInfo.component_info[0].version || tempConfig.obagent.version;
+            tempConfig.obagent.package_hash = obagentInfo.component_info[0].md5 || tempConfig.obagent.package_hash;
+          }
+        }
       }
       setComponentConfig({
         ...tempConfig,

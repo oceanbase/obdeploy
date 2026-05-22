@@ -1,6 +1,6 @@
 import { intl } from '@/utils/intl';
 import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel, history } from '@umijs/max';
 import { Modal, Progress, message } from 'antd';
 import { getDestroyTaskInfo } from '@/services/ob-deploy-web/Deployments';
 import useRequest from '@/utils/useRequest';
@@ -8,7 +8,7 @@ import { checkLowVersion, getErrorInfo } from '@/utils';
 import { formatConfigData } from '@/utils/helper';
 import NP from 'number-precision';
 import { oceanbaseComponent, obproxyComponent } from '../constants';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 
@@ -51,6 +51,8 @@ export default function DeleteDeployModal({
     setErrorVisible,
     setErrorsList,
     errorsList,
+    deployMode,
+    setCurrentStep,
   } = useModel('global');
 
   const [status, setStatus] = useState('RUNNING');
@@ -91,6 +93,15 @@ export default function DeleteDeployModal({
 
             stepNum += 1;
           }, 10);
+          if (deployMode === 'seekdb') {
+            setTimeout(() => {
+              onCancel();
+              setCurrentStep(1);
+              history.push('/obdeploy');
+            }, 2000);
+            setStatus(data?.status);
+            return;
+          }
           try {
             const { success: nameSuccess, data: nameData } =
               await getInfoByName({ name });
@@ -197,6 +208,14 @@ export default function DeleteDeployModal({
       }, 1000);
     }
   }, [status]);
+
+  useEffect(() => {
+    if (isFinished && status === 'SUCCESSFUL') {
+      setTimeout(() => {
+        onCancel();
+      }, 1500);
+    }
+  }, [isFinished]);
 
   return (
     <Modal

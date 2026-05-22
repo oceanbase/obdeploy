@@ -6,7 +6,7 @@ import useRequest, { requestPipeline } from '@/utils/useRequest';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { Modal } from 'antd';
 import { useEffect, useState } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import ClusterConfig from './ClusterConfig';
 import ExitPage from './ExitPage';
 import styles from './index.less';
@@ -14,12 +14,9 @@ import InstallConfig from './InstallConfig';
 import InstallFinished from './InstallFinished';
 import InstallProcess from './InstallProcess';
 import NodeConfig from './NodeConfig';
-import PreCheck from './PreCheck';
 import ProgressQuit from './ProgressQuit';
 import Steps from './Steps';
 import PreCheckStatus from './PreCheckStatus';
-import CheckInfo from './CheckInfo';
-import TopoComponent from './TopoComponent';
 import TopoCheck from './TopoCheck';
 
 export default function IndexPage() {
@@ -38,10 +35,11 @@ export default function IndexPage() {
     token,
     setToken,
     aliveTokenTimer,
+    deployMode,
+    setDeployMode,
   } = useModel('global');
   const [isInstall, setIsInstall] = useState(false);
 
-  const [deployMode, setDeployMode] = useState('distributed');
   const { run: fetchDeploymentInfo } = useRequest(getDeployment, {
     onError: (e: any) => {
       const errorInfo = getErrorInfo(e);
@@ -128,7 +126,7 @@ export default function IndexPage() {
     2: <NodeConfig
       deployMode={deployMode}
     />,
-    3: <ClusterConfig />,
+    3: <ClusterConfig deployMode={deployMode} />,
     4: <TopoCheck
       deployMode={deployMode}
     />,
@@ -188,7 +186,7 @@ export default function IndexPage() {
       className={`${styles.container} ${locale !== 'zh-CN' ? styles.englishContainer : ''
         }`}
     >
-      <Steps />
+      <Steps deployMode={deployMode} />
       <div className={styles.pageContainer} style={containerStyle}>
         <main className={styles.pageMain}>
           <div className={styles.pageContent}>{contentConfig[currentStep]}</div>

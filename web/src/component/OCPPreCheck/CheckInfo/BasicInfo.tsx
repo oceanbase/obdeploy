@@ -1,7 +1,7 @@
 import { intl } from '@/utils/intl';
 import { Row, Col, Tag, Tooltip } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 
 import type { BasicInfoProp } from './type';
 import styles from './index.less';

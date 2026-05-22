@@ -2,7 +2,7 @@ import { intl } from '@/utils/intl';
 import { ProForm } from '@ant-design/pro-components';
 import { Button, message, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import { getTailPath } from '@/utils/helper';
 import CustomFooter from '../CustomFooter';

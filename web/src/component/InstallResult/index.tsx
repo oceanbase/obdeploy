@@ -28,7 +28,7 @@ import { Alert, Modal, Spin } from 'antd';
 import type { ResultProps } from 'antd/es/result';
 import { isEmpty } from 'lodash';
 import React, { useEffect, useState } from 'react';
-import { history, useModel } from 'umi';
+import { history, useModel } from '@umijs/max';
 import CustomFooter from '../CustomFooter';
 import ExitBtn from '../ExitBtn';
 import styles from './index.less';

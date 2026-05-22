@@ -28,7 +28,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { flattenDeep, } from 'lodash';
 import { useEffect, useRef, useState } from 'react';
-import { getLocale, history, useModel } from 'umi';
+import { getLocale, history, useModel } from '@umijs/max';
 import {
   commonSelectStyle,
   pathRule,

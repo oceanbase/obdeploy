@@ -12,7 +12,7 @@ import { PageContainer } from '@oceanbase/ui';
 import { useRequest } from 'ahooks';
 import { find, isEmpty } from 'lodash';
 import React, { useEffect, useState } from 'react';
-import { useLocation, useModel } from 'umi';
+import { useLocation, useModel } from '@umijs/max';
 import ConnectionInfo from './Component/ConnectionInfo';
 import UpdatePreCheck from './Component/UpdatePreCheck';
 import InstallFinished from '../InstallFinished';
@@ -27,14 +27,14 @@ const Update: React.FC = () => {
     installResult,
     setConnectId,
   } = useModel('ocpInstallData');
-  const { ocpConfigData } = useModel('global');
+  const { omsConfigData } = useModel('global');
   const [current, setCurrent] = useState(step ? Number(step) : -1);
   const [backupStatus, setBackupStatus] = useState('INIT');
   const [openBackupModal, setOpenBackupModal] = useState(false);
   const [checkErrorInfo, setCheckErrorInfo] = useState<string>('');
 
-  const cluster_name = ocpConfigData?.cluster_name;
-  const version = ocpConfigData?.version;
+  const clusterName = omsConfigData?.cluster_name;
+  const version = omsConfigData?.version;
 
   // 发起 oms 的预检查
   const {
@@ -46,7 +46,7 @@ const Update: React.FC = () => {
     onSuccess: (res) => {
       if (res?.success) {
         getOmsUpgradePrecheckTask({
-          cluster_name,
+          cluster_name: clusterName,
           task_id: res?.data?.id,
         });
       }
@@ -98,7 +98,7 @@ const Update: React.FC = () => {
     },
   });
 
-  const offlineUpgrade = ocpConfigData?.upgrade_mode === 'offline' && current === 0;
+  const offlineUpgrade = omsConfigData?.upgrade_mode === 'offline' && current === 0;
 
   const {
     run: backupOms,
@@ -109,12 +109,12 @@ const Update: React.FC = () => {
       if (res?.data?.success) {
         setOpenBackupModal(false);
         setBackupStatus('SUCCESSFUL');
-        if (cluster_name && version) {
+        if (clusterName && version) {
           upgradeOms({
-            cluster_name,
+            cluster_name: clusterName,
             version,
-            image_name: ocpConfigData?.image_name,
-            upgrade_mode: ocpConfigData?.upgrade_mode,
+            image_name: omsConfigData?.image_name,
+            upgrade_mode: omsConfigData?.upgrade_mode,
           });
         }
       } else {
@@ -135,7 +135,7 @@ const Update: React.FC = () => {
         break;
       // 预检查
       case 1:
-        precheckOmsUpgrade({ cluster_name, default_oms_files_path: offlineUpgrade ? '' : ocpConfigData?.path });
+        precheckOmsUpgrade({ cluster_name: clusterName, default_oms_files_path: offlineUpgrade ? '' : omsConfigData?.path });
         setCurrent(current + 1)
         break;
       // 备份
@@ -144,20 +144,20 @@ const Update: React.FC = () => {
         break;
       // 升级部署
       case 3:
-        if (ocpConfigData?.backup_method === 'data_backup') {
+        if (omsConfigData?.backup_method === 'data_backup') {
           setBackupStatus('RUNNING');
           setOpenBackupModal(true);
           backupOms({
-            backup_path: ocpConfigData?.backup_path,
+            backup_path: omsConfigData?.backup_path,
             pre_check: false
           })
-        } else if (ocpConfigData?.backup_method === 'not_backup') {
-          if (cluster_name && version) {
+        } else if (omsConfigData?.backup_method === 'not_backup') {
+          if (clusterName && version) {
             upgradeOms({
-              cluster_name,
+              cluster_name: clusterName,
               version,
-              image_name: ocpConfigData?.image_name,
-              upgrade_mode: ocpConfigData?.upgrade_mode,
+              image_name: omsConfigData?.image_name,
+              upgrade_mode: omsConfigData?.upgrade_mode,
             });
           }
         }
@@ -305,7 +305,7 @@ const Update: React.FC = () => {
                         disabled={
                           (current === 1 &&
                             omsUpgradePrecheckTask?.task_info?.result !== 'SUCCESSFUL')
-                          || (current === 2 && backupStatus !== 'SUCCESSFUL' && ocpConfigData?.backup_method === 'data_backup')
+                          || (current === 2 && backupStatus !== 'SUCCESSFUL' && omsConfigData?.backup_method === 'data_backup')
                         }
                         type="primary"
                         loading={

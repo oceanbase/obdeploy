@@ -4,7 +4,7 @@ import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { message, Modal, notification } from 'antd';
 import type { FormInstance } from 'antd/lib/form';
 import RandExp from 'randexp';
-import { getLocale, history } from 'umi';
+import { getLocale, history } from '@umijs/max';
 import validator from 'validator';
 import { SPECIAL_SYMBOLS_OCP } from './helper';
 
@@ -118,6 +118,7 @@ export const checkLowVersion = (version: string) => {
 };
 
 export const getErrorInfo = ({ response, data, type, errorPipeline }: any) => {
+  console.log('response, data, type, errorPipeline ', response, data, type, errorPipeline)
   sessionStorage.removeItem('componentSelect');
   if (errorPipeline?.length >= 5) {
     return {
@@ -137,18 +138,6 @@ export const getErrorInfo = ({ response, data, type, errorPipeline }: any) => {
       title: intl.formatMessage({
         id: 'OBD.src.utils.NetworkTimeout',
         defaultMessage: '网络超时',
-      }),
-      desc: intl.formatMessage({
-        id: 'OBD.src.utils.YourNetworkIsAbnormalAnd',
-        defaultMessage: '您的网络发生异常，无法连接服务器',
-      }),
-    };
-  }
-  if (!response) {
-    return {
-      title: intl.formatMessage({
-        id: 'OBD.src.utils.NetworkException',
-        defaultMessage: '网络异常',
       }),
       desc: intl.formatMessage({
         id: 'OBD.src.utils.YourNetworkIsAbnormalAnd',

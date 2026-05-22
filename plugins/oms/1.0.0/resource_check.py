@@ -17,7 +17,31 @@ from __future__ import absolute_import, division, print_function
 from _types import Capacity
 
 import _errno as err
-from tool import get_port_socket_inode
+from tool import check_environment_work_dir, get_port_socket_inode
+
+
+def _oms_data_paths(server_config):
+    logs_path = server_config.get('logs_mount_path')
+    run_path = server_config.get('run_mount_path')
+    store_path = server_config.get('store_mount_path')
+    home_path = server_config.get('home_path')
+    if logs_path or run_path or store_path:
+        raw = [logs_path, run_path, store_path]
+    else:
+        raw = [server_config.get('mount_path')]
+    if home_path:
+        raw = raw + [home_path]
+    out = []
+    seen = set()
+    for p in raw:
+        if not p:
+            continue
+        p = str(p).strip()
+        if not p or p in seen:
+            continue
+        seen.add(p)
+        out.append(p)
+    return out
 
 
 def resource_check(plugin_context, work_dir_check=False, *args, **kwargs):
@@ -30,6 +54,7 @@ def resource_check(plugin_context, work_dir_check=False, *args, **kwargs):
     if plugin_context.get_variable('resource_check_pass'):
         for server in cluster_config.servers:
             check_pass(server, 'port')
+            check_pass(server, 'dir_perm')
         return plugin_context.return_true()
 
     for server in cluster_config.servers:
@@ -63,6 +88,26 @@ def resource_check(plugin_context, work_dir_check=False, *args, **kwargs):
                     [err.SUG_USE_OTHER_PORT.format()]
                 )
         check_pass(server, 'port')
+
+        data_paths = _oms_data_paths(server_config)
+        if not data_paths:
+            critical(
+                server,
+                'dir_perm',
+                err.EC_OMS_DATA_DIR_ACCESS.format(server=server, path='mount_path'),
+                [err.SUG_OMS_DATA_DIR_PERMISSION.format()],
+            )
+        else:
+            dir_perm_ok = True
+            for path in data_paths:
+                dir_err = check_environment_work_dir(
+                    client, server, path, key=path, work_dir_empty_check=True)
+                if dir_err is not None:
+                    dir_perm_ok = False
+                    critical(server, 'dir_perm', dir_err, [err.SUG_OMS_DATA_DIR_PERMISSION.format()])
+                    break
+            if dir_perm_ok:
+                check_pass(server, 'dir_perm')
 
         default_cpu_count = client.execute_command("grep -e 'processor\s*:' /proc/cpuinfo | wc -l").stdout.strip()
         if not default_cpu_count or (int(default_cpu_count) < 9):

@@ -536,6 +536,13 @@ export const connectInfoForPwd = (
       item.password = components.oceanbase?.root_password;
       item.connect_url = insertPwd(item.connect_url, item.password);
     }
+    // seekdb 模式下， seekdb 组件的密码取自 oceanbase.root_password
+    if (item.component === 'seekdb') {
+      item.password = components.oceanbase?.root_password;
+      if (item.connect_url) {
+        item.connect_url = insertPwd(item.connect_url, item.password);
+      }
+    }
     if (item.component === 'obproxy-ce'|| item.component === 'obproxy') {
       if (components.obproxy.obproxy_sys_password) {
         item.password = components.obproxy.obproxy_sys_password;

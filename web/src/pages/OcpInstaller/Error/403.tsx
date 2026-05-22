@@ -1,4 +1,4 @@
-import { history } from 'umi';
+import { history } from '@umijs/max';
 import { intl } from '@/utils/intl';
 import React from 'react';
 import AobException from '@/component/AobException';

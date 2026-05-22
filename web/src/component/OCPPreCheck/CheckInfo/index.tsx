@@ -8,7 +8,7 @@ import { intl } from '@/utils/intl';
 import useRequest from '@/utils/useRequest';
 import { ProCard } from '@ant-design/pro-components';
 import { Button, Row, Space } from 'antd';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import CustomFooter from '../../CustomFooter';
 import { formatPreCheckData } from '../helper';
 import styles from '../index.less';

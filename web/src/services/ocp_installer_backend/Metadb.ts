@@ -1,6 +1,6 @@
 /* eslint-disable */
 // 该文件由 OneAPI 自动生成，请勿手动修改！
-import { request } from 'umi';
+import { request } from '@umijs/max';
 
 /** list_metadb_deployments list metadb deployments GET /api/v1/metadb/deployments */
 export async function listMetadbDeployments(options?: { [key: string]: any }) {

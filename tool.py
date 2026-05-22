@@ -1241,6 +1241,51 @@ def get_option(options, key, default=''):
     return value
 
 
+def check_environment_work_dir(client, server, path, key='path', work_dir_empty_check=True):
+    """
+    Same directory checks as plugins/oceanbase/*/environment_check.py (work_dir branch):
+    bash -c \"[ -a path ]\", then [ -d ], [ -w ], and optional ls empty; if path missing,
+    walk up with os.path.dirname and disable empty_check (identical to OceanBase loop body).
+    Returns None if OK, else _errno.EC_FAIL_TO_INIT_PATH (formatted OBDErrorCode).
+    """
+    original_path = path
+    current = path
+    empty_check = work_dir_empty_check
+    while True:
+        if not current:
+            return _errno.EC_FAIL_TO_INIT_PATH.format(
+                server=server,
+                key=key,
+                msg=_errno.InitDirFailedErrorMessage.PATH_ONLY.format(path=original_path),
+            )
+        if client.execute_command('bash -c "[ -a %s ]"' % current):
+            is_dir = client.execute_command('[ -d {} ]'.format(current))
+            has_write_permission = client.execute_command('[ -w {} ]'.format(current))
+            if is_dir and has_write_permission:
+                if empty_check:
+                    ret = client.execute_command('ls %s' % current)
+                    if not ret or ret.stdout.strip():
+                        return _errno.EC_FAIL_TO_INIT_PATH.format(
+                            server=server,
+                            key=key,
+                            msg=_errno.InitDirFailedErrorMessage.NOT_EMPTY.format(path=current),
+                        )
+                return None
+            if not is_dir:
+                return _errno.EC_FAIL_TO_INIT_PATH.format(
+                    server=server,
+                    key=key,
+                    msg=_errno.InitDirFailedErrorMessage.NOT_DIR.format(path=current),
+                )
+            return _errno.EC_FAIL_TO_INIT_PATH.format(
+                server=server,
+                key=key,
+                msg=_errno.InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=current),
+            )
+        current = os.path.dirname(current)
+        empty_check = False
+
+
 def get_port_socket_inode(client, port, stdio=GetStdio.stdio()):
     port = hex(port)[2:].zfill(4).upper()
     cmd = "bash -c 'cat /proc/net/{tcp*,udp*}' | awk -F' ' '{if($4==\"0A\") print $2,$4,$10}' | grep ':%s' | awk -F' ' '{print $3}' | uniq" % port

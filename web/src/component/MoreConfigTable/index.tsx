@@ -166,7 +166,12 @@ export default function MoreConfigTable({
   }, [configserverAddressFormValue, configserverPortFormValue]);
   return (
     <>
-      <div style={{ height: 24, display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+        onClick={() => {
+          setShow(!show);
+          switchOnChange(!show);
+        }}
+      >
         <Space
           size={8}
           style={{
@@ -174,19 +179,16 @@ export default function MoreConfigTable({
             fontWeight: 500,
             fontSize: 16,
             lineHeight: '24px',
-          }}
-          onClick={() => {
-            setShow(!show);
-            switchOnChange(!show);
+            whiteSpace: 'nowrap',
           }}
         >
           {show ? <CaretDownOutlined /> : <CaretRightOutlined />}
-          <div>
+          <span>
             {intl.formatMessage({
               id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
               defaultMessage: '更多配置',
             })}
-          </div>
+          </span>
         </Space>
       </div>
       <ConfigTable

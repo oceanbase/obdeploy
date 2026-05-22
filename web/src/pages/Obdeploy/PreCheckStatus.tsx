@@ -9,7 +9,7 @@ import { getErrorInfo } from '@/utils';
 import { intl } from '@/utils/intl';
 import { message } from 'antd';
 import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 
 import PreCehckComponent from '@/component/PreCheck/preCheck';
 import { getPublicKey } from '@/services/ob-deploy-web/Common';
@@ -43,9 +43,13 @@ export default function PreCheckStatus() {
     scenarioParam,
     errorsList,
     ERR_CODE,
+    deployMode,
+    clusterMore,
   } = useModel('global');
+  const seekdb = deployMode === 'seekdb';
   const oceanbase = configData?.components?.oceanbase;
-  const name = configData?.components?.oceanbase?.appname;
+  const seekdbConfig = (configData?.components as any)?.seekdb;
+  const name = oceanbase?.appname || seekdbConfig?.appname;
   const [statusData, setStatusData] = useState<API.PreCheckResult>({});
   const [failedList, setFailedList] = useState<API.PreCheckInfo[]>([]);
   const [showFailedList, setShowFailedList] = useState<API.PreCheckInfo[]>([]);
@@ -72,18 +76,7 @@ export default function PreCheckStatus() {
             fetchPreCheckStatus({ name });
           }, 1000);
         }
-        if (data?.status === 'FAILED') {
-          let errorInfo: API.ErrorInfo = {
-            title: intl.formatMessage({
-              id: 'OBD.pages.components.PreCheckStatus.RequestError',
-              defaultMessage: '请求错误',
-            }),
-            desc: data?.message,
-          };
-          setErrorVisible(true);
-          setErrorsList([...errorsList, errorInfo]);
-          setCheckStatus(false);
-        } else {
+        if (data?.status !== 'RUNNING') {
           if (data?.all_passed) {
             setFailedList([]);
             setShowFailedList([]);
@@ -104,32 +97,6 @@ export default function PreCheckStatus() {
           setCheckFinished(isFinished);
           if (isFinished) {
             clearTimeout(timer);
-          }
-          if (!isScroll && !isFinished) {
-            setTimeout(() => {
-              const timelineContainer =
-                document.getElementById('timeline-container');
-              const runningItemDom = document.getElementById(
-                'running-timeline-item',
-              );
-
-              timelineContainer.scrollTop = NP.minus(
-                NP.strip(runningItemDom?.offsetTop),
-                150,
-              );
-            }, 10);
-          }
-
-          if (!isScrollFailed && !isFinished && failedList) {
-            setTimeout(() => {
-              const failedContainer =
-                document.getElementById('failed-container');
-              if (failedContainer) {
-                failedContainer.scrollTop = NP.strip(
-                  failedContainer?.scrollHeight,
-                );
-              }
-            }, 10);
           }
           setCheckStatus(true);
         }
@@ -238,8 +205,8 @@ export default function PreCheckStatus() {
     setLoading(true);
     const { data: publicKey } = await getPublicKey();
     handleCreateConfig(
-      { name: oceanbase?.appname },
-      formatConfigData(params, scenarioParam, publicKey),
+      { name: oceanbase?.appname || seekdbConfig?.appname },
+      formatConfigData(params, seekdb ? null : scenarioParam, publicKey, seekdb, clusterMore),
     );
   };
 
@@ -274,12 +241,18 @@ export default function PreCheckStatus() {
                 components: {
                   ...config?.components,
                   // 保留组件密码和必需字段，采用更可靠的密码恢复策略
-                  oceanbase: {
+                  oceanbase: config?.components?.oceanbase ? {
                     ...config?.components?.oceanbase,
                     // 优先使用原配置中的密码
                     root_password: configData?.components?.oceanbase?.root_password ||
                       config?.components?.oceanbase?.root_password,
-                  },
+                  } : config?.components?.oceanbase,
+                  // seekdb 模式：恢复 seekdb 对象密码
+                  seekdb: (config?.components as any)?.seekdb ? {
+                    ...(config?.components as any)?.seekdb,
+                    root_password: seekdbConfig?.root_password ||
+                      (config?.components as any)?.seekdb?.root_password,
+                  } : (config?.components as any)?.seekdb,
                   grafana: config?.components?.grafana ? {
                     ...config?.components?.grafana,
                     // 优先使用原配置中的密码
@@ -390,6 +363,7 @@ export default function PreCheckStatus() {
   }, []);
   return (
     <PreCehckComponent
+      type="Component"
       checkFinished={checkFinished}
       checkStatus={checkStatus}
       preCheckLoading={preCheckLoading}

@@ -19,7 +19,7 @@ import { ProCard } from '@ant-design/pro-components';
 import { Alert, Button, Col, Input, Row, Space, Table, TabsProps, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import {
   alertManagerComponent,
   allComponentsKeys,
@@ -35,6 +35,7 @@ import {
   oceanbaseStandaloneComponent,
   onlyComponentsKeys,
   prometheusComponent,
+  seekdbComponent
 } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
@@ -52,33 +53,85 @@ export const formatConfigData = (
   configData: API.DeploymentConfig,
   scenarioParam: any,
   publicKey: string,
+  isSeekdb: boolean = false,
+  clusterMore: boolean = true,
 ) => {
   const formatedConfigData = encryptPwdForConfig(configData, publicKey);
   let isOBConfig = false;
   const _configData = formatedConfigData.components || formatedConfigData;
   if (formatedConfigData.components) isOBConfig = true;
+
+  // seekdb 模式：将 oceanbase 字段数据按后端 Seekdb 模型结构转换
+  if (isSeekdb && _configData.oceanbase) {
+    const {
+      rpc_port,
+      topology,
+      parameters: obParameters,
+      mode,
+      appname,
+      component,
+      ...restOceanbase
+    } = _configData.oceanbase as any;
+
+    // 从 topology 中提取所有 IP 地址平铺到 seekdb.servers
+    const servers: string[] = (topology || []).flatMap(
+      (zone: any) => (zone.servers || []).map((s: any) => (typeof s === 'string' ? s : s.ip))
+    );
+
+    _configData.seekdb = {
+      ...restOceanbase,
+      // component 为后端必填字段，seekdb 模式下固定为 'seekdb'
+      component: component,
+      ...(servers.length ? { servers } : {}),
+      ...(mode ? { mode } : {}),
+      // seekdb 模式始终带上 parameters 字段；用户改动过的项才入内，未改动时发空数组
+      parameters: (clusterMore && obParameters?.length)
+        ? obParameters.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))
+        : [],
+    };
+    delete _configData.oceanbase;
+  } else if (isSeekdb && (_configData as any).seekdb) {
+    // getInfoByName 返回的配置已是 seekdb 结构，直接保留字段，仅过滤 parameters
+    const seekdbData = (_configData as any).seekdb;
+    const { parameters: seekdbParameters, ...restSeekdb } = seekdbData;
+    (_configData as any).seekdb = {
+      ...restSeekdb,
+      parameters: (clusterMore && seekdbParameters?.length)
+        ? seekdbParameters.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))
+        : [],
+    };
+  }
+
   Object.keys(_configData).forEach((key) => {
-    if (typeof _configData[key] === 'object' && _configData[key] !== null) {
+    const compData = (_configData as any)[key];
+    if (typeof compData === 'object' && compData !== null) {
       // 安全检查：确保 parameters 存在且是数组
-      if (Array.isArray(_configData[key]?.parameters)) {
-        for (let i = 0; i < _configData[key].parameters.length; i++) {
-          const parameter = _configData[key].parameters[i];
-          // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
-          if (
-            (!parameter.adaptive && !isExist(parameter.value)) ||
-            parameter.adaptive ||
-            !parameter.isChanged
-          ) {
-            _configData[key].parameters.splice(i--, 1);
+      if (Array.isArray(compData?.parameters)) {
+        // seekdb 的 parameters 已在上方过滤并按 clusterMore 控制，只清理 isChanged 字段
+        if (key === 'seekdb') {
+          compData.parameters.forEach((parameter: any) => {
+            delete parameter.isChanged;
+          });
+        } else {
+          for (let i = 0; i < compData.parameters.length; i++) {
+            const parameter = compData.parameters[i];
+            // 筛选原则：修改过下拉框或者输入框的参数传给后端；自动分配、值为空的参数均不传给后端
+            if (
+              (!parameter.adaptive && !isExist(parameter.value)) ||
+              parameter.adaptive ||
+              !parameter.isChanged
+            ) {
+              compData.parameters.splice(i--, 1);
+            }
+            if (parameter.key === 'ocp_meta_tenant_memory_size') {
+              parameter.value = changeParameterUnit(parameter).value;
+            }
+            delete parameter.isChanged;
           }
-          if (parameter.key === 'ocp_meta_tenant_memory_size') {
-            parameter.value = changeParameterUnit(parameter).value;
-          }
-          delete parameter.isChanged;
         }
       }
-      if (key === configServerComponentKey && Array.isArray(_configData[key]?.parameters)) {
-        _configData[key].parameters.forEach((parameter) => {
+      if (key === configServerComponentKey && Array.isArray(compData?.parameters)) {
+        compData.parameters.forEach((parameter: any) => {
           if (parameter.key === 'log_maxsize') {
             parameter.type = 'Integer';
             parameter.value = Number(parameter.value.split('MB')[0]);
@@ -88,16 +141,18 @@ export const formatConfigData = (
     }
   });
   if (scenarioParam) {
-    // 安全检查：确保 oceanbase 存在
-    if (!_configData.oceanbase) {
-      _configData.oceanbase = {};
+    // seekdb 模式 scenarioParam 注入到 seekdb 对象，否则注入到 oceanbase
+    const targetKey = isSeekdb ? 'seekdb' : 'oceanbase';
+    const targetConfig = _configData as any;
+    if (!targetConfig[targetKey]) {
+      targetConfig[targetKey] = {};
     }
-    if (!_configData.oceanbase.parameters) {
-      _configData.oceanbase.parameters = [];
+    if (!targetConfig[targetKey].parameters) {
+      targetConfig[targetKey].parameters = [];
     }
-    _configData.oceanbase.parameters = [
+    targetConfig[targetKey].parameters = [
       scenarioParam,
-      ..._configData.oceanbase.parameters,
+      ...targetConfig[targetKey].parameters,
     ];
   }
   if (isOBConfig) {
@@ -125,6 +180,7 @@ export default function CheckInfo({
     errorsList,
     scenarioParam,
     loadTypeVisible,
+    clusterMore,
   } = useModel('global');
   const { components = {}, auth, home_path } = configData || {};
   const {
@@ -136,6 +192,9 @@ export default function CheckInfo({
     prometheus = {},
     alertmanager = {},
   } = components;
+  // seekdb 模式下，自动修复后 configData.components 为后端返回结构（seekdb 对象，oceanbase 为 null）
+  // 用 seekdbComp 做兜底，确保展示字段不因数据来源切换而消失
+  const seekdbComp = (components as any)?.seekdb;
 
   const { run: handleCreateConfig, loading } = useRequest(
     createDeploymentConfig,
@@ -158,18 +217,26 @@ export default function CheckInfo({
     window.scrollTo(0, 0);
   };
 
+  // 当前 OB 环境是否为单机版
+  const standAlone = deployMode === 'standalone';
+  const seekdb = deployMode === 'seekdb';
+
   const handlePreCheck = async () => {
     const { data: publicKey } = await getPublicKey();
+    // seekdb 模式下 appname 在 oceanbase 字段中，formatConfigData 会将其转换为 seekdb 字段
+    // 需在转换前取出 appname 作为接口路径参数
+    const deployName = oceanbase?.appname || (configData?.components as any)?.seekdb?.appname;
     handleCreateConfig(
-      { name: oceanbase?.appname },
-      formatConfigData(configData, scenarioParam, publicKey),
+      { name: deployName },
+      formatConfigData(configData, seekdb ? null : scenarioParam, publicKey, seekdb, clusterMore),
     );
   };
 
   const getComponentsList = () => {
     const componentsList: API.TableComponentInfo[] = [];
     allComponentsKeys.forEach((key) => {
-      if (components?.[key]) {
+      // 只有当组件存在且有版本信息时才添加到列表
+      if (components?.[key] && components?.[key]?.version) {
         const componentConfig = componentsConfig?.[key] || {};
         componentsList.push({
           ...componentConfig,
@@ -192,7 +259,8 @@ export default function CheckInfo({
     );
 
     currentOnlyComponentsKeys.forEach((key) => {
-      if (componentsConfig?.[key]) {
+      // 只有当组件配置存在且 configData 中有对应的组件数据时才添加
+      if (componentsConfig?.[key] && components?.[key]) {
         componentsNodeConfigList.push({
           key,
           name: componentsConfig?.[key]?.name,
@@ -204,8 +272,6 @@ export default function CheckInfo({
     return componentsNodeConfigList;
   };
 
-  // 当前 OB 环境是否为单机版
-  const standAlone = deployMode === 'standalone';
   const dbConfigColumns: ColumnsType<API.DBConfig> = [
     {
       title: intl.formatMessage({
@@ -253,10 +319,15 @@ export default function CheckInfo({
   const clusterConfigInfo = [
     {
       key: 'cluster',
-      group: intl.formatMessage({
-        id: 'OBD.pages.components.CheckInfo.ClusterConfiguration',
-        defaultMessage: '集群配置',
-      }),
+      group: seekdb
+        ? intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.InstanceConfiguration',
+          defaultMessage: '实例配置',
+        })
+        : intl.formatMessage({
+          id: 'OBD.pages.components.CheckInfo.ClusterConfiguration',
+          defaultMessage: '集群配置',
+        }),
       content: [
         {
           label: intl.formatMessage({
@@ -264,7 +335,7 @@ export default function CheckInfo({
             defaultMessage: '配置模式',
           }),
           colSpan: 5,
-          value: modeConfig[oceanbase?.mode],
+          value: modeConfig[(oceanbase?.mode || seekdbComp?.mode) as keyof typeof modeConfig],
         },
         {
           label: intl.formatMessage({
@@ -273,9 +344,9 @@ export default function CheckInfo({
           }),
           colSpan: 5,
           value: (
-            <Tooltip title={oceanbase?.root_password} placement="topLeft">
+            <Tooltip title={oceanbase?.root_password || seekdbComp?.root_password} placement="topLeft">
               <Input.Password
-                value={oceanbase?.root_password}
+                value={oceanbase?.root_password || seekdbComp?.root_password}
                 visibilityToggle={true}
                 readOnly
                 bordered={false}
@@ -290,8 +361,8 @@ export default function CheckInfo({
             defaultMessage: '数据目录',
           }),
           value: (
-            <Tooltip title={oceanbase?.data_dir || initDir} placement="topLeft">
-              <div className="ellipsis">{oceanbase?.data_dir || initDir}</div>
+            <Tooltip title={oceanbase?.data_dir || seekdbComp?.data_dir || initDir} placement="topLeft">
+              <div className="ellipsis">{oceanbase?.data_dir || seekdbComp?.data_dir || initDir}</div>
             </Tooltip>
           ),
         },
@@ -301,8 +372,8 @@ export default function CheckInfo({
             defaultMessage: '日志目录',
           }),
           value: (
-            <Tooltip title={oceanbase?.redo_dir || initDir} placement="topLeft">
-              <div className="ellipsis">{oceanbase?.redo_dir || initDir}</div>
+            <Tooltip title={oceanbase?.redo_dir || seekdbComp?.redo_dir || initDir} placement="topLeft">
+              <div className="ellipsis">{oceanbase?.redo_dir || seekdbComp?.redo_dir || initDir}</div>
             </Tooltip>
           ),
         },
@@ -312,33 +383,35 @@ export default function CheckInfo({
             defaultMessage: 'SQL 端口',
           }),
           colSpan: 3,
-          value: oceanbase?.mysql_port,
+          value: oceanbase?.mysql_port || seekdbComp?.mysql_port,
         },
-        {
+        ...(!seekdb ? [{
           label: intl.formatMessage({
             id: 'OBD.pages.components.CheckInfo.RpcPort',
             defaultMessage: 'RPC 端口',
           }),
           colSpan: 3,
           value: oceanbase?.rpc_port,
-        },
+        }] : []),
         {
           label: intl.formatMessage({
             id: 'OBD.OCPPreCheck.CheckInfo.ConfigInfo.ObshellPort',
             defaultMessage: 'obshell 端口',
           }),
           colSpan: 3,
-          value: oceanbase?.obshell_port,
+          value: oceanbase?.obshell_port || seekdbComp?.obshell_port,
         },
       ],
 
-      more: oceanbase?.parameters?.length
+      more: oceanbase?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))?.length
         ? [
           {
             label:
-              componentsConfig[oceanbaseComponent].labelName ||
-              componentsConfig[oceanbaseStandaloneComponent].labelName,
-            parameters: oceanbase?.parameters,
+              seekdb
+                ? componentsConfig[seekdbComponent].labelName :
+                componentsConfig[oceanbaseComponent].labelName ||
+                componentsConfig[oceanbaseStandaloneComponent].labelName,
+            parameters: oceanbase?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value)),
           },
         ]
         : [],
@@ -348,7 +421,7 @@ export default function CheckInfo({
   if (selectedConfig.length) {
     let content: any[] = [],
       more: any = [];
-    if (selectedConfig.includes(obproxyComponent)) {
+    if (selectedConfig.includes(obproxyComponent) && obproxy) {
       content = content.concat(
         {
           label: intl.formatMessage({
@@ -372,13 +445,13 @@ export default function CheckInfo({
           value: obproxy?.rpc_listen_port,
         },
       );
-      obproxy?.parameters?.length &&
+      obproxy?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))?.length &&
         more.push({
           label: componentsConfig[obproxyComponent].labelName,
-          parameters: obproxy?.parameters,
+          parameters: obproxy?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value)),
         });
     }
-    if (selectedConfig.includes(grafanaComponent)) {
+    if (selectedConfig.includes(grafanaComponent) && grafana) {
       content = content.concat({
         label: intl.formatMessage({
           id: 'OBD.Obdeploy.ClusterConfig.GrafanaServicePort',
@@ -386,13 +459,13 @@ export default function CheckInfo({
         }),
         value: grafana?.port,
       });
-      grafana?.parameters?.length &&
+      grafana?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))?.length &&
         more.push({
           label: componentsConfig[grafanaComponent].labelName,
-          parameters: grafana?.parameters,
+          parameters: grafana?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value)),
         });
     }
-    if (selectedConfig.includes(prometheusComponent)) {
+    if (selectedConfig.includes(prometheusComponent) && prometheus) {
       content = content.concat({
         label: intl.formatMessage({
           id: 'OBD.Obdeploy.ClusterConfig.PrometheusServicePort',
@@ -400,13 +473,13 @@ export default function CheckInfo({
         }),
         value: prometheus?.port,
       });
-      prometheus?.parameters?.length &&
+      prometheus?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))?.length &&
         more.push({
           label: componentsConfig[prometheusComponent].labelName,
-          parameters: prometheus?.parameters,
+          parameters: prometheus?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value)),
         });
     }
-    if (selectedConfig.includes(alertManagerComponent)) {
+    if (selectedConfig.includes(alertManagerComponent) && alertmanager) {
       content = content.concat({
         label: intl.formatMessage({
           id: 'OBD.Obdeploy.ClusterConfig.AlertManagerPort',
@@ -414,14 +487,14 @@ export default function CheckInfo({
         }),
         value: alertmanager?.port,
       });
-      alertmanager?.parameters?.length &&
+      alertmanager?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))?.length &&
         more.push({
           label: componentsConfig[alertManagerComponent].labelName,
-          parameters: alertmanager?.parameters,
+          parameters: alertmanager?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value)),
         });
     }
 
-    if (selectedConfig.includes(obagentComponent)) {
+    if (selectedConfig.includes(obagentComponent) && obagent) {
       content = content.concat(
         {
           label: intl.formatMessage({
@@ -438,14 +511,14 @@ export default function CheckInfo({
           value: obagent?.mgragent_http_port,
         },
       );
-      obagent?.parameters?.length &&
+      obagent?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))?.length &&
         more.push({
           label: componentsConfig[obagentComponent].labelName,
-          parameters: obagent?.parameters,
+          parameters: obagent?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value)),
         });
     }
 
-    if (selectedConfig.includes(configServerComponent)) {
+    if (selectedConfig.includes(configServerComponent) && obconfigserver) {
       content = content.concat({
         label: intl.formatMessage({
           id: 'OBD.pages.Obdeploy.CheckInfo.ObconfigserverServicePort',
@@ -453,10 +526,10 @@ export default function CheckInfo({
         }),
         value: obconfigserver?.listen_port,
       });
-      obconfigserver?.parameters?.length &&
+      obconfigserver?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value))?.length &&
         more.push({
           label: componentsConfig[configServerComponentKey].labelName,
-          parameters: obconfigserver?.parameters,
+          parameters: obconfigserver?.parameters?.filter((p: any) => p.isChanged && !p.adaptive && isExist(p.value)),
         });
     }
     clusterConfigInfo.push({
@@ -468,7 +541,6 @@ export default function CheckInfo({
       content,
       more,
     });
-    console.log('prometheus checkinfo', prometheus?.basic_auth_users?.admin)
     clusterConfigInfo.map((item) => {
       if (item.key === 'cluster') {
         if (selectedConfig.includes(prometheusComponent)) {
@@ -548,8 +620,8 @@ export default function CheckInfo({
   useEffect(() => {
     const { obproxy = {}, alertmanager = {} } = configData.components;
 
-    // 处理 OBProxy 密码
-    if (obproxy?.parameters) {
+    // 处理 OBProxy 密码 - 只有在 selectedConfig 包含 obproxy 时才处理
+    if (selectedConfig.includes(obproxyComponent) && obproxy?.parameters) {
       // 如果没有密码，前端来随机生成一个
       const targetParam = obproxy?.parameters?.find(
         (item) => item.key === 'obproxy_sys_password',
@@ -628,11 +700,16 @@ export default function CheckInfo({
       {
         oceanbase?.topology?.length > 1 ? null : (
           <Alert
-            message={intl.formatMessage({
-              id: 'OBD.pages.components.CheckInfo.OceanbaseTheInstallationInformationConfiguration',
-              defaultMessage:
-                'OceanBase 安装信息配置已完成，请检查并确认以下配置信息，确定后开始预检查。',
-            })}
+            message={seekdb
+              ? intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.SeekdbInstallationInfoConfiguration',
+                defaultMessage: 'seekdb 安装信息配置已完成，请检查并确认以下配置信息，确定后开始预检查。',
+              })
+              : intl.formatMessage({
+                id: 'OBD.pages.components.CheckInfo.OceanbaseTheInstallationInformationConfiguration',
+                defaultMessage: 'OceanBase 安装信息配置已完成，请检查并确认以下配置信息，确定后开始预检查。',
+              })
+            }
             type="info"
             showIcon
           />
@@ -653,10 +730,10 @@ export default function CheckInfo({
                   colSpan={10}
                   title={intl.formatMessage({
                     id: 'OBD.pages.components.CheckInfo.DeploymentClusterName',
-                    defaultMessage: '部署集群名称',
+                    defaultMessage: '名称',
                   })}
                 >
-                  {oceanbase?.appname}
+                  {oceanbase?.appname || seekdbComp?.appname}
                 </ProCard>
                 {loadTypeVisible ? (
                   <ProCard
@@ -676,6 +753,7 @@ export default function CheckInfo({
           <DeployedCompCheckInfo
             className="card-header-padding-top-0"
             componentsList={componentsList}
+            deployMode={deployMode}
           />
         </Row>
       </ProCard>
@@ -688,20 +766,46 @@ export default function CheckInfo({
             })}
             className="card-padding-bottom-24"
           >
-            <ProCard
-              className={styles.infoSubCard}
-              style={{ border: '1px solid #e2e8f3' }}
-              split="vertical"
-            >
-              <Table
-                className={`${styles.infoCheckTable}  ob-table`}
-                columns={dbConfigColumns}
-                dataSource={oceanbase?.topology}
-                rowKey="id"
-                scroll={{ y: 300 }}
-                pagination={false}
-              />
-            </ProCard>
+            {
+              seekdb ?
+                <Col span={12}>
+                  <ProCard
+                    className={styles.infoSubCard}
+                    split="vertical"
+                  >
+                    <div style={{ padding: '16px' }}>
+                      <div style={{ color: '#8592ad', marginBottom: 8 }}>
+                        {intl.formatMessage({
+                          id: 'OBD.pages.components.CheckInfo.IpAddress',
+                          defaultMessage: 'IP 地址',
+                        })}
+                      </div>
+                      <div>
+                        {oceanbase?.topology?.[0]?.servers
+                          ?.map((item: API.OceanbaseServers) => item.ip)
+                          ?.join('，')
+                          || (seekdbComp?.servers as string[])?.join('，')
+                          || '-'}
+                      </div>
+                    </div>
+                  </ProCard>
+                </Col>
+                :
+                <ProCard
+                  className={styles.infoSubCard}
+                  style={{ border: '1px solid #e2e8f3' }}
+                  split="vertical"
+                >
+                  <Table
+                    className={`${styles.infoCheckTable}  ob-table`}
+                    columns={dbConfigColumns}
+                    dataSource={oceanbase?.topology}
+                    rowKey="id"
+                    scroll={{ y: 300 }}
+                    pagination={false}
+                  />
+                </ProCard>
+            }
           </ProCard>
           {/* 组件节点配置 */}
           {selectedConfig.length ? (
@@ -726,7 +830,7 @@ export default function CheckInfo({
             home_path={home_path}
           />
         </Row>
-      </ProCard>
+      </ProCard >
       <CompDetailCheckInfo
         className="card-header-padding-top-0"
         clusterConfigInfo={clusterConfigInfo}
@@ -784,6 +888,6 @@ export default function CheckInfo({
           </Space>
         </div>
       </footer>
-    </Space>
+    </Space >
   );
 }

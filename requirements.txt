@@ -4,7 +4,7 @@ paramiko==3.4.0
 backports.lzma==0.0.14
 MySQL-python==1.2.5
 ruamel.yaml.clib==0.2.2
-ruamel.yaml==0.16.13
+ruamel.yaml==0.17.4
 subprocess32==3.5.4
 prettytable==1.0.1
 enum34==1.1.6
@@ -13,6 +13,6 @@ halo==0.0.30
 pycryptodome==3.19.1
 inspect2==0.1.2
 six==1.16.0
-pyinstaller==5.13.1
+pyinstaller==6.0.0
 bcrypt==3.1.7
 zstandard==0.14.1

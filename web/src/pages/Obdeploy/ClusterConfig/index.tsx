@@ -7,6 +7,7 @@ import { queryComponentParameters } from '@/services/ob-deploy-web/Components';
 import { getErrorInfo, PASSWORD_REGEX, validatePassword } from '@/utils';
 import {
   formatMoreConfig,
+  generateRandomPassword,
   getInitialParameters,
   getPasswordRules,
 } from '@/utils/helper';
@@ -18,7 +19,7 @@ import { Password } from '@oceanbase/ui';
 import { useUpdateEffect } from 'ahooks';
 import { Form, message, Row, Space } from 'antd';
 import { useEffect, useState } from 'react';
-import { getLocale, useModel } from 'umi';
+import { getLocale, useModel } from '@umijs/max';
 import {
   alertManagerComponent,
   commonInputStyle,
@@ -30,6 +31,7 @@ import {
   onlyComponentsKeys,
   pathRule,
   prometheusComponent,
+  seekdbComponent,
 } from '../../constants';
 import EnStyles from '../indexEn.less';
 import ZhStyles from '../indexZh.less';
@@ -65,7 +67,9 @@ export const formatParameters = (dataSource: any) => {
   }
 };
 
-export default function ClusterConfig() {
+export default function ClusterConfig({
+  deployMode,
+}) {
   const {
     selectedConfig,
     setCurrentStep,
@@ -84,6 +88,7 @@ export default function ClusterConfig() {
     setErrorsList,
     errorsList,
     MODE_CONFIG_RULE,
+    componentsVersionInfo,
   } = useModel('global');
   const { components = {}, home_path } = configData || {};
 
@@ -104,6 +109,7 @@ export default function ClusterConfig() {
     ['oceanbase', 'parameters', 'ocp_meta_password', 'params'],
     form,
   );
+  const seekdb = deployMode === 'seekdb';
   // 密码校验是否通过
   const [grafanaPassed, setGrafanaPassed] = useState<MsgInfoType>();
   const [prometheusPassed, setPrometheusPassed] = useState<MsgInfoType>();
@@ -144,7 +150,6 @@ export default function ClusterConfig() {
   const [obRootPwd, setRootPwd] = useState<string>(
     oceanbase?.root_password || '',
   );
-  console.log('oceanbase?.root_password', prometheusV)
 
   const [obPwdMsgInfo, setObPwdMsgInfo] = useState<MsgInfoType>();
   const { run: getMoreParamsters } = useRequest(queryComponentParameters);
@@ -258,7 +263,10 @@ export default function ClusterConfig() {
     newComponents.oceanbase = {
       ...(components.oceanbase || {}),
       ...dataSource.oceanbase,
-      parameters: formatParameters(dataSource.oceanbase?.parameters),
+      // seekdb 模式下，参数表单字段存在 seekdb.parameters 下，需分割读取
+      parameters: seekdb
+        ? formatParameters((dataSource as any).seekdb?.parameters)
+        : formatParameters(dataSource.oceanbase?.parameters),
     };
     setConfigData({ ...configData, components: newComponents });
   };
@@ -312,9 +320,17 @@ export default function ClusterConfig() {
 
   const getClusterMoreParamsters = async () => {
     setClusterMoreLoading(true);
+    // seekdb 模式下，oceanbase 对象的 component/version 可能为空（如未经过 InstallConfig 选版本）
+    // 用 componentsVersionInfo 内 seekdb 的信息做兑底
+    const clusterParamSource = seekdb
+      ? {
+        component: oceanbase?.component || seekdbComponent,
+        version: oceanbase?.version || componentsVersionInfo?.[seekdbComponent]?.version,
+      }
+      : oceanbase;
     const res = await getParamstersHandler(
       getMoreParamsters,
-      oceanbase,
+      clusterParamSource,
       errorHandle,
     );
 
@@ -327,6 +343,7 @@ export default function ClusterConfig() {
       );
 
       setClusterMoreConfig(newClusterMoreConfig);
+
       form.setFieldsValue({
         oceanbase: {
           parameters: getInitialParameters(
@@ -336,6 +353,27 @@ export default function ClusterConfig() {
           ),
         },
       });
+
+      // 为 powerrag_tenant_password 自动生成密码（在 getInitialParameters 之后设置，避免被覆盖）
+      // 注意：原始数据中使用 config_parameters（带下划线），而不是 configParameter
+      const powerragParam = data?.items?.[0]?.config_parameters?.find(
+        (item: any) => item.name === 'powerrag_tenant_password'
+      );
+
+      if (powerragParam && !powerragParam.default) {
+        const password = generateRandomPassword('ob');
+        form.setFieldValue(
+          ['oceanbase', 'parameters', 'powerrag_tenant_password', 'params'],
+          {
+            value: password,
+            adaptive: true,
+            auto: true,
+            require: false,
+            type: powerragParam.type || 'String',
+            isChanged: true,
+          }
+        );
+      }
     }
     setClusterMoreLoading(false);
   };
@@ -358,7 +396,7 @@ export default function ClusterConfig() {
     });
     setComponentsMoreLoading(true);
     try {
-      const { success, data } = await getMoreParamsters({}, { filters });
+      const { success, data } = await getMoreParamsters({ filters });
       if (success) {
         const newComponentsMoreConfig = formatMoreConfig(data?.items);
         setComponentsMoreConfig(newComponentsMoreConfig);
@@ -446,13 +484,6 @@ export default function ClusterConfig() {
     }
   }, [componentsMore]);
 
-  // 确保 alertmanagerPwd 从 configData 中获取原始的未加密密码值
-  // useEffect(() => {
-  //   const originalPwd = alertmanager?.basic_auth_users?.admin;
-  //   if (originalPwd) {
-  //     setAlertmanagerPwd(originalPwd);
-  //   }
-  // }, [alertmanager?.basic_auth_users?.admin]);
 
   const initialValues = {
     oceanbase: {
@@ -545,10 +576,14 @@ export default function ClusterConfig() {
       <Space className={styles.spaceWidth} direction="vertical" size="middle">
         <ProCard className={styles.pageCard} split="horizontal">
           <ProCard
-            title={intl.formatMessage({
-              id: 'OBD.pages.components.ClusterConfig.ClusterConfiguration',
-              defaultMessage: '集群配置',
-            })}
+            title={
+              seekdb ? intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.InstanceConfiguration',
+                defaultMessage: '实例配置',
+              }) : intl.formatMessage({
+                id: 'OBD.pages.components.ClusterConfig.ClusterConfiguration',
+                defaultMessage: '集群配置',
+              })}
             className="card-padding-bottom-24"
           >
             <ProFormRadio.Group
@@ -677,14 +712,18 @@ export default function ClusterConfig() {
                   fieldProps={{ style: commonPortStyle }}
                 />
 
-                <InputPort
-                  name={['oceanbase', 'rpc_port']}
-                  label={intl.formatMessage({
-                    id: 'OBD.pages.components.ClusterConfig.RpcPort',
-                    defaultMessage: 'RPC 端口',
-                  })}
-                  fieldProps={{ style: commonPortStyle }}
-                />
+                {
+                  !seekdb &&
+                  <InputPort
+                    name={['oceanbase', 'rpc_port']}
+                    label={intl.formatMessage({
+                      id: 'OBD.pages.components.ClusterConfig.RpcPort',
+                      defaultMessage: 'RPC 端口',
+                    })}
+                    fieldProps={{ style: commonPortStyle }}
+                  />
+                }
+
               </Space>
             </Row>
             <InputPort
@@ -695,6 +734,7 @@ export default function ClusterConfig() {
               })}
               fieldProps={{ style: commonPortStyle }}
             />
+
             <div className={styles.moreSwitch}>
               <Space
                 size={8}
@@ -723,6 +763,7 @@ export default function ClusterConfig() {
               customParameter={<Parameter />}
               parameterRules={[metadbParameterRules]}
               showMetaPassword={true}
+              isSeekdb={!!seekdb}
             />
           </ProCard>
         </ProCard>

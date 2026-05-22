@@ -1079,6 +1079,24 @@
   need_restart: false
   description_en: password of observer root user
   description_local: sys租户root用户的密码
+- name: seekdb_monitor_user
+  require: false
+  type: SAFE_STRING
+  default: seekdb_monitor
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: read-only sys-tenant user for obagent monitoring when obagent is in the same deploy; auto-set with seekdb_monitor_password
+  description_local: 与 obagent 同部署时用于监控采集的只读 sys 租户用户名；与 seekdb_monitor_password 配套自动生成
+- name: seekdb_monitor_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: NULL
+  max_value: NULL
+  need_restart: false
+  description_en: password for seekdb_monitor_user; auto-generated when obagent depends on seekdb and not set in yaml
+  description_local: seekdb_monitor 用户密码；同部署含 obagent 且未在 yaml 中配置时自动生成
 # todo： 等文档更新
 - name: sql_login_thread_count
   require: false
@@ -1291,3 +1309,12 @@
   need_redeploy: false
   description_en: Production mode switch, default True. Adjust the memory_limit and __min_full_resource_pool_memory The lower bound of memory is adjusted to 16G and 2147483648
   description_local: 生产模式开关, 默认开启。开启后调整memory limit 和 __min_full_resource_pool_memory 下界调整为 16G 和 2147483648
+- name: enable_auto_start
+  require: false
+  essential: true
+  type: BOOL
+  default: false
+  need_reload: true
+  description_en: Support seekdb auto-start on boot
+  description_local: seekdb开机自启,需确保部署用户具有sudo权限且非容器环境
+

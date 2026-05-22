@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import { PageContainer } from '@oceanbase/ui';
 import { useRequest } from 'ahooks';
 import { errorHandler } from '@/utils';

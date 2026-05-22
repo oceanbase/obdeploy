@@ -52,9 +52,10 @@ def passwd_format(passwd):
 
 def display(plugin_context, cursor, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
-    stdio.start_loading('Wait for seekdb init')
-    time.sleep(5)
-    stdio.stop_loading('succeed')
+    if kwargs.get("source_type") != "display":
+        stdio.start_loading('Wait for seekdb init')
+        time.sleep(5)
+        stdio.stop_loading('succeed')
     cluster_config = plugin_context.cluster_config
     if not config_encrypted:
         display_encrypt_password = None

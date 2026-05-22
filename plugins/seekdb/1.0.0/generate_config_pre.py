@@ -35,9 +35,6 @@ def generate_random_password(cluster_config, auto_depend, dev_mode=False):
     if added_components[cluster_config.name] and 'root_password' not in global_config and not dev_mode:
         cluster_config.update_global_conf('root_password', ConfigUtil.get_random_pwd_by_total_length(20), False)
 
-    if added_components[const.COMP_OBAGENT] and be_depends[const.COMP_OBAGENT] and 'ocp_agent_monitor_password' not in global_config:
-        cluster_config.update_global_conf('ocp_agent_monitor_password', ConfigUtil.get_random_pwd_by_total_length(), False)
-
     if 'proxyro_password' not in global_config:
         for component_name in const.COMPS_ODP:
             if added_components[component_name] and be_depends[component_name]:
@@ -79,7 +76,14 @@ def generate_random_password(cluster_config, auto_depend, dev_mode=False):
             if 'ocp_meta_password' not in global_config :
                 cluster_config.update_global_conf('ocp_monitor_password', ConfigUtil.get_random_pwd_by_total_length(), False)
 
-
+    # Read-only sys-tenant account for obagent metrics when the same deploy includes obagent depending on seekdb.
+    if (cluster_config.name == const.COMP_OB_SEEKDB and added_components.get(const.COMP_OBAGENT)
+            and be_depends.get(const.COMP_OBAGENT)):
+        if 'seekdb_monitor_user' not in global_config:
+            cluster_config.update_global_conf('seekdb_monitor_user', 'seekdb_monitor', False)
+        if 'seekdb_monitor_password' not in global_config:
+            cluster_config.update_global_conf(
+                'seekdb_monitor_password', ConfigUtil.get_random_pwd_by_total_length(20), False)
 
 
 def generate_config_pre(plugin_context, auto_depend=False, *args, **kwargs):
@@ -112,7 +116,9 @@ def generate_config_pre(plugin_context, auto_depend=False, *args, **kwargs):
         'syslog_level', 'enable_syslog_wf', 'max_syslog_file_count', 'cluster_id', 'ocp_meta_tenant_log_disk_size',
         'datafile_next', 'datafile_maxsize'
     ]
-    generate_password_keys = ['root_password', 'proxyro_password', 'ocp_meta_password', 'ocp_agent_monitor_password']
+    generate_password_keys = ['root_password', 'proxyro_password', 'ocp_meta_password']
+    if 'obagent' in cluster_config.be_depends:
+        generate_password_keys.append('seekdb_monitor_password')
     generate_random_password_func_params = {
         'cluster_config': plugin_context.cluster_config,
         'auto_depend': auto_depend,

@@ -34,6 +34,16 @@ def bootstrap(plugin_context, *args, **kwargs):
         sql = 'alter user "root" IDENTIFIED BY %s'
         raise_cursor.execute(sql, [global_conf.get('root_password')])
         cursor.password = global_conf.get('root_password')
+
+    mon_pwd = global_conf.get('seekdb_monitor_password')
+    mon_user = global_conf.get('seekdb_monitor_user', 'seekdb_monitor')
+    if mon_pwd:
+        safe_user = mon_user.replace('`', '')
+        sql = 'CREATE USER IF NOT EXISTS `%s` IDENTIFIED BY %%s' % safe_user
+        raise_cursor.execute(sql, [mon_pwd])
+        grant_sql = 'GRANT SELECT ON oceanbase.* TO `%s`' % safe_user
+        raise_cursor.execute(grant_sql, raise_exception=False, exc_level='verbose')
+
     stdio.stop_loading('succeed')
 
     return plugin_context.return_true()

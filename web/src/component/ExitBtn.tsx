@@ -5,7 +5,7 @@ import { getTailPath } from '@/utils/helper';
 import { intl } from '@/utils/intl';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { Button, Modal } from 'antd';
-import { history, useModel, useRequest } from 'umi';
+import { history, useModel, useRequest } from '@umijs/max';
 
 const defaultContentText = intl.formatMessage({
   id: 'OBD.src.component.ExitBtn.AfterExitingTheDeploymentAnd',

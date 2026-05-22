@@ -20,7 +20,7 @@ import json
 from copy import deepcopy
 from glob import glob
 from tool import YamlLoader
-from const import COMPS_OB
+from const import COMPS_OB_AND_SEEKDB
 
 from _errno import *
 
@@ -46,7 +46,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
         "zone_name": "zone",
     }
     global_change_conf = {}
-    for comp in COMPS_OB:
+    for comp in COMPS_OB_AND_SEEKDB:
         if comp in cluster_config.depends:
             root_servers = {}
             ob_config = cluster_config.get_depend_config(comp)

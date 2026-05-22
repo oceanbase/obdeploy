@@ -16,7 +16,6 @@
 import time
 from collections import defaultdict
 
-global_standbyro_user_passord = None
 max_delay_time = 5000
 RECOVERY_UNTIL_SCN = 4611686018427387903
 tenant_cursor_cache = defaultdict(dict)
@@ -182,7 +181,7 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
         error("standby tenant {}:{}'s type is invalid, Expect: USER, Current:{}".format(standby_deploy_name, standby_tenant, standby_info_res['TENANT_TYPE']))
         return
     if primary_res['TENANT_TYPE'] != 'USER':
-        error("primary tenant {}:{}'s type is invalid, Expect: USER, Current:{}".format(primary_deploy_name, primary_tenant, primary_res['TENANT_TYPE'] != 'USER'))
+        error("primary tenant {}:{}'s type is invalid, Expect: USER, Current:{}".format(primary_deploy_name, primary_tenant, primary_res['TENANT_TYPE']))
         return
 
     # check primary tenant recover until scn
@@ -196,7 +195,7 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     if no_leader_log_stream.get('count') != 0:
         error("standby tenant {} has log stream no leader".format(standby_tenant))
         return
-    no_leader_log_stream = primary_cursor.fetchone(sql, (standby_info_res['TENANT_ID'], int(standby_info_res['TENANT_ID']) - 1), raise_exception=True)
+    no_leader_log_stream = primary_cursor.fetchone(sql, (primary_res['TENANT_ID'], int(primary_res['TENANT_ID']) - 1), raise_exception=True)
     if no_leader_log_stream.get('count') != 0:
         error("primary tenant {} has log stream no leader".format(primary_tenant))
         return

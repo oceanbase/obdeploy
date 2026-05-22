@@ -34,7 +34,7 @@ def register_to_obshell(plugin_context, *args, **kwargs):
         client = clients[server]
         ob_plugin_context = None
         for namespace in plugin_context.namespaces:
-            if namespace in const.COMPS_OB:
+            if namespace in const.COMPS_OB_AND_SEEKDB:
                 ob_plugin_context = plugin_context.namespaces.get(namespace)
                 break
         flag_file = os.path.join(home_path, '.alertmanager_started')

@@ -12,7 +12,7 @@ import type { Locale } from 'antd/es/locale-provider';
 import enUS from 'antd/es/locale/en_US';
 import zhCN from 'antd/es/locale/zh_CN';
 import { useEffect, useState } from 'react';
-import { getLocale, history, Outlet, setLocale, useModel } from 'umi';
+import { getLocale, history, Outlet, setLocale, useModel } from '@umijs/max';
 import styles from '../Obdeploy/index.less';
 import theme from '../theme';
 import { getTailPath } from '@/utils/helper';

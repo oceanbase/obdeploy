@@ -1,5 +1,5 @@
 import { commonInputStyle, commonStyle } from '@/pages/constants';
-import { dnsValidator, ocpServersValidator,  hybridAddressValidator } from '@/utils';
+import { dnsValidator, ocpServersValidator, hybridAddressValidator } from '@/utils';
 import { intl } from '@/utils/intl';
 import {
   CaretDownOutlined,
@@ -15,7 +15,7 @@ import {
 import { Col, message, Row, Select, Space, Tooltip } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import styles from './index.less';
 
 export default function NodeConfig({ form }: { form: FormInstance<any> }) {

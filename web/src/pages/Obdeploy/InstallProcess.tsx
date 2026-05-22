@@ -7,7 +7,7 @@ import { getErrorInfo } from '@/utils';
 import useRequest, { requestPipeline } from '@/utils/useRequest';
 import NP from 'number-precision';
 import { useEffect, useState } from 'react';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import 'video.js/dist/video-js.css';
 
 let timerProgress: NodeJS.Timer;
@@ -21,6 +21,8 @@ export default function InstallProcess() {
     setErrorsList,
     errorsList,
   } = useModel('global');
+  const seekdb = useModel('global').deployMode === 'seekdb';
+  const deployMode = useModel('global').deployMode;
   const name = configData?.components?.oceanbase?.appname;
   const [progress, setProgress] = useState(0);
   const [showProgress, setShowProgress] = useState(0);
@@ -29,7 +31,7 @@ export default function InstallProcess() {
   const [logData, setLogData] = useState<API.InstallLog>({});
 
   const { run: fetchInstallStatus } = useRequest(queryInstallStatus, {
-    onSuccess: ({ success, data }: API.OBResponseTaskInfo_) => {
+    onSuccess: ({ success, data }: any) => {
       if (success) {
         setStatusData(data || {});
         clearInterval(timerProgress);
@@ -55,7 +57,6 @@ export default function InstallProcess() {
             progress,
             NP.times(NP.divide(step, 100), stepNum),
           );
-
           if (currentProgressNumber >= 1) {
             clearInterval(timerProgress);
           } else {
@@ -111,6 +112,8 @@ export default function InstallProcess() {
 
   return (
     <InstallProcessComp
+      type="OB"
+      deployMode={deployMode}
       logData={logData}
       installStatus={installStatus}
       statusData={statusData}

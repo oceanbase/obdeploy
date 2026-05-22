@@ -1,8 +1,8 @@
 import { intl } from '@/utils/intl';
-import { useModel } from 'umi';
+import { useModel } from '@umijs/max';
 import { Space } from 'antd';
 import { ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { getLocale } from 'umi';
+import { getLocale } from '@umijs/max';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
 

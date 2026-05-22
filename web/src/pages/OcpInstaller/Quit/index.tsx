@@ -2,7 +2,7 @@ import { intl } from '@/utils/intl';
 import { Result, Space, Typography } from '@oceanbase/design';
 import { PageContainer } from '@oceanbase/ui';
 import queryString from 'query-string';
-import { history } from 'umi';
+import { history } from '@umijs/max';
 
 import ExitPageWrapper from '@/component/ExitPageWrapper';
 import PageCard from '@/component/PageCard';
@@ -34,26 +34,26 @@ export default function Quit() {
             title={
               path === 'update'
                 ? intl.formatMessage({
-                    id: 'OBD.OcpInstaller.Quit.TheUpgradeProgramHasExited',
-                    defaultMessage: '升级程序已退出',
-                  })
+                  id: 'OBD.OcpInstaller.Quit.TheUpgradeProgramHasExited',
+                  defaultMessage: '升级程序已退出',
+                })
                 : intl.formatMessage({
-                    id: 'OBD.OcpInstaller.Quit.TheDeploymentInstallerHasExited',
-                    defaultMessage: '部署安装程序已经退出！',
-                  })
+                  id: 'OBD.OcpInstaller.Quit.TheDeploymentInstallerHasExited',
+                  defaultMessage: '部署安装程序已经退出！',
+                })
             }
             subTitle={
               <Space className={styles.quitDesc}>
                 {path === 'update'
                   ? intl.formatMessage({
-                      id: 'OBD.OcpInstaller.Quit.TheUpgradeProgramHasQuit',
-                      defaultMessage:
-                        '升级程序已退出 如需再次启用升级程序，请在系统中执行',
-                    })
+                    id: 'OBD.OcpInstaller.Quit.TheUpgradeProgramHasQuit',
+                    defaultMessage:
+                      '升级程序已退出 如需再次启用升级程序，请在系统中执行',
+                  })
                   : intl.formatMessage({
-                      id: 'OBD.OcpInstaller.Quit.ToEnableTheDeploymentProgram',
-                      defaultMessage: '如需再次启用部署程序，请在系统中执行',
-                    })}
+                    id: 'OBD.OcpInstaller.Quit.ToEnableTheDeploymentProgram',
+                    defaultMessage: '如需再次启用部署程序，请在系统中执行',
+                  })}
 
                 <a
                   data-aspm={`ca48733`}
