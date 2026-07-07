@@ -65,7 +65,7 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
         "ip": ip,
         "port": port
     }
-    for comp in ['oceanbase', 'oceanbase-ce']:
+    for comp in ['oceanbase', 'oceanbase-ce', 'oceanbase.ai']:
         if comp in cluster_config.depends:
             ob_config = cluster_config.get_depend_config(comp)
             if not ob_config:

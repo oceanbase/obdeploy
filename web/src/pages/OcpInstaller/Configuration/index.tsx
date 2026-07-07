@@ -18,9 +18,20 @@ import InstallResult from '@/component/InstallResult';
 import { getTailPath } from '@/utils/helper';
 import CheckInfo from '@/component/OCPPreCheck/CheckInfo';
 import PreCheck from '@/component/OCPPreCheck/PreCheck';
+import { useKeepAlive } from '@/hooks/useKeepAlive';
+import ProgressQuit from '@/pages/Obdeploy/ProgressQuit';
+
+const PROGRESS_QUIT_STEP = 8;
 
 const Configuration: React.FC = () => {
   const [current, setCurrent] = useState(1);
+
+  useKeepAlive({
+    currentStep: current,
+    setCurrentStep: setCurrent,
+    progressQuitStep: PROGRESS_QUIT_STEP,
+    installPhaseStepThreshold: 5,
+  });
   const {
     connectId,
     installTaskId,
@@ -56,15 +67,25 @@ const Configuration: React.FC = () => {
 
   return (
     <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
-      <Steps
-        currentStep={current}
-        stepsItems={METADB_OCP_INSTALL}
-        showStepsKeys={STEPS_KEYS_INSTALL}
-      />
+      {current !== PROGRESS_QUIT_STEP && (
+        <Steps
+          currentStep={current}
+          stepsItems={METADB_OCP_INSTALL}
+          showStepsKeys={STEPS_KEYS_INSTALL}
+        />
+      )}
 
       <div
         style={{
-          paddingTop: `${current === 7 && installStatus === 'FINISHED' ? 0 : current !== 6 ? 150 : 0}px`,
+          paddingTop: `${
+            current === PROGRESS_QUIT_STEP
+              ? 70
+              : current === 7 && installStatus === 'FINISHED'
+                ? 0
+                : current !== 6
+                  ? 150
+                  : 0
+          }px`,
           width: '1040px',
           margin: '0 auto',
           overflow: 'auto',
@@ -112,6 +133,8 @@ const Configuration: React.FC = () => {
             type="install"
           />
         )}
+
+        {current === PROGRESS_QUIT_STEP && <ProgressQuit />}
       </div>
     </PageContainer>
   );

@@ -291,10 +291,46 @@ export default function ClusterConfig({
         window.scrollTo(0, 0);
       })
       .catch(({ errorFields }) => {
-        const errorName = errorFields?.[0].name;
-        form.scrollToField(errorName);
+        if (errorFields?.length) {
+          const target =
+            [...errorFields]
+              .map((errorField) => {
+                const namePath = Array.isArray(errorField.name)
+                  ? errorField.name
+                  : [errorField.name];
+                const top =
+                  document
+                    .getElementById(namePath.join('_'))
+                    ?.closest('.ant-form-item')
+                    ?.getBoundingClientRect().top ?? Number.MAX_SAFE_INTEGER;
+                return { errorField, top };
+              })
+              .sort((a, b) => a.top - b.top)[0]?.errorField ?? errorFields[0];
+
+          form.scrollToField(target.name, { block: 'center' });
+          requestAnimationFrame(() => {
+            if (
+              !document.getElementById(
+                (Array.isArray(target.name) ? target.name : [target.name]).join(
+                  '_',
+                ),
+              )
+            ) {
+              document
+                .querySelector('.ant-form-item-has-error')
+                ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+          });
+        }
+
         message.destroy();
-        if (errorName?.includes('parameters')) {
+        const errorName = errorFields?.[0]?.name;
+        if (
+          errorName &&
+          (Array.isArray(errorName)
+            ? errorName.includes('parameters')
+            : String(errorName).includes('parameters'))
+        ) {
           message.warning(
             intl.formatMessage({
               id: 'OBD.pages.components.ClusterConfig.RequiredParametersForMoreConfigurations',

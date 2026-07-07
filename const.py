@@ -66,8 +66,9 @@ COMPS_OCP_CE_AND_EXPRESS = [COMP_OCP_SERVER_CE, COMP_OCP_EXPRESS]
 COMP_OB = "oceanbase"
 COMP_OB_CE = "oceanbase-ce"
 COMP_OB_STANDALONE = "oceanbase-standalone"
+COMP_OB_AI = "oceanbase.ai"
 COMP_OB_SEEKDB = 'seekdb'
-COMPS_OB = [COMP_OB, COMP_OB_CE, COMP_OB_STANDALONE]
+COMPS_OB = [COMP_OB, COMP_OB_CE, COMP_OB_STANDALONE, COMP_OB_AI]
 # Database components obagent / obshell registration treat as OB-compatible targets
 COMPS_OB_AND_SEEKDB = COMPS_OB + [COMP_OB_SEEKDB]
 
@@ -84,6 +85,13 @@ COMP_OBAGENT = 'obagent'
 
 # oblogproxy
 COMP_OBLOGPROXY = 'oblogproxy'
+
+# oblogservice (OceanBase log service cluster)
+COMP_OBLOGSERVICE = 'oblogservice'
+# logservice integration requires oceanbase.ai >= this version
+OBLOGSERVICE_OB_MIN_VERSION = '4.6.0.1'
+# Components that may run multiple instances on the same host (different ports/paths).
+COMPS_MULTI_INSTANCE_ON_SAME_HOST = [COMP_OBLOGSERVICE]
 
 # obbinlog
 COMP_OBBINLOG_CE = 'obbinlog-ce'

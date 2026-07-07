@@ -724,10 +724,11 @@ class IO(object):
                         return True
                     if ans == 'n':
                         return False
-                    if default_option is True:
+                    if ans == '' and default_option is True:
                         return True
-                    if default_option is False:
+                    if ans == '' and default_option is False:
                         return False
+                    self.print("Invalid input '%s'. Please enter 'y' or 'n'." % ans)
                 except Exception as e:
                     if not e:
                         return False

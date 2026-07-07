@@ -1,0 +1,8 @@
+- src_path: ./home/admin/oblogservice/bin/oblogservice
+  target_path: bin/oblogservice
+  type: file
+  install_method: cp
+- src_path: ./home/admin/oblogservice/bin/ls_ctrl
+  target_path: bin/ls_ctrl
+  type: file
+  install_method: cp

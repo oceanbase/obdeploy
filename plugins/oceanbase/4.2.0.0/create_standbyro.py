@@ -116,10 +116,8 @@ def create_standbyro(plugin_context, cursors={}, cluster_configs={}, *args, **kw
     # GRANT oceanbase to standbyro
     show_db_sql = 'show databases like "oceanbase"' if mode == 'mysql' else "SELECT username FROM all_users WHERE username = 'SYS'"
     grant_sql = "GRANT SELECT ON %s.* TO standbyro;" % ("oceanbase" if mode == "mysql" else "SYS")
-    if not exec_sql_in_tenant(show_db_sql, primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=1, exec_type='fetchone'):
-        error("show database error")
-        return
-    if not exec_sql_in_tenant(grant_sql, primary_cursor, primary_tenant, mode, password=root_password, retries=3):
+    if not exec_sql_in_tenant(show_db_sql, primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=1, exec_type='fetchone') and \
+        not exec_sql_in_tenant(grant_sql, primary_cursor, primary_tenant, mode, password=root_password, retries=3):
         error('Grant standbyro failed')
         return
 

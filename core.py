@@ -43,7 +43,7 @@ from _lock import LockManager, LockMode
 from _optimize import OptimizeManager
 from _environ import ENV_REPO_INSTALL_MODE, ENV_BASE_DIR
 from _types import Capacity
-from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_OB_AND_SEEKDB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE, TPCC_PATH, TPCH_PATH, COMP_JRE, LOCATION_MODE, SERVICE_MODE, COMP_OB_SEEKDB
+from const import COMP_OCEANBASE_DIAGNOSTIC_TOOL, COMP_OBCLIENT, PKG_RPM_FILE, TEST_TOOLS, COMPS_OB, COMPS_OB_AND_SEEKDB, COMPS_ODP, PKG_REPO_FILE, TOOL_TPCC, TOOL_TPCH, TOOL_SYSBENCH, COMP_OB_STANDALONE, TPCC_PATH, TPCH_PATH, COMP_JRE, LOCATION_MODE, SERVICE_MODE, COMP_OB_SEEKDB, COMP_OBLOGSERVICE, COMP_OB_AI
 from ssh import LocalClient
 
 
@@ -424,7 +424,35 @@ class ObdHome(object):
                     status.status = err.CheckStatus.PASS
                 check_status[server] = status
         return param_check_status, check_pass
-    
+
+    def _validate_oblogservice_oceanbase_combo(self, deploy_config, repositories):
+        if COMP_OBLOGSERVICE not in deploy_config.components:
+            return True
+        ob_components = [name for name in deploy_config.components if name in const.COMPS_OB]
+        if not ob_components:
+            return True
+        min_version = Version(const.OBLOGSERVICE_OB_MIN_VERSION)
+        repo_map = {repository.name: repository for repository in (repositories or [])}
+        for comp_name in ob_components:
+            if comp_name != COMP_OB_AI:
+                self._call_stdio(
+                    'error',
+                    err.EC_OBLOGSERVICE_UNSUPPORTED_OB_TYPE.format(
+                        min_version=min_version, comp=comp_name
+                    ),
+                )
+                return False
+            repository = repo_map.get(comp_name)
+            if repository is not None and repository.version < min_version:
+                self._call_stdio(
+                    'error',
+                    err.EC_OBLOGSERVICE_OB_VERSION_TOO_LOW.format(
+                        min_version=min_version, version=repository.version
+                    ),
+                )
+                return False
+        return True
+
     def get_clients(self, deploy_config, repositories):
         ssh_clients, _ = self.get_clients_with_connect_status(deploy_config, repositories, True)
         return ssh_clients
@@ -741,6 +769,8 @@ class ObdHome(object):
                 self._call_stdio('error', 'Input is empty')
                 return False
         initial_config = ''
+        msg = ''
+        ret = True
         if deploy:
             if self.enable_encrypt:
                 try_time = 2
@@ -1538,6 +1568,8 @@ class ObdHome(object):
         self.set_repositories(repositories)
 
         for repository in repositories:
+            if repository.name in const.COMPS_MULTI_INSTANCE_ON_SAME_HOST:
+                continue
             real_servers = set()
             cluster_config = deploy_config.components[repository.name]
             for server in cluster_config.servers:
@@ -1612,8 +1644,8 @@ class ObdHome(object):
             return False
 
         deploy_config = deploy.deploy_config
-        if const.COMP_OB_CE not in deploy_config.components and const.COMP_OB not in deploy_config.components and const.COMP_OB_STANDALONE not in deploy_config.components:
-            self._call_stdio("error", "no oceanbase-ce in deployment %s" % name)
+        if const.COMP_OB_CE not in deploy_config.components and const.COMP_OB not in deploy_config.components and const.COMP_OB_STANDALONE not in deploy_config.components and const.COMP_OB_AI not in deploy_config.components:
+            self._call_stdio("error", "no oceanbase-ce, oceanbase, oceanbase-standalone or oceanbase.ai in deployment %s" % name)
 
         repositories = self.load_local_repositories(deploy_info)
         self.set_repositories(repositories)
@@ -1625,6 +1657,8 @@ class ObdHome(object):
             cluster_config = deploy_config.components[const.COMP_OB_STANDALONE]
         elif const.COMP_OB_CE in deploy_config.components:
             cluster_config = deploy_config.components[const.COMP_OB_CE]
+        elif const.COMP_OB_AI in deploy_config.components:
+            cluster_config = deploy_config.components[const.COMP_OB_AI]
         # search and get all related plugins using a mock ocp repository
         self._call_stdio('verbose', 'get plugins by mocking an ocp repository.')
         if const.COMP_OCP_SERVER in deploy_config.components:
@@ -2051,6 +2085,9 @@ class ObdHome(object):
                     self._call_stdio('error', '%s: The version of MAAS must be 1.3.0 or above' % repository.name)
                     return False
 
+        if not self._validate_oblogservice_oceanbase_combo(deploy_config, repositories):
+            return False
+
         # Get the client
         ssh_clients = self.get_clients(deploy_config, repositories)
         components_kwargs = {}
@@ -2319,6 +2356,8 @@ class ObdHome(object):
             return False
         all_repositories = current_repositories + repositories
         self.set_repositories(all_repositories)
+        if not self._validate_oblogservice_oceanbase_combo(deploy_config, all_repositories):
+            return False
         self._call_stdio('start_loading', 'Get added repositories and plugins')
         self.search_param_plugin_and_apply(repositories, deploy_config)
         self._call_stdio('stop_loading', 'succeed')
@@ -3270,6 +3309,10 @@ class ObdHome(object):
         if not self.run_workflow(workflows, no_found_act='ignore'):
             return False
 
+        workflows = self.get_workflows('redeploy_pre', no_found_act='ignore')
+        if not self.run_workflow(workflows, no_found_act='ignore'):
+            return False
+
         self._call_stdio('verbose', 'Check deploy status')
         if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
             obd = self.fork(options=Values({'force': True}))
@@ -3896,6 +3939,10 @@ class ObdHome(object):
                     self._call_stdio('error', 'Specify the components you want to upgrade.')
                     return False
 
+            if component == COMP_OBLOGSERVICE:
+                self._call_stdio('error', err.EC_OBLOGSERVICE_UPGRADE_NOT_SUPPORTED)
+                return False
+
             for current_repository in repositories:
                 if current_repository.name == component:
                     break
@@ -4106,6 +4153,9 @@ class ObdHome(object):
             deploy.start_upgrade(component, **upgrade_ctx)
         else:
             component = deploy.upgrading_component
+            if component == COMP_OBLOGSERVICE:
+                self._call_stdio('error', err.EC_OBLOGSERVICE_UPGRADE_NOT_SUPPORTED)
+                return False
             upgrade_ctx = deploy.upgrade_ctx
             upgrade_repositories = []
             for data in upgrade_ctx['upgrade_repositories']:

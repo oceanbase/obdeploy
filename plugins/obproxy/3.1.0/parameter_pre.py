@@ -25,7 +25,7 @@ def parameter_pre(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     obproxy_config_server_url = ''
 
-    for comp in ['oceanbase', 'oceanbase-ce']:
+    for comp in ['oceanbase', 'oceanbase-ce', 'oceanbase.ai']:
         if comp in cluster_config.depends:
             root_servers = {}
             ob_config = cluster_config.get_depend_config(comp)

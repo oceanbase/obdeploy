@@ -1306,6 +1306,50 @@ def confirm_port(client, pid, port):
     return False
 
 
+def check_environment_work_dir(client, server, path, key='path', work_dir_empty_check=True):
+    """
+    Check work directory exists, is a writable directory, and is empty when required.
+    Walks up to parent when path does not exist (same as oceanbase environment_check).
+    Returns None on success, or OBDErrorCode on failure.
+    """
+    original_path = path
+    empty_check = work_dir_empty_check
+    while True:
+        if not path:
+            return _errno.EC_FAIL_TO_INIT_PATH.format(
+                server=server,
+                key=key,
+                msg=_errno.InitDirFailedErrorMessage.PATH_ONLY.format(path=original_path),
+            )
+        if client.execute_command('bash -c "[ -a %s ]"' % path).code == 0:
+            is_dir = client.execute_command('[ -d {} ]'.format(path)).code == 0
+            has_write_permission = client.execute_command('[ -w {} ]'.format(path)).code == 0
+            if is_dir and has_write_permission:
+                if empty_check:
+                    ret = client.execute_command('ls %s' % path)
+                    if ret.code != 0 or (ret.stdout or '').strip():
+                        return _errno.EC_FAIL_TO_INIT_PATH.format(
+                            server=server,
+                            key=key,
+                            msg=_errno.InitDirFailedErrorMessage.NOT_EMPTY.format(path=original_path),
+                        )
+                    return None
+                return None
+            if not is_dir:
+                return _errno.EC_FAIL_TO_INIT_PATH.format(
+                    server=server,
+                    key=key,
+                    msg=_errno.InitDirFailedErrorMessage.NOT_DIR.format(path=original_path),
+                )
+            return _errno.EC_FAIL_TO_INIT_PATH.format(
+                server=server,
+                key=key,
+                msg=_errno.InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=original_path),
+            )
+        path = os.path.dirname(path)
+        empty_check = False
+
+
 def set_plugin_context_variables(plugin_context, variable_dict):
     for key, value in variable_dict.items():
         plugin_context.set_variable(key, value)
@@ -1490,11 +1534,12 @@ def byte_to_GB(byte):
 
 def set_system_conf(client, ip, var, value, stdio, var_type='ulimits', username=None):
     sudo_prefix = get_sudo_prefix(client)
+    env_clean = 'env -u LD_LIBRARY_PATH -u LD_PRELOAD '
     if var_type == 'ulimits':
-        if not client.execute_command('echo -e "{username} soft {name} {value}\\n{username} hard {name} {value}" | {sudo_prefix}tee -a /etc/security/limits.d/{name}.conf'.format(username=username or client.config.username, name=var, value=value, sudo_prefix=sudo_prefix)):
+        if not client.execute_command('echo -e "{username} soft {name} {value}\\n{username} hard {name} {value}" | {env_clean}{sudo_prefix}tee -a /etc/security/limits.d/{name}.conf'.format(username=username or client.config.username, name=var, value=value, sudo_prefix=sudo_prefix, env_clean=env_clean)):
             return False
     else:
-        ret = client.execute_command('echo "{0}={1}" | {2}tee -a /etc/sysctl.conf; sudo sysctl -p'.format(var, value, sudo_prefix))
+        ret = client.execute_command('echo "{0}={1}" | {3}{2}tee -a /etc/sysctl.conf; {3}{2}sysctl -p'.format(var, value, sudo_prefix, env_clean))
         if not ret:
             if ret.stdout and "%s = %s" % (var, value) == ret.stdout.strip().split('\n')[-1]:
                 return True

@@ -1,0 +1,79 @@
+## OceanBase AI + oblogservice (3-node).
+##
+## After oblogservice is running, note logservice_cluster_id from `obd cluster display`.
+## Configure ObServer with enable_logservice=true and LOGSERVICE_ACCESS_POINT in bootstrap, e.g.:
+##   s3://...&logservice_cluster_id=<oblogservice cluster_id>
+##
+## Replace IPs, home_path, object_store_url, and resource limits before production use.
+# user:
+#   username: your_username
+#   password: ''
+#   port: 22
+
+oblogservice:
+  version: 1.3.0
+  servers:
+    - name: server1
+      # Please don't use hostname, only IP can be supported
+      ip: 192.168.1.1
+    - name: server2
+      ip: 192.168.1.2
+    - name: server3
+      ip: 192.168.1.3
+  global:
+    cluster_id: 1 # logservice cluster ID; The default value is 1
+    memory_limit: 6G # oblogservice process memory limit
+    log_disk_size: 100G # local log disk size limit
+    max_syslog_file_count: 4 # rotated syslog file count to retain
+    port: 7890 # oblogservice RPC port
+    http_port: 7891 # oblogservice HTTP/admin port
+    home_path: /home/admin/oblogservice # install dir (bin/etc/store/log); must differ per node on same IP
+    region: region1 # logical region name
+    object_store_url: 's3://your-bucket?host=http://your-object-storage-host&access_id=xxx&access_key=yyy&s3_region=cn-north-1'
+    # object storage (OSS/S3-compatible); bootstrap creates cluster_id dir and ACCESS_POINT in bucket
+    # Control whether the current deploy/start executes bootstrap.
+    # false (Default) # Allow the execution of bootstrap. If the cluster has never been bootstrap, it will complete the initialization. If there is already a bootstrap tag, OBD usually automatically skips repetitive bootstrap. 
+    # true            # Explicitly not executing bootstrap is suitable for scenarios where the cluster has already been initialized on OSS and only the existing cluster needs to be started or joined.
+  server1:
+    az: az1 # availability zone; use distinct az per host in 3-node setup
+  server2:
+    az: az2
+  server3:
+    az: az3
+
+oceanbase.ai:
+  version: 4.6.1.0
+  depends:
+    - oblogservice # deploy oblogservice first, then oceanbase.ai
+  servers:
+    - name: server1
+      ip: 192.168.1.1
+    - name: server2
+      ip: 192.168.1.2
+    - name: server3
+      ip: 192.168.1.3
+  global:
+    memory_limit: 64G # The maximum running memory for an observer
+    datafile_size: 192G  # Size of the data file. 
+    log_disk_size: 192G  # The size of disk space used by the clog files.
+    cpu_count: 16  # logical CPU count for threading and resource scheduling
+    enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
+    max_syslog_file_count: 4  # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
+    home_path: /data/observer/node   # observer install and data root
+    # The directory for data storage. The default value is $home_path/store.
+    # data_dir: /data
+    # The directory for clog, ilog, and slog. The default value is the same as the data_dir value.
+    # redo_dir: /redo # The shared storage mode does not have redo_log
+    # Cluster name for OceanBase Database. The default value is obcluster. When you deploy OceanBase Database and obproxy, this value must be the same as the cluster_name for obproxy.
+    # appname: obcluster
+    # root_password: # root user password
+    # proxyro_password: # proxyro user pasword, consistent with obproxy's observer_sys_password, can be empty
+    mysql_port: 2881  # SQL port (obclient / apps)
+    rpc_port: 2882  # internal observer RPC port
+  server1:
+    zone: zone1  # OceanBase zone; one zone per node in 3-replica setup
+  server2:
+    zone: zone2
+  server3:
+    zone: zone3
+

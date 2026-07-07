@@ -10,7 +10,9 @@ import {
 import { intl } from '@/utils/intl';
 import { ProForm } from '@ant-design/pro-components';
 import { Button, Input, message } from 'antd';
+import type { InputRef } from 'antd/es/input';
 import { FormInstance } from 'antd/lib/form';
+import { forwardRef } from 'react';
 import { NamePath } from 'rc-field-form/lib/interface';
 
 interface CustomPasswordInputProps {
@@ -32,6 +34,58 @@ type MsgInfoType = {
   validateStatus: 'success' | 'error';
   errorMsg: string | null;
 };
+
+interface PasswordControlProps {
+  id?: string;
+  inputValue: string;
+  innerInputStyle?: React.CSSProperties;
+  placeholder?: string;
+  showCopyBtn?: boolean;
+  onValueChange: (value: string) => void;
+  onRandomGenerate: () => void;
+  onCopy: () => void;
+}
+
+const PasswordControl = forwardRef<InputRef, PasswordControlProps>(
+  (
+    {
+      id,
+      inputValue,
+      innerInputStyle,
+      placeholder,
+      showCopyBtn,
+      onValueChange,
+      onRandomGenerate,
+      onCopy,
+    },
+    ref,
+  ) => (
+    <div style={{ display: 'flex' }}>
+      <Input.Password
+        id={id}
+        ref={ref}
+        onChange={(e) => onValueChange(e.target.value)}
+        value={inputValue}
+        style={innerInputStyle}
+        placeholder={placeholder}
+      />
+      <Button onClick={onRandomGenerate} style={{ marginLeft: 12 }}>
+        {intl.formatMessage({
+          id: 'OBD.component.CustomPasswordInput.RandomlyGenerated',
+          defaultMessage: '随机生成',
+        })}
+      </Button>
+      {showCopyBtn && (
+        <Button style={{ marginLeft: 12 }} onClick={onCopy}>
+          {intl.formatMessage({
+            id: 'OBD.component.CustomPasswordInput.CopyPassword',
+            defaultMessage: '复制密码',
+          })}
+        </Button>
+      )}
+    </div>
+  ),
+);
 
 /**
  *
@@ -161,42 +215,27 @@ export default function CustomPasswordInput({
           }),
         },
         {
-          validator: (_, value) => {
-            let validateRes = validateInput(value);
+          validator: (_, fieldValue) => {
+            const validateRes = validateInput(fieldValue);
             if (validateRes.validateStatus === 'success') {
               return Promise.resolve();
-            } else {
-              return Promise.reject(new Error(validateRes.errorMsg!));
             }
+            return Promise.reject(new Error(validateRes.errorMsg!));
           },
         },
       ]}
       name={name}
       {...props}
     >
-      <div style={{ display: 'flex' }}>
-        <Input.Password
-          onChange={(e) => handleChange(e.target.value)}
-          value={value}
-          style={innerInputStyle}
-          placeholder={placeholder}
-        />
-
-        <Button onClick={handleRandomGenerate} style={{ marginLeft: 12 }}>
-          {intl.formatMessage({
-            id: 'OBD.component.CustomPasswordInput.RandomlyGenerated',
-            defaultMessage: '随机生成',
-          })}
-        </Button>
-        {showCopyBtn && (
-          <Button style={{ marginLeft: 12 }} onClick={passwordCopy}>
-            {intl.formatMessage({
-              id: 'OBD.component.CustomPasswordInput.CopyPassword',
-              defaultMessage: '复制密码',
-            })}
-          </Button>
-        )}
-      </div>
+      <PasswordControl
+        inputValue={value}
+        innerInputStyle={innerInputStyle}
+        placeholder={placeholder}
+        showCopyBtn={showCopyBtn}
+        onValueChange={handleChange}
+        onRandomGenerate={handleRandomGenerate}
+        onCopy={passwordCopy}
+      />
     </ProForm.Item>
   );
 }

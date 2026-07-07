@@ -16,7 +16,7 @@
 from __future__ import absolute_import, division, print_function
 import os
 import re
-from const import LOCATION_MODE, SERVICE_MODE, COMP_OB, COMP_OB_STANDALONE
+from const import LOCATION_MODE, SERVICE_MODE, COMP_OB, COMP_OB_STANDALONE, COMP_OB_AI
 
 def get_backup_and_archive_uri(path):
     if 'oss' in path:
@@ -135,7 +135,7 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
         if (option_mode == 'switchover' and standby_type == LOCATION_MODE) or uri_check:
             standby_archive_log_uri = getattr(options, 'standby_archive_log_uri', None)
             primary_archive_log_uri = getattr(options, 'primary_archive_log_uri', None)
-            if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE] and option_mode == 'switchover':
+            if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE, COMP_OB_AI] and option_mode == 'switchover':
                 if not primary_archive_log_uri:
                     error("The `primary_archive_log_uri` parameter is missing. Please pass it in using `--primary_archive_log_uri`.")
                     return
@@ -191,7 +191,7 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
             return plugin_context.return_true()
     
     elif option_mode in ['create_standby_tenant']:
-        if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE]:
+        if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE, COMP_OB_AI]:
             if not data_backup_uri:
                 error("The `data_backup_uri` parameter is missing. Please pass it in using `--data_backup_uri`.")
                 return
@@ -216,7 +216,7 @@ def standby_uri_check(plugin_context, cursors={}, cluster_configs={}, relation_t
             return
         
     if option_mode == "log_source":
-        if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE] and standby_type == LOCATION_MODE:
+        if ob_repository.name in [COMP_OB, COMP_OB_STANDALONE, COMP_OB_AI] and standby_type == LOCATION_MODE:
             if not archive_log_uri:
                 error("The `archive_log_uri` parameter is missing. Please pass it in using `--archive_log_uri`.")
                 return

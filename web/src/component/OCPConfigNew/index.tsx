@@ -410,13 +410,10 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
       if (ocpserver?.servers !== undefined) {
         updateValues.ocpserver.servers = ocpserver.servers;
       }
-      if (auth?.user !== undefined || auth?.password !== undefined || auth?.port !== undefined) {
-        updateValues.auth = {
-          user: auth?.user,
-          password: auth?.password,
-          port: auth?.port,
-        };
-      }
+      // 不在此处回填 auth：auth 已由 initialValues 在挂载时初始化。
+      // 该 effect 依赖 ocpserver.home_path 等字段，用户编辑用户名时会经由
+      // deployUser -> home_path 的联动触发本 effect，若在此用 model 中的旧
+      // auth.user 覆盖表单，会把用户正在输入的用户名弹回旧值，导致“用户名无法修改”。
     }
 
     // 更新表单值

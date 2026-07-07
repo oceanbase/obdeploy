@@ -28,6 +28,36 @@ import ZhStyles from './indexZh.less';
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
+export const resolveConnectionItems = (
+  items: API.ConnectionInfo[] = [],
+  components: API.Components = {},
+) => connectInfoForPwd(items, components);
+
+/** 部署刚结束时 connection 可能尚未就绪，轮询直到有数据或超时 */
+export const prefetchConnectionInfo = async (
+  name: string,
+  components: API.Components = {},
+) => {
+  const maxRetries = 10;
+  const interval = 500;
+  for (let i = 0; i < maxRetries; i++) {
+    const res = await queryConnectionInfo({ name });
+    if (res?.success) {
+      const items = resolveConnectionItems(
+        res?.data?.items || [],
+        components,
+      );
+      if (items.length) {
+        return items;
+      }
+    }
+    if (i < maxRetries - 1) {
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+  }
+  return resolveConnectionItems([], components);
+};
+
 export const connectColumns: ColumnsType<API.ConnectionInfo> = [
   {
     title: intl.formatMessage({
@@ -314,11 +344,14 @@ export default function InstallProcess() {
     setErrorsList,
     errorsList,
     deployMode,
+    prefetchedConnectInfo,
   } = useModel('global');
   const seekdb = deployMode === 'seekdb';
   const [logs, setLogs] = useState({});
   const name = configData?.components?.oceanbase?.appname;
-  const [connectInfo, setConnectInfo] = useState<API.ConnectionInfo[]>([]);
+  const [connectInfo, setConnectInfo] = useState<API.ConnectionInfo[]>(
+    () => prefetchedConnectInfo || [],
+  );
   const [installInfoItems, setInstallInfoItems] = useState<API.DeploymentReport[]>([]);
   const { run: fetchReportInfo, data: reportInfo } = useRequest(
     queryDeploymentReport,
@@ -374,7 +407,10 @@ export default function InstallProcess() {
       onSuccess: ({ success, data }) => {
         if (success) {
           setConnectInfo(
-            connectInfoForPwd(data?.items, configData?.components),
+            resolveConnectionItems(
+              data?.items || [],
+              configData?.components,
+            ),
           );
         }
       },
@@ -414,7 +450,9 @@ export default function InstallProcess() {
 
   useEffect(() => {
     fetchReportInfo({ name });
-    fetchConnectInfo({ name });
+    if (installStatus === 'SUCCESSFUL' && !prefetchedConnectInfo?.length) {
+      fetchConnectInfo({ name });
+    }
     if (seekdb) {
       fetchInstallStatus({ name });
     }
