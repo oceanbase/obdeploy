@@ -63,7 +63,7 @@ def init(plugin_context, host_clients, need_change_servers_vars, machine_check_i
             stdio.stop_loading('succeed' if transparent_hugepage else 'fail')
         if not machine_check_items[ip]['network_card']:
             network_card = False
-            stdio.start_loading("set net card MTY value")
+            stdio.start_loading("set net card MTU value")
             ret = client.execute_command("ip route | grep default | awk '{print $5}' | head -n1")
             if ret:
                 card_name = ret.stdout.strip()

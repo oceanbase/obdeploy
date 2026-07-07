@@ -1,0 +1,118 @@
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: Path
+  need_redeploy: true
+  description_en: Node work directory; configure per server name under the component (same as oceanbase home_path).
+  description_local: 节点工作目录；在组件下以 server 名称（如 server1）单独配置，写法与 oceanbase 的 home_path 一致。
+- name: cluster_id
+  name_local: 日志服务集群 ID
+  require: true
+  essential: true
+  type: INT
+  need_restart: true
+  description_en: Log service cluster ID (u64), unrelated to ObServer cluster_id.
+  description_local: 日志服务集群 ID（u64），与 ObServer 的 cluster_id 无关。
+- name: local_ip
+  name_local: 节点 IP
+  require: false
+  essential: true
+  type: IP
+  need_restart: true
+  description_en: RPC/HTTP bind IP; defaults to the server IP in config.
+  description_local: 节点启动 IP，默认取配置中的 server IP。
+- name: port
+  name_local: RPC 端口
+  require: true
+  essential: true
+  type: INT
+  min_value: 1025
+  max_value: 65535
+  need_restart: true
+  description_en: RPC protocol port for oblogservice.
+  description_local: oblogservice RPC 协议端口。
+- name: http_port
+  name_local: HTTP 端口
+  require: true
+  essential: true
+  type: INT
+  min_value: 1025
+  max_value: 65535
+  need_restart: true
+  description_en: HTTP port exposed by the node; must differ from RPC port.
+  description_local: 节点 HTTP 服务端口，不能与 RPC 端口相同。
+- name: region
+  name_local: Region
+  require: true
+  essential: true
+  type: SAFE_STRING
+  need_restart: true
+  description_en: Region name used in bootstrap topology.
+  description_local: Bootstrap 拓扑中的 REGION 名称。
+- name: az
+  name_local: 可用区
+  require: true
+  essential: true
+  type: SAFE_STRING
+  need_restart: true
+  description_en: AZ name used in bootstrap topology.
+  description_local: Bootstrap 拓扑中的 AZ 名称。
+- name: skip_bootstrap
+  name_local: 跳过 Bootstrap
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_restart: false
+  description_en: Skip ls_ctrl bootstrap when OSS is not configured yet.
+  description_local: 尚未配置对象存储时跳过 ls_ctrl bootstrap。
+- name: object_store_url
+  name_local: 对象存储 URL
+  require: false
+  essential: true
+  type: STRING
+  need_restart: true
+  description_en: S3 object store URL for bootstrap (s3://...?host=http://...&access_id=...&access_key=...).
+  description_local: Bootstrap 使用的 S3 对象存储 URL；未配置时可设 skip_bootstrap 为 true。
+- name: memory_limit
+  name_local: 最大运行内存
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  need_restart: true
+  description_en: Maximum memory for oblogservice. Defaults to 80% of available memory when unset; warn above 90%, error above 100%.
+  description_local: oblogservice 最大运行内存；未配置时默认为可用内存的 80%；超过可用 90% 告警，超过 100% 报错。
+- name: log_disk_size
+  name_local: 日志磁盘大小
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: NULL
+  need_restart: true
+  description_en: Disk space for oblogservice logs/store. Defaults to 80% of available disk on home_path when unset; warn above 90%, error above 100%.
+  description_local: oblogservice 日志/存储磁盘配额；未配置时默认为 home_path 所在磁盘可用空间的 80%；超过可用 90% 告警，超过 100% 报错。
+- name: max_syslog_file_count
+  name_local: 系统日志保留数量
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: 0
+  max_value: NULL
+  need_restart: true
+  description_en: Maximum syslog files kept before recycling; 0 disables auto cleanup. Default 4 when unset.
+  description_local: 系统日志自动回收前最多保留的文件数；0 表示不自动清理；未配置时默认 4。
+- name: bootstrap_server
+  name_local: Bootstrap 执行节点
+  require: false
+  essential: false
+  type: SAFE_STRING
+  need_restart: false
+  description_en: Server name in servers list (e.g. server1) to run ls_ctrl bootstrap; default is the first server.
+  description_local: servers 中的节点名（如 server1），用于执行 ls_ctrl bootstrap；默认为第一个 server。

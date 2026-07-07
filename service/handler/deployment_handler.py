@@ -27,7 +27,7 @@ from _deploy import DeployStatus, DeployConfigStatus
 from _errno import CheckStatus, FixEval
 from _plugin import PluginType
 from _rpm import Version
-from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMPS_OB_AND_SEEKDB, COMP_OB_CE
+from const import COMP_JRE, COMP_OCP_EXPRESS, COMPS_OB, COMPS_OB_AND_SEEKDB, COMP_OB_CE, COMPS_MULTI_INSTANCE_ON_SAME_HOST
 from service.api.v1.deployments import DeploymentInfo
 from service.handler.base_handler import BaseHandler
 from service.handler.rsa_handler import RSAHandler
@@ -865,6 +865,8 @@ class DeploymentHandler(BaseHandler):
         repositories.extend(pkgs)
         repositories = self.obd.sort_repository_by_depend(repositories, deploy_config)
         for repository in repositories:
+            if repository.name in COMPS_MULTI_INSTANCE_ON_SAME_HOST:
+                continue
             real_servers = set()
             cluster_config = deploy_config.components[repository.name]
             for server in cluster_config.servers:

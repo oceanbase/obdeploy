@@ -32,7 +32,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
         'cluster_name': 'appname',
         'observer_root_password': 'root_password'
     }
-    for comp in ['oceanbase', 'oceanbase-ce']:
+    for comp in ['oceanbase', 'oceanbase-ce', 'oceanbase.ai']:
         if comp in cluster_config.depends:
             root_servers = {}
             ob_config = cluster_config.get_depend_config(comp)

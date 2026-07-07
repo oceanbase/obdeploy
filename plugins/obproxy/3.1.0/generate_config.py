@@ -67,7 +67,7 @@ def generate_config(plugin_context, generate_config_mini=False, auto_depend=Fals
         resource[cluster_config.name]['memory'][server.ip] = cluster_config.get_global_conf_with_default()['proxy_mem_limited']
 
     if auto_depend:
-        for comp in ['oceanbase', 'oceanbase-ce', 'ob-configserver']:
+        for comp in ['oceanbase', 'oceanbase-ce', 'oceanbase.ai', 'ob-configserver']:
             if comp in cluster_config.depends:
                 continue
             if comp in plugin_context.components:

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Input, Tooltip } from 'antd';
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
   name: string;
   isPassword?: boolean;
   fieldProps?: any;
+  id?: string;
 }
 
 export default ({
@@ -17,14 +18,15 @@ export default ({
   name,
   isPassword,
   fieldProps,
+  id,
 }: Props) => {
   const [visible, setVisible] = useState(false);
   const [currentValue, setCurrentValue] = useState(value);
-  const open = useRef();
-  open.current = {
-    input: false,
-    tooltip: false,
-  };
+  const open = useRef<{ input?: boolean; tooltip?: boolean }>({});
+
+  useEffect(() => {
+    setCurrentValue(value);
+  }, [value]);
 
   const onMouseEnterInput = () => {
     open.current = {
@@ -95,11 +97,21 @@ export default ({
     };
   }, []);
 
-  useEffect(() => {
-    if (onChange) {
-      onChange(currentValue);
-    }
-  }, [currentValue]);
+  const handleChange = (nextValue: string) => {
+    setCurrentValue(nextValue);
+    onChange?.(nextValue);
+    setVisible(false);
+  };
+
+  const inputCommonProps = {
+    id,
+    className: `tooltip-input-${name}`,
+    placeholder,
+    allowClear: true,
+    value: currentValue,
+    onFocus: () => setVisible(false),
+    ...fieldProps,
+  };
 
   return (
     <Tooltip
@@ -109,32 +121,16 @@ export default ({
     >
       {isPassword ? (
         <Input.Password
-          className={`tooltip-input-${name}`}
-          placeholder={placeholder}
-          allowClear
-          value={currentValue}
-          onChange={(e: any) => {
-            setCurrentValue(e?.target?.value);
-            setVisible(false);
-          }}
-          style={{ width: 448 }}
-          onFocus={() => setVisible(false)}
-          {...fieldProps}
+          {...inputCommonProps}
+          onChange={(e) => handleChange(e?.target?.value)}
+          style={{ width: 448, ...fieldProps?.style }}
         />
       ) : (
         <Input
-          className={`tooltip-input-${name}`}
-          placeholder={placeholder}
-          allowClear
-          value={currentValue}
-          onChange={(e: any) => {
-            setCurrentValue(e?.target?.value);
-            setVisible(false);
-          }}
+          {...inputCommonProps}
+          onChange={(e) => handleChange(e?.target?.value)}
           autoComplete="off"
-          style={{ width: 448 }}
-          onFocus={() => setVisible(false)}
-          {...fieldProps}
+          style={{ width: 448, ...fieldProps?.style }}
         />
       )}
     </Tooltip>

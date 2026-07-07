@@ -292,7 +292,7 @@ def telemetry_info_collect(plugin_context, telemetry_post_data={}, *args, **kwar
         for repository in repositories:
             if repository.name != cluster_config.name:
                 continue
-            is_ob = cluster_config.name in ['oceanbase', 'oceanbase-ce']
+            is_ob = cluster_config.name in ['oceanbase', 'oceanbase-ce', 'oceanbase.ai']
 
             for server in cluster_config.servers:
                 data = {}

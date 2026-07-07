@@ -20,6 +20,9 @@ export default () => {
   const [omsConfigData, setOmsConfigData] = useState<any>({});
   const [checkOK, setCheckOK] = useState<boolean>(false);
   const [installStatus, setInstallStatus] = useState('RUNNING');
+  const [prefetchedConnectInfo, setPrefetchedConnectInfo] = useState<
+    API.ConnectionInfo[]
+  >([]);
   const [lowVersion, setLowVersion] = useState<boolean>(false);
   const [isFirstTime, setIsFirstTime] = useState<boolean>(true);
   const [ocpNewFirstTime, setOcpNewFirstTime] = useState<boolean>(true);
@@ -86,6 +89,8 @@ export default () => {
     setCheckOK,
     installStatus,
     setInstallStatus,
+    prefetchedConnectInfo,
+    setPrefetchedConnectInfo,
     lowVersion,
     setLowVersion,
     isFirstTime,

@@ -43,7 +43,7 @@ def prepare_conf(repositories, cluster_config, clients, stdio):
     cdcro_password = None
     ob_sys_username = None
 
-    for comp in ["oceanbase", "oceanbase-ce"]:
+    for comp in ["oceanbase", "oceanbase-ce", "oceanbase.ai"]:
         if comp in cluster_config.depends:
             observer_globals = cluster_config.get_depend_config(comp)
             cdcro_password = observer_globals.get('cdcro_password')

@@ -746,7 +746,7 @@ export default function InstallConfig({
                         <Tag className="blue-tag ml-8">
                           {intl.formatMessage({
                             id: 'OBD.pages.components.InstallConfig.StandaloneEdition',
-                            defaultMessage: '单机版',
+                            defaultMessage: '集中式企业版',
                           })}
                         </Tag>
                       )}
@@ -1178,7 +1178,7 @@ export default function InstallConfig({
                     {intl.formatMessage({
                       id: 'OBD.pages.Obdeploy.InstallConfig.DistributedModeDesc',
                       defaultMessage:
-                        '分布式集群是 OceanBase 的企业级原生分布式数据库架构，相较于集中式单机，分布式集群具备金融级高可用以及平滑扩缩容能力，高度兼容 Oracle（仅商业版）/MySQL 模式，适用于对数据安全要求较高的核心业务系统。',
+                        '分布式集群是 OceanBase 的企业级原生分布式数据库架构，相较于集中式，分布式集群具备金融级高可用以及平滑扩缩容能力，高度兼容 Oracle（仅商业版）/MySQL 模式，适用于对数据安全要求较高的核心业务系统。',
                     })}
                   </div>
                 }
@@ -1199,7 +1199,7 @@ export default function InstallConfig({
                     {intl.formatMessage({
                       id: 'OBD.pages.Obdeploy.InstallConfig.StandaloneModeDesc',
                       defaultMessage:
-                        '相较于分布式集群，单机集中式仅需一台主机，部署简单，即开即用。但无多副本及扩缩容能力，适用于开发测试以及数据安全要求不高的业务系统。',
+                        '相较于分布式集群，集中式仅需一台主机，部署简单，即开即用。但无多副本及扩缩容能力，适用于开发测试以及数据安全要求不高的业务系统。',
                     })}
                   </div>
                 }
@@ -1207,7 +1207,7 @@ export default function InstallConfig({
                 <Radio value="standalone">
                   {intl.formatMessage({
                     id: 'OBD.pages.Obdeploy.InstallConfig.Standalone',
-                    defaultMessage: '单机',
+                    defaultMessage: '集中式企业版',
                   })}
                 </Radio>
               </Tooltip>

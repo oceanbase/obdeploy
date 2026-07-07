@@ -16,7 +16,7 @@
 import time
 from collections import defaultdict
 
-from const import COMP_OB, COMP_OB_CE, COMPS_OB, COMP_OB_STANDALONE, SERVICE_MODE
+from const import COMP_OB, COMP_OB_CE, COMPS_OB, COMP_OB_STANDALONE, SERVICE_MODE, COMP_OB_AI
 from tool import Cursor
 
 # Same pattern as switchover_tenant.py: cache tenant cursors on the sys-level Cursor.
@@ -111,7 +111,7 @@ def failover_decouple_tenant_pre(plugin_context, cursors={}, *args, **kwargs):
             source_password = primary_info_dict.get('PASSWORD')
             
             comp_name = cluster_config.name
-            if comp_name in (COMP_OB, COMP_OB_STANDALONE):
+            if comp_name in (COMP_OB, COMP_OB_STANDALONE, COMP_OB_AI):
                 standbyro_password_dict = cluster_config.get_component_attr('standbyro_password')
                 tenant_standbyro_password = standbyro_password_dict.get(standby_tenant, '') if standbyro_password_dict else ''
             else:

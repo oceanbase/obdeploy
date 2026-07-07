@@ -119,11 +119,11 @@ def import_time_zone(plugin_context, config_encrypted, create_tenant_options=[],
                     break
 
         if mode == 'mysql':
-            cmd_str = "obclient -h%s -P\'%s\' %s -u%s -Doceanbase -A\n"
-            no_password_cmd = "obclient -h%s -P\'%s\' -u%s -Doceanbase -A\n"
+            cmd_str = "obclient -h%s -P%s %s -u%s -Doceanbase -A\n"
+            no_password_cmd = "obclient -h%s -P%s -u%s -Doceanbase -A\n"
         else:
-            cmd_str = "obclient -h%s -P\'%s\' %s -u%s -A\n"
-            no_password_cmd = "obclient -h%s -P\'%s\' -u%s -A\n"
+            cmd_str = "obclient -h%s -P%s %s -u%s -A\n"
+            no_password_cmd = "obclient -h%s -P%s -u%s -A\n"
         if not tenant_cursor:
             exec_sql_in_tenant(sql="select 1;", cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
         cmd_str = cmd_str % (tenant_cursor.ip, tenant_cursor.port, f"-p'{root_password}'" if not config_encrypted else '', tenant_cursor.user)

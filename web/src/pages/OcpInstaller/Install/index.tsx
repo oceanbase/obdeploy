@@ -21,10 +21,20 @@ import { useRequest } from 'ahooks';
 import CheckInfo from '@/component/OCPPreCheck/CheckInfo';
 import { getTailPath } from '@/utils/helper';
 import PreCheck from '@/component/OCPPreCheck/PreCheck';
+import { useKeepAlive } from '@/hooks/useKeepAlive';
+import ProgressQuit from '@/pages/Obdeploy/ProgressQuit';
 
+const PROGRESS_QUIT_STEP = 8;
 
 const Install: React.FC = () => {
   const [current, setCurrent] = useState(1);
+
+  useKeepAlive({
+    currentStep: current,
+    setCurrentStep: setCurrent,
+    progressQuitStep: PROGRESS_QUIT_STEP,
+    installPhaseStepThreshold: 5,
+  });
 
   const {
     connectId,
@@ -61,14 +71,25 @@ const Install: React.FC = () => {
 
   const isNewDB = getTailPath() === 'install'
 
-  const paddingTop = current === 2 ? 132 : current === 7 && installStatus === 'FINISHED' ? 0 : current !== 6 ? 150 : 0;
+  const paddingTop =
+    current === PROGRESS_QUIT_STEP
+      ? 70
+      : current === 2
+        ? 132
+        : current === 7 && installStatus === 'FINISHED'
+          ? 0
+          : current !== 6
+            ? 150
+            : 0;
   return (
     <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
-      <Steps
-        currentStep={current}
-        stepsItems={NEW_METADB_OCP_INSTALL}
-        showStepsKeys={STEPS_KEYS_INSTALL}
-      />
+      {current !== PROGRESS_QUIT_STEP && (
+        <Steps
+          currentStep={current}
+          stepsItems={NEW_METADB_OCP_INSTALL}
+          showStepsKeys={STEPS_KEYS_INSTALL}
+        />
+      )}
 
       <div
         style={{
@@ -148,6 +169,8 @@ const Install: React.FC = () => {
             type="install"
           />
         )}
+
+        {current === PROGRESS_QUIT_STEP && <ProgressQuit />}
       </div>
     </PageContainer>
   );

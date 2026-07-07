@@ -39,7 +39,7 @@ import _environ as ENV
 from ssh import LocalClient
 from const import (
     CONST_OBD_HOME,
-    VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS, COMP_OB_CE, COMP_ODP_CE, COMP_ODP, COMP_OCP_SERVER_CE, COMP_OB_STANDALONE,
+    VERSION, REVISION, BUILD_BRANCH, BUILD_TIME, FORBIDDEN_VARS, COMP_OB_CE, COMP_ODP_CE, COMP_ODP, COMP_OCP_SERVER_CE, COMP_OB_STANDALONE, COMP_OB_AI,
     COMP_OCEANBASE_DIAGNOSTIC_TOOL, PKG_RPM_FILE,PKG_REPO_FILE, BUILD_PLUGIN_LIST
 )
 
@@ -228,7 +228,7 @@ class ObdCommand(BaseCommand):
                                 DirectoryUtil.copy(obd_part_dir, backup_path, stdio=ROOT_IO)
                             if part != 'config_parser':
                                 for file in glob.glob('%s/*/*/*' % obd_part_dir):
-                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file):
+                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file) or COMP_OB_AI in file:
                                         continue
                                     if file[obd_path_len:] not in BUILD_PLUGIN_LIST:
                                         FileUtil.rm(file)
@@ -240,7 +240,7 @@ class ObdCommand(BaseCommand):
                         if os.path.exists(root_part_path):
                             if part != 'config_parser':
                                 for file in glob.glob('%s/*/*/*' % obd_part_dir):
-                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file) or COMP_OB_STANDALONE in file:
+                                    if COMP_OB_CE in file or COMP_OCP_SERVER_CE in file or (COMP_ODP_CE in file and 'file_map.yaml' in file) or COMP_OB_STANDALONE in file or COMP_OB_AI in file:
                                         continue
                                     if file[obd_path_len:] not in BUILD_PLUGIN_LIST:
                                         if file.replace(COMP_ODP_CE, COMP_ODP).replace('3.2.1', '3.1.0') in BUILD_PLUGIN_LIST:

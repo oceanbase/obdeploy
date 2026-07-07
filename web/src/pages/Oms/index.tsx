@@ -1,4 +1,5 @@
 
+import { useKeepAlive } from '@/hooks/useKeepAlive';
 import { getLocale, useModel } from '@umijs/max';
 import ExitPage from './ExitPage';
 import styles from './index.less';
@@ -13,10 +14,14 @@ import PreCheckStatus from './PreCheckStatus';
 
 export default function IndexPage() {
   const locale = getLocale();
-  const {
-    currentStep,
-  } = useModel('global');
+  const { currentStep, setCurrentStep } = useModel('global');
 
+  useKeepAlive({
+    currentStep,
+    setCurrentStep,
+    progressQuitStep: 8,
+    installPhaseStepThreshold: 4,
+  });
 
   const contentConfig = {
     1: <InstallConfig />,
@@ -29,19 +34,20 @@ export default function IndexPage() {
     8: <ProgressQuit />,
   };
 
-
   const containerStyle = {
-    minHeight: `${currentStep < 6 ? 'calc(100% - 240px)' : 'calc(100% - 140px)'
-      }`,
+    minHeight: `${
+      currentStep < 6 ? 'calc(100% - 240px)' : 'calc(100% - 140px)'
+    }`,
     paddingTop: `${currentStep < 6 ? '170px' : '70px'}`,
   };
 
   return (
     <div
-      className={`${styles.container} ${locale !== 'zh-CN' ? styles.englishContainer : ''
-        }`}
+      className={`${styles.container} ${
+        locale !== 'zh-CN' ? styles.englishContainer : ''
+      }`}
     >
-      <Steps />
+      {currentStep !== 8 && <Steps />}
       <div className={styles.pageContainer} style={containerStyle}>
         <main className={styles.pageMain}>
           <div className={styles.pageContent}>{contentConfig[currentStep]}</div>

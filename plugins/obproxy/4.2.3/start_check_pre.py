@@ -35,7 +35,7 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
         if work_dir_check:
             check_status[server]['dir'] = err.CheckStatus()
 
-        for comp in ["oceanbase", "oceanbase-ce"]:
+        for comp in ["oceanbase", "oceanbase-ce", "oceanbase.ai"]:
             if comp in cluster_config.depends:
                 check_status[server]['password'] = err.CheckStatus()
         check_status[server]['proxy_id'] = err.CheckStatus()

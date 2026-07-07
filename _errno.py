@@ -270,6 +270,44 @@ EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER = OBDErrorCodeTemplate(4602, 'Deploy
 EC_OBBINLOG_CE_WITH_OCENABASE_CE = OBDErrorCodeTemplate(4603, 'The Binlog service for the community version can only be used with the community version of the OceanBase database.')
 EC_OBBINLOG_WITH_OCENABASE = OBDErrorCodeTemplate(4604, 'The Binlog service for the enterprise version can only be used with the enterprise version of the OceanBase database.')
 
+# oblogservice
+EC_OBLOGSERVICE_UNSUPPORTED_OB_TYPE = OBDErrorCodeTemplate(
+    4710,
+    'oblogservice (logservice) is only supported with oceanbase.ai {min_version} or above, not with {comp}.',
+)
+EC_OBLOGSERVICE_OB_VERSION_TOO_LOW = OBDErrorCodeTemplate(
+    4711,
+    'oblogservice (logservice) requires oceanbase.ai {min_version} or above, got {version}.',
+)
+EC_OBLOGSERVICE_INVALID_BOOTSTRAP_SERVER = OBDErrorCodeTemplate(
+    4712,
+    'bootstrap_server "{bootstrap_server}" is not found in oblogservice servers list.',
+)
+EC_OBLOGSERVICE_RESOURCE_EXCEEDS_AVAILABLE = OBDErrorCodeTemplate(
+    4713,
+    '({server}) {key} ({configured}) exceeds available {resource} ({available}).',
+)
+WC_OBLOGSERVICE_RESOURCE_NEAR_LIMIT = OBDErrorCodeTemplate(
+    4714,
+    '({server}) {key} ({configured}) exceeds 90% of available {resource} ({available}).',
+)
+EC_OBLOGSERVICE_COMBINED_RESOURCE_EXCEEDS_AVAILABLE = OBDErrorCodeTemplate(
+    4716,
+    '({server}) combined {key} ({configured}, includes colocated OceanBase) exceeds available {resource} ({available}).',
+)
+WC_OBLOGSERVICE_COMBINED_RESOURCE_NEAR_LIMIT = OBDErrorCodeTemplate(
+    4717,
+    '({server}) combined {key} ({configured}, includes colocated OceanBase) exceeds 90% of available {resource} ({available}).',
+)
+EC_OBLOGSERVICE_GET_RESOURCE_INFO_FAIL = OBDErrorCodeTemplate(
+    4715,
+    '({server}) failed to get {resource} information, please configure `{key}` manually.',
+)
+EC_OBLOGSERVICE_UPGRADE_NOT_SUPPORTED = OBDErrorCodeTemplate(
+    4718,
+    'oblogservice does not support upgrade. Please destroy the cluster and deploy the target version instead.',
+)
+
 WC_PARAM_USELESS = OBDErrorCodeTemplate(4521, 'The config {key} in {current_comp} did not take effect, please config it in {comp}')
 
 #oms
