@@ -53,6 +53,9 @@ oceanbase.ai:
     - name: server3
       ip: 192.168.1.3
   global:
+    mode: shared_storage
+    enable_logservice: true
+    shared_storage_info: "oss://your-bucket?/?host=http://your-object-storage-host&access_id=xxx&access_key=yyy&max_iops=10000&max_bandwidth=1GB"
     memory_limit: 64G # The maximum running memory for an observer
     datafile_size: 192G  # Size of the data file. 
     log_disk_size: 192G  # The size of disk space used by the clog files.
@@ -76,4 +79,3 @@ oceanbase.ai:
     zone: zone2
   server3:
     zone: zone3
-

@@ -98,6 +98,9 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
     let newOcpserver: any = {
       ...(ocpserver || {}),
       ...dataSource.ocpserver,
+      // ocp_site_url 由 ServiceConfig 独立 Input 维护，避免 undefined 覆盖已保存值
+      ocp_site_url:
+        dataSource.ocpserver?.ocp_site_url ?? ocpserver?.ocp_site_url,
       dns:
         dataSource.ocpserver?.dnsType !== 'vip'
           ? dataSource.ocpserver?.dns
@@ -280,7 +283,7 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
         formValidScrollHelper(result);
         return;
       }
-      setData(result[0].value);
+      setData(form.getFieldsValue(true));
       setCurrent(current + 1);
       setErrorVisible(false);
       setErrorsList([]);
@@ -382,9 +385,10 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
       ? ocpserver.soft_dir
       : soft_dir;
 
-    // ocp_site_url 必须明确设置，即使它是 undefined 或空字符串
-    // 直接设置值，确保表单能正确更新
-    updateValues.ocpserver.ocp_site_url = ocpserver?.ocp_site_url;
+    // 仅在有值时同步 ocp_site_url，避免用 undefined 覆盖 ServiceConfig 已写入表单的默认值
+    if (ocpserver?.ocp_site_url !== undefined) {
+      updateValues.ocpserver.ocp_site_url = ocpserver.ocp_site_url;
+    }
 
     // 其他字段也同步更新
     if (ocpserver?.port !== undefined) {
