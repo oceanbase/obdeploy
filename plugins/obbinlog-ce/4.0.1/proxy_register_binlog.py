@@ -42,10 +42,15 @@ def proxy_register_binlog(plugin_context, proxy_version, *args, **kwargs):
             ips += ';' + ip + ":" + str(server_config.get('service_port'))
     try:
         cursor.execute(f"alter proxyconfig set binlog_service_ip='{ips}'", raise_exception=True)
-        if proxy_version < Version('4.2.3'):
-            cursor.execute("ALTER proxyconfig SET enable_binlog_service='True'", raise_exception=True)
     except Exception as e:
         stdio.error(e)
         return plugin_context.return_false()
+    if proxy_version < Version('4.2.3'):
+        try:
+            cursor.execute("ALTER proxyconfig SET enable_binlog_service='True'", raise_exception=True, exc_level='verbose')
+        except Exception as e:
+            if not e.args or e.args[0] != 5099:
+                stdio.error(e)
+                return plugin_context.return_false()
+            stdio.warn("The obproxy does not support enable_binlog_service, skip setting it.")
     return plugin_context.return_true()
-

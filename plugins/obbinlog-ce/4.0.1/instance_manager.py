@@ -60,10 +60,18 @@ def instance_manager(plugin_context, source_option, no_instance_exit=True, *args
                                     success = True
                                     break
                         count -= 1
+                    if not success:
+                        stdio.error(
+                            'Timeout waiting for binlog instance %s to be %s' %
+                            (
+                                instance['name'],
+                                const.BINLOG_INSTANCE_STATUS_OPERATORS_MAP[source_option],
+                            )
+                        )
+                        return plugin_context.return_false()
     except:
         stdio.exception('Failed to update binlog instance status')
         return plugin_context.return_false()
 
     plugin_context.set_variable('instances_operator', source_option)
     return plugin_context.return_true()
-

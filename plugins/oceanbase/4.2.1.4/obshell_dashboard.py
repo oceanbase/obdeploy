@@ -39,7 +39,10 @@ def compare(obshell_version, version, op):
 def passwd_format(passwd):
     return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
-def obshell_dashboard(plugin_context, obshell_clients, config_encrypted, display_encrypt_password='******', *args, **kwargs):
+def obshell_dashboard(plugin_context, obshell_clients, config_encrypted, display_encrypt_password='******', skip_when_status_check_failed=False, *args, **kwargs):
+    if skip_when_status_check_failed and plugin_context.get_variable('status_check_pass') is False:
+        return plugin_context.return_true()
+
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
 

@@ -18,7 +18,10 @@ from __future__ import absolute_import, division, print_function
 from _errno import EC_OBSERVER_FAIL_TO_START_OCS
 
 
-def obshell_health_check(plugin_context, *args, **kwargs):
+def obshell_health_check(plugin_context, skip_when_status_check_failed=False, *args, **kwargs):
+    if skip_when_status_check_failed and plugin_context.get_variable('status_check_pass') is False:
+        return plugin_context.return_true()
+
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients

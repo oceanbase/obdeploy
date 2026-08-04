@@ -17,6 +17,7 @@ from __future__ import absolute_import, division, print_function
 import re
 
 import _errno as err
+from tool import GET_MEM_TOTAL_KB_CMD, get_kernel_check_values
 
 
 def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict_check=False,  *args, **kwargs):
@@ -119,8 +120,12 @@ def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict
                     if check_item not in kernel_params:
                         continue
                     values = kernel_params[check_item]
-                    needs = kernel_param['need']
-                    recommends = kernel_param['recommend']
+                    check_values = get_kernel_check_values(client, kernel_param)
+                    if check_values is None:
+                        error = err.EC_FAILED_TO_GET_PARAM.format(ip=ip, key='MemTotal', cmd=GET_MEM_TOTAL_KB_CMD)
+                        alert_strict(server, check_item, error, [err.SUG_CONNECT_EXCEPT.format()])
+                        continue
+                    needs, recommends = check_values
                     for i in range(len(values)):
                         # This case is not handling the value of 'default'. Additional handling is required for 'default' in the future.
                         item_value = int(values[i])
@@ -146,4 +151,3 @@ def system_limits_check(plugin_context, ulimits_min, generate_configs={}, strict
     plugin_context.set_variable('need_check_servers_disk', need_check_servers_disk)
 
     return plugin_context.return_true()
-

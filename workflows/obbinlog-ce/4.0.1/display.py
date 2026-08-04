@@ -20,6 +20,6 @@ import const
 
 def display(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'status')
-    workflow.add_with_component(const.STAGE_FIRST, 'general', 'status_check')
+    workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', '0.1', {'allow_partial': True}, 'status_check')
     workflow.add(const.STAGE_SECOND, 'display')
     return plugin_context.return_true()

@@ -41,6 +41,9 @@ def connect(plugin_context, target_server=None, retry_times=101, connect_all=Fal
         if cursor:
             return return_true(connect=cursor.db, cursor=cursor, server=None)
     
+    partial_retry_times = kwargs.get('partial_retry_times')
+    if plugin_context.get_variable('status_check_pass') is False and partial_retry_times is not None:
+        retry_times = partial_retry_times
     count = retry_times
     cluster_config = plugin_context.cluster_config
     new_cluster_config = kwargs.get("new_cluster_config")

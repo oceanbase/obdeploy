@@ -53,7 +53,7 @@ def start(plugin_context, *args, **kwargs):
                 ld_libary_path = ":".join([ld_libary_path, jvm_path])
             environments['LD_LIBRARY_PATH'] = ld_libary_path
         with EnvVariables(environments, client):
-            client.execute_command("cd {0};nohup {0}/bin/logproxy -f {0}/conf/conf.json > {0}/log/out.log &".format(home_path))
+            client.execute_command("cd {0};nohup {0}/bin/logproxy -f {0}/conf/conf.json > {0}/log/out.log 2>&1 < /dev/null &".format(home_path))
             ret = client.execute_command("ps -aux | grep '%s/bin/logproxy -f %s/conf/conf.json' | grep -v grep | awk '{print $2}'" % (home_path, home_path))
         if not ret:
             stdio.stop_loading('fail')

@@ -18,18 +18,22 @@ from __future__ import absolute_import, division, print_function
 from _deploy import ClusterStatus
 
 
-def status_check(plugin_context, target_status=ClusterStatus.STATUS_RUNNING, is_error=False, *args, **kwargs):
+def status_check(plugin_context, target_status=ClusterStatus.STATUS_RUNNING, is_error=False, allow_partial=False, *args, **kwargs):
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     cluster_status = plugin_context.get_return('status').get_return('cluster_status')
     print_msg = stdio.error if is_error else stdio.warn
     status_msg = 'running' if target_status == ClusterStatus.STATUS_RUNNING else 'stopped'
     status_check_pass = True
+    matched_servers = 0
     for server in cluster_status:
-        if cluster_status[server] != target_status.value:
+        if cluster_status[server] == target_status.value:
+            matched_servers += 1
+        else:
             status_check_pass = False
             print_msg("%s %s is not %s" % (server, cluster_config.name, status_msg))
 
-    if status_check_pass:
-        return plugin_context.return_true(status_check_pass=status_check_pass)
-    return plugin_context.return_false(status_check_pass=status_check_pass)
+    plugin_context.set_variable('status_check_pass', status_check_pass)
+    if not status_check_pass and (not allow_partial or not matched_servers):
+        return plugin_context.return_false(status_check_pass=status_check_pass)
+    return plugin_context.return_true(status_check_pass=status_check_pass)

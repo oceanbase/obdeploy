@@ -130,9 +130,9 @@ export default function InstallConfig({
   const [oceanbaseType, setOceanbaseType] = useState<string>('');
   const [componentLoading, setComponentLoading] = useState(false);
   const draftNameRef = useRef();
+  const draftCheckedRef = useRef(false);
 
   // 当前 OB 环境是否为单机版
-  // const standAlone = deployMode === 'standalone';
   const standAlone = oceanbaseType === 'standalone';
   // 当前是否为 seekdb 模式
   const seekdb = deployMode === 'seekdb';
@@ -265,7 +265,12 @@ export default function InstallConfig({
                       ...currentSeekdbVersionInfo,
                       dataSource: item.info || [],
                     };
-                  } else {
+                  } else if (
+                    (deployMode === 'standalone' &&
+                      item.name === oceanbaseStandaloneComponent) ||
+                    (deployMode === 'distributed' &&
+                      item.name === oceanbaseComponent)
+                  ) {
                     setOceanbaseType(currentOceanbaseVersionInfo?.version_type || '');
                     setOBVersionValue(
                       `${currentOceanbaseVersionInfo?.version}-${currentOceanbaseVersionInfo?.release}-${currentOceanbaseVersionInfo?.md5}`,
@@ -440,11 +445,13 @@ export default function InstallConfig({
           component:
             deployMode === 'seekdb'
               ? seekdbComponent
-              : componentsVersionInfo?.[oceanbaseComponent]?.version_type === 'ce'
-                ? 'oceanbase-ce'
-                : componentsVersionInfo?.[oceanbaseComponent]?.version_type === 'business'
-                  ? 'oceanbase'
-                  : 'oceanbase-standalone',
+              : standAlone
+                ? oceanbaseStandaloneComponent
+                : componentsVersionInfo?.[oceanbaseComponent]?.version_type === 'ce'
+                  ? 'oceanbase-ce'
+                  : componentsVersionInfo?.[oceanbaseComponent]?.version_type === 'business'
+                    ? 'oceanbase'
+                    : 'oceanbase-standalone',
           appname: values?.appname,
           version:
             deployMode === 'seekdb'
@@ -587,6 +594,21 @@ export default function InstallConfig({
       return;
     }
 
+    // 集中式模式更新 oceanbaseStandaloneComponent 版本信息
+    if (deployMode === 'standalone') {
+      setComponentsVersionInfo({
+        ...componentsVersionInfo,
+        [oceanbaseStandaloneComponent]: {
+          ...componentsVersionInfo[oceanbaseStandaloneComponent],
+          ...newSelectedVersionInfo,
+          dataSource:
+            componentsVersionInfo[oceanbaseStandaloneComponent]?.dataSource ||
+            [],
+        },
+      });
+      return;
+    }
+
     let currentObproxyVersionInfo = {};
     componentsVersionInfo?.[obproxyComponent]?.dataSource?.some(
       (item: API.service_model_components_ComponentInfo) => {
@@ -636,7 +658,7 @@ export default function InstallConfig({
     ? [oceanbaseComponent]
     : deployMode === 'seekdb'
       ? [seekdbComponent]
-      : [oceanbaseStandaloneComponent, oceanbaseComponent];
+      : [oceanbaseStandaloneComponent];
 
   // seekdb 版本过滤：只保留 1.3 及以上版本
   const filterSeekdbVersions = (dataSources: API.service_model_components_ComponentInfo[]) => {
@@ -656,11 +678,24 @@ export default function InstallConfig({
     });
   };
 
+  // 集中式版本过滤：只保留集中式版本
+  const filterStandaloneVersions = (
+    dataSources: API.service_model_components_ComponentInfo[],
+  ) => {
+    if (deployMode !== 'standalone') return dataSources;
+
+    return dataSources.filter((item) => item?.version_type === 'standalone');
+  };
+
   const combinedDataSources = deployMode === 'seekdb'
     ? filterSeekdbVersions(componentsVersionInfo[seekdbComponent]?.dataSource || [])
-    : deployComponent
-      .flatMap((component) => componentsVersionInfo[component]?.dataSource || [])
-      .filter((dataSource) => dataSource !== undefined);
+    : deployMode === 'standalone'
+      ? filterStandaloneVersions(
+        componentsVersionInfo[oceanbaseStandaloneComponent]?.dataSource || [],
+      )
+      : deployComponent
+        .flatMap((component) => componentsVersionInfo[component]?.dataSource || [])
+        .filter((dataSource) => dataSource !== undefined);
 
   // seekdb 模式下，检查是否有 >= 1.3 的版本（用于禁用下一步按钮）
   const seekdbHasNoValidVersion = deployMode === 'seekdb' && combinedDataSources?.length === 0;
@@ -746,7 +781,7 @@ export default function InstallConfig({
                         <Tag className="blue-tag ml-8">
                           {intl.formatMessage({
                             id: 'OBD.pages.components.InstallConfig.StandaloneEdition',
-                            defaultMessage: '集中式企业版',
+                            defaultMessage: '集中式',
                           })}
                         </Tag>
                       )}
@@ -927,85 +962,88 @@ export default function InstallConfig({
     return NP.divide(NP.divide(originSize, 1024), 1024).toFixed(2);
   };
 
+  // 历史 DRAFT 检测：仅在首次进入时执行一次，不随部署模式切换重复触发
+  useEffect(() => {
+    if (!isFirstTime || draftCheckedRef.current) return;
+    draftCheckedRef.current = true;
+    fetchDeploymentInfo({ task_status: 'DRAFT' }).then(
+      ({ success: draftSuccess, data: draftData }: API.OBResponse) => {
+        if (draftSuccess && draftData?.items?.length) {
+          const defaultValue = draftData?.items[0]?.name;
+          draftNameRef.current = defaultValue;
+          setHasDraft(true);
+          Modal.confirm({
+            title: intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.TheFollowingHistoricalConfigurationsOf',
+              defaultMessage: '检测到系统中存在以下部署失败的历史配置',
+            }),
+            okText: intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.ContinueDeployment',
+              defaultMessage: '继续部署',
+            }),
+            cancelText: intl.formatMessage({
+              id: 'OBD.pages.components.InstallConfig.Ignore',
+              defaultMessage: '忽略',
+            }),
+            closable: true,
+            width: 424,
+            content: (
+              <Space direction="vertical" size="middle">
+                <div style={{ color: '#5C6B8A' }}>
+                  {intl.formatMessage({
+                    id: 'OBD.pages.components.InstallConfig.ContinuingDeploymentWillCleanUp',
+                    defaultMessage:
+                      '继续部署将先清理失败的历史部署环境，是否继续历史部署流程？',
+                  })}
+                </div>
+                <Select
+                  style={commonStyle}
+                  onChange={(value) => (draftNameRef.current = value)}
+                  defaultValue={defaultValue}
+                >
+                  {draftData?.items?.map((item) => (
+                    <Select.Option key={item.name} value={item.name}>
+                      {item.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Space>
+            ),
+
+            onOk: () => {
+              return new Promise<void>(async (resolve) => {
+                try {
+                  const { success: deleteSuccess } =
+                    await handleDeleteDeployment({
+                      name: draftNameRef.current,
+                    });
+                  if (deleteSuccess) {
+                    resolve();
+                    setDeleteName(draftNameRef.current);
+                    setDeleteLoadingVisible(true);
+                  }
+                } catch {
+                  setIsDraft(false);
+                  resolve();
+                }
+              });
+            },
+            onCancel: () => {
+              setIsDraft(false);
+              setHasDraft(false);
+            },
+          });
+        } else {
+          setIsDraft(false);
+        }
+      },
+    );
+  }, [isFirstTime]);
+
+  // 切换部署模式时重新拉取组件版本
   useEffect(() => {
     setComponentLoading(true);
-    if (isFirstTime) {
-      fetchAllComponentVersions();
-      fetchDeploymentInfo({ task_status: 'DRAFT' }).then(
-        ({ success: draftSuccess, data: draftData }: API.OBResponse) => {
-          if (draftSuccess && draftData?.items?.length) {
-            const defaultValue = draftData?.items[0]?.name;
-            draftNameRef.current = defaultValue;
-            setHasDraft(true);
-            Modal.confirm({
-              title: intl.formatMessage({
-                id: 'OBD.pages.components.InstallConfig.TheFollowingHistoricalConfigurationsOf',
-                defaultMessage: '检测到系统中存在以下部署失败的历史配置',
-              }),
-              okText: intl.formatMessage({
-                id: 'OBD.pages.components.InstallConfig.ContinueDeployment',
-                defaultMessage: '继续部署',
-              }),
-              cancelText: intl.formatMessage({
-                id: 'OBD.pages.components.InstallConfig.Ignore',
-                defaultMessage: '忽略',
-              }),
-              closable: true,
-              width: 424,
-              content: (
-                <Space direction="vertical" size="middle">
-                  <div style={{ color: '#5C6B8A' }}>
-                    {intl.formatMessage({
-                      id: 'OBD.pages.components.InstallConfig.ContinuingDeploymentWillCleanUp',
-                      defaultMessage:
-                        '继续部署将先清理失败的历史部署环境，是否继续历史部署流程？',
-                    })}
-                  </div>
-                  <Select
-                    style={commonStyle}
-                    onChange={(value) => (draftNameRef.current = value)}
-                    defaultValue={defaultValue}
-                  >
-                    {draftData?.items?.map((item) => (
-                      <Select.Option key={item.name} value={item.name}>
-                        {item.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Space>
-              ),
-
-              onOk: () => {
-                return new Promise<void>(async (resolve) => {
-                  try {
-                    const { success: deleteSuccess } =
-                      await handleDeleteDeployment({
-                        name: draftNameRef.current,
-                      });
-                    if (deleteSuccess) {
-                      resolve();
-                      setDeleteName(draftNameRef.current);
-                      setDeleteLoadingVisible(true);
-                    }
-                  } catch {
-                    setIsDraft(false);
-                    resolve();
-                  }
-                });
-              },
-              onCancel: () => {
-                setIsDraft(false);
-                setHasDraft(false);
-              },
-            });
-          } else {
-            setIsDraft(false);
-          }
-        },
-      );
-    } else {
-      fetchAllComponentVersions();
-    }
+    fetchAllComponentVersions();
   }, [deployMode]);
 
   // 判断是否开启在线仓库
@@ -1207,7 +1245,7 @@ export default function InstallConfig({
                 <Radio value="standalone">
                   {intl.formatMessage({
                     id: 'OBD.pages.Obdeploy.InstallConfig.Standalone',
-                    defaultMessage: '集中式企业版',
+                    defaultMessage: '集中式',
                   })}
                 </Radio>
               </Tooltip>

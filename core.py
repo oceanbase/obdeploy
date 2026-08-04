@@ -239,7 +239,11 @@ class ObdHome(object):
         else:
             self._call_stdio(msg_lv, 'No such %s template for %s-%s' % (workflow_name, component_name, version))
 
-    def run_workflow(self, workflows, sorted_components=[], repositories=[], repositories_map={}, no_found_act='exit', error_exit=True, **kwargs):
+    def run_workflow(
+        self, workflows, sorted_components=[], repositories=[],
+        repositories_map={}, no_found_act='exit', error_exit=True,
+        skip_failed_components=False, **kwargs
+    ):
         if not sorted_components and self.deploy:
             sorted_components = self.deploy.deploy_config.sorted_components
         if not repositories_map:
@@ -252,18 +256,33 @@ class ObdHome(object):
         if not sorted_components:
             sorted_components = [repository.name for repository in repositories]
 
+        failed_components = set()
         for stages in workflows(sorted_components):
-            if not self.hanlde_sub_workflows(stages, sorted_components, repositories, no_found_act=no_found_act, **kwargs):
+            active_stages = OrderedDict(
+                (component_name, templates)
+                for component_name, templates in stages.items()
+                if component_name not in failed_components
+            )
+            if not active_stages:
+                continue
+            if not self.hanlde_sub_workflows(
+                active_stages, sorted_components, repositories,
+                no_found_act=no_found_act, **kwargs
+            ):
                 return False
-            for component_name in stages:
-                for template in stages[component_name]:
+            for component_name in active_stages:
+                for template in active_stages[component_name]:
                     if isinstance(template, SubWorkflowTemplate):
                         continue
                     if component_name in kwargs:
                         template.kwargs.update(kwargs[component_name])
-                    if not self.run_plugin_template(template, component_name, repositories_map, no_found_act=no_found_act) and error_exit:
-                        return False
-        return True
+                    if not self.run_plugin_template(template, component_name, repositories_map, no_found_act=no_found_act):
+                        if error_exit:
+                            return False
+                        if skip_failed_components:
+                            failed_components.add(component_name)
+                            break
+        return not failed_components if skip_failed_components else True
 
     def hanlde_sub_workflows(self, stages, sorted_components, repositories, no_found_act='exit', **kwargs):
         sub_workflows = SubWorkflows()
@@ -3066,7 +3085,9 @@ class ObdHome(object):
         name = deploy.name
 
         components = getattr(self.options, 'components', '')
-        sort_components = deploy.deploy_config.sorted_components
+        # Stop dependents before their dependencies. The configured order is
+        # dependencies-first because it is also used by deploy and start.
+        sort_components = list(reversed(deploy.deploy_config.sorted_components))
         if components:
             components = components.split(',')
             dump = False
@@ -3315,8 +3336,17 @@ class ObdHome(object):
 
         self._call_stdio('verbose', 'Check deploy status')
         if deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
+            if not self._prepare_destroy_cluster(
+                deploy, repositories, allow_prepare_failure=False
+            ):
+                return False
             obd = self.fork(options=Values({'force': True}))
             if not obd._stop_cluster(deploy, repositories, skip_compaction=True):
+                return False
+        elif deploy_info.status == DeployStatus.STATUS_STOPPED:
+            if not self._prepare_destroy_cluster(
+                deploy, repositories, allow_prepare_failure=False
+            ):
                 return False
         elif deploy_info.status not in [DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_DEPLOYED]:
             self._call_stdio('error', 'Deploy "%s" is %s. You could not destroy an undeployed cluster' % (
@@ -3325,7 +3355,7 @@ class ObdHome(object):
 
         # Check whether the components have the parameter plugins and apply the plugins
         self.search_param_plugin_and_apply(repositories, deploy_config)
-        if not self._destroy_cluster(deploy, repositories):
+        if not self._destroy_cluster(deploy, repositories, prepared=True):
             return False
         if search_repo:
             if deploy_info.config_status != DeployConfigStatus.UNCHNAGE and not deploy.apply_temp_deploy_config():
@@ -3390,15 +3420,20 @@ class ObdHome(object):
             self._call_stdio('print', 'If you want to remove the configuration files, you can use: obd cluster prune-config %s' % name)
             return True
         elif deploy_info.status in [DeployStatus.STATUS_RUNNING, DeployStatus.STATUS_UPRADEING]:
+            if not self._prepare_destroy_cluster(deploy, repositories):
+                return False
             obd = self.fork(options=Values({'force': True}))
             if not obd._stop_cluster(deploy, repositories, skip_compaction=True):
+                return False
+        elif deploy_info.status == DeployStatus.STATUS_STOPPED:
+            if not self._prepare_destroy_cluster(deploy, repositories):
                 return False
         elif deploy_info.status not in [DeployStatus.STATUS_STOPPED, DeployStatus.STATUS_DEPLOYED]:
             self._call_stdio('error', 'Deploy "%s" is %s. You could not destroy an undeployed cluster' % (name, deploy_info.status.value))
             return False
 
         self.search_param_plugin_and_apply(repositories, deploy_config)
-        result = self._destroy_cluster(deploy, repositories)
+        result = self._destroy_cluster(deploy, repositories, prepared=True)
 
         # Print prune-config hint after successful destroy
         if result:
@@ -3406,7 +3441,63 @@ class ObdHome(object):
 
         return result
 
-    def _destroy_cluster(self, deploy, repositories, dump=True):
+    def _prepare_destroy_cluster(
+        self, deploy, repositories, allow_prepare_failure=True
+    ):
+        status = deploy.deploy_info.status
+        if status == DeployStatus.STATUS_DEPLOYED:
+            return True
+
+        self.search_param_plugin_and_apply(
+            repositories, deploy.deploy_config
+        )
+        workflows = self.get_workflows(
+            'destroy_prepare',
+            no_found_act='ignore',
+            skip_managed_prepare=(
+                not allow_prepare_failure
+                and status != DeployStatus.STATUS_RUNNING
+            ),
+        )
+        prepare_success = self.run_workflow(
+            workflows, no_found_act='ignore'
+        )
+
+        if status == DeployStatus.STATUS_RUNNING:
+            return prepare_success
+
+        cleanup_workflows = self.get_workflows(
+            'destroy_prepare_cleanup', no_found_act='ignore'
+        )
+        cleanup_success = self.run_workflow(
+            cleanup_workflows, no_found_act='ignore'
+        )
+        if not cleanup_success:
+            return False
+        if not prepare_success:
+            if allow_prepare_failure:
+                message = (
+                    'Failed to update binlog instance metadata before destroy. '
+                    'The local instances will be stopped, but external metadata '
+                    'may require manual cleanup.'
+                )
+            else:
+                message = (
+                    'Failed to update binlog instance metadata. The operation '
+                    'was aborted after cleaning up the temporary service.'
+                )
+            self._call_stdio('warn', message)
+            return allow_prepare_failure
+        return True
+
+    def _destroy_cluster(
+        self, deploy, repositories, dump=True, prepared=False
+    ):
+        if not prepared and not self._prepare_destroy_cluster(
+            deploy, repositories
+        ):
+            return False
+
         self._call_stdio('stop_loading', 'succeed')
 
         # Check the status for the deployed cluster
@@ -3432,7 +3523,10 @@ class ObdHome(object):
                 return False
 
         workflows = self.get_workflows("destroy")
-        self.run_workflow(workflows, error_exit=False)
+        if not self.run_workflow(
+            workflows, error_exit=False, skip_failed_components=True
+        ):
+            return False
 
         if not dump:
             return True

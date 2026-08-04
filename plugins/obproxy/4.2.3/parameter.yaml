@@ -464,10 +464,12 @@
 - name: vip_address
   type: STRING
   default: ''
+  need_restart: true
   description_en: vip address of obproxy
 - name: vip_port
   type: int
   default: ''
+  need_restart: true
   description_en: vip port of obproxy
 - name: dns
   type: STRING

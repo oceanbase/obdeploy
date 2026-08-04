@@ -7,7 +7,7 @@ export default defineConfig({
   routes,
   title: 'OceanBase Deployer',
   fastRefresh: true,
-  favicons: ['/assets/logo.png'],
+  favicons: ['/assets/logo.svg'],
   history: { type: 'hash' },
   extraBabelPlugins:
     process.env.NODE_ENV === 'production'
@@ -69,5 +69,5 @@ export default defineConfig({
     return config;
   },
   jsMinifier: 'terser',
-  
+
 });

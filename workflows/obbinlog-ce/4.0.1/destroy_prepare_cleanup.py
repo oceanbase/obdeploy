@@ -18,7 +18,7 @@ from __future__ import absolute_import, division, print_function
 import const
 
 
-def stop(plugin_context, workflow, *args, **kwargs):
+def destroy_prepare_cleanup(plugin_context, workflow, *args, **kwargs):
     workflow.add(const.STAGE_FIRST, 'stop_pre')
     workflow.add_with_component(const.STAGE_FIRST, 'general', 'stop')
     return plugin_context.return_true()

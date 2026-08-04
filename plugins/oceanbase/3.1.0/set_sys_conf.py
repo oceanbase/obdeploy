@@ -19,6 +19,7 @@ import re
 import _errno as err
 from _stdio import FormatText
 from ssh import get_root_permission_client
+from tool import GET_MEM_TOTAL_KB_CMD, get_kernel_check_values
 
 
 def set_system_conf(client, server, var, value, stdio, var_type='ulimits'):
@@ -118,8 +119,12 @@ def set_sys_conf(plugin_context, ulimits_min, kernel_check_items, *args, **kwarg
             if check_item not in kernel_params:
                 continue
             values = kernel_params[check_item]
-            needs = kernel_param['need']
-            recommends = kernel_param['recommend']
+            check_values = get_kernel_check_values(client, kernel_param)
+            if check_values is None:
+                stdio.error(err.EC_FAILED_TO_GET_PARAM.format(ip=server.ip, key='MemTotal', cmd=GET_MEM_TOTAL_KB_CMD))
+                stdio.stop_loading('fail')
+                return plugin_context.return_false()
+            needs, recommends = check_values
             for i in range(len(values)):
                 # This case is not handling the value of 'default'. Additional handling is required for 'default' in the future.
                 item_value = int(values[i])
