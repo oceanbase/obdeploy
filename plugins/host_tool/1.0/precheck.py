@@ -26,6 +26,13 @@ from _types import Capacity
 from tool import get_option, get_sudo_prefix, COMMAND_ENV
 
 
+def parse_kernel_parameter(line):
+    parts = line.split('=', 1)
+    if len(parts) != 2:
+        return None, None
+    return parts[0].strip(), parts[1].strip()
+
+
 def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kwargs):
     def ulimit_check(host_clients, need_change_servers_vars={}, only_check=False, username=None):
         failed_check_ips = set()
@@ -231,18 +238,20 @@ def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kw
         for kernel in kernel_param_src:
             if not kernel:
                 continue
-            kernel = kernel.split('=')
-            kernel_params[kernel[0].strip()] = re.findall(r"[-+]?\d+", kernel[1])
+            name, value = parse_kernel_parameter(kernel)
+            if name is not None:
+                kernel_params[name] = value
         for kernel_param in kernel_check_items:
             check_item = kernel_param['check_item']
             if check_item not in kernel_params:
                 continue
-            values = kernel_params[check_item]
             needs = kernel_param['need']
             recommends = kernel_param['recommend']
+            values = ([kernel_params[check_item]] if isinstance(needs, str)
+                      else re.findall(r"[-+]?\d+", kernel_params[check_item]))
             for i in range(len(values)):
                 # This case is not handling the value of 'default'. Additional handling is required for 'default' in the future.
-                item_value = int(values[i])
+                item_value = values[i] if isinstance(needs, str) else int(values[i])
                 need = needs[i] if isinstance(needs, tuple) else needs
                 recommend = recommends[i] if isinstance(recommends, tuple) else recommends
                 if isinstance(need, list):
@@ -277,4 +286,3 @@ def precheck(plugin_context, host_clients, print_recommend_cmd=True, *args, **kw
     plugin_context.set_variable('need_change_servers_vars', need_change_servers_vars)
     plugin_context.set_variable('ulimit_check', ulimit_check)
     return plugin_context.return_true(need_change_servers_vars=need_change_servers_vars)
-

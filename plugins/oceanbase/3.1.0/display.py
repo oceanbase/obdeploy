@@ -58,6 +58,7 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
         display_encrypt_password = None
     if plugin_context.get_variable('restart_manager'):
         cursor = plugin_context.get_return('connect').get_return('cursor')
+    connect_server = plugin_context.get_return('connect').get_return('server')
     try:
         while True:
             try:
@@ -65,15 +66,22 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
                 if servers:
                     stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'],
                         lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title=cluster_config.name)
+                    display_server = servers[0]
+                    if connect_server:
+                        connect_server_config = cluster_config.get_server_conf(connect_server)
+                        connect_server_port = connect_server_config.get('mysql_port', 2881)
+                        display_server = next((server_info for server_info in servers
+                                               if server_info['svr_ip'] == connect_server.ip
+                                               and server_info['inner_port'] == connect_server_port), display_server)
                     user = 'root@%s' % (cursor.tenant if cursor.tenant else 'sys')
                     password = cluster_config.get_global_conf().get('root_password', '') if not display_encrypt_password else display_encrypt_password
-                    cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A' % (servers[0]['svr_ip'], servers[0]['inner_port'], user, '-p%s ' % passwd_format(password) if password else '')
+                    cmd = 'obclient -h%s -P%s -u%s %s-Doceanbase -A' % (display_server['svr_ip'], display_server['inner_port'], user, '-p%s ' % passwd_format(password) if password else '')
                     stdio.print(cmd)
                     stdio.stop_loading('succeed')
                     info_dict = {
                         "type": "db",
-                        "ip": servers[0]['svr_ip'],
-                        "port": servers[0]['inner_port'],
+                        "ip": display_server['svr_ip'],
+                        "port": display_server['inner_port'],
                         "user": user,
                         "password": password,
                         "cmd": cmd

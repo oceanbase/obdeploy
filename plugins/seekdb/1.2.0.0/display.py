@@ -76,7 +76,7 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
         stdio.stop_loading('fail', 'seekdb need bootstarp')
 
 
-    server = cluster_config.servers[0]
+    server = plugin_context.get_return('connect').get_return('server') or cluster_config.servers[0]
     server_config = cluster_config.get_server_conf(server)
     ip = server.ip
     port = server_config.get('mysql_port', 2881)

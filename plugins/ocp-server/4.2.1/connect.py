@@ -21,6 +21,7 @@ from requests.auth import HTTPBasicAuth
 import time
 
 import _errno as err
+from _deploy import ClusterStatus
 
 
 class OcpCursor(object):
@@ -168,7 +169,7 @@ class OcpTakeOverCursor(OcpCursor):
         self.stdio = stdio
 
 
-def connect(plugin_context, target_server=None, *args, **kwargs):
+def connect(plugin_context, target_server=None, skip_inactive_servers=False, *args, **kwargs):
     def return_true(**kwargs):
         for key, value in kwargs.items():
             plugin_context.set_variable(key, value)
@@ -184,6 +185,9 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
     else:
         servers = cluster_config.servers
         stdio.start_loading('Connect to %s' % cluster_config.name)
+    if skip_inactive_servers:
+        cluster_status = plugin_context.get_return('status').get_return('cluster_status')
+        servers = [server for server in servers if cluster_status.get(server) == ClusterStatus.STATUS_RUNNING.value]
     cursors = {}
     while count and servers:
         count -= 1
@@ -210,4 +214,3 @@ def connect(plugin_context, target_server=None, *args, **kwargs):
 
     stdio.stop_loading('succeed')
     return return_true(connect=cursors, cursor=cursors)
-

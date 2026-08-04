@@ -17,7 +17,10 @@ from __future__ import absolute_import, division, print_function
 
 import const
 
+
 def destroy(plugin_context, workflow, *args, **kwargs):
+    # destroy_pre safely stops any instance process left after the logical
+    # prepare phase. Its failure prevents the destructive directory cleanup.
     workflow.add(const.STAGE_FIRST, 'destroy_pre')
     workflow.add_with_component(const.STAGE_FIRST, 'general', 'destroy')
 

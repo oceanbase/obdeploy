@@ -58,8 +58,10 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
         display_encrypt_password = None
     if plugin_context.get_variable('restart_manager'):
         cursor = plugin_context.get_return('connect').get_return('cursor')
-    server = cluster_config.servers[0]
+    server = plugin_context.get_return('connect').get_return('server') or cluster_config.servers[0]
+    server_config = cluster_config.get_server_conf(server)
     ip = server.ip
+    port = server_config.get('mysql_port', 2881)
     try:
         while True:
             try:
@@ -69,13 +71,13 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
                         lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title=cluster_config.name)
                     user = 'root'
                     password = cluster_config.get_global_conf().get('root_password', '') if not display_encrypt_password else display_encrypt_password
-                    cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase -A' % (ip, servers[0]['inner_port'], '-p%s ' % passwd_format(password) if password else '')
+                    cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase -A' % (ip, port, '-p%s ' % passwd_format(password) if password else '')
                     stdio.print(cmd)
                     stdio.stop_loading('succeed')
                     info_dict = {
                         "type": "db",
                         "ip": ip,
-                        "port": servers[0]['inner_port'],
+                        "port": port,
                         "user": user,
                         "password": password,
                         "cmd": cmd

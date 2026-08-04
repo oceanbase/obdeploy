@@ -34,15 +34,16 @@ def display(plugin_context, config_encrypted, display_encrypt_password='******',
     for server in servers:
         api_cursor = cursor.get(server)
         server_config = start_env[server]
+        port = api_cursor.port if api_cursor else cluster_config.get_server_conf(server)['port']
         original_global_conf = cluster_config.get_original_global_conf()
         ip = server.ip
         if ip == '127.0.0.1':
             ip = NetUtil.get_host_ip()
-        url = 'http://{}:{}'.format(ip, api_cursor.port)
+        url = 'http://{}:{}'.format(ip, port)
         password = (server_config['admin_password'] if not original_global_conf.get('admin_password', '') else original_global_conf['admin_password']) if not display_encrypt_password else display_encrypt_password
         results.append({
             'ip': ip,
-            'port': api_cursor.port,
+            'port': port,
             'user': "admin",
             'password': passwd_format(password) if password else '',
             'url': url,

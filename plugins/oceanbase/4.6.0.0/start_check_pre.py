@@ -153,7 +153,12 @@ def start_check_pre(plugin_context, init_check_status=False, strict_check=False,
 
     kernel_check_items = [
         {'check_item': 'vm.max_map_count', 'need': [327600, 1310720], 'recommend': 655360},
-        {'check_item': 'vm.min_free_kbytes', 'need': [32768, 2097152], 'recommend': 2097152},
+        {
+            'check_item': 'vm.min_free_kbytes',
+            'need': [32768, 2097152],
+            'recommend': 2097152,
+            'adaptive_max_memory_divisor': 200,
+        },
         {'check_item': 'vm.overcommit_memory', 'need': 0, 'recommend': 0},
         {'check_item': 'fs.file-max', 'need': [6573688, float('inf')], 'recommend': 6573688},
     ]

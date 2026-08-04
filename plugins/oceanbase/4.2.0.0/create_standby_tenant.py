@@ -27,6 +27,27 @@ from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 from _types import Capacity
 
 
+LOG_SYNC_WAIT = 'WAIT'
+LOG_SYNC_DONE = 'DONE'
+LOG_SYNC_ERROR = 'ERROR'
+
+
+def _classify_log_sync_status(sync_status_res):
+    """Classify the grouped log stream statuses returned by OceanBase."""
+    if sync_status_res is False:
+        return LOG_SYNC_ERROR
+    if not sync_status_res:
+        return LOG_SYNC_WAIT
+    should_wait = False
+    for item in sync_status_res:
+        sync_status = item.get('sync_status')
+        if sync_status == 'WAITING_LS_CREATED':
+            should_wait = True
+        elif sync_status != 'NORMAL':
+            return LOG_SYNC_ERROR
+    return LOG_SYNC_WAIT if should_wait else LOG_SYNC_DONE
+
+
 def dump_standby_relation(relation_tenants, cluster_configs, dump_relation_tenants, stdio):
     # find all relation tenant
     deploy_name_tenants = deepcopy(relation_tenants)
@@ -411,25 +432,35 @@ def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_
                 stdio.start_loading('Creating log sync task')
                 sql = "SELECT tenant_id, REPLACE(`sync_status`, ' ', '_') as sync_status, err_code, comment FROM oceanbase.V$OB_LS_LOG_RESTORE_STATUS  WHERE tenant_id = %s group by sync_status "
                 count = 600
+                sync_status_res = []
                 while count > 0:
                     sync_status_res = cursor.fetchall(sql, (res['tenant_id'], ))
-                    if sync_status_res and sync_status_res[0].get('sync_status') != 'WAITING_LS_CREATED':
+                    sync_state = _classify_log_sync_status(sync_status_res)
+                    if sync_state == LOG_SYNC_ERROR:
+                        if sync_status_res is False:
+                            stdio.error('failed to query standby tenant log sync status')
+                        else:
+                            for item in sync_status_res:
+                                if item.get('sync_status') != 'NORMAL':
+                                    stdio.error('standby tenant log sync error, tenant_id:{}, sync_status:{}, err_code:{},comment:{}'.format(item['tenant_id'], item['sync_status'], item['err_code'], item['comment']))
+                        stdio.stop_loading('fail')
+                        return plugin_context.return_false()
+                    if sync_state == LOG_SYNC_DONE:
                         break
                     count -= 1
                     time.sleep(1)
-                stdio.verbose('Wait log sync create: retry {}'.format(200 - count))
+                stdio.verbose('Wait log sync create: retry {}'.format(600 - count))
                 if count == 0:
                     stdio.warn('wait log sync create timeout')
 
-                flag = False
-                for item in sync_status_res:
-                    if item.get('sync_status') != 'NORMAL':
-                        flag = True
-                        stdio.error('standby tenant log sync error, tenant_id:{}, sync_status:{}, err_code:{},comment:{}'.format(item['tenant_id'], item['sync_status'], item['err_code'], item['comment']))
-
-                if flag:
-                    stdio.stop_loading('failed')
-                stdio.stop_loading('succeed')
+                if count == 0:
+                    for item in sync_status_res:
+                        if item.get('sync_status') != 'NORMAL':
+                            stdio.error('standby tenant log sync error, tenant_id:{}, sync_status:{}, err_code:{},comment:{}'.format(item['tenant_id'], item['sync_status'], item['err_code'], item['comment']))
+                    stdio.stop_loading('fail')
+                    return plugin_context.return_false()
+                else:
+                    stdio.stop_loading('succeed')
 
                 stdio.print('You can use the command "obd cluster tenant show {} -g" to view the relationship between the primary and standby tenants.'.format(standby_deploy_name))
 

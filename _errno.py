@@ -266,7 +266,7 @@ EC_OBLOGPROXY_DEPENDS_COMP_VERSION = OBDErrorCodeTemplate(4501, 'OBLogProxy {obl
 
 # obbinlog
 EC_OBBINLOG_DEPENDS_COMP_MIN_VERSION = OBDErrorCodeTemplate(4601, 'OBBinlog {obbinlog_version} needs to use {comp} with version {min_version} or above.')
-EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER = OBDErrorCodeTemplate(4602, 'Deploy {target_oceanbase_deploy} need depends ob-configserver. You could use `obd cluster component add {target_oceanbase_deploy} -c <ob-configserver.config>` to add or set `--rs` paramater')
+EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER = OBDErrorCodeTemplate(4602, 'Deploy {target_oceanbase_deploy} requires ob-configserver. You can add it with `obd cluster component add {target_oceanbase_deploy} -c <ob-configserver.config>`. Alternatively, obbinlog 4.3.5 or later can use the `--rs` parameter.')
 EC_OBBINLOG_CE_WITH_OCENABASE_CE = OBDErrorCodeTemplate(4603, 'The Binlog service for the community version can only be used with the community version of the OceanBase database.')
 EC_OBBINLOG_WITH_OCENABASE = OBDErrorCodeTemplate(4604, 'The Binlog service for the enterprise version can only be used with the enterprise version of the OceanBase database.')
 

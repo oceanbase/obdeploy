@@ -41,7 +41,10 @@ def passwd_format(passwd):
     return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 
-def obshell_dashboard(plugin_context, config_encrypted, display_encrypt_password='******', obshell_clients=None, *args, **kwargs):
+def obshell_dashboard(plugin_context, config_encrypted, display_encrypt_password='******', obshell_clients=None, skip_when_status_check_failed=False, *args, **kwargs):
+    if skip_when_status_check_failed and plugin_context.get_variable('status_check_pass') is False:
+        return plugin_context.return_true()
+
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
     if plugin_context.get_variable('seekdb_is_standby', default=False):
@@ -83,4 +86,3 @@ def obshell_dashboard(plugin_context, config_encrypted, display_encrypt_password
 
     stdio.stop_loading('succeed')
     return plugin_context.return_true(obshell_dashboard=dashboard_info)
-

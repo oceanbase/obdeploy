@@ -6,7 +6,7 @@ import { Button, Card, Col, Dropdown, Row, Space, Tag, Tooltip } from 'antd';
 import React from 'react';
 import { getLocale, history, useModel } from '@umijs/max';
 import compManageGuideIcon from '../../../public/assets/welcome/component-manage.svg';
-import obGuideIcon from '../../../public/assets/welcome/ob-guide.png';
+import obGuideIcon from '../../../public/assets/welcome/ob-guide.svg';
 import ocpGuideIcon from '../../../public/assets/welcome/ocp-guide.png';;
 import omsGuideIcon from '../../../public/assets/welcome/oms-guide.png';
 

@@ -52,7 +52,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
         stdio.verbose('get %s cluster address' % (server))
         cluster_server[server] = '%s:%s' % (server.ip, config['listen_port'])
         stdio.verbose('compare configuration of %s' % (server))
-        reload_unused = ['observer_root_password']
+        reload_unused = ['observer_root_password', 'vip_address', 'vip_port', 'dns']
         for key in new_config:
             if key in reload_unused:
                 continue

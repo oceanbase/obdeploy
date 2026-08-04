@@ -27,6 +27,11 @@ def restart(plugin_context, workflow, *args, **kwargs):
     new_cluster_config = new_deploy_config.components[kwargs['repository'].name] if new_deploy_config else {}
     component_name = plugin_context.cluster_config.name
     all_servers = cluster_config.servers
+
+    skip_compaction = kwargs.get('component_kwargs', {}).get('skip_compaction', False)
+    if not skip_compaction:
+        workflow.add(const.STAGE_FIRST, 'connect', 'compaction')
+
     if len(zones_servers) > 2:
         #rolling
         pre_zone = None

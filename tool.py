@@ -1355,6 +1355,59 @@ def set_plugin_context_variables(plugin_context, variable_dict):
         plugin_context.set_variable(key, value)
 
 
+GET_MEM_TOTAL_KB_CMD = "awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo"
+
+
+def get_kernel_check_values(client, kernel_param):
+    """Resolve per-server bounds for a kernel parameter check.
+
+    Kernel check definitions are static by default. A definition may opt in to
+    a memory-aware upper bound with ``adaptive_max_memory_divisor``. In that
+    case the upper bound and recommendation are raised to at least
+    ``MemTotal / divisor`` for the server being checked.
+
+    ``None`` is returned when the server's total memory cannot be determined.
+    The input definition is never mutated because one definition can be reused
+    for multiple servers with different memory sizes.
+    """
+    needs = kernel_param['need']
+    recommends = kernel_param['recommend']
+    divisor = kernel_param.get('adaptive_max_memory_divisor')
+    if not divisor:
+        return needs, recommends
+
+    try:
+        ret = client.execute_command(GET_MEM_TOTAL_KB_CMD)
+        mem_total_kb = ret.stdout.strip() if ret else ''
+        if isinstance(mem_total_kb, bytes):
+            mem_total_kb = mem_total_kb.decode('ascii')
+    except Exception:
+        return None
+
+    try:
+        divisor = int(divisor)
+        max_sysctl_value = (1 << 31) - 1
+        max_mem_total_kb = max_sysctl_value * divisor
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if (divisor <= 0 or not mem_total_kb or
+            len(mem_total_kb) > len(str(max_mem_total_kb)) or
+            not all(char in '0123456789' for char in mem_total_kb)):
+        return None
+
+    try:
+        mem_total_kb = int(mem_total_kb)
+        if mem_total_kb <= 0 or mem_total_kb > max_mem_total_kb:
+            return None
+        needs = list(needs)
+        adaptive_max = max(needs[1], mem_total_kb // divisor)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    needs[1] = adaptive_max
+    recommends = max(recommends, adaptive_max)
+    return needs, recommends
+
+
 def get_disk_info(all_paths, client, stdio):
     overview_ret = True
     disk_info = get_disk_info_by_path('', client, stdio)

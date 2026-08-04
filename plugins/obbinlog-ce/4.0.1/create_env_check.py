@@ -18,9 +18,13 @@ import re
 
 import const
 import _errno
+from _rpm import Version
 from _types import Capacity
 from tool import ConfigUtil, Cursor, get_disk_info
 from _errno import EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER
+
+
+OBBINLOG_RS_LIST_MIN_VERSION = Version('4.3.5')
 
 
 def create_env_check(plugin_context, ob_deploy, ob_cluster_repositories, *args, **kwargs):
@@ -32,6 +36,8 @@ def create_env_check(plugin_context, ob_deploy, ob_cluster_repositories, *args, 
     cluster_config = plugin_context.cluster_config
     clients = plugin_context.clients
     stdio = plugin_context.stdio
+    binlog_repository = kwargs.get('repository')
+    supports_rs_list = bool(binlog_repository and binlog_repository.version >= OBBINLOG_RS_LIST_MIN_VERSION)
 
     # resource check
     min_memory = 4 << 30
@@ -77,36 +83,46 @@ def create_env_check(plugin_context, ob_deploy, ob_cluster_repositories, *args, 
         raise_cursor.execute(sql, [pw])
         ob_cluster_config.update_global_conf('cdcro_password', pw, True)
     else:
-        if not ob_global_config.get('cdcro_password') and getattr(plugin_context.options, 'cdcro_password', None) is None:
+        cdcro_password = getattr(plugin_context.options, 'cdcro_password', None)
+        if not ob_global_config.get('cdcro_password') and cdcro_password is None:
             stdio.error('Connection observer failed, please check `cdcro_password`.')
             stdio.stop_loading('fail')
             return plugin_context.return_false()
-        if not ob_global_config.get('cdcro_password'):
+        if cdcro_password is not None:
             for server in ob_cluster_config.servers:
                 ob_server_config = ob_cluster_config.get_server_conf(server)
                 try:
-                    Cursor(ip=server.ip, port=ob_server_config['mysql_port'], user='cdcro', tenant='', password=getattr(plugin_context.options, 'cdcro_password', None), stdio=stdio)
+                    Cursor(ip=server.ip, port=ob_server_config['mysql_port'], user='cdcro', tenant='', password=cdcro_password, stdio=stdio)
                     break
-                except:
+                except Exception:
                     continue
             else:
                 stdio.error('connect observer by cdcro failed. Please check `cdcro_password`.')
                 return plugin_context.return_false()
-            ob_cluster_config.update_global_conf('cdcro_password', getattr(plugin_context.options, 'cdcro_password'), True)
+            old_cdcro_password = ob_global_config.get('cdcro_password')
+            if not ob_cluster_config.update_global_conf('cdcro_password', cdcro_password, True):
+                ob_cluster_config.update_global_conf('cdcro_password', old_cdcro_password, False)
+                stdio.error('Failed to save `cdcro_password`.')
+                stdio.stop_loading('fail')
+                return plugin_context.return_false()
     try:
         rs_lists = []
         rs_list = ''
-        for comp in const.COMPS_OB:
-            if comp in cluster_config.depends:
-                ob_servers = cluster_config.get_depend_servers(comp)
-                for ob_server in ob_servers:
-                    ob_server_conf = cluster_config.get_depend_config(comp, ob_server)
-                    rs_lists.append('{}:{}:{}'.format(ob_server.ip, ob_server_conf['rpc_port'], ob_server_conf['mysql_port']))
-        if rs_lists:
-            rs_list = ';'.join(rs_lists)
+        if supports_rs_list:
+            for comp in const.COMPS_OB:
+                if comp in cluster_config.depends:
+                    ob_servers = cluster_config.get_depend_servers(comp)
+                    for ob_server in ob_servers:
+                        ob_server_conf = cluster_config.get_depend_config(comp, ob_server)
+                        rs_lists.append('{}:{}:{}'.format(ob_server.ip, ob_server_conf['rpc_port'], ob_server_conf['mysql_port']))
+            if rs_lists:
+                rs_list = ';'.join(rs_lists)
+            else:
+                rs_list = getattr(plugin_context.options, 'root_server_list', None) or getattr(plugin_context.options, 'rs', None)
 
-        rs_list = rs_list if rs_list else (getattr(plugin_context.options, 'root_server_list', None) or getattr(plugin_context.options, 'rs', None))
         ret = cursor.fetchone("SHOW PARAMETERS LIKE 'obconfig_url';")
+        if not ret or 'value' not in ret:
+            raise ValueError("Failed to query `obconfig_url` parameter.")
         obconfig_url = ret['value']
         if not obconfig_url and not rs_list:
             stdio.error(EC_OBBINLOG_TARGET_DEPLOY_NEED_CONFIGSERVER.format(target_oceanbase_deploy=ob_deploy.name))
@@ -118,6 +134,7 @@ def create_env_check(plugin_context, ob_deploy, ob_cluster_repositories, *args, 
             plugin_context.set_variable('root_service_list', rs_list)
     except Exception as e:
         stdio.error(e)
+        stdio.stop_loading('fail')
+        return plugin_context.return_false()
     stdio.stop_loading('succeed')
     return plugin_context.return_true()
-

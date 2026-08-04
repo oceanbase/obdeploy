@@ -108,7 +108,7 @@ export default function Layout() {
           }`}
       >
         <header className={styles.pageHeader}>
-          <img src="/assets/oceanbase.png" className={styles.logo} alt="logo" />
+          <img src="/assets/oceanbase.svg" className={styles.logo} alt="logo" />
           <span className={styles.logoText}>
             {
               isUpgrade ? '升级向导' : intl.formatMessage({

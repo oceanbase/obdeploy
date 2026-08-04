@@ -134,7 +134,7 @@ def start_pre(plugin_context, *args, **kwargs):
         else:
             cmd.append('--port %s' % server_config['mysql_port'])
 
-        clusters_cmd[server] = 'cd %s; %s/bin/seekdb %s' % (home_path, home_path, ' '.join(cmd))
+        clusters_cmd[server] = 'cd %s; export reporter="obd"; %s/bin/seekdb %s' % (home_path, home_path, ' '.join(cmd))
 
     plugin_context.set_variable('scale_out', scale_out)
     plugin_context.set_variable('need_bootstrap', need_bootstrap)
