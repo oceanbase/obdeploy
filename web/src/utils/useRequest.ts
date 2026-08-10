@@ -8,7 +8,9 @@ import { handleResponseError } from '@/utils';
 import { requestHandler } from '@/pages/Layout';
 import { message } from 'antd';
 
-interface Options<R = any, P extends any[] = any> extends BaseOptions<R, P> {}
+interface Options<R = any, P extends any[] = any> extends BaseOptions<R, P> {
+  skipRequestPipeline?: boolean;
+}
 
 export const requestPipeline = {
   data:[],
@@ -26,36 +28,41 @@ export const requestPipeline = {
   }
 }
 
-const errorHandle = (error: any, onError: any) => {
+const errorHandle = (error: any, onError: any, skipRequestPipeline: boolean) => {
   const { response } = error;
-  requestPipeline.push(error);
+  if (!skipRequestPipeline) {
+    requestPipeline.push(error);
+  }
   if (onError) {
-    onError({ ...error, errorPipeline: requestPipeline.data });
+    onError(skipRequestPipeline ? error : { ...error, errorPipeline: requestPipeline.data });
   }
   return response;
 };
 
-const successHandle = (onSuccess: () => void, res: any, arg: any) => {
+const successHandle = (onSuccess: () => void, res: any, arg: any, skipRequestPipeline: boolean) => {
   if (onSuccess) {
     onSuccess(res, ...arg);
   }
   if (!res.success) {
     handleResponseError(res.msg || res.data?.message);
   }
-  requestPipeline.push(res)
+  if (!skipRequestPipeline) {
+    requestPipeline.push(res)
+  }
 };
 
 const request: any = <R, P extends any[]>(
   service: CombineService<R, P>,
   options?: Options<R, P>,
 ) => {
+  const { skipRequestPipeline = false, ...requestOptions } = options || {};
   const response = useRequest(service, {
     manual: true,
-    throwOnError: options?.throwOnError || false,
+    throwOnError: requestOptions.throwOnError || false,
     formatResult: (result: any) => result,
-    ...options,
-    onError: (error: any) => errorHandle(error, options?.onError),
-    onSuccess: (res, ...arg) => successHandle(options?.onSuccess, res, arg),
+    ...requestOptions,
+    onError: (error: any) => errorHandle(error, requestOptions.onError, skipRequestPipeline),
+    onSuccess: (res, ...arg) => successHandle(requestOptions.onSuccess, res, arg, skipRequestPipeline),
   });
   return { ...response, data: response?.data?.data };
 };

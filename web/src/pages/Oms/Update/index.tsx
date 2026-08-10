@@ -11,7 +11,7 @@ import { Button, Form, message, Space, Tooltip } from '@oceanbase/design';
 import { PageContainer } from '@oceanbase/ui';
 import { useRequest } from 'ahooks';
 import { find, isEmpty } from 'lodash';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useModel } from '@umijs/max';
 import ConnectionInfo from './Component/ConnectionInfo';
 import UpdatePreCheck from './Component/UpdatePreCheck';
@@ -21,20 +21,52 @@ import Backup from './Component/Backup';
 const Update: React.FC = () => {
   const location = useLocation();
   const step = location.search?.split('=')[1];
+  const requestedStep = step ? Number(step) : -1;
+  const initialStep =
+    Number.isInteger(requestedStep) && requestedStep >= -1 && requestedStep <= 2
+      ? requestedStep
+      : -1;
   const [form] = Form.useForm();
   const {
+    connectId,
     installStatus,
     installResult,
     setConnectId,
+    setInstallStatus,
+    setInstallResult,
+    setLogData,
+    setIsReinstall,
   } = useModel('ocpInstallData');
   const { omsConfigData } = useModel('global');
-  const [current, setCurrent] = useState(step ? Number(step) : -1);
+  const [current, setCurrent] = useState(initialStep);
+  const [upgradeTaskId, setUpgradeTaskId] = useState<number>();
+  const [finishedUpgradeTaskId, setFinishedUpgradeTaskId] = useState<number>();
   const [backupStatus, setBackupStatus] = useState('INIT');
   const [openBackupModal, setOpenBackupModal] = useState(false);
   const [checkErrorInfo, setCheckErrorInfo] = useState<string>('');
 
   const clusterName = omsConfigData?.cluster_name;
   const version = omsConfigData?.version;
+  const hasCurrentUpgradeTask = upgradeTaskId !== undefined;
+  const isUpgradeFinished =
+    hasCurrentUpgradeTask &&
+    finishedUpgradeTaskId === upgradeTaskId &&
+    installStatus === 'FINISHED' &&
+    (installResult === 'SUCCESSFUL' || installResult === 'FAILED');
+
+  const handleUpgradeTaskFinished = useCallback((taskId: number) => {
+    setFinishedUpgradeTaskId(taskId);
+  }, []);
+
+  const resetUpgradeTaskState = () => {
+    setInstallStatus('RUNNING');
+    setInstallResult('RUNNING');
+    setLogData({});
+    setIsReinstall(false);
+    setConnectId(undefined);
+    setUpgradeTaskId(undefined);
+    setFinishedUpgradeTaskId(undefined);
+  };
 
   // 发起 oms 的预检查
   const {
@@ -88,9 +120,19 @@ const Update: React.FC = () => {
   } = useRequest(OCP.upgradeOms, {
     manual: true,
     onSuccess: (res) => {
-      if (res?.success) {
-        setCurrent(current + 1);
-        setConnectId(res?.data?.id);
+      const taskId = res?.data?.id;
+      if (res?.success && taskId !== undefined) {
+        // The upgrade endpoint may return before React has committed the reset
+        // above. Re-assert the running state together with the new task identity
+        // so a previous terminal result cannot win this render.
+        setInstallStatus('RUNNING');
+        setInstallResult('RUNNING');
+        setLogData({});
+        setIsReinstall(false);
+        setFinishedUpgradeTaskId(undefined);
+        setUpgradeTaskId(taskId);
+        setConnectId(taskId);
+        setCurrent(3);
       }
     },
     onError: ({ response, data }: any) => {
@@ -110,6 +152,7 @@ const Update: React.FC = () => {
         setOpenBackupModal(false);
         setBackupStatus('SUCCESSFUL');
         if (clusterName && version) {
+          resetUpgradeTaskState();
           upgradeOms({
             cluster_name: clusterName,
             version,
@@ -153,6 +196,7 @@ const Update: React.FC = () => {
           })
         } else if (omsConfigData?.backup_method === 'not_backup') {
           if (clusterName && version) {
+            resetUpgradeTaskState();
             upgradeOms({
               cluster_name: clusterName,
               version,
@@ -197,14 +241,14 @@ const Update: React.FC = () => {
     if (current === -1) {
       getClusterList();
     }
-    if (current === 3 && installResult === 'SUCCESSFUL') {
+    if (current === 3 && isUpgradeFinished && installResult === 'SUCCESSFUL') {
       getOmsDisplay();
     }
-  }, [current, installResult]);
+  }, [current, installResult, isUpgradeFinished]);
 
   return (
     <PageContainer style={{ paddingBottom: 90, backgroundColor: '#f5f8ff' }}>
-      {installResult !== 'FAILED' && installResult !== 'SUCCESSFUL' && (
+      {!isUpgradeFinished && (
         <Steps
           currentStep={current + 2}
           stepsItems={METADB_OMS_UPDATE}
@@ -259,26 +303,28 @@ const Update: React.FC = () => {
           />
         )}
         {
-          current == 3 &&
+          current == 3 && hasCurrentUpgradeTask &&
           (
-            installStatus === 'RUNNING' ?
-              <InstallProcess
-                type="update"
-              />
-              :
+            isUpgradeFinished ?
               <InstallFinished
                 type="update"
                 setCurrent={setCurrent}
               />
+              :
+              <InstallProcess
+                type="update"
+                taskId={upgradeTaskId}
+                onTaskFinished={handleUpgradeTaskFinished}
+              />
           )
         }
       </div>
-      {current === 3 && installStatus === 'RUNNING' ? null : (
+      {current === 3 && !isUpgradeFinished ? null : (
         <>
           {current !== -1 && (
             <CustomFooter>
               <Space size={16}>
-                {current === 3 && installStatus === 'RUNNING' ? null : (
+                {current === 3 && !isUpgradeFinished ? null : (
                   <ExitBtn />
                 )}
                 {current < 3 ? (
@@ -325,7 +371,7 @@ const Update: React.FC = () => {
                   </>
                 ) : null}
                 {
-                  current === 3 && installResult === 'SUCCESSFUL' &&
+                  current === 3 && isUpgradeFinished && installResult === 'SUCCESSFUL' &&
                   <Button
                     type="primary"
                     onClick={() => {

@@ -20,11 +20,9 @@ import json
 import _errno as err
 from tool import set_plugin_context_variables, docker_run_sudo_prefix
 
-success = True
-production_mode = False
-
-
 def start_check_pre(plugin_context, init_check_status=False, first_start=False, precheck=False, *args, **kwargs):
+
+    state = {'success': True}
 
     def check_pass(server, item):
         status = check_status[server]
@@ -44,27 +42,23 @@ def start_check_pre(plugin_context, init_check_status=False, first_start=False, 
             check_pass(server, item)
 
     def critical(server, item, error, suggests=[]):
-        global success
-        success = False
+        state['success'] = False
         check_fail(server, item, error, suggests)
         print_with_suggests(error, suggests)
 
     def error(server, item, _error, suggests=[]):
-        global success
         if plugin_context.dev_mode:
             stdio.warn(_error)
         else:
             check_fail(server, item, _error, suggests)
             print_with_suggests(_error, suggests)
-            success = False
+            state['success'] = False
 
     def get_success():
-        global success
-        return success
+        return state['success']
 
     def change_success():
-        global success
-        success = True
+        state['success'] = True
 
     def print_with_suggests(error, suggests=[]):
         stdio.error('{}, {}'.format(error, suggests[0].msg if suggests else ''))
@@ -72,11 +66,7 @@ def start_check_pre(plugin_context, init_check_status=False, first_start=False, 
     check_status = {}
     cluster_config = plugin_context.cluster_config
     stdio = plugin_context.stdio
-    global production_mode
-
     for server in cluster_config.servers:
-        server_config = cluster_config.get_server_conf_with_default(server)
-        production_mode = server_config.get('production_mode', False)
         check_status[server] = {
             'port': err.CheckStatus(),
             'dir_perm': err.CheckStatus(),
