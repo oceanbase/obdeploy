@@ -15,6 +15,7 @@
 
 import copy
 import os
+import shutil
 import time
 import tempfile
 import yaml
@@ -22,6 +23,8 @@ import json
 from optparse import Values
 from singleton_decorator import singleton
 from collections import defaultdict
+from concurrent.futures import Future, TimeoutError as FutureTimeoutError
+from threading import Event, Lock, Thread
 
 from _rpm import Version
 from _types import Capacity
@@ -32,7 +35,7 @@ from service.common.task import Serial as serial
 from service.common.task import AutoRegister as auto_register
 from service.model.deployments import OMSDeploymentStatus, DeploymentStatus, Deployment
 from service.model.task import TaskStatus, TaskResult, TaskInfo, PreCheckResult, PrecheckTaskInfo, PrecheckEventResult, TaskStepInfo
-from _deploy import DeployStatus, DeployConfigStatus
+from _deploy import Deploy, DeployStatus, DeployConfigStatus
 from _errno import CheckStatus
 from ssh import LocalClient
 from tool import YamlLoader
@@ -40,6 +43,318 @@ from tool import YamlLoader
 
 @singleton
 class OmsHandler(BaseHandler):
+
+    PRECHECK_RESULT_CACHE_SIZE = 32
+    PRECHECK_TIMEOUT_SECONDS = 900
+    PRECHECK_ORPHAN_LIMIT = 4
+    PRECHECK_CLEANUP_RETRY_LIMIT = 3
+    PRECHECK_CLEANUP_RETRY_INTERVAL = 1
+    PRECHECK_CONFIG_LOCK = Lock()
+    PRECHECK_DEPLOYMENT_LOCKS = {}
+
+    def _get_precheck_deployment_lock(self, deployment_name):
+        with self.PRECHECK_CONFIG_LOCK:
+            return self.PRECHECK_DEPLOYMENT_LOCKS.setdefault(deployment_name, Lock())
+
+    def _new_precheck_obd(self, deploy=None):
+        task_obd = self.obd.__class__(
+            self.obd.home_path,
+            dev_mode=self.obd.dev_mode,
+            lock_mode=self.obd.lock_manager.mode,
+            stdio=self.obd.stdio,
+        )
+        if deploy:
+            task_obd.set_deploy(deploy)
+        task_obd.set_cmds(list(self.obd.cmds))
+        task_obd.set_options(copy.deepcopy(self.obd.options))
+        return task_obd
+
+    @staticmethod
+    def _commit_precheck_config(source_path, target_path):
+        target_dir = os.path.dirname(target_path)
+        source_mode = os.stat(source_path).st_mode & 0o777
+        fd, temp_path = tempfile.mkstemp(prefix='.oms-precheck-', dir=target_dir)
+        try:
+            with open(source_path, 'rb') as source, os.fdopen(fd, 'wb') as target:
+                fd = None
+                shutil.copyfileobj(source, target)
+                target.flush()
+                os.fsync(target.fileno())
+                os.fchmod(target.fileno(), source_mode)
+            os.replace(temp_path, target_path)
+            dir_fd = os.open(target_dir, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+            return True
+        except Exception:
+            if fd is not None:
+                os.close(fd)
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            return False
+
+    def _publish_precheck_result(self, result_key, deployment_name, precheck_result):
+        with self.PRECHECK_CONFIG_LOCK:
+            return self._publish_precheck_result_locked(result_key, deployment_name, precheck_result)
+
+    def _publish_precheck_result_locked(self, result_key, deployment_name, precheck_result):
+        published = self.context['oms_precheck_active'].get(deployment_name) == result_key and \
+            not self.context['oms_precheck_terminal'].get(result_key)
+        if published:
+            self.context['oms_precheck_result'][result_key] = precheck_result
+            self.context['oms_precheck_terminal'][result_key] = True
+            self._trim_precheck_results_locked()
+        return published
+
+    def _trim_precheck_results_locked(self):
+        cached_results = self.context['oms_precheck_result']
+        active_results = set(self.context['oms_precheck_active'].values())
+        while len(cached_results) > self.PRECHECK_RESULT_CACHE_SIZE:
+            removable = next((key for key in cached_results if key not in active_results), None)
+            if removable is None:
+                break
+            cached_results.pop(removable, None)
+
+    def _cleanup_precheck_context(self, result_key, deployment_name):
+        with self.PRECHECK_CONFIG_LOCK:
+            if self.context['oms_precheck_active'].get(deployment_name) == result_key:
+                self.context['oms_precheck_active'].pop(deployment_name, None)
+            self.context['oms_precheck_status'].pop(result_key, None)
+            self.context['oms_precheck_task_info'].pop(result_key, None)
+            self.context['oms_precheck_running_result'].pop(result_key, None)
+            self.context['oms_precheck_terminal'].pop(result_key, None)
+            self._trim_precheck_results_locked()
+
+    def _close_precheck_clients(self, runtime):
+        clients_lock = runtime.setdefault('clients_lock', Lock())
+        with clients_lock:
+            task_obd = runtime.get('task_obd')
+            failed_clients = runtime.setdefault('failed_clients', [])
+            clients_to_close = list(failed_clients)
+            failed_clients[:] = []
+            closed_clients = runtime.setdefault('closed_clients', [])
+            closed_client_ids = {id(client) for client in closed_clients}
+            precheck_future = runtime.get('precheck_future')
+            final_clients_cleaned = runtime.setdefault('final_clients_cleaned', Event())
+            final_sweep = precheck_future is not None and precheck_future.done() and \
+                not final_clients_cleaned.is_set()
+            snapshot_failed = False
+            top_client_registries = runtime.setdefault('top_client_registries', [])
+            client_registries = runtime.setdefault('client_registries', [])
+            top_registry_ids = {id(registry) for registry in top_client_registries}
+            client_registry_ids = {id(registry) for registry in client_registries}
+
+            def snapshot(registry):
+                nonlocal snapshot_failed
+                try:
+                    return list(registry.values())
+                except Exception as ex:
+                    snapshot_failed = True
+                    log.get_logger().warn(
+                        'Failed to snapshot OMS precheck SSH clients for cleanup: %s', ex)
+                    return None
+
+            registries_to_scan = []
+            if task_obd is not None:
+                current_registry = task_obd.ssh_clients
+                if isinstance(current_registry, dict):
+                    if id(current_registry) not in top_registry_ids:
+                        top_client_registries.append(current_registry)
+                        top_registry_ids.add(id(current_registry))
+                    registries_to_scan.append(current_registry)
+                else:
+                    snapshot_failed = True
+                if final_sweep:
+                    registries_to_scan.extend(top_client_registries)
+
+            scanned_top_registry_ids = set()
+            for registry in registries_to_scan:
+                if id(registry) in scanned_top_registry_ids:
+                    continue
+                scanned_top_registry_ids.add(id(registry))
+                registered_clients = snapshot(registry)
+                if registered_clients is None:
+                    continue
+                for clients in registered_clients:
+                    if isinstance(clients, dict):
+                        if id(clients) not in client_registry_ids:
+                            client_registries.append(clients)
+                            client_registry_ids.add(id(clients))
+                        nested_clients = snapshot(clients)
+                        if nested_clients is None:
+                            continue
+                        clients = nested_clients
+                    else:
+                        clients = [clients]
+                    clients_to_close.extend(list(clients))
+
+            if task_obd is not None and not snapshot_failed:
+                task_obd.ssh_clients = {}
+
+            if final_sweep:
+                clients_to_close.extend(closed_clients)
+                for registry in list(client_registries):
+                    registered_clients = snapshot(registry)
+                    if registered_clients is not None:
+                        clients_to_close.extend(registered_clients)
+            unique_clients = []
+            pending_client_ids = set()
+            for client in clients_to_close:
+                if id(client) not in pending_client_ids:
+                    unique_clients.append(client)
+                    pending_client_ids.add(id(client))
+            for client in unique_clients:
+                try:
+                    client.close()
+                except Exception:
+                    failed_clients.append(client)
+                else:
+                    if id(client) not in closed_client_ids:
+                        closed_clients.append(client)
+                        closed_client_ids.add(id(client))
+            clients_cleaned = not failed_clients and not snapshot_failed
+            if final_sweep and clients_cleaned:
+                final_clients_cleaned.set()
+            return clients_cleaned
+
+    def _cleanup_precheck_resources(self, runtime):
+        clients_cleaned = self._close_precheck_clients(runtime)
+        temp_lock = runtime.setdefault('temp_lock', Lock())
+        with temp_lock:
+            deploy_tmp = runtime.get('deploy_tmp')
+            temp_cleaned = runtime.setdefault('temp_cleaned', Event())
+            if not deploy_tmp:
+                return clients_cleaned
+            temp_path = getattr(deploy_tmp, 'name', None)
+            if temp_cleaned.is_set() and (not temp_path or not os.path.exists(temp_path)):
+                return clients_cleaned
+            cleanup_failed = False
+            try:
+                deploy_tmp.cleanup()
+            except Exception as ex:
+                cleanup_failed = True
+                log.get_logger().warn('Failed to clean OMS precheck temporary directory: %s', ex)
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    shutil.rmtree(temp_path)
+                except Exception as ex:
+                    log.get_logger().warn('Failed to sweep OMS precheck temporary directory: %s', ex)
+                    return False
+            if (temp_path and not os.path.exists(temp_path)) or (not temp_path and not cleanup_failed):
+                temp_cleaned.set()
+            return clients_cleaned and temp_cleaned.is_set()
+
+    def _schedule_precheck_resource_cleanup(self, result_key, runtime):
+        schedule_lock = runtime.setdefault('cleanup_schedule_lock', Lock())
+        with schedule_lock:
+            if runtime.get('cleanup_running'):
+                runtime['cleanup_reschedule'] = True
+                return
+            runtime['cleanup_running'] = True
+            cleanup_worker_token = object()
+            runtime['cleanup_worker_token'] = cleanup_worker_token
+
+        def cleanup():
+            try:
+                while True:
+                    cleanup_complete = False
+                    for attempt in range(self.PRECHECK_CLEANUP_RETRY_LIMIT):
+                        try:
+                            cleanup_complete = self._cleanup_precheck_resources(runtime)
+                        except BaseException as ex:
+                            cleanup_complete = False
+                            log.get_logger().exception(
+                                'Failed to clean OMS precheck resources: %s', ex)
+                        if cleanup_complete:
+                            break
+                        if attempt + 1 < self.PRECHECK_CLEANUP_RETRY_LIMIT:
+                            time.sleep(self.PRECHECK_CLEANUP_RETRY_INTERVAL)
+
+                    precheck_future = runtime.get('precheck_future')
+                    final_clients_cleaned = runtime.get('final_clients_cleaned')
+                    final_sweep_complete = precheck_future is None or \
+                        (precheck_future.done() and final_clients_cleaned and
+                         final_clients_cleaned.is_set())
+                    if cleanup_complete and final_sweep_complete:
+                        with self.PRECHECK_CONFIG_LOCK:
+                            self.context['oms_precheck_orphans'].pop(result_key, None)
+                            self._trim_precheck_results_locked()
+
+                    with schedule_lock:
+                        if runtime.pop('cleanup_reschedule', False):
+                            continue
+                        runtime['cleanup_running'] = False
+                        return
+            finally:
+                restart_cleanup = False
+                with schedule_lock:
+                    if runtime.get('cleanup_worker_token') is cleanup_worker_token:
+                        runtime['cleanup_running'] = False
+                        restart_cleanup = runtime.pop('cleanup_reschedule', False)
+                if restart_cleanup:
+                    self._schedule_precheck_resource_cleanup(result_key, runtime)
+
+        Thread(target=cleanup, name='oms-precheck-cleanup', daemon=True).start()
+
+    def _finish_precheck_context(self, result_key, deployment_name, precheck_result):
+        published = self._publish_precheck_result(result_key, deployment_name, precheck_result)
+        self._cleanup_precheck_context(result_key, deployment_name)
+        return published
+
+    def _finish_precheck_orphan(self, result_key, runtime):
+        self._schedule_precheck_resource_cleanup(result_key, runtime)
+
+    def _track_precheck_orphan(self, result_key, runtime):
+        precheck_future = runtime.get('precheck_future')
+        if precheck_future is None:
+            return
+        callback_lock = runtime.setdefault('orphan_callback_lock', Lock())
+        with callback_lock:
+            if runtime.get('orphan_callback_registered'):
+                return
+            runtime['orphan_callback_registered'] = True
+            with self.PRECHECK_CONFIG_LOCK:
+                self.context['oms_precheck_orphans'][result_key] = precheck_future
+            precheck_future.add_done_callback(
+                lambda _: self._finish_precheck_orphan(result_key, runtime))
+
+    def _is_precheck_active(self, deployment_name, result_key):
+        with self.PRECHECK_CONFIG_LOCK:
+            return self.context['oms_precheck_active'].get(deployment_name) == result_key
+
+    def _timeout_precheck(self, deployment_name, result_key, runtime):
+        published = False
+        with self.PRECHECK_CONFIG_LOCK:
+            if self.context['oms_precheck_active'].get(deployment_name) == result_key and \
+                    not self.context['oms_precheck_terminal'].get(result_key):
+                runtime['cancelled'].set()
+                running_result = self.context['oms_precheck_running_result'].get(result_key)
+                task_info = running_result.task_info.copy(deep=True) if running_result else \
+                    self.context['oms_precheck_task_info'].get(result_key)
+                task_info = task_info.copy(deep=True) if task_info else TaskInfo(
+                    id=result_key[1], status=TaskStatus.RUNNING, result=TaskResult.RUNNING)
+                precheck_events = copy.deepcopy(running_result.precheck_result) if running_result else []
+                task_info.status = TaskStatus.FINISHED
+                task_info.result = TaskResult.FAILED
+                task_info.message = 'OMS precheck execution timeout after {0} seconds'.format(
+                    self.PRECHECK_TIMEOUT_SECONDS)
+                precheck_result = PrecheckTaskInfo(task_info=task_info, precheck_result=precheck_events)
+                published = self._publish_precheck_result_locked(
+                    result_key, deployment_name, precheck_result)
+                if published:
+                    precheck_future = runtime.get('precheck_future')
+                    if precheck_future is not None:
+                        self.context['oms_precheck_orphans'][result_key] = precheck_future
+                    self.context['oms_precheck_active'].pop(deployment_name, None)
+                    self._trim_precheck_results_locked()
+        if published:
+            log.get_logger().error(task_info.message)
+            self._cleanup_precheck_context(result_key, deployment_name)
+            self._track_precheck_orphan(result_key, runtime)
+            self._schedule_precheck_resource_cleanup(result_key, runtime)
+        return published
 
     def get_oms_images(self, servers, username, password, port, pwd_decrypt=True):
         password = RSAHandler().decrypt_private_key(password) if password is not None and pwd_decrypt else password
@@ -86,6 +401,19 @@ class OmsHandler(BaseHandler):
         return cluster_config_yaml_path
 
     def create_deployment(self, name: str, config_path: str):
+        deployment_lock = self._get_precheck_deployment_lock(name)
+        if not deployment_lock.acquire(blocking=False):
+            raise Exception(
+                "OMS configuration for deployment {0} is busy. Please retry later.".format(name))
+        try:
+            with self.PRECHECK_CONFIG_LOCK:
+                if self.context['oms_precheck_active'].get(name):
+                    raise Exception("OMS precheck for deployment {0} is still running".format(name))
+            return self._create_deployment(name, config_path)
+        finally:
+            deployment_lock.release()
+
+    def _create_deployment(self, name: str, config_path: str):
         log.get_logger().debug('deploy cluster')
         deploy = self.obd.deploy_manager.get_deploy_config(name)
         if deploy:
@@ -145,26 +473,71 @@ class OmsHandler(BaseHandler):
 
     @serial("oms_precheck")
     def oms_precheck(self, id, background_tasks):
-        task_manager = task.get_task_manager()
-        app_name = self.context['oms_deployment_id'][id]
+        app_name = self.context['oms_deployment_id'].get(id)
         log.get_logger().info('precheck start: %s' % app_name)
         if not app_name:
             raise Exception(f"no such deploy for id: {id}")
-        task_info = task_manager.get_task_info(app_name, task_type="oms_precheck")
-        if task_info is not None and task_info.status != TaskStatus.FINISHED:
-            raise Exception(f"task {app_name} exists and not finished")
-        deploy = self.obd.deploy
-        if not deploy:
+        initializing = ('initializing', id)
+        deployment_lock = self._get_precheck_deployment_lock(app_name)
+        if not deployment_lock.acquire(blocking=False):
+            raise Exception(
+                "OMS configuration for deployment {0} is busy. Please retry later.".format(app_name))
+        try:
+            with self.PRECHECK_CONFIG_LOCK:
+                if self.context['oms_precheck_active'].get(app_name):
+                    raise Exception(f"task {app_name} exists and not finished")
+                worker_keys = set(self.context['oms_precheck_active'].values())
+                worker_keys.update(self.context['oms_precheck_orphans'])
+                worker_count = len(worker_keys)
+                if worker_count >= self.PRECHECK_ORPHAN_LIMIT:
+                    raise Exception(
+                        'Too many OMS precheck workers are running or waiting for cleanup ({0}). '
+                        'Please wait for an existing task to finish or restart the OBD Web service.'.format(
+                            worker_count))
+                self.context['oms_precheck_active'][app_name] = initializing
+        finally:
+            deployment_lock.release()
+        try:
+            self.context['oms_deployment']['task_id'] = self.context['oms_deployment']['task_id'] + 1 if \
+                self.context['oms_deployment']['task_id'] else 1
+            task_id = self.context['oms_deployment']['task_id']
+            ret = TaskInfo(id=task_id, status=TaskStatus.RUNNING, result=TaskResult.RUNNING,
+                           message='oms_precheck', total='port, connect_db')
+            result_key = (id, task_id)
+            with self.PRECHECK_CONFIG_LOCK:
+                self.context['oms_precheck_task_info'][result_key] = ret
+                self.context['oms_precheck_active'][app_name] = result_key
+            background_tasks.add_task(self._precheck, app_name, result_key)
+            return ret
+        except BaseException:
+            with self.PRECHECK_CONFIG_LOCK:
+                if self.context['oms_precheck_active'].get(app_name) in (initializing, locals().get('result_key')):
+                    self.context['oms_precheck_active'].pop(app_name, None)
+                if 'result_key' in locals():
+                    self.context['oms_precheck_task_info'].pop(result_key, None)
+            raise
+
+    def _prepare_oms_precheck(self, app_name, runtime):
+        task_obd = self._new_precheck_obd()
+        runtime['task_obd'] = task_obd
+        source_deploy = task_obd.deploy_manager.get_deploy_config(app_name)
+        if not source_deploy:
             raise Exception("no such deploy for name:{0}".format(app_name))
-        deploy_info = deploy.deploy_info
-        if deploy_info.status == DeployStatus.STATUS_DEPLOYED:
-            self.obd.deploy_cluster(app_name)
+        deploy_tmp = tempfile.TemporaryDirectory(prefix='oms-precheck-')
+        runtime['deploy_tmp'] = deploy_tmp
+        cloned_config_dir = os.path.join(deploy_tmp.name, app_name)
+        shutil.copytree(source_deploy.config_dir, cloned_config_dir)
+        deploy = Deploy(cloned_config_dir,
+                        config_parser_manager=task_obd.deploy_manager.config_parser_manager,
+                        stdio=task_obd.stdio)
+        runtime['target_config_path'] = source_deploy.deploy_config.yaml_path
+        task_obd.set_deploy(deploy)
         deploy_config = deploy.deploy_config
-        pkgs, repositories, errors = self.obd.search_components_from_mirrors(deploy_config, only_info=True)
+        pkgs, repositories, errors = task_obd.search_components_from_mirrors(deploy_config, only_info=True)
         if errors:
             raise Exception("{}".format('\n'.join(errors)))
         repositories.extend(pkgs)
-        repositories = self.obd.sort_repository_by_depend(repositories, deploy_config)
+        repositories = task_obd.sort_repository_by_depend(repositories, deploy_config)
         for repository in repositories:
             real_servers = set()
             cluster_config = deploy_config.components[repository.name]
@@ -174,27 +547,9 @@ class OmsHandler(BaseHandler):
                         "Deploying multiple {} instances on the same server is not supported.'".format(
                             repository.name))
                 real_servers.add(server.ip)
-        self.obd.search_param_plugin_and_apply(repositories, deploy_config)
-        self.obd.set_repositories(repositories)
-
-        self._precheck(app_name, repositories, init_check_status=True)
-        info = task_manager.get_task_info(app_name, task_type="oms_precheck")
-        if info is not None and info.exception is not None:
-            exception = copy.deepcopy(info.exception)
-            info.exception = None
-            raise exception
-        task_manager.del_task_info(app_name, task_type="oms_precheck")
-        background_tasks.add_task(self._precheck, app_name, repositories, init_check_status=False)
-        self.context['oms_deployment']['task_id'] = self.context['oms_deployment']['task_id'] + 1 if \
-        self.context['oms_deployment']['task_id'] else 1
-        log.get_logger().info('task id: %d' % self.context['oms_deployment']['task_id'])
-        task_status = TaskStatus.RUNNING.value
-        task_res = TaskResult.RUNNING.value
-        task_message = 'oms_precheck'
-        ret = TaskInfo(id=self.context['oms_deployment']['task_id'], status=task_status, result=task_res, message=task_message, total='port, connect_db')
-        log.get_logger().info('task ret: %s' % ret)
-        self.context['task_info'][self.context['oms_deployment'][ret.id]] = ret
-        return ret
+        task_obd.search_param_plugin_and_apply(repositories, deploy_config)
+        task_obd.set_repositories(repositories)
+        return task_obd, repositories
 
     def _init_check_status(self, check_key, servers, check_result={}):
         check_status = defaultdict(lambda: defaultdict(lambda: None))
@@ -206,149 +561,286 @@ class OmsHandler(BaseHandler):
             check_status[server] = {check_key: status}
         return check_status
 
-    @auto_register('oms_precheck')
-    def _precheck(self, name, repositories, init_check_status=False):
-        if init_check_status:
-            self._init_precheck(repositories)
-        else:
-            self._do_precheck(repositories)
+    def _precheck(self, name, result_key):
+        log.get_logger().info('OMS precheck background task started: %s', name)
+        runtime = {
+            'task_obd': None,
+            'cancelled': Event(),
+            'clients_lock': Lock(),
+            'temp_lock': Lock(),
+            'closed_clients': [],
+            'failed_clients': [],
+            'temp_cleaned': Event(),
+        }
+        precheck_future = self._run_precheck_async(name, result_key, runtime)
+        runtime['precheck_future'] = precheck_future
+        try:
+            precheck_future.result(timeout=self.PRECHECK_TIMEOUT_SECONDS)
+        except FutureTimeoutError:
+            if precheck_future.done():
+                precheck_future.result()
+            else:
+                self._timeout_precheck(name, result_key, runtime)
+        log.get_logger().info('OMS precheck background task finished: %s', name)
 
-    def _init_precheck(self, repositories):
+    def _execute_precheck(self, name, result_key, runtime):
+        success = False
+        message = ''
+        try:
+            task_obd, repositories = self._prepare_oms_precheck(name, runtime)
+            if self._precheck_cancelled(name, result_key, runtime):
+                return
+            if not self._init_precheck(name, result_key, task_obd, repositories, runtime):
+                return
+            self._publish_precheck_progress(name, result_key, task_obd)
+            success, message = self._do_precheck(name, result_key, task_obd, repositories, runtime)
+        except BaseException as ex:
+            message = str(ex)
+            log.get_logger().exception('OMS precheck failed: %s', message)
+        finally:
+            task_obd = runtime.get('task_obd')
+            try:
+                if task_obd is None:
+                    raise Exception(message or 'Failed to initialize OMS precheck')
+                precheck_result = self._build_precheck_result(result_key, task_obd, success, message)
+            except BaseException as ex:
+                log.get_logger().exception('Failed to build OMS precheck result: %s', ex)
+                task_info = self.context['oms_precheck_task_info'].get(result_key)
+                if not task_info:
+                    task_info = TaskInfo(id=result_key[1], status=TaskStatus.FINISHED,
+                                         result=TaskResult.FAILED)
+                task_info.status = TaskStatus.FINISHED
+                task_info.result = TaskResult.FAILED
+                task_info.message = str(ex)
+                precheck_result = PrecheckTaskInfo(task_info=task_info, precheck_result=[])
+            try:
+                cleanup_complete = self._cleanup_precheck_resources(runtime)
+            except BaseException as ex:
+                cleanup_complete = False
+                log.get_logger().exception('Failed to clean OMS precheck resources: %s', ex)
+            if not cleanup_complete:
+                self._track_precheck_orphan(result_key, runtime)
+            self._finish_precheck_context(result_key, name, precheck_result)
+
+    def _precheck_cancelled(self, deployment_name, result_key, runtime):
+        return runtime['cancelled'].is_set() or not self._is_precheck_active(deployment_name, result_key)
+
+    def _run_precheck_async(self, name, result_key, runtime):
+        precheck_future = Future()
+        runtime['precheck_future'] = precheck_future
+
+        def run():
+            if not precheck_future.set_running_or_notify_cancel():
+                return
+            try:
+                precheck_future.set_result(self._execute_precheck(name, result_key, runtime))
+            except BaseException as ex:
+                precheck_future.set_exception(ex)
+
+        precheck_thread = Thread(target=run, name='oms-precheck', daemon=True)
+        precheck_thread.start()
+        return precheck_future
+
+    def _init_precheck(self, deployment_name, result_key, task_obd, repositories, runtime):
         log.get_logger().info('init precheck')
         param_check_status = {}
         servers_set = set()
+        self.context['oms_precheck_status'][result_key] = {}
 
-        self.obd.ssh_clients = {}
+        task_obd.ssh_clients = {}
         kwargs = {repository.name: {'clients': {}} for repository in repositories}
-        init_check_status_workflows = self.obd.get_workflows('init_check_status', no_found_act='ignore',
-                                                             repositories=repositories)
-        workflows_ret = self.obd.run_workflow(init_check_status_workflows, no_found_act='ignore',
+        init_check_status_workflows = task_obd.get_workflows('init_check_status', no_found_act='ignore',
+                                                            repositories=repositories)
+        workflows_ret = task_obd.run_workflow(init_check_status_workflows, no_found_act='ignore',
                                               repositories=repositories, **kwargs)
+        if self._precheck_cancelled(deployment_name, result_key, runtime):
+            return False
 
         for repository in repositories:
-            if not self.obd.namespaces.get(repository.name):
+            if not task_obd.namespaces.get(repository.name):
                 continue
-            if not workflows_ret and self.obd.namespaces.get(repository.name).get_return('exception'):
-                raise self.obd.namespaces.get(repository.name).get_return('exception')
+            if not workflows_ret and task_obd.namespaces.get(repository.name).get_return('exception'):
+                raise task_obd.namespaces.get(repository.name).get_return('exception')
             repository_status = {}
-            servers = self.obd.deploy.deploy_config.components.get(repository.name).servers
+            servers = task_obd.deploy.deploy_config.components.get(repository.name).servers
             for server in servers:
                 repository_status[server] = {'param': CheckStatus()}
                 servers_set.add(server)
             param_check_status[repository.name] = repository_status
 
-        self.context['oms_deployment']['param_check_status'] = param_check_status
+        self.context['oms_precheck_status'][result_key]['param_check_status'] = param_check_status
         server_connect_status = {}
         for server in servers_set:
             server_connect_status[server] = {'ssh': CheckStatus()}
-        self.context['oms_deployment']['connect_check_status'] = {'ssh': server_connect_status}
-        self.context['oms_deployment']['servers_set'] = servers_set
+        self.context['oms_precheck_status'][result_key]['connect_check_status'] = {'ssh': server_connect_status}
+        self.context['oms_precheck_status'][result_key]['servers_set'] = servers_set
+        return True
 
-    def _do_precheck(self, repositories):
-        self.context['oms_deployment_ssh'][self.context['id']] = 'success'
+    def _do_precheck(self, deployment_name, result_key, task_obd, repositories, runtime):
         log.get_logger().info('start precheck')
         log.get_logger().info('ssh check')
-        ssh_clients, connect_status = self.obd.get_clients_with_connect_status(self.obd.deploy.deploy_config,
+        ssh_clients, connect_status = task_obd.get_clients_with_connect_status(task_obd.deploy.deploy_config,
                                                                                repositories, fail_exit=False)
         log.get_logger().info('connect_status: ', connect_status)
-        check_status = self._init_check_status('ssh', self.context['oms_deployment']['servers_set'], connect_status)
-        self.context['oms_deployment']['connect_check_status'] = {'ssh': check_status}
+        if self._precheck_cancelled(deployment_name, result_key, runtime):
+            return False, 'OMS precheck execution timeout'
+        servers_set = self.context['oms_precheck_status'][result_key]['servers_set']
+        check_status = self._init_check_status('ssh', servers_set, connect_status)
+        self.context['oms_precheck_status'][result_key]['connect_check_status'] = {'ssh': check_status}
         for k, v in connect_status.items():
             if v.status == v.FAIL:
-                self.context['oms_deployment_ssh'][self.context['id']] = 'fail'
                 log.get_logger().info('ssh check failed')
-                return
+                self._publish_precheck_progress(deployment_name, result_key, task_obd)
+                return False, 'SSH check failed'
+        self._publish_precheck_progress(deployment_name, result_key, task_obd)
         log.get_logger().info('ssh check succeed')
 
-        param_check_status, check_pass = self.obd.deploy_param_check_return_check_status(repositories,
-                                                                                         self.obd.deploy.deploy_config)
+        param_check_status, check_pass = task_obd.deploy_param_check_return_check_status(
+            repositories, task_obd.deploy.deploy_config)
+        if self._precheck_cancelled(deployment_name, result_key, runtime):
+            return False, 'OMS precheck execution timeout'
         param_check_status_result = {}
         for comp_name in param_check_status:
             status_res = param_check_status[comp_name]
             param_check_status_result[comp_name] = self._init_check_status('param', status_res.keys(), status_res)
-        self.context['oms_deployment']['param_check_status'] = param_check_status_result
+        self.context['oms_precheck_status'][result_key]['param_check_status'] = param_check_status_result
+        self._publish_precheck_progress(deployment_name, result_key, task_obd)
 
         log.get_logger().debug('precheck param check status: %s' % param_check_status)
         log.get_logger().debug('precheck param check status res: %s' % check_pass)
         if not check_pass:
-            return
+            return False, 'Parameter check failed'
 
-        components = [comp_name for comp_name in self.obd.deploy.deploy_config.components.keys()]
-        workflows = self.obd.get_workflows('generate_config', repositories=repositories)
+        components = [comp_name for comp_name in task_obd.deploy.deploy_config.components.keys()]
+        workflows = task_obd.get_workflows('generate_config', repositories=repositories)
         component_kwargs = {
             repository.name: {"generate_check": False, "generate_consistent_config": True, "auto_depend": True,
                               "components": components} for repository in repositories}
-        workflow_ret = self.obd.run_workflow(workflows, repositories=repositories, error_exit=False, **component_kwargs)
+        workflow_ret = task_obd.run_workflow(workflows, repositories=repositories, error_exit=False, **component_kwargs)
+        if self._precheck_cancelled(deployment_name, result_key, runtime):
+            return False, 'OMS precheck execution timeout'
         if not workflow_ret:
             for repository in repositories:
-                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                for plugin_ret in task_obd.get_namespace(repository.name).all_plugin_ret.values():
                     if plugin_ret.get_return("exception"):
                         raise plugin_ret.get_return("exception")
             raise Exception('generate config error!')
-        if not self.obd.deploy.deploy_config.dump():
-            raise Exception('generate config dump error,place check disk space!')
+        with self._get_precheck_deployment_lock(deployment_name):
+            with self.PRECHECK_CONFIG_LOCK:
+                if runtime['cancelled'].is_set() or \
+                        self.context['oms_precheck_active'].get(deployment_name) != result_key:
+                    return False, 'OMS precheck execution timeout'
+            if not task_obd.deploy.deploy_config.dump():
+                raise Exception('generate config dump error,place check disk space!')
+            if not self._commit_precheck_config(
+                    task_obd.deploy.deploy_config.yaml_path, runtime['target_config_path']):
+                raise Exception('failed to commit generated OMS precheck config')
+            with self.PRECHECK_CONFIG_LOCK:
+                if runtime['cancelled'].is_set() or \
+                        self.context['oms_precheck_active'].get(deployment_name) != result_key:
+                    return False, 'OMS precheck execution timeout'
 
         log.get_logger().info('generate config succeed')
-        ssh_clients = self.obd.get_clients(self.obd.deploy.deploy_config, repositories)
+        if self._precheck_cancelled(deployment_name, result_key, runtime):
+            return False, 'OMS precheck execution timeout'
+        ssh_clients = task_obd.get_clients(task_obd.deploy.deploy_config, repositories)
+        if self._precheck_cancelled(deployment_name, result_key, runtime):
+            return False, 'OMS precheck execution timeout'
 
         component_kwargs = {}
         log.get_logger().info('start start_check')
         for repository in repositories:
             component_kwargs[repository.name] = {"work_dir_check": True, "precheck": True, "clients": ssh_clients,}
-        workflows = self.obd.get_workflows('start_check', no_found_act='ignore', repositories=repositories)
-        if not self.obd.run_workflow(workflows, repositories=repositories, no_found_act='ignore', error_exit=False,
-                                     **component_kwargs):
+        workflows = task_obd.get_workflows('start_check', no_found_act='ignore', repositories=repositories)
+        workflow_ret = task_obd.run_workflow(
+            workflows, repositories=repositories, no_found_act='ignore',
+            error_exit=False, **component_kwargs)
+        if self._precheck_cancelled(deployment_name, result_key, runtime):
+            return False, 'OMS precheck execution timeout'
+        self._publish_precheck_progress(deployment_name, result_key, task_obd)
+        if not workflow_ret:
             for repository in repositories:
-                for plugin_ret in self.obd.get_namespace(repository.name).all_plugin_ret.values():
+                for plugin_ret in task_obd.get_namespace(repository.name).all_plugin_ret.values():
                     if plugin_ret.get_return("exception"):
                         raise plugin_ret.get_return("exception")
+            return False, 'Start check failed'
         log.get_logger().info('end start_check')
+        return True, ''
+
+    def _publish_precheck_progress(self, deployment_name, result_key, task_obd):
+        if not self._is_precheck_active(deployment_name, result_key):
+            return
+        task_info = self.context['oms_precheck_task_info'].get(result_key)
+        if not task_info:
+            return
+        task_info = task_info.copy(deep=True)
+        task_info.info = []
+        check_result = []
+        for component in task_obd.deploy.deploy_config.components:
+            namespace = task_obd.get_namespace(component)
+            namespace_union = {}
+            if namespace and 'start_check_status' in namespace.variables:
+                namespace_union = util.recursive_update_dict(
+                    namespace_union, namespace.variables.get('start_check_status'))
+            for server, result in namespace_union.items():
+                if result is not None:
+                    self.parse_precheck_result(component, check_result, task_info, server, result)
+        check_result.sort(key=lambda item: item.result)
+        snapshot = PrecheckTaskInfo(task_info=task_info, precheck_result=check_result)
+        with self.PRECHECK_CONFIG_LOCK:
+            if self.context['oms_precheck_active'].get(deployment_name) == result_key:
+                self.context['oms_precheck_running_result'][result_key] = snapshot
+
+    def _build_precheck_result(self, result_key, task_obd, success, message):
+        precheck_result = PrecheckTaskInfo()
+        task_info = self.context['oms_precheck_task_info'].get(result_key)
+        if not task_info:
+            raise Exception("no precheck task for key:{0}".format(result_key))
+        task_info = task_info.copy(deep=True)
+        check_result = []
+        all_passed = []
+        task_info.info = []
+        for component in task_obd.deploy.deploy_config.components:
+            namespace_union = {}
+            namespace = task_obd.get_namespace(component)
+            if namespace and 'start_check_status' in namespace.variables:
+                namespace_union = util.recursive_update_dict(
+                    namespace_union, namespace.variables.get('start_check_status'))
+            log.get_logger().debug('namespace_union: %s' % namespace_union)
+            for server, result in namespace_union.items():
+                if result is None:
+                    log.get_logger().warn("precheck for server: {} is None".format(server.ip))
+                    continue
+                all_passed.append(self.parse_precheck_result(component, check_result, task_info, server, result))
+        check_result.sort(key=lambda p: p.result)
+        task_info.status = TaskStatus.FINISHED
+        task_info.result = TaskResult.SUCCESSFUL if success and all(all_passed) else TaskResult.FAILED
+        if message:
+            task_info.message = message
+        precheck_result.task_info = task_info
+        precheck_result.precheck_result = check_result
+        return precheck_result
 
     def get_precheck_result(self, id, task_id):
         log.get_logger().info('get oms precheck result')
+        result_key = (id, task_id)
+        with self.PRECHECK_CONFIG_LOCK:
+            cached_result = self.context['oms_precheck_result'].get(result_key)
+            if cached_result:
+                return cached_result.copy(deep=True)
+            name = self.context['oms_deployment_id'].get(id)
+            if not name:
+                raise Exception(f"no such deploy for id: {id}")
+            task_info = self.context['oms_precheck_task_info'].get(result_key)
+            if not task_info:
+                raise Exception("no precheck task for deployment:{0}, task:{1}".format(name, task_id))
+            running_result = self.context['oms_precheck_running_result'].get(result_key)
+            if running_result:
+                return running_result.copy(deep=True)
+            task_info = task_info.copy(deep=True)
         precheck_result = PrecheckTaskInfo()
-        deploy = self.obd.deploy
-        name = self.context['oms_deployment_id'][id]
-        if not name:
-            raise Exception(f"no such deploy for id: {id}")
-        if not deploy:
-            deploy = self.obd.deploy_manager.get_deploy_config(name)
-            self.obd.set_deploy(deploy)
-        components = deploy.deploy_config.components
-
-        param_check_status = None
-        connect_check_status = None
-        check_result = []
-        task_info = self.context['task_info'][self.context['oms_deployment'][task_id]]
-        all_passed = []
         precheck_result.task_info = task_info
-        task_info.info = []
-
-        for component in components:
-            namespace_union = {}
-            namespace = self.obd.get_namespace(component)
-            if namespace:
-                variables = namespace.variables
-                if 'start_check_status' in variables.keys():
-                    namespace_union = util.recursive_update_dict(namespace_union, variables.get('start_check_status'))
-
-            log.get_logger().debug('namespace_union: %s' % namespace_union)
-            if namespace_union:
-                for server, result in namespace_union.items():
-                    if result is None:
-                        log.get_logger().warn("precheck for server: {} is None".format(server.ip))
-                        continue
-                    all_passed.append(self.parse_precheck_result(component, check_result, task_info, server, result))
-        check_result.sort(key=lambda p: p.result)
-        precheck_result.precheck_result = check_result
-        status_flag = [i.status for i in task_info.info]
-        if TaskStatus.RUNNING not in status_flag:
-            task_info.status = TaskStatus.FINISHED
-            task_info.result = TaskResult.SUCCESSFUL if all(all_passed) else TaskResult.FAILED
-        precheck_result.task_info = task_info
-        if self.context['oms_deployment_ssh'][id] == 'fail' and TaskStatus.FINISHED in status_flag:
-            precheck_result.task_info.result = TaskResult.FAILED
-            precheck_result.task_info.status = TaskStatus.FINISHED
+        precheck_result.precheck_result = []
         return precheck_result
 
     def parse_precheck_result(self, component, check_result, task_info, server, result):

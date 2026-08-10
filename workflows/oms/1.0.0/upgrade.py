@@ -19,5 +19,9 @@ from const import STAGE_FIRST
 
 
 def upgrade(plugin_context, workflow, *args, **kwargs):
-    workflow.add(STAGE_FIRST, 'meta_backup', 'upgrade_pre', 'generate_oms_config', 'health_check')
+    # Both upgrade modes perform their final health check inside upgrade_pre:
+    # online upgrade can still roll back there, while offline_upgrade_start
+    # includes health_check in its nested workflow. Do not repeat health_check
+    # after upgrade_pre has advanced the persisted upgrade index.
+    workflow.add(STAGE_FIRST, 'meta_backup', 'generate_oms_config', 'upgrade_pre')
     return plugin_context.return_true()
