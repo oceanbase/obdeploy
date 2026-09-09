@@ -6230,7 +6230,19 @@ class ObdHome(object):
                         self._call_stdio('error', 'Cannot find the plugin for {}'.format(component_name))
                         return False
                     LocalClient.execute_command('rm -rf {}'.format(tmp_dir))
-                    for file_map in plugin.file_map_data:
+                    # InstallPlugin file maps became package-aware in 3.2.0 and
+                    # the old ``file_map_data`` property was removed. Takeover
+                    # only needs the remote target paths, so load the map with
+                    # the package identity discovered from the running cluster.
+                    package_vars = {
+                        'name': component_name,
+                        'version': version,
+                        'release': release,
+                        'release_simple': release,
+                        'arch': '',
+                        'md5': '',
+                    }
+                    for file_map in plugin.load_file_map_data(package_vars):
                         if file_map['type'] == 'bin':
                             self._call_stdio('start_loading', 'Get %s from %s' % (home_path, file_map['target_path']))
                             ret = ssh_client.get_file('{}/{}'.format(tmp_dir, file_map['target_path']), '{}/{}'.format(home_path, file_map['target_path']), stdio=self.stdio)
