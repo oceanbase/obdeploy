@@ -30,7 +30,7 @@ from _stdio import SafeStdio
 from tool import Cursor
 
 
-def connect(plugin_context, target_server=None, retry_times=101, connect_all=False, *args, **kwargs):
+def connect(plugin_context, target_server=None, retry_times=201, connect_all=False, *args, **kwargs):
     def return_true(**kwargs):
         for key, value in kwargs.items():
             plugin_context.set_variable(key, value)
