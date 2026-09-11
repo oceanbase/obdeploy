@@ -63,15 +63,19 @@ def init(plugin_context, source_option=None, *args, **kwargs):
         for mount_path in need_init_paths:
             mount_path_exist = check_mount_path(mount_path, client)
             if mount_path_exist:
-                if force:
-                    ret = clean_mount_path(mount_path, client)
-                    if not ret:
+                # Existing OMS data is expected when a stopped deployment is
+                # started again.  Only a fresh deploy may clean/reject a
+                # non-empty mount path; start/restart must preserve it.
+                if source_option == "deploy":
+                    if force:
+                        ret = clean_mount_path(mount_path, client)
+                        if not ret:
+                            global_ret = False
+                            stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='mount path', msg=ret.stderr))
+                    else:
                         global_ret = False
-                        stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='mount path', msg=ret.stderr))
-                else:
-                    global_ret = False
-                    stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='mount path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=mount_path)))
-                    source_option == "deploy" and stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
+                        stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='mount path', msg=InitDirFailedErrorMessage.NOT_EMPTY.format(path=mount_path)))
+                        stdio.error(EC_COMPONENT_DIR_NOT_EMPTY.format(deploy_name=deploy_name), _on_exit=True)
 
             if global_ret and not client.execute_command(f"""bash -c 'mkdir -p {os.path.join(mount_path)}'"""):
                 stdio.error(EC_FAIL_TO_INIT_PATH.format(server=server, key='mount path',msg=InitDirFailedErrorMessage.PERMISSION_DENIED.format(path=mount_path)))

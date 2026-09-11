@@ -49,9 +49,12 @@ def health_check(plugin_context, new_cluster_config=None, **kwargs):
                     if server not in init_pass_server:
                         prefix = docker_run_sudo_prefix(client)
                         ret = client.execute_command("%sdocker logs %s|tail -1" % (prefix, container_name), stdio=stdio)
-                        if not ret or ret.stdout.strip() != 'OMS service start successfully':
-                            continue
-                        init_pass_server.append(server)
+                        if ret and ret.stdout.strip() == 'OMS service start successfully':
+                            init_pass_server.append(server)
+                        # On restart the success marker may no longer be the
+                        # final log line.  Do not gate the authoritative HTTP
+                        # health probe on that log ordering; the endpoint will
+                        # keep failing until the service is actually ready.
                 if server in check_pass_server:
                     continue
                 server_config = cluster_config.get_server_conf(server)
