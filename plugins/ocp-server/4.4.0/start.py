@@ -214,7 +214,12 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
         environ_variable += ("export OCP_BOOTSTRAP_WITH_PROPERTY=%s;" % OCP_BOOTSTRAP_WITH_PROPERTY) if OCP_BOOTSTRAP_WITH_PROPERTY else ""
         real_cmd = environ_variable + cmd
         execute_cmd = "cd {}; {} > /dev/null 2>&1 &".format(home_path, real_cmd)
-        if launch_user:
+        # Running through ``sudo su - <same user> ... &`` adds an asynchronous
+        # shell between launch and the immediate process probe below.  The
+        # probe then races the shell and reports a false start failure even
+        # though the requested launch user is already the SSH user.  Execute
+        # directly in that case; retain sudo/su only for an actual user switch.
+        if launch_user and launch_user != client.config.username:
             cmd_file = os.path.join(home_path, 'cmd.sh')
             client.write_file(execute_cmd, cmd_file)
             execute_cmd = "chmod +x {0};sudo chown -R {1} {0};sudo su - {1} -c '{0}' &".format(cmd_file, launch_user)
