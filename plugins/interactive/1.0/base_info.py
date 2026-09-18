@@ -183,24 +183,23 @@ def base_info(plugin_context, *args, **kwargs):
             break
 
     obshell_port = "2886"
-    if install_mode != "standby":
-        while True:
-            obshell_port = InteractiveUI.prompt("OBShell port", obshell_port or "2886").strip() or "2886"
-            ok, port_val = parse_port(obshell_port)
-            if not ok:
-                stdio.warn("Invalid port. Enter a number between 1 and 65535.")
-                continue
-            if port_val == int(mysql_port):
-                stdio.warn("OBShell port must be different from MySQL port (%s)." % mysql_port)
-                continue
-            if install_mode in ("primary", "standby") and rpc_port and port_val == int(rpc_port):
-                stdio.warn("OBShell port must be different from RPC port (%s)." % rpc_port)
-                continue
-            if is_port_in_use(client, port_val, stdio):
-                stdio.warn("Port %s is already in use on the target. Please choose another port." % port_val)
-                continue
-            obshell_port = str(port_val)
-            break
+    while True:
+        obshell_port = InteractiveUI.prompt("OBShell port", obshell_port or "2886").strip() or "2886"
+        ok, port_val = parse_port(obshell_port)
+        if not ok:
+            stdio.warn("Invalid port. Enter a number between 1 and 65535.")
+            continue
+        if port_val == int(mysql_port):
+            stdio.warn("OBShell port must be different from MySQL port (%s)." % mysql_port)
+            continue
+        if install_mode in ("primary", "standby") and rpc_port and port_val == int(rpc_port):
+            stdio.warn("OBShell port must be different from RPC port (%s)." % rpc_port)
+            continue
+        if is_port_in_use(client, port_val, stdio):
+            stdio.warn("Port %s is already in use on the target. Please choose another port." % port_val)
+            continue
+        obshell_port = str(port_val)
+        break
 
     auto_start_s = InteractiveUI.prompt("Do you want to enable the Seekdb service to start automatically when the system boots up? (y/yes or n/no)", "no")
     auto_start = InteractiveUI.parse_yes_no(auto_start_s, default_yes=False)

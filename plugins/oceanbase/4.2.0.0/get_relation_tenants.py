@@ -15,7 +15,8 @@
 from queue import Queue
 
 
-def get_relation_tenants(plugin_context, repository, cluster_configs={}, *args, **kwargs):
+def get_relation_tenants(plugin_context, repository, cluster_configs=None, *args, **kwargs):
+    cluster_configs = {} if cluster_configs is None else cluster_configs
     cmds = plugin_context.cmds
     options = plugin_context.options
     deploy_manager = kwargs.get('deploy_manager')

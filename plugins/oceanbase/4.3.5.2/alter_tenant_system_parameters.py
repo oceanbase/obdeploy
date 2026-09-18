@@ -18,6 +18,7 @@ from tool import exec_sql_in_tenant
 
 def alter_tenant_system_parameters(plugin_context, cursor, create_tenant_options=[], *args, **kwargs):
     stdio = plugin_context.stdio
+    cluster_config = plugin_context.cluster_config
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
     for options in multi_options:
         tenant_name = getattr(options, 'tenant_name', 'test')
@@ -28,7 +29,7 @@ def alter_tenant_system_parameters(plugin_context, cursor, create_tenant_options
         if system_parameters:
             for parameter in system_parameters:
                 sql = sql.format(parameter, system_parameters[parameter])
-                res = exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=tenant_name, mode=mode, password=root_password if root_password else '', stdio=stdio)
+                res = exec_sql_in_tenant(sql=sql, cursor=cursor, tenant=tenant_name, mode=mode, password=root_password if root_password else '', stdio=stdio, cluster_config=cluster_config)
                 if not res:
                     stdio.warn("Failed to modify tenant-level parameter %s" % parameter)
     return plugin_context.return_true()

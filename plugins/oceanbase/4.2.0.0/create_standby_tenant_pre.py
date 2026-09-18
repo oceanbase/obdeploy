@@ -17,11 +17,13 @@ from collections import defaultdict
 
 from tool import ConfigUtil
 from _stdio import FormatText
+from _deploy import ObserverIdentity, ObserverIdentityError
 
 tenant_cursor_cache = defaultdict(dict)
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=None, print_exception=True, retries=20, exec_type='exec'):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=None,
+                       print_exception=True, retries=20, exec_type='exec', cluster_config=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     # find tenant ip, port
@@ -32,7 +34,8 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=Non
         query_sql = "select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
         tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
         for tenant_server_port in tenant_server_ports:
-            tenant_ip = tenant_server_port['SVR_IP']
+            tenant_ip = ObserverIdentity.externalize_ip(
+                cluster_config, tenant_server_port['SVR_IP']) if cluster_config else tenant_server_port['SVR_IP']
             tenant_port = tenant_server_port['SQL_PORT']
             tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=print_exception)
             if tenant_cursor:
@@ -42,7 +45,10 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', args=Non
                 break
     if not tenant_cursor and retries:
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, args=args, print_exception=print_exception, retries=retries-1, exec_type=exec_type)
+        return exec_sql_in_tenant(
+            sql, cursor, tenant, mode, user, password, args=args,
+            print_exception=print_exception, retries=retries-1,
+            exec_type=exec_type, cluster_config=cluster_config)
     if exec_type == 'exec':
         return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose') if tenant_cursor else False
     elif exec_type == 'fetchone':
@@ -66,6 +72,13 @@ def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *a
     stdio = plugin_context.stdio
     standby_deploy_name = plugin_context.cluster_config.deploy_name
     current_cluster_config = plugin_context.cluster_config
+    try:
+        ObserverIdentity.require_verified_loopback_capability(
+            list(cluster_configs.values()) + [current_cluster_config],
+            'tenant standby creation')
+    except ObserverIdentityError as e:
+        stdio.error(str(e))
+        return plugin_context.return_false()
     plugin_context.cluster_config = current_cluster_config
     cmds = plugin_context.cmds
     primary_deploy_name = cmds[1]
@@ -170,28 +183,67 @@ def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *a
     cluster_configs[standby_deploy_name] = current_cluster_config
     plugin_context.set_variable('cluster_configs', cluster_configs)
 
+    # Validate the SERVICE restore source before creating or modifying the
+    # standbyro user.  A mismatched loopback identity must fail without
+    # leaving any tenant user, unit, or resource pool behind.
+    sql = '''select group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host  from oceanbase.cdb_ob_access_point where tenant_name=%s)'''
+    res = primary_cursor.fetchone(sql, (primary_tenant, ))
+    if not res or not res.get('ip_list'):
+        error('ip_list query error.')
+        return
+    try:
+        restore_source_endpoints = ';'.join(
+            ObserverIdentity.externalize_sql_endpoint(
+                primary_cluster_config, endpoint)
+            for endpoint in res['ip_list'].split(';'))
+    except ObserverIdentityError as e:
+        error(str(e))
+        return
+    plugin_context.set_variable(
+        'restore_source_endpoints', restore_source_endpoints)
+
     # create standbyro in primary tenant
     # try to connect to tenant with standbyro if the user has entered a password or there is a password in the inner_config
-    if (standbyro_password_input is None and not standbyro_password_inner) or not exec_sql_in_tenant('select 1' if mode == 'mysql' else 'select 1 from DUAL', primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=2, exec_type='fetchone'):
+    if (standbyro_password_input is None and not standbyro_password_inner) or not exec_sql_in_tenant(
+            'select 1' if mode == 'mysql' else 'select 1 from DUAL',
+            primary_cursor, primary_tenant, mode, user='standbyro',
+            password=standbyro_password, print_exception=False, retries=2,
+            exec_type='fetchone', cluster_config=primary_cluster_config):
         # can not connect to tenant with standbyro user, try to connect to tenant with root user
-        if exec_sql_in_tenant('select 1' if mode == 'mysql' else 'select 1 from DUAL', primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=2, exec_type='fetchone'):
+        if exec_sql_in_tenant(
+                'select 1' if mode == 'mysql' else 'select 1 from DUAL',
+                primary_cursor, primary_tenant, mode, password=root_password,
+                print_exception=False, retries=2, exec_type='fetchone',
+                cluster_config=primary_cluster_config):
             # if standbyro exists ?
             sql = "select * from oceanbase.__all_user where user_name = 'standbyro'" if mode == 'mysql' else "select * from SYS.ALL_USERS where username = 'standbyro'"
-            if exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, print_exception=False, retries=1, exec_type='fetchone'):
+            if exec_sql_in_tenant(
+                    sql, primary_cursor, primary_tenant, mode,
+                    password=root_password, print_exception=False, retries=1,
+                    exec_type='fetchone', cluster_config=primary_cluster_config):
                 error("Authentication failed because the standbyro user already exists but the password is incorrect. Please re-create the tenant with ' --standbyro-password=xxxxxx'")
                 return
             # create standbyro
             sql = f"""CREATE USER standbyro IDENTIFIED BY "{standbyro_password}" """
-            if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, retries=1):
+            if not exec_sql_in_tenant(
+                    sql, primary_cursor, primary_tenant, mode,
+                    password=root_password, retries=1,
+                    cluster_config=primary_cluster_config):
                 error('Create standbyro user failed')
                 return
             if mode == "oracle":
                 sql = "GRANT CREATE SESSION TO standbyro"
-                if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, retries=1):
+                if not exec_sql_in_tenant(
+                        sql, primary_cursor, primary_tenant, mode,
+                        password=root_password, retries=1,
+                        cluster_config=primary_cluster_config):
                     error("Grant create session failed")
                     return
                 sql = "GRANT STANDBY_REPLICATION TO standbyro"
-                if not exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode, password=root_password, retries=1):
+                if not exec_sql_in_tenant(
+                        sql, primary_cursor, primary_tenant, mode,
+                        password=root_password, retries=1,
+                        cluster_config=primary_cluster_config):
                     error("Grant STANDBY_REPLICATION failed")
                     return
 
@@ -203,8 +255,14 @@ def create_standby_tenant_pre(plugin_context, cursors={}, cluster_configs={}, *a
     # GRANT oceanbase to standbyro
     show_db_sql = 'show databases like "oceanbase"' if mode == 'mysql' else "SELECT username FROM all_users WHERE username = 'SYS'"
     grant_sql = "GRANT SELECT ON %s.* TO standbyro;" % ("oceanbase" if mode == "mysql" else "SYS")
-    if not exec_sql_in_tenant(show_db_sql, primary_cursor, primary_tenant, mode, user='standbyro', password=standbyro_password, print_exception=False, retries=1, exec_type='fetchone') and \
-        not exec_sql_in_tenant(grant_sql, primary_cursor, primary_tenant, mode, password=root_password, retries=3):
+    if not exec_sql_in_tenant(
+            show_db_sql, primary_cursor, primary_tenant, mode, user='standbyro',
+            password=standbyro_password, print_exception=False, retries=1,
+            exec_type='fetchone', cluster_config=primary_cluster_config) and \
+        not exec_sql_in_tenant(
+            grant_sql, primary_cursor, primary_tenant, mode,
+            password=root_password, retries=3,
+            cluster_config=primary_cluster_config):
         error('Grant standbyro failed')
         return
 

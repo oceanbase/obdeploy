@@ -14,10 +14,17 @@
 # limitations under the License.
 
 from const import MAX_AVAILABILITY, MAX_PROTECTION
+from _deploy import ObserverIdentity, ObserverIdentityError
 import time
 
 
-def set_tenant_sync_mode(plugin_context, cursors=None, create_tenant_options=[], standbyro_password='', *args, **kwargs):
+def _externalize_service_list(cluster_config, service_list):
+    return ';'.join(
+        ObserverIdentity.externalize_sql_endpoint(cluster_config, endpoint)
+        for endpoint in service_list.split(';') if endpoint)
+
+
+def set_tenant_sync_mode(plugin_context, cursors=None, cluster_configs=None, create_tenant_options=[], standbyro_password='', *args, **kwargs):
     stdio = plugin_context.stdio
     cmds = plugin_context.cmds
 
@@ -25,6 +32,7 @@ def set_tenant_sync_mode(plugin_context, cursors=None, create_tenant_options=[],
     primary_deploy_name = cmds[1]
     primary_tenant = cmds[2]
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
+    cluster_configs = cluster_configs or plugin_context.get_variable('cluster_configs') or {}
 
     primary_cursor = cursors.get(primary_deploy_name)
     standby_cursor = cursors.get(standby_deploy_name)
@@ -33,7 +41,7 @@ def set_tenant_sync_mode(plugin_context, cursors=None, create_tenant_options=[],
         return plugin_context.return_false()
 
     for options in multi_options:
-        sync_mode = getattr(options, 'sync_mode', 'performance').strip()
+        sync_mode = getattr(options, 'sync_mode', 'performance').strip().lower()
         if sync_mode == 'performance':
             continue
 
@@ -53,12 +61,27 @@ def set_tenant_sync_mode(plugin_context, cursors=None, create_tenant_options=[],
             stdio.stop_loading('fail')
             return plugin_context.return_false()
 
+        try:
+            # Validate and externalize both endpoint lists before executing
+            # either ALTER SYSTEM statement to avoid a one-sided update.
+            primary_service = _externalize_service_list(
+                cluster_configs.get(primary_deploy_name), primary_res['ip_list'])
+            standby_service = _externalize_service_list(
+                cluster_configs.get(standby_deploy_name), standby_res['ip_list'])
+        except ObserverIdentityError as e:
+            stdio.error(str(e))
+            stdio.stop_loading('fail')
+            return plugin_context.return_false()
+        stdio.verbose(
+            'Resolved sync standby endpoints: primary=%s, standby=%s' % (
+                standby_service, primary_service))
+
         # Escape password for use inside double-quoted SYNC_STANDBY_DEST string (same as set_sync_mode.py)
         pwd_escaped = (standbyro_password or '').replace('\\', '\\\\').replace('"', '\\"')
 
         if sync_mode == "protection":
-            dest_primary = 'SERVICE=%s USER=%s PASSWORD=%s' % (standby_res['ip_list'], f'standbyro@{standby_tenant}', pwd_escaped)
-            dest_standby = 'SERVICE=%s USER=%s PASSWORD=%s' % (primary_res['ip_list'], f'standbyro@{primary_tenant}', pwd_escaped)
+            dest_primary = 'SERVICE=%s USER=%s PASSWORD=%s' % (standby_service, f'standbyro@{standby_tenant}', pwd_escaped)
+            dest_standby = 'SERVICE=%s USER=%s PASSWORD=%s' % (primary_service, f'standbyro@{primary_tenant}', pwd_escaped)
             set_mode_sql = 'ALTER SYSTEM SET STANDBY TENANT TO MAXIMIZE PROTECTION tenant = %s'
             expected_mode = MAX_PROTECTION
         elif sync_mode == "availability":
@@ -69,8 +92,8 @@ def set_tenant_sync_mode(plugin_context, cursors=None, create_tenant_options=[],
                 service_options += ' NET_TIMEOUT=%s' % net_timeout
             if health_check_time:
                 service_options += ' HEALTH_CHECK_TIME=%s' % health_check_time
-            dest_primary = 'SERVICE=%s%s USER=%s PASSWORD=%s' % (standby_res['ip_list'], service_options, f'standbyro@{standby_tenant}', pwd_escaped)
-            dest_standby = 'SERVICE=%s%s USER=%s PASSWORD=%s' % (primary_res['ip_list'], service_options, f'standbyro@{primary_tenant}', pwd_escaped)
+            dest_primary = 'SERVICE=%s%s USER=%s PASSWORD=%s' % (standby_service, service_options, f'standbyro@{standby_tenant}', pwd_escaped)
+            dest_standby = 'SERVICE=%s%s USER=%s PASSWORD=%s' % (primary_service, service_options, f'standbyro@{primary_tenant}', pwd_escaped)
             set_mode_sql = 'ALTER SYSTEM SET STANDBY TENANT TO MAXIMIZE AVAILABILITY tenant = %s'
             expected_mode = MAX_AVAILABILITY
 

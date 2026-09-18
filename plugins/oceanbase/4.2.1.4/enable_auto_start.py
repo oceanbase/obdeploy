@@ -17,6 +17,8 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import const
+from _deploy import ObserverIdentity, ObserverIdentityError
 from ssh import get_root_permission_client
 from tool import is_root_user, contains_duplicate_nodes
 
@@ -25,6 +27,14 @@ def enable_auto_start(plugin_context, *args, **kwargs):
     new_cluster_config = kwargs.get('new_cluster_config')
     cluster_config = plugin_context.cluster_config
     global_config = cluster_config.get_global_conf()
+    try:
+        identity = ObserverIdentity.marker(cluster_config)
+    except ObserverIdentityError as e:
+        plugin_context.stdio.error(str(e))
+        return plugin_context.return_false()
+    if identity and identity['state'] == const.OBSERVER_IDENTITY_PLANNED:
+        plugin_context.stdio.error('automatic start cannot be enabled before standalone observer identity is verified')
+        return plugin_context.return_false()
     if new_cluster_config:
         old_config = cluster_config.get_server_conf_with_default(cluster_config.servers[0])
         new_config = new_cluster_config.get_server_conf_with_default(cluster_config.servers[0])

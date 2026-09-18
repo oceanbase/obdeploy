@@ -29,7 +29,7 @@ def scale_out(plugin_context, workflow, *args, **kwargs):
         workflow.add_with_kwargs(const.STAGE_FIRST, {'target_servers': added_servers}, 'obshell_port_check')
     workflow.add_with_kwargs(const.STAGE_FIRST, {'target_servers': added_servers}, 'scenario_start_check', 'ocp_tenant_check')
 
-    workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap')
+    workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'verify_observer_identity')
 
     workflow.add_with_kwargs(const.STAGE_THIRD, {'target_servers': pre_exist_server}, 'connect', 'scale_out')
     if component_name in [const.COMP_OB_STANDALONE, const.COMP_OB_CE]:

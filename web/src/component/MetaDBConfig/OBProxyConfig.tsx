@@ -50,7 +50,7 @@ export default function OBProxyConfig({
     setErrorsList,
     errorsList,
   } = useModel('global');
-  const { isShowMoreConfig, setIsShowMoreConfig, deployUser, useRunningUser } =
+  const { isShowMoreConfig, setIsShowMoreConfig, deployUser } =
     useModel('ocpInstallData');
   const { components = {} } = ocpConfigData || {};
   const { obproxy = {} } = components;
@@ -152,9 +152,7 @@ export default function OBProxyConfig({
 
   useUpdateEffect(() => {
     const homePath =
-      !useRunningUser && deployUser === 'root'
-        ? `/${deployUser}`
-        : `/home/${deployUser}`;
+      deployUser === 'root' ? `/${deployUser}` : `/home/${deployUser}`;
     form.setFieldValue(['obproxy', 'home_path'], homePath);
   }, [deployUser]);
   const [show, setShow] = useState<boolean>(false);

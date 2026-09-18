@@ -1,0 +1,150 @@
+# coding: utf-8
+# Copyright (c) 2025 OceanBase.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import absolute_import, division, print_function
+import platform
+from copy import deepcopy
+
+from collections import OrderedDict
+from const import PLATFORM_DARWIN
+from seekdb_14_parameters import UNSUPPORTED_CONFIGURATION_PARAMETERS
+
+IS_DARWIN = platform.system() == PLATFORM_DARWIN
+
+
+def construct_opts(server_config, param_list,  cmd, primary_rpc_info):
+
+    not_opt_lite_str = OrderedDict({
+        'mysql_port': '--port',
+        'nodaemon': '--nodaemon',
+        'data_dir': '--data-dir',
+        'redo_dir': '--redo-dir',
+        'home_path': '--base-dir',
+
+    })
+
+    not_cmd_opt = [
+        'home_path', 'obconfig_url', 'root_password', 'proxyro_password', 'scenario',
+        'clog_dir', 'ilog_dir', 'slog_dir', '$_zone_idc', 'production_mode',
+        'obshell_port', 'zone', 'appname', 'cluster_id', 'enable_auto_start', 'install_utils',
+        'seekdb_monitor_user', 'seekdb_monitor_password', 'local_ip', 'devname', 'log_dir'
+    ] + list(UNSUPPORTED_CONFIGURATION_PARAMETERS)
+    need_bootstrap=False
+    get_value = lambda key: "'%s'" % server_config[key] if isinstance(server_config[key], str) else server_config[key]
+    opt_str = []
+    if server_config.get('enable_rpc_service') and server_config.get('rpc_port') is not None:
+        # restart --wp only contains changed parameters.  Keep the effective
+        # RPC state from the full server config so an rpc_port-only change (or
+        # enabling RPC with an unchanged non-default port) reaches the process.
+        param_list.setdefault('rpc_port', server_config['rpc_port'])
+    for key in param_list:
+        if key not in not_cmd_opt and key not in not_opt_lite_str and not key.startswith('ocp_meta_tenant_'):
+            if key == 'rpc_port' and not server_config.get('enable_rpc_service'):
+                continue
+            value = get_value(key)
+            opt_str.append('%s=%s' % (key, value))
+        if key == 'enable_rpc_service' and bool(server_config.get(key)):
+            opt_str.append('enable_rpc_tls=true')
+
+    param_list['mysql_port'] = server_config['mysql_port']
+    for key in not_opt_lite_str:
+        if key in param_list:
+            value = get_value(key)
+            cmd.append('%s %s' % (not_opt_lite_str[key], value))
+    if primary_rpc_info:
+        cmd.append('--role=STANDBY')
+        log_restore_source = "'" + primary_rpc_info['primary_ip'] + ':' + str(primary_rpc_info['rpc_port']) + "'"
+        opt_str.append('log_restore_source=%s' % log_restore_source)
+
+    if len(opt_str) > 0:
+        cmd.append(' ' + ' '.join([f'--parameter {opt}' for opt in opt_str]))
+
+
+def start_pre(plugin_context, *args, **kwargs):
+    new_cluster_config = plugin_context.get_variable('new_cluster_config')
+    primary_rpc_info = plugin_context.get_variable('primary_rpc_info')
+    cluster_config = new_cluster_config if new_cluster_config else plugin_context.cluster_config
+    clients = plugin_context.clients
+    stdio = plugin_context.stdio
+    options = plugin_context.options
+
+    clusters_cmd = {}
+    if cluster_config.added_servers:
+        scale_out = True
+        need_bootstrap = False
+    else:
+        scale_out = False
+        need_bootstrap = True
+
+    mock_primary_rpc_info = deepcopy(primary_rpc_info)
+    if mock_primary_rpc_info and mock_primary_rpc_info['primary_ip'] in [server.ip for server in cluster_config.servers]:
+        mock_primary_rpc_info = None
+    for server in cluster_config.servers:
+        client = clients[server]
+        server_config = cluster_config.get_server_conf(server)
+        home_path = server_config['home_path']
+
+        param_config = {}
+        if new_cluster_config:
+            old_config = plugin_context.cluster_config.get_server_conf_with_default(server)
+            new_config = new_cluster_config.get_server_conf_with_default(server)
+            for key in new_config:
+                param_value = new_config[key]
+                if key not in old_config or old_config[key] != param_value:
+                    param_config[key] = param_value
+        else:
+            param_config = server_config
+
+        if not server_config.get('data_dir'):
+            server_config['data_dir'] = '%s/store' % home_path
+        if not server_config.get('redo_dir'):
+            server_config['redo_dir'] = '%s/redo' % server_config['data_dir']
+
+        if not server_config.get('local_ip') and not server_config.get('devname'):
+            server_config['local_ip'] = server.ip
+
+        if client.execute_command(
+                'ls {}/sstable/block_file'.format(server_config['data_dir'])).stdout.strip():
+            need_bootstrap = False
+
+        remote_pid_path = '%s/run/seekdb.pid' % home_path
+        remote_pid = client.execute_command('cat %s' % remote_pid_path).stdout.strip()
+        if remote_pid:
+            if IS_DARWIN:
+                if client.execute_command('ps -p %s' % remote_pid):
+                    continue
+            else:
+                if client.execute_command('ls /proc/%s' % remote_pid):
+                    continue
+
+        stdio.verbose('%s start command construction' % server)
+        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s/etc/seekdb.config.bin' % home_path):
+            use_parameter = False
+        else:
+            use_parameter = True
+
+        cmd = []
+        if use_parameter:
+            construct_opts(server_config, param_config, cmd, mock_primary_rpc_info)
+        else:
+            cmd.append('--port %s' % server_config['mysql_port'])
+
+        clusters_cmd[server] = 'cd %s; export reporter="obd"; %s/bin/seekdb %s' % (home_path, home_path, ' '.join(cmd))
+
+    plugin_context.set_variable('scale_out', scale_out)
+    plugin_context.set_variable('need_bootstrap', need_bootstrap)
+    plugin_context.set_variable('clusters_cmd', clusters_cmd)
+
+    return plugin_context.return_true()

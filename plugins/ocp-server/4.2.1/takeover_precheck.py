@@ -43,19 +43,26 @@ def takeover_precheck(plugin_context, cursors=None, *args, **kwargs):
             stdio.error("unable to export obcluster to ocp, ocp version must be at least 4.2.0")
             return plugin_context.return_false(ocp_version=ocp_version)
         server = cluster_config.servers[0]
-        mysql_port = cluster_config.get_global_conf().get("mysql_port")
-        root_password = cluster_config.get_global_conf().get("root_password")
+        server_config = cluster_config.get_server_conf_with_default(server) or {}
+        mysql_port = server_config.get("mysql_port")
+        root_password = server_config.get("root_password")
         if root_password is None or root_password == "":
             stdio.error("unable to export obcluster to ocp, root password is empty")
             return plugin_context.return_false(ocp_version=ocp_version)
         precheck_data = {"connectionMode": "direct", "address": server.ip, "port": mysql_port,
                          "rootSysPassword": root_password}
-        proxyro_password = cluster_config.get_global_conf().get("proxyro_password")
+        proxyro_password = server_config.get("proxyro_password")
         if proxyro_password is not None and proxyro_password != "":
             precheck_data.update({"proxyroPassword": proxyro_password})
         precheck_result = cursor.take_over_precheck(precheck_data, stdio=stdio)
         stdio.verbose("precheck result %s" % precheck_result)
-        return plugin_context.return_true(ocp_version=ocp_version)
+        already_taken_over = bool(
+            precheck_result and precheck_result.get('already_taken_over'))
+        if already_taken_over:
+            stdio.print("The OceanBase cluster already exists in OCP; skip duplicate takeover submission.")
+        return plugin_context.return_true(
+            ocp_version=ocp_version,
+            already_taken_over=already_taken_over)
     except Exception as ex:
         stdio.exception('')
         stdio.error("do takeover precheck got exception:%s", ex)

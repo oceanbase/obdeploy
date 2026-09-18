@@ -15,11 +15,13 @@
 
 import time
 from collections import defaultdict
+from _deploy import ObserverIdentity
 
 tenant_cursor_cache = defaultdict(dict)
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_exception=False, retries=20):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_exception=False, retries=20,
+                       cluster_config=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     # find tenant ip, port
@@ -30,7 +32,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_ex
         query_sql = "select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
         tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
         for tenant_server_port in tenant_server_ports:
-            tenant_ip = tenant_server_port['SVR_IP']
+            tenant_ip = ObserverIdentity.externalize_ip(cluster_config, tenant_server_port['SVR_IP'])
             tenant_port = tenant_server_port['SQL_PORT']
             tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=raise_exception)
             if tenant_cursor:
@@ -41,13 +43,22 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_ex
     if not tenant_cursor and retries:
         retries -= 1
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, raise_exception=raise_exception, retries=retries)
-    return tenant_cursor.execute(sql, raise_exception=False, exc_level='verbose') if tenant_cursor else False
+        return exec_sql_in_tenant(
+            sql, cursor, tenant, mode, user, password, raise_exception=raise_exception, retries=retries,
+            cluster_config=cluster_config)
+    if not tenant_cursor:
+        if raise_exception:
+            raise RuntimeError('Failed to connect tenant {} for SQL execution.'.format(tenant))
+        return False
+    return tenant_cursor.execute(
+        sql, raise_exception=raise_exception, exc_level='verbose')
 
 
-def verify_password(cursor, tenant_name, stdio, key='', password='', user='root', mode='mysql'):
+def verify_password(cursor, tenant_name, stdio, key='', password='', user='root', mode='mysql', cluster_config=None):
     sql = 'select 1' if mode == 'mysql' else 'select 1 from DUAL'
-    if exec_sql_in_tenant(sql, cursor, tenant_name, mode, user=user, password=password, raise_exception=False, retries=2):
+    if exec_sql_in_tenant(
+            sql, cursor, tenant_name, mode, user=user, password=password, raise_exception=False, retries=2,
+            cluster_config=cluster_config):
         return True
     stdio.error("Authentication failed, no valid password for {}:{}. please retry with '--{}=xxxxxx' option.".format(tenant_name, user, key))
     return False
@@ -65,17 +76,22 @@ def failover_decouple_tenant(plugin_context, cursors={}, *args, **kwargs):
     option_type = cmds[2]
     tenant_name = getattr(options, 'tenant_name', '')
     standby_cursor = cursors.get(deploy_name)
+    standby_cluster_config = plugin_context.cluster_config
     tenant_mode = plugin_context.get_variable('tenant_mode', default='mysql').lower()
     # do inner check
     stdio.start_loading('Inner check')
     user = 'SYS' if tenant_mode == 'oracle' else 'root'
     standby_tenant_password = getattr(plugin_context.options, 'tenant_root_password') if getattr(plugin_context.options, 'tenant_root_password') else ''
-    if not verify_password(standby_cursor, tenant_name, stdio, key='tenant-root-password', password=standby_tenant_password, user=user, mode=tenant_mode):
+    if not verify_password(
+            standby_cursor, tenant_name, stdio, key='tenant-root-password', password=standby_tenant_password,
+            user=user, mode=tenant_mode, cluster_config=standby_cluster_config):
         stdio.stop_loading('failed')
         return
     try:
         sql = "ALTER SYSTEM ACTIVATE STANDBY VERIFY"
-        exec_sql_in_tenant(sql, standby_cursor, tenant_name, mode=tenant_mode, user=user, password=standby_tenant_password, raise_exception=True, retries=2)
+        exec_sql_in_tenant(
+            sql, standby_cursor, tenant_name, mode=tenant_mode, user=user, password=standby_tenant_password,
+            raise_exception=True, retries=2, cluster_config=standby_cluster_config)
     except Exception as e:
         error("Standby tenant {}:{} do {} verify failed:{}".format(deploy_name, tenant_name, option_type, e))
         return
@@ -85,13 +101,17 @@ def failover_decouple_tenant(plugin_context, cursors={}, *args, **kwargs):
     stdio.start_loading('Do {}'.format(option_type))
     try:
         sql = "ALTER SYSTEM SET LOG_RESTORE_SOURCE = ''"
-        exec_sql_in_tenant(sql, standby_cursor, tenant_name, mode=tenant_mode, user=user, password=standby_tenant_password, raise_exception=True, retries=2)
+        exec_sql_in_tenant(
+            sql, standby_cursor, tenant_name, mode=tenant_mode, user=user, password=standby_tenant_password,
+            raise_exception=True, retries=2, cluster_config=standby_cluster_config)
     except Exception as e:
         error("Standby tenant {}:{} do set log restore source failed:{}".format(deploy_name, tenant_name, e))
         return
     try:
         sql = "ALTER SYSTEM ACTIVATE STANDBY"
-        exec_sql_in_tenant(sql, standby_cursor, tenant_name, mode=tenant_mode, user=user, password=standby_tenant_password, raise_exception=True, retries=2)
+        exec_sql_in_tenant(
+            sql, standby_cursor, tenant_name, mode=tenant_mode, user=user, password=standby_tenant_password,
+            raise_exception=True, retries=2, cluster_config=standby_cluster_config)
     except Exception as e:
         retry_message = 'After resolving the issue, you can retry by manually executing SQL:\'{}\' with the root user in the tenant {}:{}.'.format(sql, deploy_name, tenant_name)
         error("Do {} on tenant{}:{} failed. error message info:{}. \n {}".format(option_type, deploy_name, tenant_name, e, retry_message))

@@ -17,9 +17,10 @@ import os
 import time
 
 from tool import FileUtil
+from _deploy import ObserverIdentity
 
 
-def exec_sql_in_tenant(cursor, tenant, mode='mysql', user='', password='', print_exception=True, retries=20, args=[]):
+def exec_sql_in_tenant(cursor, tenant, mode='mysql', user='', password='', print_exception=True, retries=20, args=[], cluster_config=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
 
@@ -28,7 +29,7 @@ def exec_sql_in_tenant(cursor, tenant, mode='mysql', user='', password='', print
     tenant_cursor = []
 
     for tenant_server_port in tenant_server_ports:
-        tenant_ip = tenant_server_port['SVR_IP']
+        tenant_ip = ObserverIdentity.externalize_ip(cluster_config, tenant_server_port['SVR_IP']) if cluster_config else tenant_server_port['SVR_IP']
         tenant_port = tenant_server_port['SQL_PORT']
         cursor_tenant = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip,
                                           port=tenant_port, mode=mode, print_exception=print_exception)
@@ -38,7 +39,7 @@ def exec_sql_in_tenant(cursor, tenant, mode='mysql', user='', password='', print
     if not tenant_cursor and retries:
         time.sleep(1)
         return exec_sql_in_tenant(cursor, tenant, mode, user, password, print_exception=print_exception,
-                                  retries=retries - 1, args=args)
+                                  retries=retries - 1, args=args, cluster_config=cluster_config)
 
 
 def scenario_check(scenario):
@@ -89,7 +90,7 @@ def tenant_optimize(plugin_context, tenant_cursor=None, scenario=None, tenant_na
             return plugin_context.return_false()
 
         root_password = root_password or getattr(options, tenant_name + '_root_password', "")
-        tenant_cursor = exec_sql_in_tenant(cursor=cursor, tenant=tenant_name, mode=mode, password=root_password if root_password else '')
+        tenant_cursor = exec_sql_in_tenant(cursor=cursor, tenant=tenant_name, mode=mode, password=root_password if root_password else '', cluster_config=cluster_config)
 
     def _optimize(json_files):
         for file in json_files:

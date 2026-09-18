@@ -428,7 +428,7 @@ class DevModeMajorCommand(HiddenMajorCommand):
         self.register_command(DevModeDisableCommand())
 
 
-class EnvironmentSetCommand(HiddenObdCommand):
+class EnvironmentSetCommand(ObdCommand):
 
     def __init__(self):
         super(EnvironmentSetCommand, self).__init__("set", "Set obd environment variable")
@@ -449,7 +449,7 @@ class EnvironmentSetCommand(HiddenObdCommand):
             return self._show_help()
 
 
-class EnvironmentUnsetCommand(HiddenObdCommand):
+class EnvironmentUnsetCommand(ObdCommand):
 
     def __init__(self):
         super(EnvironmentUnsetCommand, self).__init__("unset", "Unset obd environment variable")
@@ -469,7 +469,7 @@ class EnvironmentUnsetCommand(HiddenObdCommand):
             return self._show_help()
 
 
-class EnvironmentShowCommand(HiddenObdCommand):
+class EnvironmentShowCommand(ObdCommand):
 
     def __init__(self):
         super(EnvironmentShowCommand, self).__init__("show", "Show obd environment variables")
@@ -484,7 +484,7 @@ class EnvironmentShowCommand(HiddenObdCommand):
         return True
 
 
-class EnvironmentClearCommand(HiddenObdCommand):
+class EnvironmentClearCommand(ObdCommand):
 
     def __init__(self):
         super(EnvironmentClearCommand, self).__init__("clear", "Clear obd environment variables")
@@ -493,7 +493,7 @@ class EnvironmentClearCommand(HiddenObdCommand):
         return COMMAND_ENV.clear(stdio=obd.stdio)
 
 
-class EnvironmentMajorCommand(HiddenMajorCommand):
+class EnvironmentMajorCommand(MajorCommand):
 
     def __init__(self):
         super(EnvironmentMajorCommand, self).__init__('env', 'Environment variables for OBD')
@@ -905,9 +905,6 @@ class WebCommand(ObdCommand):
         self.parser.add_option('-w', '--white', type='str', help="ip white list, eq: '127.0.0.1, 192.168.1.1'.", default='')
 
     def _do_command(self, obd):
-        if COMMAND_ENV.get(const.ENCRYPT_PASSWORD) == '1':
-            ROOT_IO.error('OBD Web has been disabled. Please execute the ` obd pwd encrypt disable ` command and try again')
-            return False
         from service.app import OBDWeb
         # white_ip_list = self.get_white_ip_list()
         url = '/#/updateWelcome' if self.cmds and self.cmds[0] in ('upgrade', 'update') else ''
@@ -1209,6 +1206,33 @@ class ClusterEditConfigCommand(ClusterMirrorCommand):
             return obd.edit_deploy_config(self.cmds[0])
         else:
             return self._show_help()
+
+
+class ClusterChangeIpCommand(ClusterMirrorCommand):
+
+    def __init__(self):
+        super(ClusterChangeIpCommand, self).__init__(
+            'change-ip',
+            'Change the local OBD management IP for a standalone deployment.'
+        )
+        self.parser.add_option('--old-ip', type='string', help='Current management IP.')
+        self.parser.add_option('--new-ip', type='string', help='New management IP.')
+        self.parser.add_option('--dry-run', action='store_true', help='Run all checks without changing the configuration.')
+        self.parser.add_option('-y', '--yes', action='store_true', help='Confirm the configuration change.')
+
+    def _do_command(self, obd):
+        if len(self.cmds) != 1:
+            return self._show_help()
+        if not self.opts.old_ip or not self.opts.new_ip:
+            ROOT_IO.error('Both --old-ip and --new-ip are required.')
+            return False
+        return obd.change_cluster_ip(
+            self.cmds[0],
+            self.opts.old_ip,
+            self.opts.new_ip,
+            dry_run=bool(self.opts.dry_run),
+            need_confirm=not bool(self.opts.yes)
+        )
 
 
 class ClusterChangeRepositoryCommand(ClusterMirrorCommand):
@@ -1700,6 +1724,7 @@ class ClusterMajorCommand(MajorCommand):
         self.register_command(ClusterRestartCommand())
         self.register_command(ClusterRedeployCommand())
         self.register_command(ClusterEditConfigCommand())
+        self.register_command(ClusterChangeIpCommand())
         self.register_command(ClusterReloadCommand())
         self.register_command(ClusterReloadCommand())
         self.register_command(CLusterUpgradeCommand())
@@ -3270,4 +3295,3 @@ if __name__ == '__main__':
         if ret:
             ROOT_IO.exit(0)
         ROOT_IO.exit(1)
-

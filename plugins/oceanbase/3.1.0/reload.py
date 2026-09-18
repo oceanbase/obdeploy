@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from _deploy import InnerConfigItem
+from _deploy import InnerConfigItem, ObserverIdentity
 from _errno import EC_OBSERVER_INVALID_MODFILY_GLOBAL_KEY
 from ssh import get_root_permission_client
 from tool import is_root_user
@@ -86,7 +86,7 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
         stdio.verbose('get %s new configuration' % (server))
         new_config = new_cluster_config.get_server_conf_with_default(server)
         stdio.verbose('get %s cluster address' % (server))
-        cluster_server[server] = '%s:%s' % (server.ip, config['rpc_port'])
+        cluster_server[server] = '%s:%s' % (ObserverIdentity.identity_ip(cluster_config, server), config['rpc_port'])
         stdio.verbose('compare configuration of %s' % (server))
         for key in new_config:
             if key in not_paramters:
@@ -94,6 +94,9 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
                 continue
             n_value = new_config[key]
             if key == 'obconfig_url':
+                if ObserverIdentity.is_loopback(cluster_config):
+                    stdio.error('obconfig_url is not supported for standalone loopback identity')
+                    return plugin_context.return_false()
                 cfg_url = get_ob_configserver_cfg_url(n_value, cluster_config.name, stdio)
                 if cfg_url:
                     n_value = cfg_url

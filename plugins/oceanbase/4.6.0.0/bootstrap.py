@@ -18,7 +18,7 @@ from __future__ import absolute_import, division, print_function
 import time
 
 import const
-from _deploy import InnerConfigItem
+from _deploy import InnerConfigItem, ObserverIdentity
 
 
 def _build_logservice_access_point(cluster_config, stdio):
@@ -90,13 +90,14 @@ def bootstrap(plugin_context, *args, **kwargs):
         for server in cluster_config.servers:
             server_config = cluster_config.get_server_conf(server)
             server_config_default = cluster_config.get_server_conf_with_default(server)
+            identity_ip = ObserverIdentity.identity_ip(cluster_config, server)
             zone = server_config['zone']
             if zone in floor_servers:
-                floor_servers[zone].append('%s:%s' % (server.ip, server_config['rpc_port']))
+                floor_servers[zone].append('%s:%s' % (identity_ip, server_config['rpc_port']))
             else:
                 floor_servers[zone] = []
                 zones_config[zone] = {}
-                bootstrap.append('REGION "%s" ZONE "%s" SERVER "%s:%s"' % (server_config_default['zone_region'], server_config['zone'], server.ip, server_config['rpc_port']))
+                bootstrap.append('REGION "%s" ZONE "%s" SERVER "%s:%s"' % (server_config_default['zone_region'], server_config['zone'], identity_ip, server_config['rpc_port']))
 
             zone_config = zones_config[zone]
             zone_config['$_zone_idc'] = server_config_default['zone_idc']

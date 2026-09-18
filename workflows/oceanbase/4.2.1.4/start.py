@@ -30,7 +30,7 @@ def start(plugin_context, workflow, *args, **kwargs):
     if not client:
         return plugin_context.return_false()
     component_name = cluster_config.name
-    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'user_pre', 'create_user')
+    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'verify_observer_identity', 'user_pre', 'create_user')
     if component_name in [const.COMP_OB_CE]:
         workflow.add(const.STAGE_FIRST, 'obshell_start', 'obshell_bootstrap')
     install_utils = cluster_config.get_global_conf().get('install_utils', False)
@@ -44,4 +44,3 @@ def start(plugin_context, workflow, *args, **kwargs):
     if enable_observer_auto and not client.execute_command(cmd):
         workflow.add(const.STAGE_SECOND, 'enable_auto_start')
     plugin_context.return_true()
-

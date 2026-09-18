@@ -25,7 +25,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
   const isNewDB = getTailPath() === 'install';
 
   const [clusterMoreLoading, setClusterMoreLoading] = useState(false);
-  const { deployUser, useRunningUser } = useModel('ocpInstallData');
+  const { deployUser } = useModel('ocpInstallData');
   const {
     ocpClusterMore,
     setOcpClusterMore,
@@ -153,8 +153,7 @@ export default function ClusterConfig({ form }: { form: FormInstance<any> }) {
 
   useUpdateEffect(() => {
     const rootUser = deployUser === 'root';
-    const homePath =
-      !useRunningUser && rootUser ? `/${deployUser}` : `/home/${deployUser}`;
+    const homePath = rootUser ? `/${deployUser}` : `/home/${deployUser}`;
     form.setFieldValue(['oceanbase', 'home_path'], homePath);
   }, [deployUser]);
 

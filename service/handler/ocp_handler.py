@@ -731,6 +731,29 @@ class OcpHandler(BaseHandler):
         return ret
 
     def _create_tenant(self, task_id):
+        def get_tenant_id(tenant_name):
+            result = self.context['metadb_cursor'].fetchone(
+                "select TENANT_ID from oceanbase.DBA_OB_TENANTS where TENANT_NAME = %s",
+                [tenant_name])
+            if result is False:
+                raise Exception("Check tenant {} failed".format(tenant_name))
+            if not result:
+                return None
+            return result.get('TENANT_ID', result.get('tenant_id'))
+
+        def prepare_tenant_state(tenant_config):
+            state = copy.deepcopy(tenant_config)
+            tenant_id = get_tenant_id(state['tenant_name'])
+            recorded_tenant_id = state.get('tenant_id')
+            owns_existing_tenant = (
+                state.get('created_by_obd', False) and
+                recorded_tenant_id is not None and
+                str(recorded_tenant_id) == str(tenant_id))
+            state['created_by_obd'] = owns_existing_tenant
+            if not owns_existing_tenant:
+                state.pop('tenant_id', None)
+            return state
+
         metadb_version = self.context['metadb_cursor'].fetchone("select ob_version() as version")["version"]
         mock_oceanbase_repository = Repository("oceanbase-ce", "/")
         mock_oceanbase_repository.version = metadb_version
@@ -740,14 +763,23 @@ class OcpHandler(BaseHandler):
         else:
             ocp_config = self.obd.deploy.deploy_config.components[COMP_OCP_SERVER_CE]
         global_conf_with_default = ocp_config.get_global_conf_with_default()
-        meta_tenant_config = global_conf_with_default['ocp_meta_tenant']
+        meta_tenant_state = prepare_tenant_state(global_conf_with_default['ocp_meta_tenant'])
+        monitor_tenant_state = prepare_tenant_state(global_conf_with_default['ocp_monitor_tenant'])
+
+        if not ocp_config.update_global_conf('ocp_meta_tenant', meta_tenant_state, save=False) or \
+                not ocp_config.update_global_conf('ocp_monitor_tenant', monitor_tenant_state, save=False) or \
+                not self.obd.deploy.deploy_config.dump():
+            self.context['deploy_status'][task_id] = 'failed'
+            raise Exception("Persist tenant ownership failed")
+
+        meta_tenant_config = copy.deepcopy(meta_tenant_state)
         meta_tenant_config["variables"] = "ob_tcp_invited_nodes='%'"
         meta_tenant_config["create_if_not_exists"] = True
         meta_tenant_config["database"] = global_conf_with_default["ocp_meta_db"]
         meta_tenant_config["db_username"] = global_conf_with_default["ocp_meta_username"]
         meta_tenant_config["db_password"] = global_conf_with_default.get("ocp_meta_password", "")
         meta_tenant_config[meta_tenant_config['tenant_name'] + "_root_password"] = global_conf_with_default.get("ocp_meta_password", "")
-        monitor_tenant_config = global_conf_with_default['ocp_monitor_tenant']
+        monitor_tenant_config = copy.deepcopy(monitor_tenant_state)
         monitor_tenant_config["variables"] = "ob_tcp_invited_nodes='%'"
         monitor_tenant_config["create_if_not_exists"] = True
         monitor_tenant_config["database"] = global_conf_with_default["ocp_monitor_db"]
@@ -761,11 +793,176 @@ class OcpHandler(BaseHandler):
         self.obd.set_deploy(None)
         log.get_logger().info("start create tenant")
         workflow = self.obd.get_workflows('create_tenant_web', repositories=[mock_oceanbase_repository], no_found_act='ignore')
-        if not self.obd.run_workflow(workflow, repositories=[mock_oceanbase_repository], **{'oceanbase-ce': {'cluster_config': ocp_config, 'cursor': self.context['metadb_cursor'], 'create_tenant_options': [Values(meta_tenant_config), Values(monitor_tenant_config)], 'clients': ssh_clients}}):
+        created_tenants = {}
+        create_tenant_kwargs = {
+            'oceanbase-ce': {
+                'cluster_config': ocp_config,
+                'cursor': self.context['metadb_cursor'],
+                'create_tenant_options': [
+                    Values(meta_tenant_config), Values(monitor_tenant_config)],
+                'clients': ssh_clients,
+                'created_tenants': created_tenants}}
+        create_error = None
+        try:
+            create_success = self.obd.run_workflow(
+                workflow, repositories=[mock_oceanbase_repository],
+                **create_tenant_kwargs)
+        except Exception as ex:
+            create_success = False
+            create_error = ex
+        finally:
             self.obd.set_deploy(deploy)
+
+        tenant_states = (meta_tenant_state, monitor_tenant_state)
+        historical_owned_ids = {
+            tenant_state['tenant_name']: tenant_state['tenant_id']
+            for tenant_state in tenant_states if tenant_state['created_by_obd']}
+        ownership_changed = False
+        for tenant_state in tenant_states:
+            tenant_name = tenant_state['tenant_name']
+            current_tenant_id = get_tenant_id(tenant_name)
+            if created_tenants.get(tenant_name, False):
+                tenant_state['created_by_obd'] = True
+                tenant_state['tenant_id'] = current_tenant_id
+            elif tenant_name in historical_owned_ids:
+                recorded_tenant_id = historical_owned_ids[tenant_name]
+                tenant_state['created_by_obd'] = (
+                    current_tenant_id is not None and
+                    str(current_tenant_id) == str(recorded_tenant_id))
+                if tenant_state['created_by_obd']:
+                    tenant_state['tenant_id'] = recorded_tenant_id
+                else:
+                    tenant_state.pop('tenant_id', None)
+                    ownership_changed = True
+            else:
+                tenant_state['created_by_obd'] = False
+                tenant_state.pop('tenant_id', None)
+            if tenant_state['created_by_obd'] and tenant_state.get('tenant_id') is None:
+                self.context['deploy_status'][task_id] = 'failed'
+                raise Exception("Record tenant ownership failed")
+        if not ocp_config.update_global_conf('ocp_meta_tenant', meta_tenant_state, save=False) or \
+                not ocp_config.update_global_conf('ocp_monitor_tenant', monitor_tenant_state, save=False) or \
+                not self.obd.deploy.deploy_config.dump():
             self.context['deploy_status'][task_id] = 'failed'
+            raise Exception("Persist tenant ownership failed")
+        if ownership_changed:
+            self.context['deploy_status'][task_id] = 'failed'
+            raise Exception("Tenant ownership changed during creation")
+        if not create_success:
+            self.context['deploy_status'][task_id] = 'failed'
+            if create_error is not None:
+                raise create_error
             raise Exception("Create tenant failed")
-        self.obd.set_deploy(deploy)
+
+    def _take_over_metadb(self, id, name):
+        config = self.context['ocp_deployment_info'][id]['config']
+        ocpserver = config.components.ocpserver
+        metadb = ocpserver.metadb
+        servers = ocpserver.servers
+        password = RSAHandler().decrypt_private_key(ocpserver.admin_password)
+        address = 'http://' + str(servers[0]) + ':' + str(ocpserver.port)
+        metadb_cluster_name = self._resolve_metadb_cluster_name(metadb, name)
+
+        ocp_deploy = self.obd.deploy
+        ocp_repositories = self.obd.repositories
+        ocp_options = self.obd.options
+        try:
+            log.get_logger().info("begin take_over metadb %s", metadb_cluster_name)
+            takeover_options = copy.copy(ocp_options)
+            takeover_options._update_loose({"address": address, "user": 'admin', "password": password})
+            self.obd.set_options(takeover_options)
+            takeover_success = self.obd.export_to_ocp(metadb_cluster_name)
+        finally:
+            self.obd.set_deploy(ocp_deploy)
+            self.obd.set_repositories(ocp_repositories)
+            self.obd.set_options(ocp_options)
+        if not takeover_success:
+            raise Exception("Failed to take over MetaDB %s" % metadb_cluster_name)
+        log.get_logger().info("finish take_over metadb %s", metadb_cluster_name)
+
+    @staticmethod
+    def _get_oceanbase_component(deploy):
+        if deploy is None or deploy.deploy_info.status != DeployStatus.STATUS_RUNNING:
+            return None
+        for component in COMPS_OB:
+            if component in deploy.deploy_config.components:
+                return deploy.deploy_config.components[component]
+        return None
+
+    def _get_running_oceanbase_deploy(self, name):
+        if not name:
+            return None
+        deploy = self.obd.deploy_manager.get_deploy_config(name, read_only=True)
+        return deploy if self._get_oceanbase_component(deploy) is not None else None
+
+    @staticmethod
+    def _endpoint_matches(cluster_config, host, port):
+        for server in cluster_config.servers:
+            server_config = cluster_config.get_server_conf_with_default(server) or {}
+            try:
+                mysql_port = int(server_config.get('mysql_port', 2881))
+            except (TypeError, ValueError):
+                continue
+            if str(server.ip).strip() == host and mysql_port == port:
+                return True
+        return False
+
+    def _resolve_metadb_cluster_name(self, metadb, fallback_name):
+        if metadb is None:
+            if self._get_running_oceanbase_deploy(fallback_name) is not None:
+                return fallback_name
+            raise Exception("MetaDB cluster name is required for takeover")
+
+        host = str(metadb.host or '').strip()
+        try:
+            port = int(metadb.port)
+        except (TypeError, ValueError):
+            raise Exception("Invalid MetaDB port for takeover: %s" % metadb.port)
+
+        # The connection endpoint can identify the actual OceanBase cluster even
+        # when the Web form loses cluster_name or uses the new OCP deployment name.
+        cursor = self.context.get('metadb_cursor')
+        if cursor is not None:
+            try:
+                row = cursor.fetchone(
+                    "select distinct value as cluster_name from oceanbase.GV$OB_PARAMETERS "
+                    "where name = 'cluster' limit 1",
+                    raise_exception=True,
+                    exc_level='verbose')
+                database_cluster_name = str((row or {}).get('cluster_name') or '').strip()
+                if self._get_running_oceanbase_deploy(database_cluster_name) is not None:
+                    return database_cluster_name
+            except Exception:
+                log.get_logger().warning(
+                    "Failed to resolve MetaDB deployment from OceanBase cluster parameter",
+                    exc_info=True)
+
+        explicit_cluster_name = str(metadb.cluster_name or '').strip()
+        if self._get_running_oceanbase_deploy(explicit_cluster_name) is not None:
+            return explicit_cluster_name
+
+        matches = []
+        for deploy in self.obd.deploy_manager.get_deploy_configs(read_only=True):
+            cluster_config = self._get_oceanbase_component(deploy)
+            if cluster_config is not None and self._endpoint_matches(cluster_config, host, port):
+                matches.append(deploy.name)
+        matches = sorted(set(matches))
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            raise Exception(
+                "Cannot determine MetaDB deployment for %s:%s: multiple running OceanBase "
+                "deployments match (%s)" % (host, port, ', '.join(matches)))
+        raise Exception(
+            "Cannot determine MetaDB deployment for %s:%s: no running OBD-managed "
+            "OceanBase deployment matches" % (host, port))
+
+    def _take_over_metadb_for_task(self, id, name, task_id):
+        try:
+            self._take_over_metadb(id, name)
+        except Exception:
+            self.context['deploy_status'][task_id] = 'failed'
+            raise
 
     @auto_register("install")
     def _do_install(self, id, task_id):
@@ -852,17 +1049,7 @@ class OcpHandler(BaseHandler):
             raise Exception("task {0} start failed".format(name))
         self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
         log.get_logger().info("finish do start %s", name)
-        if not self.context['ocp_deployment_info'][id]['config'].components.ocpserver.metadb:
-            log.get_logger().info("begin take_over metadb")
-            config = self.context['ocp_deployment_info'][id]['config']
-            servers = config.components.ocpserver.servers
-            port = config.components.ocpserver.port
-            password = config.components.ocpserver.admin_password
-            password = RSAHandler().decrypt_private_key(password)
-            address = ['http://' + str(server) + ':' + str(port) for server in servers]
-            self.obd.options._update_loose({"address": address[0], "user": 'admin', "password": password})
-            self.obd.export_to_ocp(name)
-            log.get_logger().info("finish take_over metadb")
+        self._take_over_metadb_for_task(id, name, task_id)
         deploy = self.obd.deploy_manager.get_deploy_config(name)
         self.obd.set_deploy(deploy)
         self.context['process_installed'][task_id] = 'done'
@@ -955,6 +1142,7 @@ class OcpHandler(BaseHandler):
 
     @auto_register("reinstall")
     def _do_reinstall(self, id, task_id):
+        self.context['deploy_status'][task_id] = self.context['process_installed'][task_id] = ''
         log.get_logger().info("clean io buffer before start reinstall")
         self.buffer.clear()
         log.get_logger().info("clean namespace for init")
@@ -1044,20 +1232,9 @@ class OcpHandler(BaseHandler):
             raise Exception("task {0} start failed".format(name))
 
         self.obd.deploy.update_deploy_status(DeployStatus.STATUS_RUNNING)
-        self.context['process_installed'][task_id] = 'done'
         log.get_logger().info("finish do start %s", name)
 
-        if not self.context['ocp_deployment_info'][id]['config'].components.ocpserver.metadb:
-            log.get_logger().info("begin take_over metadb")
-            config = self.context['ocp_deployment_info'][id]['config']
-            servers = config.components.ocpserver.servers
-            port = config.components.ocpserver.port
-            password = config.components.ocpserver.admin_password
-            password = RSAHandler().decrypt_private_key(password)
-            address = ['http://' + str(server) + ':' + str(port) for server in servers]
-            self.obd.options._update_loose({"address": address[0], "user": 'admin', "password": password})
-            self.obd.export_to_ocp(name)
-            log.get_logger().info("finish take_over metadb")
+        self._take_over_metadb_for_task(id, name, task_id)
         deploy = self.obd.deploy_manager.get_deploy_config(name)
         self.obd.set_deploy(deploy)
         self.context['process_installed'][task_id] = 'done'
@@ -1138,7 +1315,7 @@ class OcpHandler(BaseHandler):
             task_info.result = TaskResult.SUCCESSFUL
             task_info.status = TaskStatus.FINISHED
 
-        if failed:
+        if failed or self.context['deploy_status'][task_id] == 'failed':
             task_info.result = TaskResult.FAILED
             task_info.status = TaskStatus.FINISHED
         return task_info
@@ -1830,7 +2007,3 @@ class OcpHandler(BaseHandler):
             for _ in ret:
                 data.address.append(_['inner_ip_address'])
         return data
-
-
-
-

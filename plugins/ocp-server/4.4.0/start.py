@@ -24,6 +24,12 @@ from _types import Capacity, CapacityWithB
 from tool import get_option
 
 
+def resolve_java_bin(java_bin, home_path, launch_user):
+    if launch_user and java_bin == 'java':
+        return os.path.join(home_path, 'jre/bin/java')
+    return java_bin
+
+
 def append_format_parameters(original, kv):
     stripped = original.strip("'")
     if stripped:
@@ -31,6 +37,23 @@ def append_format_parameters(original, kv):
     else:
         updated = kv
     return f"'{updated}'"
+
+
+def append_monitordb_parameters(original, monitor_db, jdbc_host, monitor_password, jdbc_port,
+                                monitor_user, monitor_tenant, cluster_name):
+    if not monitor_user or 'ocp.monitordb.host:' in original:
+        return original
+    monitor_password = monitor_password.replace("'", """'"'"'""")
+    username = monitor_user + "@" + monitor_tenant + cluster_name
+    connection_properties = [
+        f"ocp.monitordb.database:{monitor_db}",
+        f"ocp.monitordb.host:{jdbc_host}",
+        f"ocp.monitordb.password:{monitor_password}",
+        f"ocp.monitordb.port:{jdbc_port}",
+        f"ocp.monitordb.username:{username}"
+    ]
+    return append_format_parameters(original, "\n".join(connection_properties))
+
 
 def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwargs):
     def generate_ocp_bootstrap_with_property(start_parameters):
@@ -135,7 +158,7 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
                             '--add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.nio.fs=ALL-UNNAMED ' \
                             '--add-opens=java.base/sun.security.jca=ALL-UNNAMED --add-opens=java.base/sun.security.ssl=ALL-UNNAMED ' \
                             '--add-opens=java.logging/java.util.logging=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED'
-        java_bin = server_config['java_bin']
+        java_bin = resolve_java_bin(server_config['java_bin'], home_path, launch_user)
         client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
         cmd = f'{java_bin} -Dfile.encoding=UTF-8 -Docp.host.ip={server.ip} {extra_options_str} -jar {jvm_memory_option} {home_path}/lib/ocp-server.jar --bootstrap'
         jar_cmd = copy.deepcopy(cmd)
@@ -211,9 +234,13 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
         
         elif extract_doc_result and extract_doc_result[server]:
             OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.ai.assistant.system.knowledge.path:{}".format(os.path.join(home_path, 'knowledge')))
+        OCP_BOOTSTRAP_WITH_PROPERTY = append_monitordb_parameters(
+            OCP_BOOTSTRAP_WITH_PROPERTY, monitor_db, jdbc_host, monitor_password, jdbc_port,
+            monitor_user, monitor_tenant, cluster_name)
         environ_variable += ("export OCP_BOOTSTRAP_WITH_PROPERTY=%s;" % OCP_BOOTSTRAP_WITH_PROPERTY) if OCP_BOOTSTRAP_WITH_PROPERTY else ""
         real_cmd = environ_variable + cmd
-        execute_cmd = "cd {}; {} > /dev/null 2>&1 &".format(home_path, real_cmd)
+        start_log = os.path.join(log_dir, 'ocp-start.log')
+        execute_cmd = "cd {}; {} > {} 2>&1 &".format(home_path, real_cmd, start_log)
         if launch_user:
             cmd_file = os.path.join(home_path, 'cmd.sh')
             client.write_file(execute_cmd, cmd_file)

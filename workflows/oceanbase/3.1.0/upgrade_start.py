@@ -19,6 +19,5 @@ import const
 
 
 def upgrade_start(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check')
+    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'verify_observer_identity')
     plugin_context.return_true()
-

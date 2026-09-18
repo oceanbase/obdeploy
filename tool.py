@@ -76,7 +76,17 @@ else:
         pass
 
 
-__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict", "COMMAND_ENV", "TimeUtils", "Cursor")
+__all__ = ("timeout", "DynamicLoading", "ConfigUtil", "DirectoryUtil", "FileUtil", "YamlLoader", "OrderedDict", "COMMAND_ENV", "TimeUtils", "Cursor", "parse_service_metadata")
+
+
+def parse_service_metadata(value):
+    """Parse comma-delimited SERVICE metadata without truncating punctuation."""
+    metadata = {}
+    for field in re.split(r',(?=[A-Z][A-Z0-9_]*=)', value or ''):
+        key, separator, field_value = field.partition('=')
+        if separator and key:
+            metadata[key] = field_value
+    return metadata
 
 _WINDOWS = os.name == 'nt'
 
@@ -1016,13 +1026,13 @@ class Cursor(SafeStdio):
             if self.mode != 'mysql':
                 self.stdio.error('python2 only support mysql mode')
                 return False
-            self.stdio.verbose('connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+            self.stdio.verbose('connect %s -P%s -u%s -p******' % (self.ip, self.port, self.user))
             self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), passwd=str(self.password))
             self.cursor = self.db.cursor(cursorclass=mysql.cursors.DictCursor)
     else:
         def _connect(self):
             if self.mode == 'mysql':
-                self.stdio.verbose('mysql connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+                self.stdio.verbose('mysql connect %s -P%s -u%s -p******' % (self.ip, self.port, self.user))
                 self.db = mysql.connect(host=self.ip, user=self.user, port=int(self.port), password=str(self.password),
                                         cursorclass=mysql.cursors.DictCursor, charset='utf8mb4')
                 self.cursor = self.db.cursor()
@@ -1035,11 +1045,11 @@ class Cursor(SafeStdio):
                         cx_Oracle.init_oracle_client(os.path.join(OBD_INSTALL_PATH, 'lib/site-packages'))
                         init_cx_oracle = True
                     self.stdio.verbose(
-                        'oracle connect %s -P%s -u%s -p%s' % (self.ip, self.port, self.user, self.password))
+                        'oracle connect %s -P%s -u%s -p******' % (self.ip, self.port, self.user))
                     self.db = cx_Oracle.connect(self.user, self.password, "%s:%s" % (self.ip, self.port))
                     self.cursor = self.db.cursor()
                 except Exception as e:
-                    self.stdio.verbose('connect %s -P%s -u%s -p%s failed, error:\n%s' % (self.ip, self.port, self.user, self.password, e))
+                    self.stdio.verbose('connect %s -P%s -u%s -p****** failed, error:\n%s' % (self.ip, self.port, self.user, e))
             else:
                 self.stdio.error('only support mysql and oracle mode')
                 return False
@@ -1067,12 +1077,20 @@ class Cursor(SafeStdio):
             return Cursor(ip=ip, port=port, user=user, tenant=tenant, password=password, mode=mode, stdio=self.stdio)
         except:
             print_exception and self.stdio.exception('')
-            self.stdio.verbose('fail to connect %s -P%s -u%s@%s  -p%s' % (ip, port, user, tenant, password))
+            self.stdio.verbose('fail to connect %s -P%s -u%s@%s  -p******' % (ip, port, user, tenant))
             return None
 
     def execute(self, sql, args=None, execute_func=None, raise_exception=False, exc_level='error', stdio=None):
+        sensitive_sql = any(
+            keyword in str(sql).upper()
+            for keyword in (
+                'PASSWORD', 'PASSWD', 'IDENTIFIED',
+                'LOG_RESTORE_SOURCE', 'SYNC_STANDBY_DEST'))
+        sql_for_log = '<sensitive SQL omitted>' if sensitive_sql else sql
+        args_for_log = '<provided>' if args is not None else None
         try:
-            stdio.verbose('%s execute sql: %s. args: %s' % (self.mode, sql, args))
+            stdio.verbose('%s execute sql: %s. args: %s' % (
+                self.mode, sql_for_log, args_for_log))
             if not args:
                 self.cursor.execute(sql)
             else:
@@ -1081,10 +1099,16 @@ class Cursor(SafeStdio):
                 return self.cursor
             return getattr(self.cursor, execute_func)()
         except Exception as e:
-            getattr(stdio, exc_level)(EC_SQL_EXECUTE_FAILED.format(sql=sql))
+            getattr(stdio, exc_level)(EC_SQL_EXECUTE_FAILED.format(sql=sql_for_log))
             if raise_exception is None:
                 raise_exception = self._raise_exception
             if raise_exception:
+                if sensitive_sql:
+                    sanitized_error = RuntimeError(
+                        'Sensitive SQL execution failed; details omitted.')
+                    if hasattr(sanitized_error, '__suppress_context__'):
+                        sanitized_error.__suppress_context__ = True
+                    raise sanitized_error
                 stdio.exception('')
                 raise e
             return False
@@ -1519,7 +1543,7 @@ def get_sys_log_disk_size(memory_limit):
         sys_log_disk_size = int(memory_limit * 0.03) + (1 << 30)
     return sys_log_disk_size
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None, cluster_config=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     # find tenant ip, port
@@ -1528,13 +1552,17 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
     tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
     for tenant_server_port in tenant_server_ports:
         tenant_ip = tenant_server_port['SVR_IP']
+        if cluster_config:
+            # Lazy import avoids the _deploy -> tool module import cycle.
+            from _deploy import ObserverIdentity
+            tenant_ip = ObserverIdentity.externalize_ip(cluster_config, tenant_ip)
         tenant_port = tenant_server_port['SQL_PORT']
         tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password if retries % 2 or not len(args) > 0 else args[0], ip=tenant_ip, port=tenant_port, print_exception=False)
         if tenant_cursor:
             break
     if not tenant_cursor and retries:
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio, cluster_config=cluster_config)
     return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
 
 

@@ -27,13 +27,72 @@ from obshell.model.info import Agentidentity
 from obshell.request import ProtocolOptions
 
 
+def _new_obshell_client(server, server_config):
+    root_password = server_config.get('root_password', '')
+    obshell_port = server_config.get('obshell_port', 2886)
+    return ClientSet(server.ip, obshell_port, PasswordAuth(root_password))
+
+
+def _get_obshell_info(server, server_config, client):
+    """Return a protocol-compatible client and its agent information."""
+    try:
+        obshell_api = getattr(client, 'v1', client)
+        return client, obshell_api.get_info()
+    except requests.exceptions.ConnectionError:
+        raise
+    except Exception as e:
+        match = re.search(r'status code: (\d+)', str(e))
+        if (not hasattr(client, 'v1') or not match or
+                match.group(1) != '400'):
+            raise
+        client = ClientV1(
+            server.ip,
+            server_config.get('obshell_port', 2886),
+            PasswordAuth(server_config.get('root_password', '')),
+            protocol_options=ProtocolOptions.https_insecure(),
+        )
+        return client, client.get_info()
+
+
+def _publish_existing_obshell_client(plugin_context):
+    """Publish a client without changing the existing cluster identity.
+
+    A normal start skips takeover/bootstrap after SeekDB data already exists,
+    but later component plugins still need an authenticated OBShell client.
+    Client discovery is deliberately best-effort so this path preserves the
+    historical behavior where a running SeekDB is not failed by this step.
+    """
+    cluster_config = plugin_context.cluster_config
+    fallback_client = None
+    for server in cluster_config.servers:
+        server_config = cluster_config.get_server_conf(server)
+        client = _new_obshell_client(server, server_config)
+        if fallback_client is None:
+            fallback_client = client
+        try:
+            client, _ = _get_obshell_info(server, server_config, client)
+        except Exception as e:
+            plugin_context.stdio.verbose(
+                'Failed to initialize obshell client %s:%s: %s',
+                server.ip, server_config.get('obshell_port', 2886), e)
+            continue
+        plugin_context.set_variable('obshell_client', client)
+        return
+    if fallback_client is not None:
+        # Keep registration best-effort. The consumer will surface the actual
+        # connection error and can retry after OBShell becomes ready.
+        plugin_context.set_variable('obshell_client', fallback_client)
+
+
 def obshell_bootstrap(plugin_context, need_bootstrap=None, *args, **kwargs):
     scale_out = plugin_context.get_variable('scale_out')
-    if not need_bootstrap and not scale_out:
-        return plugin_context.return_true()
     stdio = plugin_context.stdio
     cluster_config = plugin_context.cluster_config
+    if not need_bootstrap and not scale_out:
+        _publish_existing_obshell_client(plugin_context)
+        return plugin_context.return_true()
     if plugin_context.get_variable('seekdb_is_standby', default=False):
+        _publish_existing_obshell_client(plugin_context)
         stdio.print('Standby cluster: skip OBShell bootstrap.')
         return plugin_context.return_true()
     stdio.start_loading('obshell bootstrap')
@@ -46,34 +105,27 @@ def obshell_bootstrap(plugin_context, need_bootstrap=None, *args, **kwargs):
             for server in cluster_config.servers:
                 if server not in obshell_clients:
                     server_config = cluster_config.get_server_conf(server)
-                    root_password = server_config.get('root_password', '')
-                    obshell_port = server_config.get('obshell_port', 2886)
-                    client = ClientSet(server.ip, obshell_port,
-                                       PasswordAuth(root_password))
+                    client = _new_obshell_client(server, server_config)
                     obshell_clients[server] = client
+                else:
+                    server_config = cluster_config.get_server_conf(server)
                 client = obshell_clients[server]
                 try:
-                    info = client.v1.get_info()
+                    client, info = _get_obshell_info(
+                        server, server_config, client)
+                    obshell_clients[server] = client
                 except requests.exceptions.ConnectionError:
                     continue
-                except Exception as e:
-                    match = re.search(r'status code: (\d+)', str(e))
-                    if match and match.group(1) == '400':
-                        client = ClientV1(
-                            server.ip,
-                            obshell_port,
-                            PasswordAuth(root_password),
-                           protocol_options=ProtocolOptions.https_insecure(),
-                        )
-                        info = client.get_info()
-                    else:
-                        stdio = plugin_context.stdio
-                        stdio.error(f'Failed to connect obshell {server.ip}:{obshell_port}')
-                        return plugin_context.return_false()
-                        
+                except Exception:
+                    obshell_port = server_config.get('obshell_port', 2886)
+                    stdio.error('Failed to connect obshell %s:%s' %
+                                (server.ip, obshell_port))
+                    return plugin_context.return_false()
+
+                obshell_api = getattr(client, 'v1', client)
                 if info.identity == Agentidentity.TAKE_OVER_MASTER.value:
-                    dag = client.v1.get_agent_last_maintenance_dag()
-                    client.v1.wait_dag_succeed(dag.generic_id)
+                    dag = obshell_api.get_agent_last_maintenance_dag()
+                    obshell_api.wait_dag_succeed(dag.generic_id)
                     take_over_count = len(cluster_config.servers)
                     break
                 elif info.identity == Agentidentity.CLUSTER_AGENT.value:

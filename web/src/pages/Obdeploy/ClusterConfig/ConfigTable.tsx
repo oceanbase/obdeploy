@@ -29,6 +29,7 @@ interface ConfigTableProps {
   parameterRules?: RulesDetail[] | RulesDetail;
   isSeekdb?: boolean;
   isNewDB?: boolean;
+  keepMountedWhenHidden?: boolean;
 }
 
 export const parameterValidator = (_: any, value?: API.ParameterValue) => {
@@ -152,11 +153,13 @@ export default function ConfigTable({
   isNewDB,
   showMetaPassword,
   isSeekdb = false,
+  keepMountedWhenHidden = false,
 }: ConfigTableProps) {
   return (
     <>
-      {showVisible ? (
-        <Spin spinning={loading}>
+      {showVisible || keepMountedWhenHidden ? (
+        <div style={{ display: showVisible ? undefined : 'none' }}>
+          <Spin spinning={loading}>
           <div
             style={{
               display: 'flex',
@@ -215,7 +218,8 @@ export default function ConfigTable({
               );
             })}
           </div>
-        </Spin>
+          </Spin>
+        </div>
       ) : null}
     </>
   );

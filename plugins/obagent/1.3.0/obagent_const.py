@@ -38,6 +38,10 @@ def obagent_const(plugin_context, **kwargs):
     if has_seekdb:
         OBAGNET_CONFIG_MAP["monitor_password"] = "{seekdb_monitor_password}"
         OBAGNET_CONFIG_MAP["monitor_user"] = "{seekdb_monitor_user}"
+        OBAGNET_CONFIG_MAP["seekdb_password"] = "{seekdb_monitor_password}"
+        OBAGNET_CONFIG_MAP["seekdb_user"] = "{seekdb_monitor_user}"
+        OBAGNET_CONFIG_MAP["seekdb_host"] = "{server_ip}"
+        OBAGNET_CONFIG_MAP["seekdb_port"] = "{mysql_port}"
         OBAGNET_CONFIG_MAP.pop("cluster_name", None)
         OBAGNET_CONFIG_MAP.pop("zone_name", None)
         OBAGNET_CONFIG_MAP.pop("cluster_id", None)

@@ -16,6 +16,7 @@ import DataBaseNodeConfig from './DataBaseNodeConfig';
 import { formValidScorllHelper } from './helper';
 import NodeConfig from './NodeConfig';
 import OBProxyConfig from './OBProxyConfig';
+import { getConfiguredLaunchUser } from '../OCPConfigNew/helper';
 import UserConfig from './UserConfig';
 
 interface MetaDBConfig {
@@ -47,6 +48,7 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
     proxyMoreConfig,
   } = useModel('global');
   const { components = {}, auth, launch_user } = ocpConfigData;
+  const { useRunningUser } = useModel('ocpInstallData');
   const { oceanbase = {}, ocpserver = {}, obproxy = {} } = components;
   const initDBConfigData = oceanbase?.topology?.length
     ? oceanbase?.topology?.map((item: API.Zone, index: number) => ({
@@ -130,9 +132,10 @@ export default function MetaDBConfig({ setCurrent, current }: MetaDBConfig) {
       components: newComponents,
       auth: newAuth,
     };
-    if (dataSource.launch_user !== '') {
-      newConfigData.launch_user = dataSource.launch_user;
-    }
+    newConfigData.launch_user = getConfiguredLaunchUser(
+      useRunningUser,
+      dataSource.launch_user,
+    );
     setOcpConfigData(newConfigData);
   };
   const prevStep = () => {

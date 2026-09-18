@@ -21,6 +21,7 @@ import re
 from _errno import WC_OBAGENT_SERVER_NAME_ERROR
 from tool import YamlLoader, FileUtil
 from const import COMPS_OB_AND_SEEKDB, COMP_OB_SEEKDB
+from seekdb_mapper import configure_seekdb_mapper, map_seekdb_start_parameters
 
 stdio = None
 
@@ -43,11 +44,9 @@ def start(plugin_context, is_reinstall=False, *args, **kwargs):
             break
     with FileUtil.open(os.path.join(repository_dir, 'conf/obd_agent_mapper.yaml')) as f:
         config_mapper = yaml.load(f).get('config_mapper', {})
+    semantic_seekdb_mapper = False
     if COMP_OB_SEEKDB in cluster_config.depends:
-        config_mapper['monitor_password'] = 'monagent.seekdb.password'
-        config_mapper['monitor_user'] = 'monagent.seekdb.user'
-        if 'seekdb_monitor_status' not in config_mapper:
-            config_mapper['seekdb_monitor_status'] = 'monagent.pipeline.seekdb.status'
+        semantic_seekdb_mapper = configure_seekdb_mapper(config_mapper)
     stdio.start_loading('Start obagent')
 
     for comp in COMPS_OB_AND_SEEKDB:
@@ -88,6 +87,9 @@ def start(plugin_context, is_reinstall=False, *args, **kwargs):
                     start_parameters[key] = param_value
         else:
             start_parameters = server_config
+        if COMP_OB_SEEKDB in cluster_config.depends:
+            start_parameters = map_seekdb_start_parameters(
+                start_parameters, semantic_seekdb_mapper, server.ip)
         if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s' % config_flag):
             use_parameter = False
 
@@ -131,5 +133,3 @@ def start(plugin_context, is_reinstall=False, *args, **kwargs):
     plugin_context.set_variable('targets', targets)
     plugin_context.set_variable('pid_path', pid_path)
     return plugin_context.return_true(need_bootstrap=False)
-
-

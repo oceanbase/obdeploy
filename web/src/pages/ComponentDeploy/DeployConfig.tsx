@@ -17,6 +17,7 @@ import DataEmpty from '../../.././/public/assets/data-empty.svg';
 import { alertManagerComponent, componentVersionTypeToComponent, configServerComponent, grafanaComponent, obagentComponent, obproxyCeComponent, obproxyComponent, prometheusComponent } from '../constants';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
+import { prepareComponentChangeSelection } from './utils';
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
 
@@ -242,18 +243,24 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
     } else {
       // 根据不同的组件类型，决定需要自动选择的相关组件
       let componentsToAdd: string[] = [record.component_name];
+      const isDeployed = (componentName: string) =>
+        componentsList?.component_list?.some(
+          (component) =>
+            component.component_name === componentName &&
+            component.deployed === 1,
+        );
 
       if (record.component_name === prometheusComponent) {
         // 如果选择prometheus，则OBAgent自动选择
-        if (!selectedConfig.includes(obagentComponent)) {
+        if (!isDeployed(obagentComponent) && !selectedConfig.includes(obagentComponent)) {
           componentsToAdd.push(obagentComponent);
         }
       } else if (record.component_name === grafanaComponent || record.component_name === alertManagerComponent) {
         // 如果选择grafana或是alertManager，则OBAgent和prometheus自动选择
-        if (!selectedConfig.includes(obagentComponent)) {
+        if (!isDeployed(obagentComponent) && !selectedConfig.includes(obagentComponent)) {
           componentsToAdd.push(obagentComponent);
         }
-        if (!selectedConfig.includes(prometheusComponent)) {
+        if (!isDeployed(prometheusComponent) && !selectedConfig.includes(prometheusComponent)) {
           componentsToAdd.push(prometheusComponent);
         }
       }
@@ -272,49 +279,55 @@ export default function DeployConfig({ clusterList }: DeployConfigProps) {
 
 
   const nextStep = () => {
-    // 排除掉已部署的组件，只选择未部署的组件
-    const deployedComponentsList = componentsList?.component_list?.filter(item => item.deployed !== 1)
-    const selectedComponent = deployedComponentsList?.filter(
-      (component) => selectedConfig?.includes(component.component_name),
-    );
+    // 排除已部署的组件，并让后续步骤仅使用本次真正需要部署的组件。
+    // 否则自动选中的已部署依赖（例如 OBAgent）会在后续页面被重新写入请求。
+    const { selectedComponents, nextSelectedConfig } =
+      prepareComponentChangeSelection(
+        componentsList?.component_list,
+        selectedConfig,
+      );
 
-    if (selectedComponent) {
-      let tempConfig: API.ComponentChangeConfig = {};
-      for (let selector of selectedComponent) {
-        const key = componentVersionTypeToComponent[selector.component_name] ||
-          selector.component_name;
-        tempConfig[key] = {
-          component: selector.component_name,
-          version: selector.component_info?.[0]?.version,
-          package_hash: selector.component_info?.[0]?.md5,
-          release: selector.component_info?.[0]?.release,
-        };
-      }
-      Object.keys(componentConfig).forEach((key) => {
-        if (tempConfig[key]) {
-          tempConfig[key] = { ...tempConfig[key], ...componentConfig[key] };
-        }
-      });
-      if (tempConfig.obagent) {
-        tempConfig.obagent.servers = selectedCluster?.ob_servers || [];
-        // 如果 obagent 的 release 为空，从 componentsList 中找到对应记录进行兼容
-        if (!tempConfig.obagent.release) {
-          const obagentInfo = componentsList?.component_list?.find(
-            (item) => item.component_name === obagentComponent,
-          );
-          if (obagentInfo?.component_info?.[0]?.release) {
-            tempConfig.obagent.release = obagentInfo.component_info[0].release;
-            tempConfig.obagent.version = obagentInfo.component_info[0].version || tempConfig.obagent.version;
-            tempConfig.obagent.package_hash = obagentInfo.component_info[0].md5 || tempConfig.obagent.package_hash;
-          }
-        }
-      }
-      setComponentConfig({
-        ...tempConfig,
-        appname: selectedCluster?.name,
-        home_path: componentConfig?.home_path,
-      });
+    setSelectedConfig(nextSelectedConfig);
+
+    if (!selectedComponents.length) {
+      return;
     }
+
+    let tempConfig: API.ComponentChangeConfig = {};
+    for (let selector of selectedComponents) {
+      const key = componentVersionTypeToComponent[selector.component_name] ||
+        selector.component_name;
+      tempConfig[key] = {
+        component: selector.component_name,
+        version: selector.component_info?.[0]?.version,
+        package_hash: selector.component_info?.[0]?.md5,
+        release: selector.component_info?.[0]?.release,
+      };
+    }
+    Object.keys(componentConfig).forEach((key) => {
+      if (tempConfig[key]) {
+        tempConfig[key] = { ...tempConfig[key], ...componentConfig[key] };
+      }
+    });
+    if (tempConfig.obagent) {
+      tempConfig.obagent.servers = selectedCluster?.ob_servers || [];
+      // 如果 obagent 的 release 为空，从 componentsList 中找到对应记录进行兼容
+      if (!tempConfig.obagent.release) {
+        const obagentInfo = componentsList?.component_list?.find(
+          (item) => item.component_name === obagentComponent,
+        );
+        if (obagentInfo?.component_info?.[0]?.release) {
+          tempConfig.obagent.release = obagentInfo.component_info[0].release;
+          tempConfig.obagent.version = obagentInfo.component_info[0].version || tempConfig.obagent.version;
+          tempConfig.obagent.package_hash = obagentInfo.component_info[0].md5 || tempConfig.obagent.package_hash;
+        }
+      }
+    }
+    setComponentConfig({
+      ...tempConfig,
+      appname: selectedCluster?.name,
+      home_path: componentConfig?.home_path,
+    });
     setDeployUser(selectedCluster!.deploy_user);
     setCurrent(current + 1);
     window.scrollTo(0, 0);

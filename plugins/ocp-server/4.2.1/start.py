@@ -23,6 +23,13 @@ import time
 from _types import Capacity, CapacityWithB
 from tool import get_option
 
+
+def resolve_java_bin(java_bin, home_path, launch_user):
+    if launch_user and java_bin == 'java':
+        return os.path.join(home_path, 'jre/bin/java')
+    return java_bin
+
+
 def append_format_parameters(original, kv):
     stripped = original.strip("'")
     if stripped:
@@ -30,6 +37,22 @@ def append_format_parameters(original, kv):
     else:
         updated = kv
     return f"'{updated}'"
+
+
+def append_monitordb_parameters(original, monitor_db, jdbc_host, monitor_password, jdbc_port,
+                                monitor_user, monitor_tenant, cluster_name):
+    if not monitor_user or 'ocp.monitordb.host:' in original:
+        return original
+    monitor_password = monitor_password.replace("'", """'"'"'""")
+    username = monitor_user + "@" + monitor_tenant + cluster_name
+    connection_properties = [
+        f"ocp.monitordb.database:{monitor_db}",
+        f"ocp.monitordb.host:{jdbc_host}",
+        f"ocp.monitordb.password:{monitor_password}",
+        f"ocp.monitordb.port:{jdbc_port}",
+        f"ocp.monitordb.username:{username}"
+    ]
+    return append_format_parameters(original, "\n".join(connection_properties))
 
 
 def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwargs):
@@ -120,7 +143,7 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
         else:
             memory_size = server_config.get('memory_size', '1G')
             jvm_memory_option = "-Xms{0} -Xmx{0}".format(str(Capacity(memory_size)).lower())
-        java_bin = server_config['java_bin']
+        java_bin = resolve_java_bin(server_config['java_bin'], home_path, launch_user)
         client.add_env('PATH', '%s/jre/bin:' % server_config['home_path'])
         host_ip = f'-Docp.host.ip={server.ip}' if ocp_repository.version >= '4.3.0' else ''
         cmd = f'{java_bin} -Dfile.encoding=UTF-8 {host_ip} -jar {jvm_memory_option} {home_path}/lib/ocp-server.jar --bootstrap'
@@ -189,10 +212,14 @@ def start(plugin_context, multi_process_flag=False, start_env=None, *args, **kwa
                 else:
                     OCP_BOOTSTRAP_WITH_PROPERTY = append_format_parameters(OCP_BOOTSTRAP_WITH_PROPERTY, "ocp.file.local.dir:{}".format(f"{home_path}/data/files"))
 
+        OCP_BOOTSTRAP_WITH_PROPERTY = append_monitordb_parameters(
+            OCP_BOOTSTRAP_WITH_PROPERTY, monitor_db, jdbc_host, monitor_password, jdbc_port,
+            monitor_user, monitor_tenant, cluster_name)
         cmd += ' --progress-log={}'.format(os.path.join(log_dir, 'bootstrap.log'))
         environ_variable += ("export OCP_BOOTSTRAP_WITH_PROPERTY=%s;" % OCP_BOOTSTRAP_WITH_PROPERTY) if OCP_BOOTSTRAP_WITH_PROPERTY else ""
         real_cmd = environ_variable + cmd
-        execute_cmd = "cd {}; {} > /dev/null 2>&1 &".format(home_path, real_cmd)
+        start_log = os.path.join(log_dir, 'ocp-start.log')
+        execute_cmd = "cd {}; {} > {} 2>&1 &".format(home_path, real_cmd, start_log)
         if launch_user and launch_user != client.config.username:
             cmd_file = os.path.join(home_path, 'cmd.sh')
             client.write_file(execute_cmd, cmd_file)

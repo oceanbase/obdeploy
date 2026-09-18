@@ -13,9 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from pymysql import err
+from _deploy import ObserverIdentity, ObserverIdentityError
 
 
-def get_deployment_connections(plugin_context, relation_deploy_names=[], cursors={}, cluster_configs={}, retry_times=1, not_connect_act="ignore", *args, **kwargs):
+def get_deployment_connections(plugin_context, relation_deploy_names=None, cursors=None, cluster_configs=None, retry_times=1, not_connect_act="ignore", *args, **kwargs):
+    relation_deploy_names = [] if relation_deploy_names is None else relation_deploy_names
+    cursors = {} if cursors is None else cursors
+    cluster_configs = {} if cluster_configs is None else cluster_configs
     def call_plugin(plugin, cluster_config, *args, **kwargs):
         return plugin(plugin_context.namespace, plugin_context.namespaces, plugin_context.deploy_name, plugin_context.deploy_status,
             plugin_context.repositories, plugin_context.components, plugin_context.clients,
@@ -33,6 +37,28 @@ def get_deployment_connections(plugin_context, relation_deploy_names=[], cursors
     if deploy_name not in relation_deploy_names:
         relation_deploy_names.append(deploy_name)
     cluster_configs[plugin_context.cluster_config.deploy_name] = plugin_context.cluster_config
+    protected_modes = {
+        'log_source'
+    }
+    if kwargs.get('option_mode') in protected_modes:
+        try:
+            ObserverIdentity.reject_loopback_capability(cluster_configs, kwargs.get('option_mode'))
+        except ObserverIdentityError as e:
+            stdio.error(str(e))
+            stdio.stop_loading('fail')
+            return plugin_context.return_false()
+    verified_loopback_modes = {
+        'create_standby_tenant', 'switchover_tenant', 'switchover',
+        'failover_decouple_tenant', 'set_sync_mode'
+    }
+    if kwargs.get('option_mode') in verified_loopback_modes:
+        try:
+            ObserverIdentity.require_verified_loopback_capability(
+                cluster_configs, kwargs.get('option_mode'))
+        except ObserverIdentityError as e:
+            stdio.error(str(e))
+            stdio.stop_loading('fail')
+            return plugin_context.return_false()
     plugin_manager = kwargs.get('plugin_manager')
     repository = kwargs.get('repository')
     connect_plugin = plugin_manager.get_best_py_script_plugin('connect', repository.name, repository.version)
@@ -55,6 +81,22 @@ def get_deployment_connections(plugin_context, relation_deploy_names=[], cursors
                 stdio.error("{}'s observer connection fail.".format(deploy_name))
                 stdio.stop_loading('fail')
                 return plugin_context.return_false()
+    if kwargs.get('option_mode') in verified_loopback_modes:
+        try:
+            if kwargs.get('option_mode') == 'create_standby_tenant':
+                missing_connections = [
+                    name for name in relation_deploy_names if not cursors.get(name)]
+                if missing_connections:
+                    raise ObserverIdentityError(
+                        '%s requires connections to deployments: %s' % (
+                            kwargs.get('option_mode'), ', '.join(missing_connections)))
+            for relation_deploy_name, cluster_config in cluster_configs.items():
+                ObserverIdentity.require_verified_observed_loopback_capability(
+                    cluster_config, cursors.get(relation_deploy_name), kwargs.get('option_mode'))
+        except ObserverIdentityError as e:
+            stdio.error(str(e))
+            stdio.stop_loading('fail')
+            return plugin_context.return_false()
     stdio.stop_loading('succeed')
     plugin_context.set_variable('cursors', cursors)
     return plugin_context.return_true()

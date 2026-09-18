@@ -888,7 +888,7 @@ class MetadbHandler(BaseHandler):
         return task_info
 
     def create_connection_info(self, info, sys=False):
-        self.context["connection_info"][info.cluster_name] = info
+        requested_cluster_name = info.cluster_name
         passwd = RSAHandler().decrypt_private_key(info.password)
         info.password = passwd
         log.get_logger().info(
@@ -898,7 +898,25 @@ class MetadbHandler(BaseHandler):
             raise Exception('The incoming user must belong to the sys tenant.')
         self.context['meta_database'] = info.database
         self.context['metadb_cursor'] = Cursor(ip=info.host, port=info.port, user=info.user, password=info.password, tenant=None, stdio=self.obd.stdio)
-        connection_info = DatabaseConnection(id=info.cluster_name, host=info.host, port=info.port, user=info.user, password=info.password, database=info.database)
+        cluster_name = requested_cluster_name
+        try:
+            row = self.context['metadb_cursor'].fetchone(
+                "select distinct value as cluster_name from oceanbase.GV$OB_PARAMETERS "
+                "where name = 'cluster' limit 1",
+                raise_exception=True,
+                exc_level='verbose')
+            cluster_name = (row or {}).get('cluster_name') or cluster_name
+        except Exception:
+            log.get_logger().warning(
+                "Failed to read OceanBase cluster name from MetaDB connection",
+                exc_info=True)
+        info.cluster_name = cluster_name
+        self.context["connection_info"][cluster_name] = info
+        if requested_cluster_name and requested_cluster_name != cluster_name:
+            self.context["connection_info"][requested_cluster_name] = info
+        connection_info = DatabaseConnection(
+            cluster_name=cluster_name, host=info.host, port=info.port,
+            user=info.user, password=info.password, database=info.database)
         connection_info_copy = copy.deepcopy(connection_info)
         connection_info_copy.password = ''
         return connection_info_copy

@@ -10,6 +10,7 @@ import ExitBtn from '../ExitBtn';
 import ResourcePlan from './ResourcePlan';
 import ServiceConfig from './ServiceConfig';
 import UserConfig from './UserConfig';
+import { getConfiguredLaunchUser, getOcpUserPaths } from './helper';
 
 type TenantType = {
   name: {
@@ -125,7 +126,10 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
     };
     if (isOldDB) {
       if (dataSource.auth) result.auth = dataSource.auth;
-      if (dataSource.launch_user) result.launch_user = dataSource.launch_user;
+      result.launch_user = getConfiguredLaunchUser(
+        useRunningUser,
+        dataSource.launch_user,
+      );
     }
     setOcpConfigData({ ...result });
   };
@@ -295,14 +299,10 @@ export default function OCPConfigNew({ setCurrent, current }: API.StepProp) {
     soft_dir = undefined;
 
   if (isUseNewDBRef.current) {
-    let val = launch_user ? launch_user : auth.user;
-    home_path = launch_user
-      ? `/home/${launch_user}`
-      : auth.user === 'root'
-        ? '/root'
-        : `/home/${auth.user}`;
-    log_dir = `/home/${val}/logs`;
-    soft_dir = `/home/${val}/software`;
+    const paths = getOcpUserPaths(launch_user || auth.user);
+    home_path = paths?.home_path;
+    log_dir = paths?.log_dir;
+    soft_dir = paths?.soft_dir;
   }
   let initialValues: FormValues = {
     ocpserver: {

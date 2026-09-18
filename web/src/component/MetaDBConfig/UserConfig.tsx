@@ -2,27 +2,40 @@ import { commonInputStyle, commonPortStyle } from '@/pages/constants';
 import { intl } from '@/utils/intl';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { ProForm, ProFormDigit } from '@ant-design/pro-components';
+import { useModel } from '@umijs/max';
 import { Checkbox, Input, Tooltip } from 'antd';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import type { FormInstance } from 'antd/lib/form';
-import { useModel } from '@umijs/max';
 
 import { nameReg } from '@/utils';
 import { useEffect } from 'react';
+import { getDeployUserAfterSshChange } from '../OCPConfigNew/helper';
 import styles from './index.less';
 
 export default function UserConfig({ form }: { form: FormInstance<any> }) {
-  const { useRunningUser, setUseRunningUser, setDeployUser } =
+  const { useRunningUser, setUseRunningUser, deployUser, setDeployUser } =
     useModel('ocpInstallData');
   const { DOCS_USER } = useModel('global');
   const onChange = (e: CheckboxChangeEvent) => {
     let { checked } = e.target;
     setUseRunningUser(checked);
+    setDeployUser(
+      checked
+        ? form.getFieldValue('launch_user') || deployUser
+        : form.getFieldValue(['auth', 'user']),
+    );
   };
 
-  const userChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const sshUserChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
-    setDeployUser(value);
+    setDeployUser(
+      getDeployUserAfterSshChange(useRunningUser, deployUser, value),
+    );
+  };
+
+  const launchUserChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    if (value) setDeployUser(value);
   };
 
   useEffect(() => {
@@ -66,7 +79,7 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
           },
         ]}
       >
-        <Input disabled={useRunningUser} onChange={userChange} />
+        <Input onChange={sshUserChange} />
       </ProForm.Item>
       <p className={styles.descText}>
         {intl.formatMessage({
@@ -96,7 +109,6 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
         <Input.Password
           style={{ marginBottom: 21 }}
           autoComplete="new-password"
-          disabled={useRunningUser}
           placeholder={intl.formatMessage({
             id: 'OBD.component.MetaDBConfig.UserConfig.IfYouHaveConfiguredPassword',
             defaultMessage: '如已配置免密登录，则无需再次输入密码',
@@ -163,27 +175,28 @@ export default function UserConfig({ form }: { form: FormInstance<any> }) {
           rules={
             useRunningUser
               ? [
-                {
-                  required: true,
-                  message: intl.formatMessage({
-                    id: 'OBD.component.MetaDBConfig.UserConfig.EnterARunningUsername',
-                    defaultMessage: '请输入运行用户名',
-                  }),
-                },
-                {
-                  pattern: nameReg,
-                  message: intl.formatMessage({
-                    id: 'OBD.component.MetaDBConfig.UserConfig.ItStartsWithALetter',
-                    defaultMessage:
-                      '以英文字母开头，可包含英文、数字、下划线和连字符，且不超过32位',
-                  }),
-                },
-              ]
+                  {
+                    required: true,
+                    message: intl.formatMessage({
+                      id: 'OBD.component.MetaDBConfig.UserConfig.EnterARunningUsername',
+                      defaultMessage: '请输入运行用户名',
+                    }),
+                  },
+                  {
+                    pattern: nameReg,
+                    message: intl.formatMessage({
+                      id: 'OBD.component.MetaDBConfig.UserConfig.ItStartsWithALetter',
+                      defaultMessage:
+                        '以英文字母开头，可包含英文、数字、下划线和连字符，且不超过32位',
+                    }),
+                  },
+                ]
               : []
           }
         >
           <Input
             style={{ marginBottom: 24 }}
+            onChange={launchUserChange}
             placeholder={intl.formatMessage({
               id: 'OBD.component.MetaDBConfig.UserConfig.PleaseEnter',
               defaultMessage: '请输入',

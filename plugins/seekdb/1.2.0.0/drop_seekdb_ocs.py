@@ -25,6 +25,6 @@ def drop_seekdb_ocs(plugin_context, cursors={}, *args, **kwargs):
         return plugin_context.return_true()
     standby_deploy_name = plugin_context.get_variable('standby_deploy_name')
     standby_cursor = cursors.get(standby_deploy_name)
-    sql = "drop database ocs"
+    sql = "drop database if exists ocs"
     standby_cursor.execute(sql, stdio=stdio)
     return plugin_context.return_true()

@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import, division, print_function
 from const import COMP_OB, COMP_OB_CE
+from _deploy import ObserverIdentity, ObserverIdentityError
 
 
 def add_plugin(component_name, plugins):
@@ -24,6 +25,13 @@ def add_plugin(component_name, plugins):
 
 def scale_out_check(plugin_context, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
+    try:
+        if cluster_config.added_servers and ObserverIdentity.is_loopback(cluster_config):
+            plugin_context.stdio.error('scale-out is not supported for standalone loopback identity')
+            return plugin_context.return_false()
+    except ObserverIdentityError as e:
+        plugin_context.stdio.error(str(e))
+        return plugin_context.return_false()
     added_components = cluster_config.get_deploy_added_components()
     changed_components = cluster_config.get_deploy_changed_components()
     be_depend = cluster_config.be_depends

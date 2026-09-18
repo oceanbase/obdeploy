@@ -20,7 +20,44 @@ import uuid
 import traceback
 
 
-__all__ = ("Moment", "Time", "Capacity", "CapacityWithB", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String", "Path", "SafeString", "PathList", "SafeStringList", "DBUrl", "WebUrl", "OBUser")
+__all__ = ("Moment", "Time", "Capacity", "CapacityWithB", "CapacityMB", "StringList", "Dict", "List", "StringOrKvList", "Double", "Boolean", "Integer", "String", "Path", "SafeString", "PathList", "SafeStringList", "DBUrl", "WebUrl", "OBUser", "effective_memory_total", "effective_memory_available")
+
+
+def effective_memory_total(physical_total, cgroup_limit=None):
+    """Return the usable memory ceiling, accounting for cgroup v1/v2 limits."""
+    try:
+        physical_total = int(physical_total or 0)
+    except (TypeError, ValueError):
+        physical_total = 0
+    try:
+        cgroup_limit = int(str(cgroup_limit).strip())
+    except (TypeError, ValueError):
+        cgroup_limit = 0
+    if physical_total <= 0:
+        return max(cgroup_limit, 0)
+    if 0 < cgroup_limit < physical_total:
+        return cgroup_limit
+    return physical_total
+
+
+def effective_memory_available(
+        physical_total, host_available, cgroup_limit=None, cgroup_usage=None):
+    """Return host availability constrained by the remaining cgroup budget."""
+    total = effective_memory_total(physical_total, cgroup_limit)
+    try:
+        host_available = int(host_available or 0)
+    except (TypeError, ValueError):
+        host_available = 0
+    try:
+        cgroup_limit = int(str(cgroup_limit).strip())
+        cgroup_usage = int(str(cgroup_usage).strip())
+    except (TypeError, ValueError):
+        cgroup_limit = 0
+        cgroup_usage = 0
+    available = min(max(host_available, 0), total)
+    if 0 < cgroup_limit <= total and cgroup_usage > 0:
+        available = min(available, max(cgroup_limit - cgroup_usage, 0))
+    return available
 
 
 class Null(object):

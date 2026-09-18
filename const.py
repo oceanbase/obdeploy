@@ -69,6 +69,17 @@ COMP_OB_STANDALONE = "oceanbase-standalone"
 COMP_OB_AI = "oceanbase.ai"
 COMP_OB_SEEKDB = 'seekdb'
 COMPS_OB = [COMP_OB, COMP_OB_CE, COMP_OB_STANDALONE, COMP_OB_AI]
+# Standalone observer identity.  The management address remains the address in
+# ServerConfig.ip; only observer's self-registration address uses loopback.
+OB_STANDALONE_LOOPBACK_MIN_VERSION = '4.4.2.3'
+OBSERVER_IDENTITY_IP = 'observer_identity_ip'
+OBSERVER_IDENTITY_STATE = 'observer_identity_state'
+OBSERVER_IDENTITY_SOURCE = 'observer_identity_source'
+OBSERVER_IDENTITY_PLANNED = 'planned'
+OBSERVER_IDENTITY_VERIFIED = 'verified'
+OBSERVER_IDENTITY_FRESH_BOOTSTRAP = 'fresh_bootstrap'
+OBSERVER_IDENTITY_LEGACY_MANUAL = 'legacy_manual'
+OBSERVER_LOOPBACK_IP = '127.0.0.1'
 # Database components obagent / obshell registration treat as OB-compatible targets
 COMPS_OB_AND_SEEKDB = COMPS_OB + [COMP_OB_SEEKDB]
 

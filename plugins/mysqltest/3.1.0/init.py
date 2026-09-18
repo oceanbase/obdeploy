@@ -22,10 +22,10 @@ import hashlib
 
 from ssh import LocalClient
 from tool import FileUtil
+from _deploy import ObserverIdentity
 from _errno import EC_MYSQLTEST_FAILE_NOT_FOUND, EC_MYSQLTEST_PARSE_CMD_FAILED
-from const import COMP_OB_SEEKDB
+from const import COMP_OB_SEEKDB, COMPS_OB
 from _types import Capacity
-from const import COMP_OB_SEEKDB
 
 
 def init(plugin_context, env=None, *args, **kwargs):
@@ -86,6 +86,12 @@ def init(plugin_context, env=None, *args, **kwargs):
         else:
             port = root_server['inner_port']
             host = root_server['svr_ip']
+            mysqltest_cluster_config = plugin_context.cluster_config
+            for component_name in COMPS_OB:
+                if component_name in mysqltest_cluster_config.depends:
+                    db_cluster_config = mysqltest_cluster_config.get_depend_cluster_config(component_name)
+                    host = ObserverIdentity.externalize_ip(db_cluster_config, host)
+                    break
     else:
         stdio.error('Failed to get root server.')
         return plugin_context.return_false()

@@ -214,6 +214,10 @@ const Update: React.FC = () => {
     if (current === 1) {
       stopPreCheck();
     }
+    if (current === 2) {
+      setBackupStatus('INIT');
+      setCheckErrorInfo('');
+    }
   };
 
   // 获取已部署的集群列表 适用于 OBD 部署
@@ -291,12 +295,9 @@ const Update: React.FC = () => {
         )}
         {current == 2 && (
           <Backup
-            current={current}
-            setCurrent={setCurrent}
             setBackupStatus={setBackupStatus}
             backupStatus={backupStatus}
             openBackupModal={openBackupModal}
-            setOpenBackupModal={setOpenBackupModal}
             checkErrorInfo={checkErrorInfo}
             setCheckErrorInfo={setCheckErrorInfo}
             backupOmsLoading={backupOmsLoading}
@@ -351,7 +352,9 @@ const Update: React.FC = () => {
                         disabled={
                           (current === 1 &&
                             omsUpgradePrecheckTask?.task_info?.result !== 'SUCCESSFUL')
-                          || (current === 2 && backupStatus !== 'SUCCESSFUL' && omsConfigData?.backup_method === 'data_backup')
+                          || (current === 2
+                            && backupStatus !== 'SUCCESSFUL'
+                            && omsConfigData?.backup_method !== 'not_backup')
                         }
                         type="primary"
                         loading={

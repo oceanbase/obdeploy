@@ -16,10 +16,121 @@
 import time
 from collections import defaultdict
 from const import MAX_PERFORMANCE
+from _deploy import ObserverIdentity, ObserverIdentityError
 
 max_delay_time = 5000
 RECOVERY_UNTIL_SCN = 4611686018427387903
 tenant_cursor_cache = defaultdict(dict)
+
+
+def get_log_restore_source_statement(mode, restore_source):
+    if str(mode).lower() == 'oracle':
+        escaped_source = str(restore_source).replace("'", "''")
+        return (
+            "ALTER SYSTEM SET LOG_RESTORE_SOURCE = '{}'".format(
+                escaped_source),
+            None)
+    return 'ALTER SYSTEM SET LOG_RESTORE_SOURCE = %s', (restore_source,)
+
+
+def get_tenant_protection_mode(cursor, tenant):
+    """Read protection mode and fail closed when it cannot be verified."""
+    sql = (
+        "SELECT PROTECTION_MODE FROM oceanbase.DBA_OB_TENANTS "
+        "WHERE TENANT_NAME = %s")
+    result = cursor.fetchone(
+        sql, (tenant,), raise_exception=True, exc_level='verbose')
+    if not result or not result.get('PROTECTION_MODE'):
+        raise ObserverIdentityError(
+            'Primary tenant {} protection mode is unavailable.'.format(
+                tenant))
+    return result['PROTECTION_MODE']
+
+
+def parse_tenant_endpoint_metadata(value, relation_label):
+    """Parse USER and SERVICE/IP_LIST from tenant relationship metadata."""
+    if not value:
+        raise ObserverIdentityError(
+            '{} metadata is empty.'.format(relation_label))
+    try:
+        parts = dict(p.split('=', 1) for p in value.split(',') if '=' in p)
+    except Exception:
+        raise ObserverIdentityError(
+            '{} metadata is malformed.'.format(relation_label))
+    user = parts.get('USER', '')
+    service = parts.get('IP_LIST') or parts.get('SERVICE', '')
+    if '@' not in user or not service:
+        raise ObserverIdentityError(
+            '{} metadata must contain USER and SERVICE/IP_LIST.'.format(
+                relation_label))
+    endpoints = [endpoint for endpoint in service.split(';') if endpoint]
+    if not endpoints:
+        raise ObserverIdentityError(
+            '{} metadata does not contain any endpoint.'.format(relation_label))
+    return user.split('@', 1)[1], sorted(endpoints)
+
+
+def resolve_tenant_deploy(tenant_name, endpoint_list, deployment_tenants,
+                          cursors, cluster_configs, relation_label):
+    """Resolve one deployment by tenant name and advertised endpoints."""
+    name_candidates = [
+        (tenant_info[0], tenant_info[1])
+        for tenant_info in deployment_tenants
+        if tenant_info[1] == tenant_name]
+    if not name_candidates:
+        raise ObserverIdentityError(
+            '{} tenant {} was not found in the relation graph.'.format(
+                relation_label, tenant_name))
+    if not endpoint_list:
+        raise ObserverIdentityError(
+            '{} tenant {} does not have an endpoint to verify.'.format(
+                relation_label, tenant_name))
+
+    source_is_loopback = any(
+        endpoint.split('+', 1)[0].rpartition(':')[0] == '127.0.0.1'
+        for endpoint in endpoint_list)
+    if source_is_loopback and len(name_candidates) != 1:
+        raise ObserverIdentityError(
+            'Loopback {} tenant {} is ambiguous across {} deployments.'.format(
+                relation_label, tenant_name, len(name_candidates)))
+
+    matches = []
+    for candidate_deploy, candidate_tenant in name_candidates:
+        candidate_cursor = cursors.get(candidate_deploy)
+        if not candidate_cursor:
+            continue
+        res_ip = candidate_cursor.fetchone(
+            'select group_concat(host separator ";") as ip_list from '
+            '(select concat(svr_ip,":",SQL_PORT) as host from '
+            'oceanbase.cdb_ob_access_point where tenant_name=%s)',
+            (candidate_tenant,), raise_exception=False)
+        if not res_ip or not res_ip['ip_list']:
+            continue
+        candidate_cluster_config = cluster_configs.get(candidate_deploy)
+        curr_ip_list = ObserverIdentity.externalize_ip_list(
+            candidate_cluster_config, res_ip['ip_list']).split(';')
+        expected_ip_list = [
+            ObserverIdentity.externalize_sql_endpoint(
+                candidate_cluster_config, endpoint).split('+', 1)[0]
+            if source_is_loopback else endpoint.split('+', 1)[0]
+            for endpoint in endpoint_list]
+        if sorted(curr_ip_list) == sorted(expected_ip_list):
+            matches.append(candidate_deploy)
+    if len(matches) != 1:
+        raise ObserverIdentityError(
+            'Expected exactly one {} deployment, found {}.'.format(
+                relation_label.lower(), len(matches)))
+    return matches[0]
+
+
+def resolve_strong_standby_deploy(strong_standby, strong_standby_ip_list,
+                                  standby_deploy_name, standby_tenant,
+                                  primary_standby_tenants, cursors, cluster_configs):
+    """Resolve a strong standby by tenant name and advertised endpoints."""
+    return resolve_tenant_deploy(
+        strong_standby, strong_standby_ip_list,
+        [[standby_deploy_name, standby_tenant]] + primary_standby_tenants,
+        cursors, cluster_configs, 'Strong standby')
 
 
 def get_standbyro_password(deploy_name, tenant_name, cluster_config, get_option, stdio):
@@ -33,7 +144,7 @@ def get_standbyro_password(deploy_name, tenant_name, cluster_config, get_option,
     return standbyro_password.get(tenant_name, '') if standbyro_password else ''
 
 
-def get_ip_list(cursor, deploy_name, tenant, stdio):
+def get_ip_list(cursor, deploy_name, tenant, stdio, cluster_config=None):
     if not cursor:
         stdio.verbose('Get ip list error: failed to connect {}.'.format(deploy_name))
         return
@@ -41,10 +152,11 @@ def get_ip_list(cursor, deploy_name, tenant, stdio):
     if not res:
         stdio.error('{}:{} not exist.'.format(deploy_name, tenant))
         return
-    return res['ip_list']
+    return ObserverIdentity.externalize_ip_list(cluster_config, res['ip_list'])
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_exception=False, retries=20):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_exception=False, retries=20,
+                       cluster_config=None, sql_args=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     # find tenant ip, port
@@ -55,7 +167,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_ex
         query_sql = "select a.SVR_IP as SVR_IP, c.SQL_PORT as SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
         tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
         for tenant_server_port in tenant_server_ports:
-            tenant_ip = tenant_server_port['SVR_IP']
+            tenant_ip = ObserverIdentity.externalize_ip(cluster_config, tenant_server_port['SVR_IP'])
             tenant_port = tenant_server_port['SQL_PORT']
             tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, password=password, ip=tenant_ip, port=tenant_port, mode=mode, print_exception=raise_exception)
             if tenant_cursor:
@@ -65,15 +177,24 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', raise_ex
                 break
     if not tenant_cursor and retries:
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, raise_exception=raise_exception, retries=retries - 1)
-    return tenant_cursor.execute(sql, raise_exception=False, exc_level='verbose') if tenant_cursor else False
+        return exec_sql_in_tenant(
+            sql, cursor, tenant, mode, user, password, raise_exception=raise_exception,
+            retries=retries - 1, cluster_config=cluster_config, sql_args=sql_args)
+    if not tenant_cursor:
+        if raise_exception:
+            raise RuntimeError('Failed to connect tenant {} for SQL execution.'.format(tenant))
+        return False
+    return tenant_cursor.execute(
+        sql, args=sql_args, raise_exception=raise_exception, exc_level='verbose')
 
 
-def verify_password(cursor, tenant_name, stdio, key, password='', user='', mode='mysql'):
+def verify_password(cursor, tenant_name, stdio, key, password='', user='', mode='mysql', cluster_config=None):
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
     sql = 'show databases like "oceanbase"' if mode == 'mysql' else "SELECT username FROM all_users WHERE username = 'SYS'"
-    if exec_sql_in_tenant(sql, cursor, tenant_name, mode, user=user, password=password, raise_exception=False, retries=5):
+    if exec_sql_in_tenant(
+            sql, cursor, tenant_name, mode, user=user, password=password, raise_exception=False, retries=5,
+            cluster_config=cluster_config):
         return True
     if key == 'standbyro_password':
         key = 'standbyro-password'
@@ -115,6 +236,7 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     primary_cursor = cursors.get(primary_deploy_name)
     standby_cursor = cursors.get(standby_deploy_name)
     primary_cluster_config = cluster_configs[primary_deploy_name]
+    standby_cluster_config = cluster_configs[standby_deploy_name]
     standbyro_password = get_standbyro_password(primary_deploy_name, primary_tenant, primary_cluster_config, get_option, stdio)
 
     # find primary and standby tenant`s others relationship
@@ -235,28 +357,25 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
         error("Standby tenant {} transform status is abnormal".format(standby_tenant))
         return
         
-    sql_mode = "SELECT PROTECTION_MODE FROM oceanbase.DBA_OB_TENANTS WHERE TENANT_NAME = %s"
-    res_mode = primary_cursor.fetchone(sql_mode, (primary_tenant,), raise_exception=False, exc_level='verbose')
-    p_mode = res_mode['PROTECTION_MODE'] if res_mode else ''
+    try:
+        p_mode = get_tenant_protection_mode(primary_cursor, primary_tenant)
+    except Exception as e:
+        error("Query primary tenant {} protection mode failed: {}".format(
+            primary_tenant, e))
+        return
 
     strong_standby = None
     strong_standby_ip_list = []
-    if p_mode and MAX_PERFORMANCE not in p_mode.upper():
+    protected_mode = bool(p_mode and MAX_PERFORMANCE not in p_mode.upper())
+    if protected_mode:
         sql_dest = "SELECT VALUE FROM oceanbase.CDB_OB_SYNC_STANDBY_DEST WHERE TENANT_ID = (SELECT TENANT_ID FROM oceanbase.DBA_OB_TENANTS WHERE TENANT_NAME = %s)"
         res_dest = primary_cursor.fetchone(sql_dest, (primary_tenant,), raise_exception=False, exc_level='verbose')
-        dest_value = res_dest['VALUE'] if res_dest else ''
-        if dest_value:
-            try:
-                dest_parts = dict(p.split('=', 1) for p in dest_value.split(',') if '=' in p)
-                dest_user = dest_parts.get('USER', '')
-                if '@' in dest_user:
-                    strong_standby = dest_user.split('@')[1]
-                dest_service = dest_parts.get('IP_LIST') or dest_parts.get('SERVICE', '')
-                if dest_service:
-                    strong_standby_ip_list = [ip.split('+')[0] for ip in dest_service.split(';') if ip]
-                    strong_standby_ip_list.sort()
-            except Exception:
-                pass
+        try:
+            strong_standby, strong_standby_ip_list = parse_tenant_endpoint_metadata(
+                res_dest['VALUE'] if res_dest else '', 'Strong standby')
+        except ObserverIdentityError as e:
+            error(str(e))
+            return
 
     standby_upstream = None
     standby_upstream_ip_list = []
@@ -264,71 +383,77 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     res_source = standby_cursor.fetchone(sql_source, (standby_info_res['TENANT_ID'],), raise_exception=False)
     if res_source and res_source['VALUE']:
         try:
-            source_parts = dict(p.split('=', 1) for p in res_source['VALUE'].split(',') if '=' in p)
-            source_user = source_parts.get('USER', '')
-            if '@' in source_user:
-                standby_upstream = source_user.split('@')[1]
-            source_service = source_parts.get('IP_LIST') or source_parts.get('SERVICE', '')
-            if source_service:
-                standby_upstream_ip_list = [ip.split('+')[0] for ip in source_service.split(';') if ip]
-                standby_upstream_ip_list.sort()
-        except Exception:
-            pass
+            standby_upstream, standby_upstream_ip_list = parse_tenant_endpoint_metadata(
+                res_source['VALUE'], 'Standby upstream')
+        except ObserverIdentityError:
+            standby_upstream = None
+            standby_upstream_ip_list = []
 
     strong_standby_deploy = None
     if strong_standby:
-        if strong_standby == standby_tenant:
-            strong_standby_deploy = standby_deploy_name
-            
-        if not strong_standby_deploy:
-            for tenant_info in primary_standby_tenants:
-                p_s_deploy, p_s_tenant = tenant_info[0], tenant_info[1]
-                if p_s_tenant == strong_standby:
-                    # To distinguish between clusters with the same tenant name, we match the IP list
-                    p_s_cursor = cursors.get(p_s_deploy)
-                    if p_s_cursor:
-                        res_ip = p_s_cursor.fetchone('select group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host from oceanbase.cdb_ob_access_point where tenant_name=%s)', (p_s_tenant,), raise_exception=False)
-                        if res_ip and res_ip['ip_list']:
-                            curr_ip_list = res_ip['ip_list'].split(';')
-                            curr_ip_list.sort()
-                            if curr_ip_list == strong_standby_ip_list:
-                                strong_standby_deploy = p_s_deploy
-                                break
-        
-        # Fallback to just matching by name if IP match failed for some reason
-        if not strong_standby_deploy:
-            for tenant_info in primary_standby_tenants:
-                p_s_deploy, p_s_tenant = tenant_info[0], tenant_info[1]
-                if p_s_tenant == strong_standby:
-                    strong_standby_deploy = p_s_deploy
-                    break
+        try:
+            strong_standby_deploy = resolve_strong_standby_deploy(
+                strong_standby, strong_standby_ip_list,
+                standby_deploy_name, standby_tenant, primary_standby_tenants,
+                cursors, cluster_configs)
+        except ObserverIdentityError as e:
+            error(str(e))
+            return
+
+    standby_upstream_deploy = None
+    if standby_upstream:
+        try:
+            standby_upstream_deploy = resolve_tenant_deploy(
+                standby_upstream, standby_upstream_ip_list,
+                [[primary_deploy_name, primary_tenant]] + primary_standby_tenants,
+                cursors, cluster_configs, 'Standby upstream')
+        except ObserverIdentityError as e:
+            error(str(e))
+            return
+    if strong_standby_deploy and strong_standby_deploy != standby_deploy_name and \
+            standby_upstream_deploy not in (primary_deploy_name, strong_standby_deploy):
+        error(
+            'Cannot safely classify standby upstream deployment {} for protected-mode '
+            'switchover.'.format(standby_upstream_deploy or 'unknown'))
+        return
 
     plugin_context.set_variable('pre_switchover_p_mode', p_mode)
     plugin_context.set_variable('pre_switchover_strong_standby', strong_standby)
     plugin_context.set_variable('pre_switchover_strong_standby_deploy', strong_standby_deploy)
     plugin_context.set_variable('pre_switchover_standby_upstream', standby_upstream)
+    plugin_context.set_variable('pre_switchover_standby_upstream_deploy', standby_upstream_deploy)
 
     # 0. do password verify
     primary_tenant_password = getattr(plugin_context.options, 'tenant_root_password') if getattr(plugin_context.options, 'tenant_root_password') else ''
     standby_tenant_password = getattr(plugin_context.options, 'tenant_root_password') if getattr(plugin_context.options, 'tenant_root_password') else ''
 
-    if not verify_password(primary_cursor, primary_tenant, stdio, key='tenant-root-password', password=primary_tenant_password, mode=primary_tenant_mode):
+    if not verify_password(
+            primary_cursor, primary_tenant, stdio, key='tenant-root-password', password=primary_tenant_password,
+            mode=primary_tenant_mode, cluster_config=primary_cluster_config):
         stdio.stop_loading('fail')
         return
-    if not verify_password(standby_cursor, standby_tenant, stdio, key='standbyro_password', password=standbyro_password, user='standbyro', mode=standby_tenant_mode):
+    if not verify_password(
+            standby_cursor, standby_tenant, stdio, key='standbyro_password', password=standbyro_password,
+            user='standbyro', mode=standby_tenant_mode, cluster_config=standby_cluster_config):
         stdio.stop_loading('fail')
         return
-    if not verify_password(standby_cursor, standby_tenant, stdio, key='tenant-root-password', password=standby_tenant_password, mode=standby_tenant_mode):
+    if not verify_password(
+            standby_cursor, standby_tenant, stdio, key='tenant-root-password', password=standby_tenant_password,
+            mode=standby_tenant_mode, cluster_config=standby_cluster_config):
         stdio.stop_loading('fail')
         return
-    if not verify_password(primary_cursor, primary_tenant, stdio, key='standbyro_password', password=standbyro_password, user='standbyro', mode=primary_tenant_mode):
+    if not verify_password(
+            primary_cursor, primary_tenant, stdio, key='standbyro_password', password=standbyro_password,
+            user='standbyro', mode=primary_tenant_mode, cluster_config=primary_cluster_config):
         stdio.stop_loading('fail')
         return
 
     # 1.do ob inner primary switchover verify
     try:
         sql = "ALTER SYSTEM SWITCHOVER TO STANDBY VERIFY"
-        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode=primary_tenant_mode, password=primary_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(
+            sql, primary_cursor, primary_tenant, mode=primary_tenant_mode, password=primary_tenant_password,
+            raise_exception=True, retries=5, cluster_config=primary_cluster_config)
     except Exception as e:
         exception("Primary tenant {}:{} do switchover verify failed:{}".format(primary_deploy_name, primary_tenant, e))
         return
@@ -341,7 +466,9 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     stdio.verbose("begin switchover primary tenant to standby tenant on the tenant {}:{}".format(primary_deploy_name, primary_tenant))
     try:
         sql = "ALTER SYSTEM SWITCHOVER TO STANDBY"
-        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, mode=primary_tenant_mode, password=primary_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(
+            sql, primary_cursor, primary_tenant, mode=primary_tenant_mode, password=primary_tenant_password,
+            raise_exception=True, retries=5, cluster_config=primary_cluster_config)
     except Exception as e:
         exception("Switchover primary tenant {} to standby tenant {} failed. error message info:{}".format(primary_tenant, standby_tenant, e))
         return
@@ -350,29 +477,42 @@ def switchover_tenant(plugin_context, cluster_configs, cursors={}, primary_info=
     
     # 3. set log restore source for the new standby tenant
     stdio.start_loading('Set log restore source')
-    ip_list = get_ip_list(standby_cursor, standby_deploy_name, standby_tenant, stdio)
+    ip_list = get_ip_list(
+        standby_cursor, standby_deploy_name, standby_tenant, stdio,
+        cluster_config=standby_cluster_config)
     if not ip_list:
         stdio.error("Get the ip list of the tenant {}:{} failed.".format(standby_deploy_name, standby_tenant))
         return
-    sql = "ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE={} USER=standbyro@{} PASSWORD={}'".format(ip_list, standby_tenant, standbyro_password)
+    restore_source = 'SERVICE={} USER=standbyro@{} PASSWORD={}'.format(
+        ip_list, standby_tenant, standbyro_password)
+    sql, sql_args = get_log_restore_source_statement(
+        primary_tenant_mode, restore_source)
     try:
-        exec_sql_in_tenant(sql, primary_cursor, primary_tenant, primary_tenant_mode, password=standby_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(
+            sql, primary_cursor, primary_tenant, primary_tenant_mode, password=standby_tenant_password,
+            raise_exception=True, retries=5, cluster_config=primary_cluster_config,
+            sql_args=sql_args)
         stdio.stop_loading('succeed')
     except Exception as e:
-        retry_message = 'After resolving the issue, you can retry by manually executing SQL:\'{}\' with the root user in the tenant {}:{}.'.format(sql, primary_deploy_name, primary_tenant)
+        retry_message = 'After resolving the issue, retry setting LOG_RESTORE_SOURCE with the root user in tenant {}:{}.'.format(primary_deploy_name, primary_tenant)
         exception("Set the new standby tenant {}:{}'s log restore to {}:{} failed:{}. \n {}".format(primary_deploy_name, primary_tenant, standby_deploy_name, standby_tenant, e, retry_message))
+        return
     
     # 4. standby switchover verify, switch standby tenant to primary tenant
     try:
         sql = "ALTER SYSTEM SWITCHOVER TO PRIMARY VERIFY"
-        exec_sql_in_tenant(sql, standby_cursor, standby_tenant, mode=standby_tenant_mode, password=standby_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(
+            sql, standby_cursor, standby_tenant, mode=standby_tenant_mode, password=standby_tenant_password,
+            raise_exception=True, retries=5, cluster_config=standby_cluster_config)
     except Exception as e:
         exception("Standby tenant {}:{} do switchover verify failed:{}".format(standby_deploy_name, standby_tenant, e))
         return
     stdio.verbose("begin switchover standby tenant to primary tenant on the tenant {}:{}".format(standby_deploy_name, standby_tenant))
     try:
         sql = "ALTER SYSTEM SWITCHOVER TO PRIMARY"
-        exec_sql_in_tenant(sql, standby_cursor, standby_tenant, mode=standby_tenant_mode, password=standby_tenant_password, raise_exception=True, retries=5)
+        exec_sql_in_tenant(
+            sql, standby_cursor, standby_tenant, mode=standby_tenant_mode, password=standby_tenant_password,
+            raise_exception=True, retries=5, cluster_config=standby_cluster_config)
     except Exception as e:
         exception("Switchover standby tenant {} to primary tenant {} failed. error message info:{}".format(standby_tenant, primary_tenant, e))
         return

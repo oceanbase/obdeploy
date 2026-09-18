@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+from _deploy import ObserverIdentity
 from _rpm import Version
 from _stdio import FormatText
 from tool import NetUtil
@@ -66,7 +67,7 @@ def obshell_dashboard(plugin_context, obshell_clients, config_encrypted, display
     if compare(obshell_version, Version('4.3.0.0'), '>='):
         server_config = cluster_config.get_server_conf(cluster_config.servers[0])
         obshell_port = server_config.get("obshell_port")
-        if ip == '127.0.0.1':
+        if ip == '127.0.0.1' and not ObserverIdentity.is_loopback(cluster_config):
             ip = NetUtil.get_host_ip()
         dashboard_info = f"http://{ip}:{str(obshell_port)}"
         dashboard_info_list = [{

@@ -13,32 +13,45 @@ import * as OCP from '@/services/ocp_installer_backend/OCP';
 import { CloseCircleOutlined, CheckCircleFilled, ExclamationCircleFilled, InfoCircleOutlined, CheckCircleOutlined, CloseCircleFilled } from '@ant-design/icons';
 import { useRequest } from 'ahooks';;
 import { useModel } from '@umijs/max';
-import CustomFooter from '@/component/CustomFooter';
-import ExitBtn from '@/component/ExitBtn';
 import { pathRule } from '@/pages/constants';
-import { useEffect, useState } from 'react';
+
+type BackupProps = {
+    setBackupStatus: (status: string) => void;
+    backupStatus: string;
+    openBackupModal: boolean;
+    checkErrorInfo: string;
+    setCheckErrorInfo: (error: string) => void;
+    backupOmsLoading: boolean;
+};
 
 export default function Backup({
-    setCurrent,
-    current,
     setBackupStatus,
     backupStatus,
     openBackupModal,
     checkErrorInfo,
     setCheckErrorInfo,
     backupOmsLoading
-}: API.StepProp) {
-    const { omsConfigData, setOmsConfigData, setErrorVisible, setErrorsList } =
-        useModel('global');
+}: BackupProps) {
+    const { omsConfigData, setOmsConfigData } = useModel('global');
 
     const [form] = ProForm.useForm();
     const backupMethod = ProForm.useWatch(['backup_method'], form);
     const backupPath = ProForm.useWatch(['backup_path'], form);
+
+    const isCurrentValidation = (params: any[]) => {
+        const request = params?.[0];
+        return request?.backup_path === form.getFieldValue('backup_path')
+            && form.getFieldValue('backup_method') === 'data_backup';
+    };
+
     const {
         run: backupOms,
     } = useRequest(OCP.backupOms, {
         manual: true,
-        onSuccess: (res) => {
+        onSuccess: (res, params) => {
+            if (!isCurrentValidation(params)) {
+                return;
+            }
             if (res?.data?.success) {
                 setBackupStatus('SUCCESSFUL');
             } else {
@@ -46,30 +59,14 @@ export default function Backup({
                 setBackupStatus('FAILED');
             }
         },
-        onError: (res) => {
+        onError: (res, params) => {
+            if (!isCurrentValidation(params)) {
+                return;
+            }
             setCheckErrorInfo(res?.data?.error);
             setBackupStatus('FAILED');
         },
     });
-
-    const nextStep = () => {
-        setOmsConfigData({
-            ...omsConfigData,
-            backup_method: backupMethod,
-            backup_path: backupPath,
-        });
-        setBackupStatus('INIT');
-        setCurrent(current + 1);
-        setErrorVisible(false);
-        setErrorsList([]);
-        setCheckErrorInfo('');
-        window.scrollTo(0, 0);
-    };
-
-    const prevStep = () => {
-        setBackupStatus('INIT');
-        setCurrent(current - 1);
-    };
 
     const backupStatusList = [
         {
@@ -193,6 +190,8 @@ export default function Backup({
                                 },
                             ]}
                             onChange={(e) => {
+                                setBackupStatus('INIT');
+                                setCheckErrorInfo('');
                                 setOmsConfigData({
                                     ...omsConfigData,
                                     backup_method: e,
@@ -258,12 +257,17 @@ export default function Backup({
                                         id: 'OBD.pages.Oms.Update.Component.Backup.PleaseEnterBackupPath',
                                         defaultMessage: '请输入备份路径',
                                     })}
+                                    onChange={() => {
+                                        setBackupStatus('INIT');
+                                        setCheckErrorInfo('');
+                                    }}
                                 />
                             </ProForm.Item>
                             <ProForm.Item label={<br />}>
                                 <Button
                                     onClick={() => {
                                         setCheckErrorInfo('');
+                                        setBackupStatus('RUNNING');
                                         backupOms({ backup_path: backupPath, pre_check: true });
                                         setOmsConfigData({
                                             ...omsConfigData,
@@ -304,21 +308,6 @@ export default function Backup({
                     style={{ width: 100, height: 100, paddingTop: 24, margin: '0 auto' }}
                 />
             </Modal>
-            <CustomFooter>
-                <ExitBtn />
-                <Button onClick={prevStep}>
-                    {intl.formatMessage({
-                        id: 'OBD.component.ConnectConfig.PreviousStep',
-                        defaultMessage: '上一步',
-                    })}
-                </Button>
-                <Button type="primary" onClick={nextStep}>
-                    {intl.formatMessage({
-                        id: 'OBD.component.ConnectConfig.NextStep',
-                        defaultMessage: '下一步',
-                    })}
-                </Button>
-            </CustomFooter>
         </Space>
     );
 }
