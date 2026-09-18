@@ -31,11 +31,73 @@ version_compatibility = {
 }
 
 
+def get_install_command(install_method, is_jre_repo, launch_user, deploy_user):
+    """Return a copy command when a JRE repository must cross user homes.
+
+    Link-mode deployments normally link dependency files from the deployment
+    user's OBD repository.  A different process user cannot traverse a private
+    deployment home (for example, /root), so the JRE must be materialized in
+    the component home instead.
+    """
+    if install_method == InstallPlugin.InstallMethod.CP:
+        return "cp -f"
+    if is_jre_repo and launch_user and launch_user != deploy_user:
+        return "cp -f"
+    return "ln -fs"
+
+
+def get_server_launch_user(cluster_config, server):
+    return cluster_config.get_server_conf(server).get("launch_user")
+
+
+def install_repository_files(client, install_file_items, repo_dir, home_path,
+                             is_jre_repo, launch_user, deploy_user):
+    client.add_env("_repo_dir", repo_dir, True)
+    client.add_env("_home_path", home_path, True)
+    mkdir_bash = "mkdir -p ${_home_path} && cd ${_repo_dir} && find -type d | xargs -i mkdir -p ${_home_path}/{}"
+    if not client.execute_command(mkdir_bash):
+        return False
+
+    success = True
+    for install_file_item in install_file_items:
+        source = os.path.join(repo_dir, install_file_item.target_path)
+        target = os.path.join(home_path, install_file_item.target_path)
+        client.add_env("source", source, True)
+        client.add_env("target", target, True)
+        install_cmd = get_install_command(
+            install_file_item.install_method,
+            is_jre_repo,
+            launch_user,
+            deploy_user,
+        )
+        if install_file_item.type == InstallPlugin.FileItemType.DIR:
+            if client.execute_command("ls -1 ${source}"):
+                success = client.execute_command(
+                    "cd ${source} && find -type f | xargs -i %(install_cmd)s ${source}/{} ${target}/{}"
+                    % {"install_cmd": install_cmd}
+                ) and success
+                success = client.execute_command(
+                    "cd ${source} && find -type l | xargs -i %(install_cmd)s ${source}/{} ${target}/{}"
+                    % {"install_cmd": install_cmd}
+                ) and success
+        else:
+            success = client.execute_command(
+                "%(install_cmd)s ${source} ${target}" % {"install_cmd": install_cmd}
+            ) and success
+            if launch_user:
+                success = client.execute_command("sudo chown -R %s ${target}" % launch_user) and success
+
+    if is_jre_repo and launch_user:
+        success = client.execute_command("sudo chown -R %s ${_home_path}" % launch_user) and success
+    return success
+
+
 def install_repo(plugin_context, obd_home, install_repository, install_plugin, check_repository, check_file_map,
                  requirement_map, msg_lv, *args, **kwargs):
     cluster_config = plugin_context.cluster_config
 
     def install_to_home_path():
+        launch_user = get_server_launch_user(cluster_config, server)
         repo_dir = install_repository.repository_dir.replace(obd_home, remote_obd_home, 1)
         if is_lib_repo:
             home_path = os.path.join(remote_home_path, 'lib')
@@ -45,32 +107,15 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
         else:
             home_path = remote_home_path
 
-        client.add_env("_repo_dir", repo_dir, True)
-        client.add_env("_home_path", home_path, True)
-        mkdir_bash = "mkdir -p ${_home_path} && cd ${_repo_dir} && find -type d | xargs -i mkdir -p ${_home_path}/{}"
-        if not client.execute_command(mkdir_bash):
-            return False
-        success = True
-        for install_file_item in install_file_items:
-            source = os.path.join(repo_dir, install_file_item.target_path)
-            target = os.path.join(home_path, install_file_item.target_path)
-            client.add_env("source", source, True)
-            client.add_env("target", target, True)
-            if install_file_item.install_method == InstallPlugin.InstallMethod.CP:
-                install_cmd = "cp -f"
-            else:
-                install_cmd = "ln -fs"
-            if install_file_item.type == InstallPlugin.FileItemType.DIR:
-                if client.execute_command("ls -1 ${source}"):
-                    success = client.execute_command("cd ${source} && find -type f | xargs -i %(install_cmd)s ${source}/{} ${target}/{}" % {"install_cmd": install_cmd}) and success
-                    success = client.execute_command("cd ${source} && find -type l | xargs -i %(install_cmd)s ${source}/{} ${target}/{}" % {"install_cmd": install_cmd}) and success
-            else:
-                success = client.execute_command("%(install_cmd)s ${source} ${target}" % {"install_cmd": install_cmd}) and success
-                launch_user = cluster_config.get_global_conf().get("launch_user")
-                if launch_user:
-                    success = client.execute_command("sudo chown -R %s ${target}" % launch_user) and success
-
-        return success
+        return install_repository_files(
+            client,
+            install_file_items,
+            repo_dir,
+            home_path,
+            is_jre_repo,
+            launch_user,
+            client.config.username,
+        )
     
     stdio = plugin_context.stdio
     clients = plugin_context.clients
@@ -142,7 +187,10 @@ def install_repo(plugin_context, obd_home, install_repository, install_plugin, c
             # save data file for later comparing
             client.put_file(install_repository.data_file_path, remote_repository_data_path, stdio=sub_io)
             # link files to home_path
-            install_to_home_path()
+            if not install_to_home_path():
+                stdio.error("Failed to install repository {} to {}".format(install_repository, remote_home_path))
+                stdio.stop_loading('fail')
+                return False
         stdio.verbose('%s %s installed' % (server, install_repository.name))
     stdio.stop_loading('succeed')
 

@@ -23,6 +23,11 @@ from _types import Capacity
 from tool import COMMAND_ENV
 
 
+def get_oceanbase_home_path(home_path):
+    """Reserve a stable OceanBase directory for current and future components."""
+    return '{}/oceanbase'.format(home_path.rstrip('/'))
+
+
 def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
     stdio = plugin_context.stdio
     ip = client.config.host
@@ -37,6 +42,7 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
     cpu_count = oceanbase_config['cpu_count']
     memory_limit = oceanbase_config['memory_limit']
     home_path = oceanbase_config['home_path']
+    oceanbase_home_path = get_oceanbase_home_path(home_path)
     data_dir = oceanbase_config['data_dir']
     log_dir = oceanbase_config['log_dir']
     datafile_maxsize = oceanbase_config['datafile_maxsize']
@@ -50,7 +56,7 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
     obshell_port and stdio.print(f'obshell port: {obshell_port}')
     stdio.print(f'cpu count: {cpu_count}')
     stdio.print(f'memory limit: {Capacity(memory_limit)}')
-    stdio.print(f'home path: {home_path}' + '/' + 'oceanbase_name')
+    stdio.print(f'home path: {oceanbase_home_path}')
     stdio.print(f'data dir: {data_dir}')
     stdio.print(f'log dir: {log_dir}')
     stdio.print(f'datafile maxsize: {Capacity(datafile_maxsize)}')
@@ -128,7 +134,7 @@ def confirm_config(plugin_context, client, cluster_name, *args, **kwargs):
                     'root_password': root_password,
                     'cpu_count': cpu_count,
                     'memory_limit': str(Capacity(memory_limit)),
-                    'home_path': home_path + '/' + 'oceanbase_name',
+                    'home_path': oceanbase_home_path,
                     'data_dir': data_dir,
                     'redo_dir': log_dir,
                     'datafile_size': '2G',

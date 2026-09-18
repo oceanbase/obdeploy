@@ -271,7 +271,7 @@ def oceanbase_config_input(plugin_context, client, cluster_name=None, *args, **k
             default_home_path = f'/{user}/{cluster_name}'
         else:
             default_home_path = f'/home/{user}/{cluster_name}'
-        home_path = stdio.read(f'Enter the OB installation directory (Default: {default_home_path}): ', blocked=True).strip() or default_home_path
+        home_path = stdio.read(f'Enter the deployment base directory (OceanBase will use its oceanbase subdirectory, Default: {default_home_path}): ', blocked=True).strip() or default_home_path
         if dir_check(client, home_path, create_dir=False, memory_limit=memory_limit):
             client.execute_command(f'mkdir -p {home_path}')
             break

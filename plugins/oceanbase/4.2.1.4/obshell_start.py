@@ -17,6 +17,8 @@ from __future__ import absolute_import, division, print_function
 
 import time
 
+import const
+from _deploy import ObserverIdentity
 from _errno import EC_OBSERVER_FAIL_TO_START_OCS
 from tool import ConfigUtil
 
@@ -45,7 +47,15 @@ def obshell_start(plugin_context, *args, **kwargs):
             server_config = cluster_config.get_server_conf(server)
             password = server_config.get('root_password', '')
             client.add_env('OB_ROOT_PASSWORD', password if client._is_local else ConfigUtil.passwd_format(password), True)
-            cmd = 'cd %s; %s/bin/obshell admin start --ip %s --port %s' % (server_config['home_path'], server_config['home_path'], server.ip, server_config['obshell_port'])
+            # obshell validates this value against observer.config.bin.  A
+            # standalone observer can use loopback as its database identity
+            # while OBD still reaches obshell through the management IP.
+            obshell_identity_ip = ObserverIdentity.identity_ip(cluster_config, server)
+            standalone_env = 'OBSHELL_STANDALONE_MODE=true ' \
+                if cluster_config.name == const.COMP_OB_STANDALONE else ''
+            cmd = 'cd %s; %s%s/bin/obshell admin start --ip %s --port %s' % (
+                server_config['home_path'], standalone_env, server_config['home_path'],
+                obshell_identity_ip, server_config['obshell_port'])
             stdio.verbose('start obshell: %s' % cmd)
             res = client.execute_command(cmd)
             if not res:

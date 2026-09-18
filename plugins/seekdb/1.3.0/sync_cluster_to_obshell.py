@@ -79,14 +79,27 @@ def _new_client_and_token(cluster_meta):
         )
 
 
+def _sync_failure_is_fatal(cluster_config):
+    try:
+        version = tuple(int(part) for part in str(cluster_config.version).split('.')[:2])
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return version >= (1, 4)
+
+
 def sync_cluster_to_obshell(plugin_context, *args, **kwargs):
     stdio = plugin_context.stdio
     mode = plugin_context.get_variable('install_mode', spacename='interactive')
-    if mode != 'standby':
+    standby_cluster_config = plugin_context.cluster_config
+    sync_pending = standby_cluster_config.get_component_attr('_obshell_standby_sync_pending')
+    if mode != 'standby' and not sync_pending:
         stdio.verbose('Current install mode is not standby, skip obshell standby pair sync.')
         return plugin_context.return_true()
 
-    primary_deploy_name = plugin_context.get_variable('primary_deploy_name')
+    primary_deploy_name = (
+        plugin_context.get_variable('primary_deploy_name')
+        or standby_cluster_config.get_component_attr('_cluster_primary')
+    )
     if not primary_deploy_name:
         stdio.verbose('No primary_deploy_name found, skip obshell standby pair sync.')
         return plugin_context.return_true()
@@ -102,7 +115,6 @@ def sync_cluster_to_obshell(plugin_context, *args, **kwargs):
         return plugin_context.return_false()
 
     primary_cluster_config = primary_deploy.deploy_config.components.get('seekdb')
-    standby_cluster_config = plugin_context.cluster_config
     if not primary_cluster_config or not standby_cluster_config:
         stdio.error('Failed to load seekdb cluster config from primary or standby deploy.')
         return plugin_context.return_false()
@@ -142,9 +154,19 @@ def sync_cluster_to_obshell(plugin_context, *args, **kwargs):
         standby_status = standby_client.get_seekdb_standby_status()
         stdio.verbose('Primary obshell standby status: %s' % primary_status)
         stdio.verbose('Standby obshell standby status: %s' % standby_status)
+        if not standby_cluster_config.update_component_attr(
+                '_obshell_standby_sync_pending', False, save=True):
+            raise Exception('Failed to persist obshell standby sync status.')
         stdio.stop_loading('succeed')
     except Exception as e:
         stdio.stop_loading('fail')
-        stdio.warn('Sync standby relation to obshell failed: %s' % e)
+        message = 'Sync standby relation to obshell failed: %s' % e
+        if _sync_failure_is_fatal(standby_cluster_config):
+            stdio.error(message)
+            return plugin_context.return_false()
+        # Preserve the pre-1.4 lifecycle contract: the database start remains
+        # successful and the persisted pending marker triggers a later retry.
+        stdio.warn(message)
+        return plugin_context.return_true()
 
     return plugin_context.return_true()

@@ -22,12 +22,13 @@ import const
 from tool import Exector, COMMAND_ENV
 from collections import defaultdict
 from _stdio import FormatText
+from _deploy import ObserverIdentity
 
 
 tenant_cursor_cache = defaultdict(dict)
 
 
-def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None):
+def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_exception=True, retries=20, args=[], stdio=None, cluster_config=None):
     global tenant_cursor
     if not user:
         user = 'SYS' if mode == 'oracle' else 'root'
@@ -39,7 +40,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
         query_sql = "select a.SVR_IP,c.SQL_PORT from oceanbase.DBA_OB_UNITS as a, oceanbase.DBA_OB_TENANTS as b, oceanbase.DBA_OB_SERVERS as c  where a.TENANT_ID=b.TENANT_ID and a.SVR_IP=c.SVR_IP and a.svr_port=c.SVR_PORT and TENANT_NAME=%s"
         tenant_server_ports = cursor.fetchall(query_sql, (tenant, ), raise_exception=False, exc_level='verbose')
         for tenant_server_port in tenant_server_ports:
-            tenant_ip = tenant_server_port['SVR_IP']
+            tenant_ip = ObserverIdentity.externalize_ip(cluster_config, tenant_server_port['SVR_IP']) if cluster_config else tenant_server_port['SVR_IP']
             tenant_port = tenant_server_port['SQL_PORT']
             tenant_cursor = cursor.new_cursor(tenant=tenant, user=user, mode=mode, password=password, ip=tenant_ip, port=tenant_port, print_exception=print_exception)
             if tenant_cursor:
@@ -49,7 +50,7 @@ def exec_sql_in_tenant(sql, cursor, tenant, mode, user='', password='', print_ex
                 break
     if not tenant_cursor and retries:
         time.sleep(1)
-        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio)
+        return exec_sql_in_tenant(sql, cursor, tenant, mode, user, password, print_exception=print_exception, retries=retries-1, args=args, stdio=stdio, cluster_config=cluster_config)
     return tenant_cursor.execute(sql, args=args, raise_exception=False, exc_level='verbose', stdio=stdio) if tenant_cursor else False
 
 def is_support_sdk_import_timezone(version):
@@ -107,7 +108,7 @@ def import_time_zone(plugin_context, config_encrypted, create_tenant_options=[],
                     time_zone = getattr(options, 'time_zone', '')
                     if not time_zone:
                         time_zone = client.execute_command('date +%:z').stdout.strip()
-                    exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
+                    exec_sql_in_tenant(sql="SET GLOBAL time_zone='%s';" % time_zone, cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '', cluster_config=cluster_config)
                     exector_path = getattr(options, 'exector_path', '/usr/obd/lib/executer')
                     exector = Exector(tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user, tenant_cursor.password, exector_path, stdio)
                     time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
@@ -125,7 +126,7 @@ def import_time_zone(plugin_context, config_encrypted, create_tenant_options=[],
             cmd_str = "obclient -h%s -P%s %s -u%s -A\n"
             no_password_cmd = "obclient -h%s -P%s -u%s -A\n"
         if not tenant_cursor:
-            exec_sql_in_tenant(sql="select 1;", cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '')
+            exec_sql_in_tenant(sql="select 1;", cursor=cursor, tenant=name, mode=mode, password=root_password if root_password else '', cluster_config=cluster_config)
         cmd_str = cmd_str % (tenant_cursor.ip, tenant_cursor.port, f"-p'{root_password}'" if not config_encrypted else '', tenant_cursor.user)
         no_password_cmd = no_password_cmd % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)
         cursors.append(tenant_cursor)

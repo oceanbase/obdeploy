@@ -92,8 +92,7 @@ def seekdb_install_compute_config(plugin_context, *args, **kwargs):
         ('max_syslog_file_count', str(syslog_count)), ('log_disk_size', log_disk_size_str),
         ('auto_start', str(auto_start)),
     ]
-    if install_mode != 'standby':
-        config_list.insert(7, ('obshell_port', obshell_port))
+    config_list.insert(7, ('obshell_port', obshell_port))
     if base_info.get('rpc_port'):
         idx = next((i for i, (k, _) in enumerate(config_list) if k == 'mysql_port'), -1)
         if idx >= 0:

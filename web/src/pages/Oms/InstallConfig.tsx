@@ -722,6 +722,12 @@ export default function InstallConfig() {
       formItemProps: (_: any, config: any) => {
         const { record } = config;
         return {
+          // The steps navigation is fixed at z-index 99. Keep this field's
+          // validation bubble below it when the input scrolls underneath.
+          popoverProps: {
+            placement: 'bottomLeft',
+            zIndex: 98,
+          },
           validateFirst: true,
           validateTrigger: ['onChange'],
           rules: [

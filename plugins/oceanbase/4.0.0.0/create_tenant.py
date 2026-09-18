@@ -26,7 +26,8 @@ from _types import Capacity
 tenant_cursor_cache = defaultdict(dict)
 
 
-def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_out_component='', *args, **kwargs):
+def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_out_component='',
+                  created_tenants=None, *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -49,6 +50,8 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
         stdio.stop_loading('fail')
 
     stdio = plugin_context.stdio
+    if created_tenants is None:
+        created_tenants = {}
     multi_options = create_tenant_options if create_tenant_options else [plugin_context.options]
     create_tenant_components = const.COMPS_OCP + [const.COMP_PRAG, 'ocp-express', 'obbinlog-ce', 'obbinlog']
     if scale_out_component in create_tenant_components:
@@ -88,6 +91,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
         res = cursor.fetchone(sql, [name])
         if res:
             plugin_context.set_variable('tenant_exists', True)
+            created_tenants.setdefault(name, False)
             if create_if_not_exists:
                 continue
             else:
@@ -308,6 +312,7 @@ def create_tenant(plugin_context, create_tenant_options=[], cursor=None, scale_o
                 if res is False:
                     error('create tenant failed')
                     return plugin_context.return_false()
+                created_tenants[name] = True
             except Exception as e:
                 stdio.stop_loading('fail')
                 stdio.error(e)

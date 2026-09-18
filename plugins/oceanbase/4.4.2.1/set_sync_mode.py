@@ -18,6 +18,13 @@ from __future__ import absolute_import, division, print_function
 import time
 
 from const import MAX_PERFORMANCE, MAX_PROTECTION, MAX_AVAILABILITY
+from _deploy import ObserverIdentity, ObserverIdentityError
+
+
+def _externalize_service_list(cluster_config, service_list):
+    return ';'.join(
+        ObserverIdentity.externalize_sql_endpoint(cluster_config, endpoint)
+        for endpoint in service_list.split(';') if endpoint)
 
 def _get_tenant_unit_service_list(cursor, tenant_name, stdio):
     query_sql = 'select group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from oceanbase.cdb_ob_access_point where tenant_name=%s)'
@@ -56,6 +63,7 @@ def set_sync_mode(plugin_context, cursors=None, cluster_configs=None, *args, **k
         return plugin_context.return_false()
 
     cursors = cursors or plugin_context.get_variable('cursors') or {}
+    cluster_configs = cluster_configs or plugin_context.get_variable('cluster_configs') or {}
     
     standby_deploy_name = cmds[0]
     standby_tenant_name = cmds[1]
@@ -150,6 +158,22 @@ def set_sync_mode(plugin_context, cursors=None, cluster_configs=None, *args, **k
         stdio.stop_loading('fail')
         return plugin_context.return_false()
 
+    try:
+        # Each endpoint must be translated with the configuration of the
+        # deployment that owns it. Validate both lists before changing either
+        # tenant so a malformed loopback identity cannot cause a partial write.
+        standby_service = _externalize_service_list(
+            cluster_configs.get(standby_deploy_name), standby_service)
+        primary_service = _externalize_service_list(
+            cluster_configs.get(primary_deploy_name), primary_service)
+    except ObserverIdentityError as e:
+        stdio.error(str(e))
+        stdio.stop_loading('fail')
+        return plugin_context.return_false()
+    stdio.verbose(
+        'Resolved sync standby endpoints: primary=%s, standby=%s' % (
+            standby_service, primary_service))
+
     # Escape password for use inside double-quoted string (escape backslash and double-quote)
     pwd_escaped = (standbyro_password or '').replace('\\', '\\\\').replace('"', '\\"')
     dest_user = 'standbyro@%s' % standby_tenant_name
@@ -179,7 +203,9 @@ def set_sync_mode(plugin_context, cursors=None, cluster_configs=None, *args, **k
 
     # 1. Primary: set sync standby dest to standby
     sql_primary_dest = "ALTER SYSTEM SET SYNC_STANDBY_DEST = '%s' tenant = '%s'" % (dest_primary, primary_tenant_name)
-    stdio.verbose('Primary set SYNC_STANDBY_DEST: %s' % sql_primary_dest)
+    stdio.verbose(
+        'Primary set SYNC_STANDBY_DEST for tenant %s with resolved standby endpoint %s.' % (
+            primary_tenant_name, standby_service))
     if not primary_cursor.execute(sql_primary_dest, raise_exception=False, exc_level='verbose'):
         stdio.error('Primary set SYNC_STANDBY_DEST failed.')
         stdio.stop_loading('fail')
@@ -187,7 +213,9 @@ def set_sync_mode(plugin_context, cursors=None, cluster_configs=None, *args, **k
 
     # 2. Standby: set sync standby dest to primary
     sql_standby_dest = "ALTER SYSTEM SET SYNC_STANDBY_DEST = '%s' tenant = '%s'" % (dest_standby, standby_tenant_name)
-    stdio.verbose('Standby set SYNC_STANDBY_DEST: %s' % sql_standby_dest)
+    stdio.verbose(
+        'Standby set SYNC_STANDBY_DEST for tenant %s with resolved primary endpoint %s.' % (
+            standby_tenant_name, primary_service))
     if not standby_cursor.execute(sql_standby_dest, raise_exception=False, exc_level='verbose'):
         stdio.error('Standby set SYNC_STANDBY_DEST failed.')
         stdio.stop_loading('fail')

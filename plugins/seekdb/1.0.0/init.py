@@ -46,6 +46,7 @@ def init(plugin_context, source_option=None, *args, **kwargs):
     clean_dir_keys = plugin_context.get_variable('clean_dir_keys')
     data_dir_not_same_redo_dir_keys = plugin_context.get_variable('data_dir_not_same_redo_dir_keys')
     data_dir_same_redo_dir_keys = plugin_context.get_variable('data_dir_same_redo_dir_keys')
+    default_redo_dir_subdir = plugin_context.get_variable('default_redo_dir_subdir')
     stop_ob_or_obshell = plugin_context.get_variable('stop_ob_or_obshell')
     stdio.verbose('option `force` is %s' % force)
     stdio.start_loading('Initializes seekdb work home')
@@ -61,7 +62,11 @@ def init(plugin_context, source_option=None, *args, **kwargs):
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
         if not server_config.get('redo_dir'):
-            server_config['redo_dir'] = server_config['data_dir']
+            if default_redo_dir_subdir:
+                server_config['redo_dir'] = os.path.join(
+                    server_config['data_dir'], default_redo_dir_subdir)
+            else:
+                server_config['redo_dir'] = server_config['data_dir']
         for key, value in dir_mapping.items():
             if not server_config.get('%s_dir' % key):
                 server_config['%s_dir' % key] = '%s/%s' % (server_config[value], key)

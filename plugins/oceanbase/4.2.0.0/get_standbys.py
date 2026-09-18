@@ -14,8 +14,10 @@
 # limitations under the License.
 
 from const import LOCATION_MODE
+from _deploy import ObserverIdentity
+from tool import parse_service_metadata
 
-def get_ip_list(cursor, deploy_name, tenant, stdio):
+def get_ip_list(cursor, deploy_name, tenant, stdio, cluster_config=None):
     if not cursor:
         stdio.verbose("Connect to {} failed.".format(deploy_name))
         return
@@ -26,7 +28,8 @@ def get_ip_list(cursor, deploy_name, tenant, stdio):
     if not res['ip_list']:
         stdio.verbose('tenant:{}:{} is not exist.'.format(deploy_name, tenant))
         return
-    ip_list = res['ip_list'].split(';')
+    external_ip_list = ObserverIdentity.externalize_ip_list(cluster_config, res['ip_list'])
+    ip_list = external_ip_list.split(';')
     if not ip_list:
         stdio.error('Query ip list error for tenant:{}:{}.'.format(deploy_name, tenant))
         return False
@@ -65,7 +68,10 @@ def get_standbys(plugin_context, primary_tenant='', relation_tenants=[], all_ten
     
     all_tenant_names = [primary_tenant] if primary_tenant else all_tenant_names
     for tenant_name in all_tenant_names:
-        ip_list = get_ip_list(primary_cursor, primary_deploy_name, tenant_name, stdio)
+        primary_cluster_config = cluster_configs.get(primary_deploy_name)
+        ip_list = get_ip_list(
+            primary_cursor, primary_deploy_name, tenant_name, stdio,
+            cluster_config=primary_cluster_config)
         res = primary_cursor.fetchone('select TENANT_ID from oceanbase.DBA_OB_TENANTS where tenant_name=%s', (tenant_name, ), raise_exception=False)
         if not res:
             stdio.verbose('tenant:{}:{} is not exist.'.format(primary_deploy_name, tenant_name)) 
@@ -124,15 +130,33 @@ def get_standbys(plugin_context, primary_tenant='', relation_tenants=[], all_ten
                 stdio.verbose("tenant:{}:{}`primary tenant is not exist".format(relation_deploy_name, relation_tenant_name))
                 continue
 
-            primary_info_dict = {}
-            primary_info_arr = res['VALUE'].split(',')
-            for primary_info in primary_info_arr:
-                kv = primary_info.split('=')
-                primary_info_dict[kv[0]] = kv[1]
-            primary_ip_list = primary_info_dict.get('IP_LIST').split(';')
-            primary_ip_list.sort()
+            primary_info_dict = parse_service_metadata(res['VALUE'])
+            primary_endpoint_list = (
+                primary_info_dict.get('IP_LIST') or
+                primary_info_dict.get('SERVICE'))
             primary_tenant_id = primary_info_dict.get('TENANT_ID')
-            if primary_ip_list == ip_list and tenant_id == int(primary_tenant_id):
+            if not primary_endpoint_list or not primary_tenant_id:
+                stdio.error(
+                    'Tenant {}:{} log restore source must contain '
+                    'IP_LIST/SERVICE and TENANT_ID.'.format(
+                        relation_deploy_name, relation_tenant_name))
+                stdio.stop_loading('fail')
+                return
+            primary_ip_list_value = ObserverIdentity.externalize_ip_list(
+                primary_cluster_config, primary_endpoint_list)
+            primary_ip_list = [
+                endpoint.split('+', 1)[0]
+                for endpoint in primary_ip_list_value.split(';')]
+            primary_ip_list.sort()
+            try:
+                primary_tenant_id = int(primary_tenant_id)
+            except (TypeError, ValueError):
+                stdio.error(
+                    'Tenant {}:{} log restore source TENANT_ID is invalid.'.format(
+                        relation_deploy_name, relation_tenant_name))
+                stdio.stop_loading('fail')
+                return
+            if primary_ip_list == ip_list and tenant_id == primary_tenant_id:
                 sql = 'select ob_version() as version'
                 res = cursor.fetchone(sql, raise_exception=False)
                 standby_tenants.append([relation_deploy_name, relation_tenant_name, res['version']])

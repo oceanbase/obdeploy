@@ -17,6 +17,30 @@ from __future__ import absolute_import, division, print_function
 
 import time
 
+from _deploy import ObserverIdentity, ObserverIdentityError
+
+
+def _parse_restore_source(restore_source):
+    values = {}
+    for item in restore_source.split(','):
+        key, separator, value = item.partition('=')
+        if separator:
+            values[key.strip()] = value.strip()
+    return values
+
+
+def _externalize_service_list(cluster_config, service_list):
+    return sorted(
+        ObserverIdentity.externalize_sql_endpoint(cluster_config, endpoint).split('+', 1)[0]
+        for endpoint in service_list.split(';') if endpoint)
+
+
+def _service_list_uses_loopback(service_list):
+    return any(
+        endpoint.split('+', 1)[0].rpartition(':')[0] == '127.0.0.1'
+        for endpoint in service_list.split(';') if endpoint)
+
+
 def _get_tenant_role(cursor, tenant_name):
     sql = "SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS WHERE TENANT_NAME = %s"
     res = cursor.fetchone(sql, (tenant_name,), raise_exception=False)
@@ -112,48 +136,82 @@ def set_sync_mode_pre(plugin_context, cursors=None, cluster_configs=None, *args,
         stdio.error("Failed to get LOG_RESTORE_SOURCE for %s" % standby_tenant_name)
         return plugin_context.return_false()
 
-    primary_info_dict = {}
     try:
-        primary_info_arr = restore_source.split(',')
-        for primary_info in primary_info_arr:
-            kv = primary_info.split('=')
-            if len(kv) == 2:
-                primary_info_dict[kv[0]] = kv[1]
-    except Exception as e:
-        stdio.error("Failed to parse LOG_RESTORE_SOURCE: %s" % restore_source)
+        primary_info_dict = _parse_restore_source(restore_source)
+        primary_ip_list_raw = primary_info_dict.get('IP_LIST', '')
+        if not primary_ip_list_raw:
+            raise ValueError('missing IP_LIST')
+        primary_tenant_id = int(primary_info_dict['TENANT_ID'])
+    except (KeyError, TypeError, ValueError):
+        stdio.error("Failed to parse LOG_RESTORE_SOURCE metadata for %s" % standby_tenant_name)
         return plugin_context.return_false()
 
-    primary_ip_list_raw = primary_info_dict.get('IP_LIST', '').split(';')
-    primary_ip_list = [ip.split('+')[0] for ip in primary_ip_list_raw if ip]
-    primary_ip_list.sort()
-    primary_tenant_id = int(primary_info_dict['TENANT_ID']) if primary_info_dict.get('TENANT_ID') else None
-
     relation_tenants = plugin_context.get_variable('relation_tenants') or []
-    primary_deploy_name = None
-    primary_tenant_name = None
-    primary_cursor = None
+    standby_cluster_config = (cluster_configs or {}).get(standby_deploy_name)
+    if not standby_cluster_config:
+        stdio.error("Missing cluster config for standby deployment: %s" % standby_deploy_name)
+        return plugin_context.return_false()
 
-    for relation_kv in relation_tenants:
-        relation_deploy_name = relation_kv[0]
-        relation_tenant_name = relation_kv[1]
+    primary_dict = standby_cluster_config.get_component_attr('primary_tenant') or {}
+    primary_info = primary_dict.get(standby_tenant_name) or []
+    mapped_primary = tuple(primary_info[0]) if len(primary_info) == 1 and len(primary_info[0]) >= 2 else None
+    source_is_loopback = _service_list_uses_loopback(primary_ip_list_raw)
+
+    if source_is_loopback:
+        if not mapped_primary or mapped_primary not in relation_tenants or \
+                mapped_primary[0] not in (cluster_configs or {}):
+            stdio.error(
+                'Cannot resolve a loopback LOG_RESTORE_SOURCE without a unique valid persisted primary_tenant mapping.')
+            return plugin_context.return_false()
+        candidates = [mapped_primary]
+    else:
+        candidates = relation_tenants
+
+    matches = []
+    for relation_deploy_name, relation_tenant_name in candidates:
         relation_cursor = cursors.get(relation_deploy_name)
         if not relation_cursor:
             stdio.verbose("fail to get {}'s cursor".format(relation_deploy_name))
             continue
 
+        relation_cluster_config = (cluster_configs or {}).get(relation_deploy_name)
+        if not relation_cluster_config:
+            stdio.error("Missing cluster config for relation deployment: %s" % relation_deploy_name)
+            return plugin_context.return_false()
+
         res = relation_cursor.fetchone('select TENANT_ID, group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from oceanbase.cdb_ob_access_point where tenant_name=%s)', (relation_tenant_name, ), raise_exception=False)
         if not res or not res['ip_list']:
             stdio.verbose("fail to get {}'s ip list".format(relation_deploy_name))
             continue
+        if int(res['TENANT_ID']) != primary_tenant_id:
+            continue
 
-        ip_list = res['ip_list'].split(';')
-        ip_list.sort()
-        if res['TENANT_ID'] == primary_tenant_id and ip_list == primary_ip_list:
-            primary_deploy_name = relation_deploy_name
-            primary_tenant_name = relation_tenant_name
-            primary_cursor = relation_cursor
-            break
+        try:
+            primary_ip_list = _externalize_service_list(
+                relation_cluster_config, primary_ip_list_raw)
+            relation_ip_list = _externalize_service_list(
+                relation_cluster_config, res['ip_list'])
+        except ObserverIdentityError as e:
+            if source_is_loopback:
+                stdio.error(str(e))
+                return plugin_context.return_false()
+            stdio.verbose(
+                "skip relation deployment %s: %s" % (relation_deploy_name, str(e)))
+            continue
 
+        if relation_ip_list == primary_ip_list:
+            matches.append((relation_deploy_name, relation_tenant_name, relation_cursor))
+
+    if len(matches) != 1:
+        if source_is_loopback:
+            stdio.error(
+                'The persisted primary_tenant mapping does not match the live loopback LOG_RESTORE_SOURCE.')
+        else:
+            stdio.error(
+                'Expected exactly one primary tenant matching the live LOG_RESTORE_SOURCE, found %s.' % len(matches))
+        return plugin_context.return_false()
+
+    primary_deploy_name, primary_tenant_name, primary_cursor = matches[0]
     if not primary_deploy_name:
         stdio.error("Could not find the primary cluster for standby %s. Ensure the primary cluster is deployed and managed by obd." % standby_tenant_name)
         return plugin_context.return_false()

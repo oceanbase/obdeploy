@@ -44,7 +44,11 @@ def parameter_pre(plugin_context, **kwargs):
 
         for server in cluster_config.servers:
             server_config = deepcopy(cluster_config.get_server_conf_with_default(server))
-            user_server_config = deepcopy(cluster_config.get_server_conf(server))
+            # Defaults must not hide dependency-provided values. In particular,
+            # a SeekDB dependency needs to override the generic OBAgent defaults
+            # (monitor.ob=active and monitor.seekdb=inactive) unless the user
+            # explicitly configured those fields.
+            user_server_config = deepcopy(cluster_config.get_explicit_server_conf(server))
             if 'monagent_host_ip' not in user_server_config:
                 server_config['monagent_host_ip'] = server.ip
             missed_keys = get_missing_required_parameters(user_server_config)

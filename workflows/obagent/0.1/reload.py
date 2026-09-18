@@ -18,5 +18,8 @@ from __future__ import absolute_import, division, print_function
 import const
 
 def reload(plugin_context, workflow, *args, **kwargs):
-    workflow.add(const.STAGE_FIRST, 'connect', 'reload')
+    workflow.add(const.STAGE_FIRST, 'connect')
+    # Database-side credential changes must finish before OBAgent switches to
+    # the new connection settings. SeekDB applies its reload in STAGE_SECOND.
+    workflow.add(const.STAGE_THIRD, 'reload')
     return plugin_context.return_true()

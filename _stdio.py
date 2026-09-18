@@ -648,6 +648,9 @@ class IO(object):
     def start_progressbar(self, text, maxval, widget_type='download'):
         if self.sync_obj:
             return False
+        if not getattr(self.get_cur_out_obj(), 'isatty', lambda: False)():
+            self.print(text)
+            return False
         self.sync_obj = self._start_sync_obj(IOProgressBar, lambda x: x.finish_progressbar(), text=text, maxval=maxval, widget_type=widget_type)
         if self.sync_obj:
             self.log(MsgLevel.INFO, text)

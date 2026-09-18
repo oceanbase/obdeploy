@@ -20,6 +20,7 @@ import requests
 from urllib.parse import urlparse
 
 from _errno import EC_OBSERVER_FAILED_TO_REGISTER, EC_OBSERVER_FAILED_TO_REGISTER_WITH_DETAILS
+from _deploy import ObserverIdentity, ObserverIdentityError
 
 from tool import NetUtil
 
@@ -88,6 +89,16 @@ def configserver_pre(plugin_context, *args, **kwargs):
     clients = plugin_context.clients
     stdio = plugin_context.stdio
     options = plugin_context.options
+    try:
+        identity = ObserverIdentity.prepare(plugin_context, cluster_config)
+    except ObserverIdentityError as e:
+        stdio.error(str(e))
+        return plugin_context.return_false()
+    if identity:
+        # Loopback identity is bootstrapped with rs_list.  Configserver must
+        # never publish or replace it with the management address.
+        plugin_context.set_variable('cfg_url', '')
+        return plugin_context.return_true()
     global_config = cluster_config.get_global_conf()
     appname = global_config['appname'] if 'appname' in global_config else None
     cluster_id = global_config['cluster_id'] if 'cluster_id' in global_config else None

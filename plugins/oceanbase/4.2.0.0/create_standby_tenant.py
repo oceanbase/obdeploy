@@ -94,7 +94,7 @@ def dump_standbyro_password(deploy_name, tenant_name, standbyro_password, cluste
     return True
 
 
-def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_tenant_options=[], relation_tenants={}, cluster_configs={}, primary_tenant_info={}, standbyro_password='', *args, **kwargs):
+def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_tenant_options=[], relation_tenants={}, cluster_configs={}, primary_tenant_info={}, standbyro_password='', restore_source_endpoints='', *args, **kwargs):
     def get_option(key, default=''):
         value = getattr(options, key, default)
         if not value:
@@ -132,7 +132,6 @@ def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_
         if primary_tenant_info:
             primary_deploy_name = primary_tenant_info.get('primary_deploy_name')
             primary_tenant = primary_tenant_info.get('primary_tenant')
-            primary_cursor = plugin_context.get_variable('cursors').get(primary_deploy_name)
             primary_memory_size = primary_tenant_info['memory_size']
             primary_log_disk_size = primary_tenant_info['log_disk_size']
             primary_params = ['max_cpu', 'min_cpu', 'unit_num', 'memory_size', 'log_disk_size', 'max_iops', 'min_iops', 'iops_weight']
@@ -143,6 +142,9 @@ def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_
             mode = get_option('mode', 'mysql').lower()
             if not mode in ['mysql', 'oracle']:
                 error('No such tenant mode: %s.\n--mode must be `mysql` or `oracle`' % mode)
+                return
+            if not restore_source_endpoints:
+                error('SERVICE restore source endpoints are unavailable.')
                 return
 
             # options not support
@@ -351,14 +353,7 @@ def create_standby_tenant(plugin_context, config_encrypted, cursor=None, create_
                     return
 
                 # create standby tenant
-                # query ip_list
-                sql = '''select group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host  from oceanbase.cdb_ob_access_point where tenant_name=%s)'''
-                res = primary_cursor.fetchone(sql, (primary_tenant, ))
-                if not res:
-                    stdio.error('ip_list query error.')
-                    return
-
-                sql = '''CREATE STANDBY TENANT {} LOG_RESTORE_SOURCE = 'SERVICE={} USER=standbyro@{} PASSWORD={}' RESOURCE_POOL_LIST=('{}') , primary_zone='{}' '''.format(name, res['ip_list'], primary_tenant, standbyro_password, pool_name, primary_zone)
+                sql = '''CREATE STANDBY TENANT {} LOG_RESTORE_SOURCE = 'SERVICE={} USER=standbyro@{} PASSWORD={}' RESOURCE_POOL_LIST=('{}') , primary_zone='{}' '''.format(name, restore_source_endpoints, primary_tenant, standbyro_password, pool_name, primary_zone)
                 if locality:
                     sql += ", locality = '%s'" % locality
 

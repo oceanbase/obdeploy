@@ -17,11 +17,11 @@ from __future__ import absolute_import, division, print_function
 
 import const
 
-def check_opt(plugin_context, workflow, *args, **kwargs):
+def check_opt(plugin_context, workflow, repository, *args, **kwargs):
     kwargs = {
         "name": plugin_context.cmds[1],
         "context": {},
-        "repository": plugin_context.repositories[0]
+        "repository": repository,
     }
     workflow.add_with_component_version_kwargs(const.STAGE_FIRST, 'general', plugin_context.repositories[0].version, {"repository": plugin_context.repositories[0]}, 'sync_cluster_config')
     workflow.add_with_component_version_kwargs(const.STAGE_SECOND, "commands", '0.1', kwargs, 'check_opt')

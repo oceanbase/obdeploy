@@ -17,6 +17,8 @@ from __future__ import absolute_import, division, print_function
 
 import time
 
+from _deploy import ObserverIdentity
+
 
 def active_check(plugin_context,  *args, **kwargs):
     
@@ -38,7 +40,7 @@ def active_check(plugin_context,  *args, **kwargs):
                 where svr_ip = %s and svr_port = %s and refreshed_schema_version > 1
                 ) as b on a.tenant_id = b.tenant_id 
             where b.tenant_id is null'''
-            if restart_manager.execute_sql(sql, args=(server.ip, config['rpc_port']), error=False).get('cnt'):
+            if restart_manager.execute_sql(sql, args=(ObserverIdentity.identity_ip(cluster_config, server), config['rpc_port']), error=False).get('cnt'):
                 break
         else:
             break

@@ -14,6 +14,7 @@
 # limitations under the License.
 from _rpm import Version
 from const import LOCATION_MODE
+from _deploy import ObserverIdentity, ObserverIdentityError
 
 
 def switchover_tenant_pre(plugin_context, repository, cursors={}, cluster_configs={}, relation_tenants={}, *args, **kwargs):
@@ -40,51 +41,102 @@ def switchover_tenant_pre(plugin_context, repository, cursors={}, cluster_config
         return
 
     primary = {}
+    cluster_config = cluster_configs.get(standby_deploy_name)
+    if not cluster_config:
+        stdio.error("Get {} cluster config is failed.".format(standby_deploy_name))
+        return
+    primary_dict = cluster_config.get_component_attr('primary_tenant')
+    primary_info = primary_dict.get(standby_tenant, []) if primary_dict else []
+    mapped_primary = (primary_info[0][0], primary_info[0][1]) if primary_info else None
+
     if kwargs.get('source_type', None) == LOCATION_MODE:
-        cluster_config = cluster_configs.get(standby_deploy_name)
-        if not cluster_configs:
-            stdio.error("Get {} cluster config is failed.".format(standby_deploy_name))
+        if not mapped_primary or mapped_primary not in relation_tenants or \
+                mapped_primary[0] not in cluster_configs:
+            stdio.error(
+                'Tenant {} cannot find valid primary tenant information'.format(standby_tenant))
             return
-        primary_dict = cluster_config.get_component_attr('primary_tenant')
-        if not primary_dict:
-            stdio.error('The primary_tenant data is empty in inner_config')
-            return
-        primary_info = primary_dict[standby_tenant]
-        if not primary_info:
-            stdio.error('Tenant {} cannot find the primary tenant information'.format(standby_tenant))
-            return
-        primary['primary_deploy_name'] = primary_info[0][0]
-        primary['primary_tenant'] = primary_info[0][1]
+        primary['primary_deploy_name'] = mapped_primary[0]
+        primary['primary_tenant'] = mapped_primary[1]
     else:
         primary_info_dict = {}
-        primary_info_arr = res['VALUE'].split(',')
-        for primary_info in primary_info_arr:
-            kv = primary_info.split('=')
-            primary_info_dict[kv[0]] = kv[1]
-        primary_ip_list_raw = primary_info_dict.get('IP_LIST').split(';')
-        primary_ip_list = [ip.split('+')[0] for ip in primary_ip_list_raw]
-        primary_ip_list.sort()
-        primary_tenant_id = int(primary_info_dict['TENANT_ID']) if primary_info_dict else None
-        # find primary tenant
-        for relation_kv in relation_tenants:
-            relation_deploy_name = relation_kv[0]
-            relation_tenant_name = relation_kv[1]
-            relation_cursor = cursors.get(relation_deploy_name)
-            if not relation_cursor:
-                stdio.verbose("fail to get {}'s cursor".format(relation_deploy_name))
-                continue
+        for item in res['VALUE'].split(','):
+            key, separator, value = item.partition('=')
+            if separator:
+                primary_info_dict[key] = value
+        primary_ip_list_value = primary_info_dict.get('IP_LIST')
+        primary_tenant_id_value = primary_info_dict.get('TENANT_ID')
+        if not primary_ip_list_value or not primary_tenant_id_value:
+            stdio.error('Invalid SERVICE LOG_RESTORE_SOURCE for tenant {}:{}.'.format(
+                standby_deploy_name, standby_tenant))
+            return
+        primary_ip_list_raw = primary_ip_list_value.split(';')
+        primary_tenant_id = int(primary_tenant_id_value)
+        source_is_loopback = any(
+            endpoint.split('+', 1)[0].rpartition(':')[0] == '127.0.0.1'
+            for endpoint in primary_ip_list_raw)
 
-            res = relation_cursor.fetchone('select TENANT_ID, group_concat(host separator ";") as ip_list from (select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from oceanbase.cdb_ob_access_point where tenant_name=%s)', (relation_tenant_name, ), raise_exception=True)
-            if not res or not res['ip_list']:
-                stdio.verbose("fail to get {}'s ip list".format(relation_deploy_name))
-                continue
-
-            ip_list = res['ip_list'].split(';')
-            ip_list.sort()
-            if res['TENANT_ID'] == primary_tenant_id and ip_list == primary_ip_list:
-                primary['primary_deploy_name'] = relation_deploy_name
-                primary['primary_tenant'] = relation_tenant_name
-                break
+        if source_is_loopback:
+            if not mapped_primary or mapped_primary not in relation_tenants or \
+                    mapped_primary[0] not in cluster_configs:
+                stdio.error(
+                    'Cannot resolve a loopback LOG_RESTORE_SOURCE without a valid persisted primary_tenant mapping.')
+                return
+            primary_deploy_name, primary_tenant_name = mapped_primary
+            primary_cluster_config = cluster_configs.get(primary_deploy_name)
+            try:
+                primary_ip_list = [
+                    ObserverIdentity.externalize_sql_endpoint(primary_cluster_config, endpoint).split('+', 1)[0]
+                    for endpoint in primary_ip_list_raw]
+            except ObserverIdentityError as e:
+                stdio.error(str(e))
+                return
+            primary_cursor = cursors.get(primary_deploy_name)
+            if not primary_cursor:
+                stdio.error('Primary deploy: {} connect check fail.'.format(primary_deploy_name))
+                return
+            candidate = primary_cursor.fetchone(
+                'select TENANT_ID, group_concat(host separator ";") as ip_list from '
+                '(select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from '
+                'oceanbase.cdb_ob_access_point where tenant_name=%s)',
+                (primary_tenant_name, ), raise_exception=True)
+            candidate_ip_list = ObserverIdentity.externalize_ip_list(
+                primary_cluster_config, candidate['ip_list']).split(';') if candidate and candidate['ip_list'] else []
+            if candidate and candidate['TENANT_ID'] == primary_tenant_id and \
+                    sorted(candidate_ip_list) == sorted(primary_ip_list):
+                primary['primary_deploy_name'] = primary_deploy_name
+                primary['primary_tenant'] = primary_tenant_name
+            else:
+                stdio.error(
+                    'The persisted primary_tenant mapping does not match the live loopback LOG_RESTORE_SOURCE.')
+                return
+        else:
+            primary_ip_list = sorted(endpoint.split('+', 1)[0] for endpoint in primary_ip_list_raw)
+            matches = []
+            for relation_deploy_name, relation_tenant_name in relation_tenants:
+                relation_cursor = cursors.get(relation_deploy_name)
+                if not relation_cursor:
+                    stdio.verbose("fail to get {}'s cursor".format(relation_deploy_name))
+                    continue
+                candidate = relation_cursor.fetchone(
+                    'select TENANT_ID, group_concat(host separator ";") as ip_list from '
+                    '(select concat(svr_ip,":",SQL_PORT) as host,TENANT_ID from '
+                    'oceanbase.cdb_ob_access_point where tenant_name=%s)',
+                    (relation_tenant_name, ), raise_exception=True)
+                if not candidate or not candidate['ip_list']:
+                    stdio.verbose("fail to get {}'s ip list".format(relation_deploy_name))
+                    continue
+                relation_cluster_config = cluster_configs.get(relation_deploy_name)
+                candidate_ip_list = ObserverIdentity.externalize_ip_list(
+                    relation_cluster_config, candidate['ip_list']).split(';')
+                if candidate['TENANT_ID'] == primary_tenant_id and sorted(candidate_ip_list) == primary_ip_list:
+                    matches.append((relation_deploy_name, relation_tenant_name))
+            if len(matches) != 1:
+                stdio.error(
+                    'Expected exactly one primary tenant matching the live LOG_RESTORE_SOURCE, found {}.'.format(
+                        len(matches)))
+                return
+            primary['primary_deploy_name'] = matches[0][0]
+            primary['primary_tenant'] = matches[0][1]
 
     if not primary:
         stdio.error('Tenant: {}:{} not found primary tenant'.format(standby_deploy_name, standby_tenant))

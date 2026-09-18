@@ -19,6 +19,7 @@ from collections.abc import Iterable, Iterator
 import os
 import re
 import sys
+import tempfile
 import getpass
 import hashlib
 from copy import deepcopy
@@ -214,29 +215,51 @@ class InnerConfig(object):
         self.path = path
         self.yaml_loader = yaml_loader
         self.config = {}
+        self.load_error = None
         self._load()
 
     def _load(self):
         self.config = {}
+        self.load_error = None
+        if not os.path.isfile(self.path):
+            return
         try:
             with FileUtil.open(self.path, 'rb') as f:
                 config = self.yaml_loader.load(f)
+                if config is None:
+                    config = {}
                 for component_name in config:
                     if InnerConfigKey.is_keyword(component_name):
                         self.config[InnerConfigItem(component_name)] = config[component_name]
                     else:
                         self.config[component_name] = ComponentInnerConfig(component_name, config[component_name])
-        except:
-            pass
+        except Exception as e:
+            # Most callers historically treated a missing inner config as an
+            # empty one.  Keep that behaviour for a missing file, but retain a
+            # parse/read error so address identity handling can fail closed.
+            self.load_error = e
 
     def _dump(self):
+        temp_path = None
         try:
-            stdio = self.yaml_loader.stdio if self.yaml_loader else None
-            with FileUtil.open(self.path, 'w', stdio=stdio) as f:
+            parent_dir = os.path.dirname(self.path) or '.'
+            fd, temp_path = tempfile.mkstemp(prefix='.%s.' % os.path.basename(self.path), suffix='.tmp', dir=parent_dir)
+            with os.fdopen(fd, 'w') as f:
                 self.yaml_loader.dump(self.config, f)
+                f.flush()
+                os.fsync(f.fileno())
+            os.rename(temp_path, self.path)
+            temp_path = None
+            self.load_error = None
             return True
         except:
             pass
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
         return False
 
     def dump(self):
@@ -628,14 +651,31 @@ class ClusterConfig(object):
 
     def get_inner_config(self):
         return self._inner_config
+
+    def _save_component_inner_config(self, previous, save):
+        if not save or self._deploy_config.dump_inner_config():
+            return True
+        # Keep the shared ComponentInnerConfig object alive because
+        # DeployConfig.inner_config references the same instance.
+        self._inner_config.clear()
+        self._inner_config.update(previous)
+        return False
     
     def update_component_attr(self, key, value, save=True):
+        previous = deepcopy(self._inner_config)
         self._inner_config.update_attr(key, value)
-        return self._deploy_config.dump() if save else True
+        return self._save_component_inner_config(previous, save)
+
+    def update_component_attrs(self, attrs, save=True):
+        previous = deepcopy(self._inner_config)
+        for key, value in attrs.items():
+            self._inner_config.update_attr(key, value)
+        return self._save_component_inner_config(previous, save)
     
     def del_component_attr(self, key, save=True):
+        previous = deepcopy(self._inner_config)
         self._inner_config.del_attr(key)
-        return self._deploy_config.dump() if save else True
+        return self._save_component_inner_config(previous, save)
     
     def get_component_attr(self, key):
         return self._inner_config.get_attr(key)
@@ -712,6 +752,9 @@ class ClusterConfig(object):
         else:
             config = cluster_config.get_server_conf(server) if server else cluster_config.get_global_conf()
         return deepcopy(config)
+
+    def get_depend_cluster_config(self, name):
+        return self._depends.get(name)
 
     def get_be_depend_config(self, name, server=None, with_default=True):
         if name not in self._be_depends:
@@ -1072,6 +1115,14 @@ class ClusterConfig(object):
         format_conf and self._apply_temp_conf(config)
         return config
 
+    def get_explicit_server_conf(self, server, format_conf=False):
+        """Return include/global/server values without parameter defaults."""
+        config = self._get_include_config('config', {})
+        config.update(self.get_original_global_conf())
+        config.update(self._server_conf.get(server, {}))
+        format_conf and self._apply_temp_conf(config)
+        return config
+
 
 class DeployStatus(Enum):
 
@@ -1085,6 +1136,330 @@ class DeployStatus(Enum):
     STATUS_DESTROYING = 'destroying'
     STATUS_DESTROYED = 'destroyed'
     STATUS_UPRADEING = 'upgrading'
+
+
+class ObserverIdentityError(Exception):
+    pass
+
+
+class ObserverIdentity(object):
+    """Resolve standalone observer identity without changing management IPs."""
+
+    VALID_STATES = (const.OBSERVER_IDENTITY_PLANNED, const.OBSERVER_IDENTITY_VERIFIED)
+    VALID_SOURCES = (const.OBSERVER_IDENTITY_FRESH_BOOTSTRAP, const.OBSERVER_IDENTITY_LEGACY_MANUAL)
+
+    @classmethod
+    def _check_inner_config(cls, cluster_config):
+        deploy_config = getattr(cluster_config, '_deploy_config', None)
+        inner_config = getattr(deploy_config, 'inner_config', None)
+        error = getattr(inner_config, 'load_error', None)
+        if cluster_config.name == const.COMP_OB_STANDALONE and error:
+            raise ObserverIdentityError('failed to load OBD inner config: %s' % error)
+
+    @classmethod
+    def _marker(cls, cluster_config):
+        cls._check_inner_config(cluster_config)
+        identity_ip = cluster_config.get_component_attr(const.OBSERVER_IDENTITY_IP)
+        state = cluster_config.get_component_attr(const.OBSERVER_IDENTITY_STATE)
+        source = cluster_config.get_component_attr(const.OBSERVER_IDENTITY_SOURCE)
+        values = (identity_ip, state, source)
+        if not any(values):
+            return None
+        if not all(values):
+            raise ObserverIdentityError('standalone observer identity metadata is incomplete')
+        if identity_ip != const.OBSERVER_LOOPBACK_IP:
+            raise ObserverIdentityError('unsupported standalone observer identity ip: %s' % identity_ip)
+        if state not in cls.VALID_STATES:
+            raise ObserverIdentityError('unsupported standalone observer identity state: %s' % state)
+        if source not in cls.VALID_SOURCES:
+            raise ObserverIdentityError('unsupported standalone observer identity source: %s' % source)
+        return {'ip': identity_ip, 'state': state, 'source': source}
+
+    @classmethod
+    def marker(cls, cluster_config):
+        if cluster_config.name != const.COMP_OB_STANDALONE:
+            return None
+        return cls._marker(cluster_config)
+
+    @classmethod
+    def _server(cls, cluster_config, server=None):
+        if server is not None:
+            return server
+        if len(cluster_config.servers) != 1:
+            raise ObserverIdentityError('standalone loopback identity requires exactly one server')
+        return cluster_config.servers[0]
+
+    @classmethod
+    def management_ip(cls, cluster_config, server=None):
+        return cls._server(cluster_config, server).ip
+
+    @classmethod
+    def identity_ip(cls, cluster_config, server=None):
+        marker = cls.marker(cluster_config)
+        if marker:
+            return marker['ip']
+        server = cls._server(cluster_config, server)
+        # Explicit 127 is the pre-marker legacy contract.  Other local_ip
+        # values never replace the historical management-IP identity.
+        if cls.is_explicit_legacy_loopback(cluster_config, server):
+            return const.OBSERVER_LOOPBACK_IP
+        return server.ip
+
+    @classmethod
+    def is_explicit_legacy_loopback(cls, cluster_config, server=None):
+        if cluster_config.name != const.COMP_OB_STANDALONE:
+            return False
+        server = cls._server(cluster_config, server)
+        return cluster_config.get_server_conf(server).get('local_ip') == const.OBSERVER_LOOPBACK_IP
+
+    @classmethod
+    def _has_initialization_evidence(cls, plugin_context, cluster_config, server, server_config):
+        clients = getattr(plugin_context, 'clients', {}) or {}
+        client = clients.get(server)
+        if not client:
+            raise ObserverIdentityError('missing management client while inspecting observer initialization state on %s' % server.ip)
+        home_path = server_config.get('home_path')
+        if home_path:
+            result = client.execute_command('test -e %s/etc/observer.config.bin' % home_path)
+            if result.code == 0:
+                return True
+            if result.code != 1:
+                raise ObserverIdentityError('failed to inspect observer initialization state on %s: %s' % (
+                    server.ip, result.stderr))
+        data_dir = server_config.get('data_dir') or ('%s/store' % home_path if home_path else None)
+        clog_sub_dir = plugin_context.get_variable('clog_sub_dir', 'clog')
+        if data_dir:
+            result = client.execute_command('test -d %s/%s' % (data_dir, clog_sub_dir))
+            if result.code == 0:
+                result = client.execute_command('ls -A %s/%s/' % (data_dir, clog_sub_dir))
+                if result.code != 0:
+                    raise ObserverIdentityError('failed to inspect observer initialization state on %s: %s' % (
+                        server.ip, result.stderr))
+                return bool(result.stdout.strip())
+            if result.code != 1:
+                raise ObserverIdentityError('failed to inspect observer initialization state on %s: %s' % (
+                    server.ip, result.stderr))
+        return False
+
+    @classmethod
+    def is_loopback(cls, cluster_config):
+        marker = cls.marker(cluster_config)
+        return bool(marker and marker['ip'] == const.OBSERVER_LOOPBACK_IP) or \
+            (not marker and cls.is_explicit_legacy_loopback(cluster_config))
+
+    @classmethod
+    def prepare(cls, plugin_context, cluster_config):
+        """Persist intent before observer's first start and return the marker."""
+        if cluster_config.name != const.COMP_OB_STANDALONE:
+            return None
+        marker = cls._marker(cluster_config)
+        if marker:
+            server = cls._server(cluster_config)
+            server_config = cluster_config.get_server_conf(server)
+            explicit_local_ip = server_config.get('local_ip')
+            if server_config.get('devname'):
+                raise ObserverIdentityError('devname cannot be used with standalone loopback identity')
+            if explicit_local_ip and explicit_local_ip != marker['ip']:
+                raise ObserverIdentityError('local_ip conflicts with persisted standalone observer identity %s' % marker['ip'])
+            return marker
+
+        server = cls._server(cluster_config)
+        server_config = cluster_config.get_server_conf(server)
+        explicit_local_ip = server_config.get('local_ip')
+        legacy_loopback = explicit_local_ip == const.OBSERVER_LOOPBACK_IP
+        status = getattr(plugin_context, 'deploy_status', None)
+        is_first_start = getattr(status, 'value', status) == DeployStatus.STATUS_DEPLOYED.value
+        supports_loopback = cluster_config.version is not None and \
+            Version(cluster_config.version) >= Version(const.OB_STANDALONE_LOOPBACK_MIN_VERSION)
+
+        if not legacy_loopback and not (is_first_start and supports_loopback):
+            return None
+        if not legacy_loopback and cls._has_initialization_evidence(
+                plugin_context, cluster_config, server, server_config):
+            # OBD persists planned before launching all new loopback
+            # deployments.  Existing observer state without that marker must
+            # therefore retain historical real-IP semantics.
+            return None
+        if server_config.get('devname'):
+            raise ObserverIdentityError('devname cannot be used with standalone loopback identity')
+        if explicit_local_ip and explicit_local_ip != const.OBSERVER_LOOPBACK_IP:
+            raise ObserverIdentityError('local_ip must be omitted or set to %s for standalone %s or later' % (
+                const.OBSERVER_LOOPBACK_IP, const.OB_STANDALONE_LOOPBACK_MIN_VERSION))
+
+        source = const.OBSERVER_IDENTITY_LEGACY_MANUAL if legacy_loopback else const.OBSERVER_IDENTITY_FRESH_BOOTSTRAP
+        state = const.OBSERVER_IDENTITY_PLANNED
+        attrs = {
+            const.OBSERVER_IDENTITY_IP: const.OBSERVER_LOOPBACK_IP,
+            const.OBSERVER_IDENTITY_STATE: state,
+            const.OBSERVER_IDENTITY_SOURCE: source,
+        }
+        if not cluster_config.update_component_attrs(attrs):
+            raise ObserverIdentityError('failed to persist standalone observer identity before start')
+        return {'ip': const.OBSERVER_LOOPBACK_IP, 'state': state, 'source': source}
+
+    @classmethod
+    def verify(cls, cluster_config, raw_servers):
+        marker = cls.marker(cluster_config)
+        if not marker:
+            return True
+        if len(raw_servers) != 1:
+            raise ObserverIdentityError('standalone loopback identity expected one observer, got %s' % len(raw_servers))
+        raw_ips = set(row.get('svr_ip') for row in raw_servers)
+        if raw_ips != set([marker['ip']]):
+            raise ObserverIdentityError('observer identity mismatch: expected %s, got %s' % (
+                marker['ip'], ','.join(sorted(str(ip) for ip in raw_ips))))
+        server = cls._server(cluster_config)
+        server_config = cluster_config.get_server_conf(server)
+        raw_server = raw_servers[0]
+        expected_ports = {
+            'svr_port': server_config.get('rpc_port'),
+            'inner_port': server_config.get('mysql_port'),
+        }
+        for key, expected in expected_ports.items():
+            if key in raw_server and expected is not None and int(raw_server[key]) != int(expected):
+                raise ObserverIdentityError('observer identity %s mismatch: expected %s, got %s' % (
+                    key, expected, raw_server[key]))
+        if marker['state'] == const.OBSERVER_IDENTITY_PLANNED:
+            if not cluster_config.update_component_attr(
+                    const.OBSERVER_IDENTITY_STATE, const.OBSERVER_IDENTITY_VERIFIED):
+                raise ObserverIdentityError('failed to persist verified standalone observer identity')
+        return True
+
+    @classmethod
+    def externalize_ip(cls, cluster_config, raw_ip):
+        marker = cls.marker(cluster_config)
+        if marker:
+            if marker['state'] == const.OBSERVER_IDENTITY_VERIFIED and raw_ip == marker['ip']:
+                return cls.management_ip(cluster_config)
+            return raw_ip
+        # The raw row itself confirms the identity for a markerless legacy
+        # deployment, so it is safe to expose the management endpoint.
+        if raw_ip == const.OBSERVER_LOOPBACK_IP and cls.is_explicit_legacy_loopback(cluster_config):
+            return cls.management_ip(cluster_config)
+        return raw_ip
+
+    @classmethod
+    def externalize_endpoint(cls, cluster_config, endpoint):
+        """Translate the IP part of an observer endpoint to its management IP."""
+        if not endpoint or not cluster_config:
+            return endpoint
+        address, plus, extra_port = endpoint.partition('+')
+        raw_ip, separator, sql_port = address.rpartition(':')
+        if not separator:
+            return cls.externalize_ip(cluster_config, address)
+        external_ip = cls.externalize_ip(cluster_config, raw_ip)
+        result = '%s:%s' % (external_ip, sql_port)
+        return '%s+%s' % (result, extra_port) if plus else result
+
+    @classmethod
+    def externalize_ip_list(cls, cluster_config, ip_list):
+        """Translate every endpoint in a semicolon-separated observer IP list."""
+        if not ip_list or not cluster_config:
+            return ip_list
+        return ';'.join(cls.externalize_endpoint(cluster_config, endpoint) for endpoint in ip_list.split(';'))
+
+    @classmethod
+    def require_verified_loopback_capability(cls, cluster_configs, capability):
+        """Fail closed when a sensitive operation targets an unverified loopback identity."""
+        if isinstance(cluster_configs, dict):
+            cluster_configs = cluster_configs.values()
+        elif not isinstance(cluster_configs, (list, tuple, set)):
+            cluster_configs = [cluster_configs]
+        for cluster_config in cluster_configs:
+            if not cluster_config or cluster_config.name != const.COMP_OB_STANDALONE:
+                continue
+            marker = cls.marker(cluster_config)
+            if marker:
+                if marker['state'] != const.OBSERVER_IDENTITY_VERIFIED:
+                    raise ObserverIdentityError(
+                        '%s requires a verified standalone loopback identity; current state is %s' % (
+                            capability, marker['state']))
+                continue
+            if cls.is_explicit_legacy_loopback(cluster_config):
+                raise ObserverIdentityError(
+                    '%s requires verified standalone loopback identity metadata' % capability)
+
+    @classmethod
+    def require_verified_observed_loopback_capability(cls, cluster_config, cursor, capability):
+        """Validate the live observer identity after a management connection is established."""
+        if not cluster_config or cluster_config.name != const.COMP_OB_STANDALONE or not cursor:
+            return
+        rows = cursor.fetchall(
+            'SELECT DISTINCT SVR_IP AS svr_ip FROM oceanbase.DBA_OB_SERVERS',
+            raise_exception=False, exc_level='verbose')
+        if not rows:
+            raise ObserverIdentityError(
+                'failed to inspect standalone observer identity before %s' % capability)
+        raw_ips = set(row.get('svr_ip', row.get('SVR_IP')) for row in rows)
+        marker = cls.marker(cluster_config)
+        if const.OBSERVER_LOOPBACK_IP in raw_ips:
+            if raw_ips != set([const.OBSERVER_LOOPBACK_IP]):
+                raise ObserverIdentityError(
+                    'ambiguous standalone observer identities before %s: %s' % (
+                        capability, ','.join(sorted(str(ip) for ip in raw_ips))))
+            if not marker or marker['state'] != const.OBSERVER_IDENTITY_VERIFIED:
+                raise ObserverIdentityError(
+                    '%s requires verified standalone loopback identity metadata' % capability)
+        elif marker:
+            raise ObserverIdentityError(
+                'standalone observer identity mismatch before %s: expected %s, got %s' % (
+                    capability, marker['ip'], ','.join(sorted(str(ip) for ip in raw_ips))))
+
+    @classmethod
+    def externalize_sql_endpoint(cls, cluster_config, endpoint):
+        """Validate a loopback SQL endpoint against its deployment before externalizing it."""
+        if not cluster_config:
+            raise ObserverIdentityError('missing cluster config for standalone loopback endpoint')
+        if cluster_config.name != const.COMP_OB_STANDALONE:
+            return endpoint
+        marker = cls.marker(cluster_config)
+        if not marker:
+            endpoint_address = str(endpoint).split('+', 1)[0] if endpoint is not None else ''
+            if endpoint_address.rpartition(':')[0] == const.OBSERVER_LOOPBACK_IP:
+                raise ObserverIdentityError(
+                    'standalone loopback endpoint requires verified identity metadata')
+            return cls.externalize_endpoint(cluster_config, endpoint)
+        if marker['state'] != const.OBSERVER_IDENTITY_VERIFIED:
+            raise ObserverIdentityError(
+                'standalone loopback endpoint requires verified identity metadata; current state is %s' %
+                marker['state'])
+
+        endpoint = str(endpoint).strip() if endpoint is not None else ''
+        if not endpoint or endpoint.count('+') > 1:
+            raise ObserverIdentityError('invalid standalone loopback SQL endpoint: %s' % endpoint)
+        address, plus, rpc_port = endpoint.partition('+')
+        raw_ip, separator, sql_port = address.rpartition(':')
+        if not separator or not raw_ip or not sql_port.isdigit() or (plus and not rpc_port.isdigit()):
+            raise ObserverIdentityError('invalid standalone loopback SQL endpoint: %s' % endpoint)
+
+        server = cls._server(cluster_config)
+        server_config = cluster_config.get_server_conf(server)
+        if raw_ip not in (marker['ip'], server.ip):
+            raise ObserverIdentityError(
+                'standalone loopback SQL endpoint IP mismatch: expected %s or %s, got %s' % (
+                    marker['ip'], server.ip, raw_ip))
+        expected_sql_port = server_config.get('mysql_port')
+        expected_rpc_port = server_config.get('rpc_port')
+        if expected_sql_port is None or int(sql_port) != int(expected_sql_port):
+            raise ObserverIdentityError(
+                'standalone loopback SQL endpoint port mismatch: expected %s, got %s' % (
+                    expected_sql_port, sql_port))
+        if plus and (expected_rpc_port is None or int(rpc_port) != int(expected_rpc_port)):
+            raise ObserverIdentityError(
+                'standalone loopback RPC endpoint port mismatch: expected %s, got %s' % (
+                    expected_rpc_port, rpc_port))
+        return cls.externalize_endpoint(cluster_config, endpoint)
+
+    @classmethod
+    def reject_loopback_capability(cls, cluster_configs, capability):
+        if isinstance(cluster_configs, dict):
+            cluster_configs = cluster_configs.values()
+        elif not isinstance(cluster_configs, (list, tuple, set)):
+            cluster_configs = [cluster_configs]
+        for cluster_config in cluster_configs:
+            if cluster_config and (cls.is_loopback(cluster_config) or cls.is_explicit_legacy_loopback(cluster_config)):
+                raise ObserverIdentityError(
+                    '%s is not supported for standalone loopback identity; external endpoint adaptation is required' % capability)
 
 
 class ClusterStatus(Enum):
@@ -1490,22 +1865,32 @@ class DeployConfig(SafeStdio):
     def _dump_inner_config(self):
         if self.inner_config:
             self._separate_config()
-            self.inner_config.dump()
+            return self.inner_config.dump()
+        return True
+
+    def dump_inner_config(self):
+        return self._dump_inner_config()
 
     def _dump(self):
         if self._do_not_dump:
             raise Exception("Cannot dump because flag DO NOT DUMP exists.")
         self._encrypt_password_before_dump()
         try:
+            if not self._dump_inner_config():
+                return False
             with open(self.yaml_path, 'w') as f:
-                self._dump_inner_config()
                 self.yaml_loader.dump(self._src_data, f)
             return True
         except:
             import logging
             logging.exception('')
             pass
-        return False
+            return False
+        finally:
+            if self._need_encrypt_dump and COMMAND_ENV.get(const.ENCRYPT_PASSWORD) == '1' and self._config_encrypted:
+                self.change_deploy_config_password(False, False)
+                self._config_encrypted = False
+                self._need_encrypt_dump = True
 
     def dump(self):
         return self._dump()
@@ -1787,7 +2172,7 @@ class Deploy(object):
         self.stdio = stdio
         self.config_parser_manager = config_parser_manager
         self._uprade_meta = None
-        self._config_encrypted = True
+        self._config_encrypted = None
 
     def set_config_decrypted(self):
         self._config_encrypted = False

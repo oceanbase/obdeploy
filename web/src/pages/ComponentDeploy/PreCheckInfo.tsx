@@ -56,7 +56,6 @@ export default function PreCheckInfo() {
     componentConfig,
     setComponentConfig,
     selectedConfig,
-    lowVersion,
     current,
     setCurrent,
     setPreCheckInfoOk,
@@ -132,14 +131,9 @@ export default function PreCheckInfo() {
       (item) => componentVersionTypeToComponent[item] || item,
     );
 
-    let currentOnlyComponentsKeys = onlyComponentsKeys.filter(
+    const currentOnlyComponentsKeys = onlyComponentsKeys.filter(
       (key) => key !== 'obagent' && tempSelectedConfig.includes(key),
     );
-
-    if (lowVersion) {
-      currentOnlyComponentsKeys = currentOnlyComponentsKeys.filter(
-      );
-    }
 
     currentOnlyComponentsKeys.forEach((key) => {
       if (componentsConfig?.[key]) {

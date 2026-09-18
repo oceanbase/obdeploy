@@ -15,7 +15,6 @@
 
 from __future__ import absolute_import, division, print_function
 
-import json
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -42,15 +41,27 @@ class ObagentAPICursor(object):
         return self._request('GET', 'api/v1/agent/status', stdio=stdio)
 
     def reload(self, data, stdio=None):
-        return self._request('POST', 'api/v1/module/config/update', data, stdio=stdio)
+        return self._request(
+            'POST', 'api/v1/module/config/update', {'configs': data}, stdio=stdio)
 
     def _request(self, method, api, data=None, stdio=None):
         url = self.url_prefix + api
-        stdio.verbose('send http request method: {}, url: {}, data: {}'.format(method, url, data))
+        config_keys = []
+        if isinstance(data, dict):
+            config_keys = [item.get('key') for item in data.get('configs', [])
+                           if isinstance(item, dict)]
+        stdio.verbose('send http request method: {}, url: {}, config keys: {}'.format(
+            method, url, config_keys))
         try:
+            request_kwargs = {
+                'auth': self.auth,
+                'verify': False,
+            }
             if data is not None:
-                data = json.dumps(data)
-            resp = requests.request(method, url, auth=self.auth, data=data, verify=False)
+                # OBAgent binds this endpoint as JSON. Using requests' json
+                # argument also sets Content-Type, which plain data= omitted.
+                request_kwargs['json'] = data
+            resp = requests.request(method, url, **request_kwargs)
             return_code = resp.status_code
             content = resp.content
         except Exception as e:

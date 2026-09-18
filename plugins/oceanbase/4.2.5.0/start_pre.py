@@ -19,6 +19,9 @@ import os.path
 from tool import FileUtil
 from collections import OrderedDict
 
+from _deploy import ObserverIdentity, ObserverIdentityError
+import const
+
 
 def construct_opts(server_config, param_list, rs_list_opt, cfg_url, cmd, need_bootstrap, home_path=None):
     not_opt_str = OrderedDict({
@@ -74,6 +77,18 @@ def start_pre(plugin_context, *args, **kwargs):
     options = plugin_context.options
     repositories = plugin_context.repositories
     cfg_url = plugin_context.get_variable('cfg_url', None)
+    try:
+        identity = ObserverIdentity.marker(cluster_config)
+    except ObserverIdentityError as e:
+        stdio.error(str(e))
+        return plugin_context.return_false()
+    loopback_identity = bool(identity)
+    planned_identity = bool(identity and identity['state'] == const.OBSERVER_IDENTITY_PLANNED)
+    if loopback_identity and cluster_config.added_servers:
+        stdio.error('scale-out is not supported for standalone loopback identity')
+        return plugin_context.return_false()
+    if loopback_identity:
+        cfg_url = ''
     root_servers = {}
     clusters_cmd = {}
     if cluster_config.added_servers:
@@ -89,7 +104,7 @@ def start_pre(plugin_context, *args, **kwargs):
         config = cluster_config.get_server_conf(server)
         zone = config['zone']
         if zone not in root_servers:
-            root_servers[zone] = '%s:%s:%s' % (server.ip, config['rpc_port'], config['mysql_port'])
+            root_servers[zone] = '%s:%s:%s' % (ObserverIdentity.identity_ip(cluster_config, server), config['rpc_port'], config['mysql_port'])
     rs_list_opt  = '-r \'%s\'' % ';'.join([root_servers[zone] for zone in root_servers])
 
     path = ''
@@ -117,6 +132,10 @@ def start_pre(plugin_context, *args, **kwargs):
     for server in cluster_config.servers:
         client = clients[server]
         server_config = cluster_config.get_server_conf(server)
+        if loopback_identity:
+            # local_ip is a launch-only identity override.  Never let it leak
+            # into ClusterConfig's cached configuration or config.yaml.
+            server_config = dict(server_config)
         home_path = server_config['home_path']
 
         start_parameters = {}
@@ -133,10 +152,13 @@ def start_pre(plugin_context, *args, **kwargs):
         if not server_config.get('data_dir'):
             server_config['data_dir'] = '%s/store' % home_path
 
-        if not server_config.get('local_ip') and not server_config.get('devname'):
+        if loopback_identity:
+            server_config['local_ip'] = identity['ip']
+            start_parameters['local_ip'] = identity['ip']
+        elif not server_config.get('local_ip') and not server_config.get('devname'):
             server_config['local_ip'] = server.ip
 
-        if client.execute_command('ls {}/{}/'.format(server_config['data_dir'], plugin_context.get_variable('clog_sub_dir'))).stdout.strip():
+        if not planned_identity and client.execute_command('ls {}/{}/'.format(server_config['data_dir'], plugin_context.get_variable('clog_sub_dir'))).stdout.strip():
             need_bootstrap = False
 
         remote_pid_path = '%s/run/observer.pid' % home_path
@@ -146,7 +168,7 @@ def start_pre(plugin_context, *args, **kwargs):
                 continue
 
         stdio.verbose('%s start command construction' % server)
-        if not getattr(options, 'with_parameter', False) and client.execute_command('ls %s/etc/observer.config.bin' % home_path):
+        if not planned_identity and not getattr(options, 'with_parameter', False) and client.execute_command('ls %s/etc/observer.config.bin' % home_path):
             use_parameter = False
         else:
             use_parameter = True

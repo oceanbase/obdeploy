@@ -30,11 +30,10 @@ def start(plugin_context, workflow, *args, **kwargs):
             client = list(clients.values())[0]
     if not client:
         return plugin_context.return_false()
-    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'user_pre', 'create_user')
+    workflow.add(const.STAGE_FIRST, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'verify_observer_identity', 'user_pre', 'create_user')
     install_utils = cluster_config.get_global_conf().get('install_utils', False)
     utils_flag = os.path.join(server_config['home_path'], 'bin', 'ob_admin')
     cmd = 'ls %s' % utils_flag
     if install_utils and not client.execute_command(cmd):
         workflow.add(const.STAGE_SECOND, 'install_ob_utils')
     plugin_context.return_true()
-

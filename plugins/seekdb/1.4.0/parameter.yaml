@@ -1,0 +1,2895 @@
+- name: data_dir
+  name_local: 数据目录
+  essential: true
+  type: PATH
+  min_value: null
+  max_value: null
+  need_redeploy: true
+  description_en: the directory for the data file
+  description_local: 存储sstable等数据的目录
+  section: SSTABLE
+  read_only: true
+- name: redo_dir
+  name_local: Redo 日志目录
+  require: false
+  essential: true
+  type: PATH
+  min_value: null
+  max_value: null
+  need_redeploy: true
+  description_en: Directory for redo and clog files.
+  description_local: Redo 和 clog 文件目录。
+  section: SSTABLE
+  read_only: true
+- name: datafile_size
+  name_local: 数据文件大小
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: null
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: size of the data file. Please enter an capacity, such as 20G
+  description_local: 数据文件大小。请输入带容量带单位的整数，如20G
+- name: datafile_next
+  name_local: 数据文件自增步长
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: null
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend step. Please enter an capacity, such as 2G
+  description_local: 数据文件自增步长。请输入带容量带单位的整数，如2G
+- name: datafile_maxsize
+  name_local: 数据文件最大空间
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: 0M
+  max_value: null
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the auto extend max size. Please enter an capacity, such as 20G
+  description_local: 数据文件最大空间。请输入带容量带单位的整数，如20G
+- name: datafile_disk_percentage
+  require: false
+  type: INT
+  min_value: 0
+  max_value: 99
+  modify_limit: decrease
+  section: SSTABLE
+  need_restart: false
+  description_en: the percentage of disk space used by the data files.
+  description_local: data_dir所在磁盘将被OceanBase系统初始化用于存储数据，本配置项表示占用该磁盘总空间的百分比
+- name: _datafile_usage_upper_bound_percentage
+  require: false
+  type: INT
+  default: 90
+  min_value: null
+  max_value: null
+  section: SSTABLE
+  need_restart: false
+  description_en: 'the percentage of disk space usage upper bound to trigger datafile extend. Range: [5,99] in integer'
+- name: enable_rpc_service
+  name_local: rpc网络服务
+  require: false
+  essential: true
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: Enable RPC network service. Must be enabled when using RPC-dependent features such as standby replication.
+  description_local: rpc网络服务。部署指定，动态修改无效；重启生效。备库等场景必须开启。
+- name: enable_rpc_tls
+  name_local: 启用 RPC TLS
+  require: false
+  essential: true
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: Whether to enable TLS for RPC connections. Static effective (restart required).
+  description_local: 控制是否启用 RPC 的 TLS。静态生效，需重启。
+- name: rpc_port
+  name_local: 内部通信端口
+  require: true
+  essential: true
+  type: INT
+  default: 2882
+  min_value: 1025
+  max_value: 65535
+  modify_limit: modify
+  need_restart: true
+  description_en: the port number for RPC protocol.
+  description_local: 集群内部通信的端口号
+  section: OBSERVER
+- name: mysql_port
+  name_local: 服务端口
+  require: true
+  essential: true
+  type: INT
+  default: 2881
+  min_value: 1025
+  max_value: 65535
+  modify_limit: modify
+  need_restart: true
+  description_en: port number for mysql connection
+  description_local: SQL服务协议端口号
+  section: OBSERVER
+- name: internal_sql_execute_timeout
+  require: false
+  type: TIME
+  default: 30s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the number of microseconds an internal DML request is permitted to execute before it is terminated.
+  description_local: 系统内部SQL请求的超时时间
+- name: net_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: the number of rpc/mysql I/O threads for Libeasy.
+  description_local: 网络IO线程数
+- name: server_task_queue_size
+  require: false
+  type: INT
+  default: 16384
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the size of the local server runtime task queue. Range: [1024,+∞)'
+- name: memory_budget
+  name_local: 逻辑内存预算
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0M
+  min_value: 0M
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Logical memory budget used to size caches and buffers. 0M targets 80% of cgroup or physical memory while reserving at least 1G for the system when possible; the minimum automatic value is 1G.
+  description_local: 用于计算缓存和缓冲区大小的逻辑内存预算。0M 表示按 cgroup 或物理内存的 80% 计算，并在条件允许时至少为系统预留 1G；自动值最小为 1G。
+- name: memory_limit
+  name_local: 已废弃内存配置
+  require: false
+  essential: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: 0M
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: Deprecated compatibility parameter ignored by SeekDB 1.4. OBD rejects explicit use; configure memory_budget
+    instead.
+  description_local: SeekDB 1.4 仅为兼容而保留且不会用于内存控制，OBD 禁止显式配置，请改用 memory_budget。
+- name: kvcache_memory_limit
+  name_local: KV Cache 内存上限
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: 0M
+  max_value: 1T
+  section: RUNTIME
+  need_restart: false
+  description_en: Maximum KV cache memory. 0M uses min(1T, 40% of memory_budget).
+  description_local: KV Cache 内存上限，0M 表示取 memory_budget 的 40%，最大为 1T。
+- name: memstore_memory_limit
+  name_local: MemStore 内存上限
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: 0M
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Maximum MemStore memory. 0M uses 50% of memory_budget.
+  description_local: MemStore 内存上限，0M 表示取 memory_budget 的 50%。
+- name: vector_memory_limit
+  name_local: 向量模块内存上限
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: 0M
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Maximum vector module memory. 0M uses 50% of memory_budget.
+  description_local: 向量模块内存上限，0M 表示取 memory_budget 的 50%。
+- name: cpu_count
+  name_local: 系统CPU总数
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the number of CPUs in the system. If this parameter is set to zero, the number will be detected automatically.
+  description_local: 系统CPU总数，如果设置为0，将自动检测。
+- name: trace_log_slow_query_watermark
+  type: TIME
+  default: 1s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the threshold of execution time (in milliseconds) of a query beyond which it is considered to be a slow
+    query.
+  description_local: 执行时间超过该阈值的查询会被认为是慢查询，慢查询的追踪日志会被打印到系统日志中
+- name: enable_record_trace_log
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether to always record the trace log.
+  description_local: 是否记录追踪日志
+- name: max_string_print_length
+  require: false
+  type: INT
+  default: 500
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: truncate very long string when printing to log file
+  description_local: 打印系统日志时，单行日志最大长度
+- name: enable_record_trace_id
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether record app trace id is turned on.
+  description_local: 是否记录应用端设置的追踪ID
+- name: enable_rich_error_msg
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether add ip:port, time and trace id to user error message.
+  description_local: 是否在客户端消息中添加服务器地址、时间、追踪ID等调试信息
+- name: debug_sync_timeout
+  require: false
+  type: TIME
+  default: '0'
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Enable the debug sync facility and optionally specify a default wait timeout in micro seconds. A zero value
+    keeps the facility disabled
+  description_local: 打开debug sync调试开关，并设置其超时时间；值为0时，则关闭。
+- name: dead_socket_detection_timeout
+  require: false
+  type: TIME
+  default: 3s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specify a tcp_user_timeout for RFC5482. A zero value makes the option disabled
+  description_local: 失效socket检测超时时间
+- name: enable_perf_event
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether to enable perf event feature.
+  description_local: perf event调试特性开关
+- name: schema_history_expire_time
+  require: false
+  type: TIME
+  default: 7d
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the hour of expire time for schema history
+  description_local: 元数据历史数据过期时间
+- name: default_compress_func
+  require: false
+  type: SAFE_STRING
+  default: zstd_1.3.8
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: default compress function name for create new table
+  description_local: MySQL模式下，建表时使用的默认压缩算法
+- name: default_row_format
+  require: false
+  type: SAFE_STRING
+  default: dynamic
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: default row format in mysql mode
+  description_local: MySQL模式下，建表时使用的默认行格式
+- name: storage_rowsets_size
+  require: false
+  type: INT
+  default: 8192
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the row number processed by vectorized storage engine within one batch. Range: (0,1048576]'
+- name: weak_read_version_refresh_interval
+  require: false
+  type: TIME
+  default: 1000ms
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the time interval to refresh cluster weak read version Range: [50ms, +∞)'
+- name: syslog_level
+  require: false
+  type: SAFE_STRING
+  default: EDIAG
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the current level of logging.
+  description_local: 系统日志级别
+- name: syslog_io_bandwidth_limit
+  require: false
+  type: CAPACITY_MB
+  default: 5MB
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Syslog IO bandwidth limitation, exceeding syslog would be truncated. Use 0 to disable ERROR log.
+  description_local: 系统日志所能占用的磁盘IO带宽上限，超过带宽的系统日志将被丢弃
+- name: diag_syslog_per_error_limit
+  require: false
+  type: INT
+  default: 200
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: DIAG syslog limitation for each error per second, exceeding syslog would be truncated
+- name: max_syslog_file_count
+  require: false
+  essential: true
+  type: INT
+  default: 2
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the maximum number of the log files that can co-exist before the log file recycling kicks in.
+    Each log file can occupy at most 256MB disk space. When this value is set to 0, no log file will be removed.
+  description_local: 系统日志自动回收复用时，最多保留多少个。值0表示不自动清理。
+- name: enable_async_syslog
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether use async syslog
+  description_local: 是否启用系统日志异步写
+- name: syslog_disk_size
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the size of disk space used by the syslog files. Range: [0, +∞)'
+- name: syslog_compress_func
+  require: false
+  type: STRING
+  default: none
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'compress function name for syslog files, values: none, zstd_1.3.8'
+- name: syslog_file_uncompressed_count
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'specifies the minimum number of the syslog files that will not be compressed. Each syslog file can occupy
+    at most 256MB disk space. When this value is set to 0, all syslog file may be compressed. Range: [0, +∞) in integer'
+- name: cache_wash_threshold
+  require: false
+  type: CAPACITY_MB
+  default: 64M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: size of remaining memory at which cache eviction will be triggered.
+  description_local: 触发缓存清理的容量阈值
+- name: memory_chunk_cache_size
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the maximum size of memory cached by memory chunk cache.
+  description_local: 内存分配器缓存的内存块容量。值为0的时候表示系统自适应。
+- name: enable_sql_operator_dump
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether sql operators (sort/hash join/material/window function/interm result/...) allowed to write
+    to disk
+  description_local: 是否允许SQL处理过程的中间结果写入磁盘以释放内存
+- name: _chunk_row_store_mem_limit
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the maximum size of memory used by ChunkRowStore, 0 means follow operator''s setting. Range: [0, +∞)'
+- name: _sort_area_size
+  require: false
+  type: CAPACITY_MB
+  default: 32M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'size of maximum memory that could be used by SORT. Range: [2M,+∞)'
+- name: _hash_area_size
+  require: false
+  type: CAPACITY_MB
+  default: 32M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'size of maximum memory that could be used by HASH JOIN. Range: [4M,+∞)'
+- name: _enable_partition_level_retry
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether allow the partition level retry when the leader changes
+- name: _enable_defensive_check
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether allow to do some defensive checks when the query is executed, 0 means defensive check
+    is disabled, 1 means normal defensive check is enabled, 2 means more strict defensive check is enabled, such as check
+    partition id validity
+- name: _sql_insert_multi_values_split_opt
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: True means that the split + batch optimization for inserting multiple rows of the insert values ​​statement
+    can be done
+- name: _min_malloc_sample_interval
+  require: false
+  type: INT
+  default: 16
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the min malloc times between two samples, which is not more than _max_malloc_sample_interval. 10000 means
+    not to sample any malloc, Range: [1, 10000]'
+- name: _max_malloc_sample_interval
+  require: false
+  type: INT
+  default: 256
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the max malloc times between two samples, which is not less than _min_malloc_sample_interval. 1 means to
+    sample all malloc, Range: [1, 10000]'
+- name: _enable_values_table_folding
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: whether enable values statement folds self params
+- name: spill_compression_codec
+  require: false
+  type: STRING
+  default: NONE
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specific the compression algorithm type to compress the spilled data in temp block store during the sql
+    execution phase. The supported compression codec is ZSTD. NONE means no compression.The default value is NONE.
+- name: max_stale_time_for_weak_consistency
+  require: false
+  type: TIME
+  default: 5s
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the max data stale time that cluster weak read version behind current timestamp,no smaller than weak_read_version_refresh_interval,
+    range: [5s, +∞)'
+- name: enable_monotonic_weak_read
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies observer supportting atomicity and monotonic order read
+- name: server_cpu_quota_min
+  require: false
+  type: DOUBLE
+  default: 0.0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: the number of minimal vCPUs allocated to the server tenant(a special internal tenant that exists on every
+    observer)
+  description_local: 系统可以使用的最小CPU配额，将会预留
+- name: server_cpu_quota_max
+  require: false
+  type: DOUBLE
+  default: 0.0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: the number of maximal vCPUs allocated to the server tenant
+  description_local: 系统可以使用的最大CPU配额
+- name: workers_per_cpu_quota
+  require: false
+  type: INT
+  default: 10
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: the ratio(integer) between the number of system allocated workers vs the maximum number of threads that
+    can be scheduled concurrently.
+  description_local: 每个CPU配额分配多少个工作线程
+- name: _ob_max_thread_num
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'ob max thread number upper limit of observer thread count. Range: [0, 10000), 0 means no limit.'
+- name: cpu_quota_concurrency
+  require: false
+  type: DOUBLE
+  default: 10.0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: max allowed concurrency for 1 CPU quota
+  description_local: 租户每个CPU配额允许的最大并发数
+- name: px_workers_per_cpu_quota
+  require: false
+  type: INT
+  default: 10
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: the ratio between the number of system allocated px workers vs the maximum number of threads that can be
+    scheduled concurrently.
+  description_local: 并行执行工作线程数的比例
+- name: undo_retention
+  require: false
+  type: INT
+  default: 1800
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the low threshold value of undo retention. The system retains undo for at least the time specified in this
+    config when active txn protection is banned. Range: [0, 4294967295]'
+- name: _mvcc_gc_using_min_txn_snapshot
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies enable mvcc gc using active txn snapshot
+- name: _rowsets_target_maxsize
+  require: false
+  type: INT
+  default: 524288
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the size of the memory reserved for vectorized sql engine. Range: [262144, 8388608]'
+- name: _rowsets_max_rows
+  require: false
+  type: INT
+  default: 256
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the row number processed by vectorized sql engine within one batch. Range: [0, 65535]'
+- name: _ctx_memory_limit
+  require: false
+  type: STRING
+  default: ''
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies server runtime context memory limits.
+- name: _enable_convert_real_to_decimal
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies whether convert column type float(M,D), double(M,D) to decimal(M,D) in DDL
+- name: _enable_decimal_int_type
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies wether use decimal_int type as backend for decimal values
+- name: _optimizer_ads_time_limit
+  require: false
+  type: INT
+  default: 10
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the maximum optimizer dynamic sampling time limit. Range: [0, 300]'
+- name: _hash_join_enabled
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable/disable hash join
+- name: _optimizer_sortmerge_join_enabled
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable/disable merge join
+- name: _nested_loop_join_enabled
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable/disable nested loop join
+- name: _enable_mysql_compatible_dates
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Specifies whether to use MySQL-compatible date format that allows for invalid dates.
+- name: _min_const_integer_precision
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: the minimum precision of integer constant
+- name: _lob_rowsets_max_rows
+  require: false
+  type: INT
+  default: 65535
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: max batch size of physical plan with lob data
+- name: _use_hash_rollup
+  require: false
+  type: STRING
+  default: AUTO
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'policy of hash based rollup plan:AUTO: hash rollup plan is up to optimizer;FORCED: hash rollup plan is
+    used by default;DISABLED: hash rollup plan is disabled;'
+- name: _enable_constant_type_demotion
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Controls whether to enable constant type demotion to optimize comparisons between constants and columns
+    by downgrading the constant's type to match the column's type.
+- name: _non_standard_comparison_level
+  require: false
+  type: STRING
+  default: NONE
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'Enable non-standard comparisons to optimize filtering by aligning constants with column types. Currently
+    only affects comparisons between string columns and int constants NONE: all comparison types use standard comparison.
+    EQUAL: non-standard comparisons rules will applied in equal conditions. RANGE: non-standard comparisons rules will applied
+    in range conditions. '
+- name: _memstore_limit_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Deprecated compatibility parameter. The configured value is accepted and persisted, but is ignored by memstore
+    sizing and memory control.
+- name: freeze_trigger_percentage
+  require: false
+  type: INT
+  default: 20
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: the threshold of the size of the mem store when freeze will be triggered.
+  description_local: 触发全局冻结的租户使用内存阈值。另见enable_global_freeze_trigger。
+- name: writing_throttling_trigger_percentage
+  require: false
+  type: INT
+  default: 60
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: the threshold of the size of the mem store when writing_limit will be triggered. Rang:(0,100]. setting 100
+    means turn off writing limit
+- name: data_disk_write_limit_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'used to stop user write operations. When the user data disk reaches this watermark, SQL requests will report
+    that the disk is full. The configuration should be greater than data_disk_usage_limit_percentage, with the recommended
+    setting being: (1 - memstore_limit_size / data_disk_size) * 100%'
+- name: writing_throttling_maximum_duration
+  require: false
+  type: TIME
+  default: 2h
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: maximum duration of writting throttling(in minutes), max value is 3 days
+- name: plan_cache_evict_interval
+  require: false
+  type: TIME
+  default: 5s
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: time interval for periodic plan cache eviction.
+  description_local: 执行计划缓存的淘汰间隔
+- name: default_progressive_merge_num
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: default progressive_merge_num for a newly created table. Range:[0,)
+- name: _parallel_min_message_pool
+  require: false
+  type: CAPACITY_MB
+  default: 16M
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'DTL message buffer pool reserve the mininum size after extend the size. Range: [16M,8G]'
+- name: _parallel_server_sleep_time
+  require: false
+  type: DOUBLE
+  default: 1.0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'sleep time between get channel data in millisecond. Range: [0, 2000]'
+- name: _px_max_message_pool_pct
+  require: false
+  type: DOUBLE
+  default: 40.0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'The maximum percentage of server runtime memory available to the DTL message buffer pool. Range: [0,90]'
+- name: _px_message_compression
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'Enable DTL send message with compressionValue: True: enable compression False: disable compression'
+- name: _px_chunklist_count_ratio
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the ratio of the dtl buffer manager list. Range: [1, 128]'
+- name: _sqlexec_disable_hash_based_distagg_tiv
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'disable hash based distinct aggregation in the second stage of three stage aggregation for gby queriesValue:  True:turned
+    on  False: turned off'
+- name: _force_hash_groupby_dump
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'force hash groupby to dumpValue:  True:turned on  False: turned off'
+- name: _force_hash_join_spill
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'force hash join to dump after get all build hash table Value:  True:turned on  False: turned off'
+- name: _enable_hash_join_hasher
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'which hash function to choose for hash join 1: murmurhash, 2: crc, 4: xxhash'
+- name: _enable_hash_join_processor
+  require: false
+  type: INT
+  default: 7
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'which path to process for hash join, default 7 to auto choose 1: nest loop, 2: recursive, 4: in-memory'
+- name: _pushdown_storage_level
+  require: false
+  type: INT
+  default: 4
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the level of storage pushdown. Range: [0, 4] 0: disabled, 1:blockscan, 2: blockscan & filter, 3: blockscan
+    & filter & aggregate, 4: blockscan & filter & aggregate & group by'
+- name: workarea_size_policy
+  require: false
+  type: STRING
+  default: AUTO
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: policy used to size SQL working areas (MANUAL/AUTO)
+- name: temporary_file_max_disk_size
+  require: false
+  type: CAPACITY_MB
+  default: 0M
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'maximum disk usage of temporary file on a single node, 0 means no limit. Range: [0,+∞)'
+- name: _temporary_file_io_area_size
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'memory buffer size of temporary files, as a percentage of total server runtime memory. Range: [0, 50),
+    percentage'
+- name: _storage_meta_memory_limit_percentage
+  require: false
+  type: INT
+  default: 13
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'maximum memory for storage metadata, as a percentage of total server runtime memory. Range: [0, 50), percentage,
+    0 means no limit to storage meta memory'
+- name: _max_tablet_cnt_per_gb
+  require: false
+  type: INT
+  default: 20000
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'The maximum number of tablets supported per 1GB of server runtime memory. Range: [1000, 50000)'
+- name: _enable_filter_reordering
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable filter reordering in storage engine
+- name: enable_sys_table_ddl
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: specifies whether a system table is allowed be to created manually.
+  description_local: 是否允许新建和修改系统表。主要在系统升级过程中使用。
+- name: tablet_meta_table_scan_batch_count
+  require: false
+  type: INT
+  default: 999
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  need_redeploy: false
+  description_en: the number of tablet replica info that will be read by each request on the tablet-related system tables
+    during procedures such as load-balancing, daily merge, election and etc. Range:(0,65536]
+  description_local: Tablet meta table 迭代器使用过程中在内存里缓存的 Tablet 数量。
+- name: tablet_meta_table_check_interval
+  require: false
+  type: TIME
+  default: 30m
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  need_redeploy: false
+  description_en: 'the time interval that observer compares tablet meta table with local ls replica info and make adjustments
+    to ensure the correctness of tablet meta table. Range: [1m,+∞)'
+  description_local: DBA_OB_TABLET_REPLICAS/CDB_OB_TABLET_REPLICAS 视图的后台巡检线程的检查间隔。
+- name: enable_ddl
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: specifies whether DDL operation is turned on.
+  description_local: 是否允许执行DDL
+- name: _enable_parallel_table_creation
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: 'specifies whether create table parallelly. Value:  True: create table parallelly;  False: create table
+    serially'
+- name: enable_major_freeze
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: specifies whether major_freeze function is turned on.
+  description_local: 自动全局冻结开关
+- name: ob_event_history_recycle_interval
+  require: false
+  type: TIME
+  default: 7d
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: the time to recycle event history.
+  description_local: OB事件表中事件条目的保存期限
+- name: _recyclebin_object_purge_frequency
+  require: false
+  type: TIME
+  default: 10m
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: 'the time to purge recyclebin. Range: [0m, +∞)'
+- name: recyclebin_object_expire_time
+  require: false
+  type: TIME
+  default: 0s
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: recyclebin object expire time, default 0 that means auto purge recyclebin off.
+  description_local: 回收站对象的有效期，超过有效的对象将被回收；0表示关闭回收功能；
+- name: _parallel_ddl_control
+  require: false
+  type: STRING
+  default: ''
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: switch for parallel capability of parallel DDL
+- name: log_disk_size
+  name_local: Redo 日志大小
+  require: false
+  essential: true
+  type: CAPACITY_MB
+  default: 0
+  min_value: null
+  max_value: null
+  description_en: the size of disk space used by the clog files. Please enter an capacity, such as 20G
+  description_local: Redo 日志磁盘的大小。请输入带容量带单位的整数，如24G
+  section: LOGSERVICE
+  need_restart: false
+- name: log_disk_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  description_en: the percentage of disk space used by the clog files.
+  description_local: Redo 日志占用其所在磁盘总空间的百分比。
+  section: LOGSERVICE
+  need_restart: false
+- name: log_disk_utilization_limit_threshold
+  require: false
+  type: INT
+  default: 95
+  min_value: null
+  max_value: null
+  section: LOGSERVICE
+  need_restart: false
+  description_en: 'maximum of log disk usage percentage before stop submitting or receiving logs, should be bigger than log_disk_utilization_threshold.
+    Range: [80, 100]'
+- name: log_disk_utilization_threshold
+  name_local: Redo 回收触发阈值
+  require: false
+  essential: true
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: LOGSERVICE
+  need_restart: false
+  description_en: Threshold to trigger redo recycling, as percentage. 0 recycles redo as fast as possible; non-zero recycles
+    only when log usage exceeds this value times log_disk_size (small-portion semantics). Suggested around 80 in some deployments;
+    if primary recycles logs too aggressively, standby sync may disconnect.
+  description_local: 触发 redo 回收的阈值（百分比）。0 表示尽快回收；非 0 表示当日志用量超过该值与 log_disk_size 的乘积时才回收。可参考 80；主库日志回收过快时备库异步同步有断开风险。
+- name: log_disk_throttling_percentage
+  require: false
+  type: INT
+  default: 60
+  min_value: null
+  max_value: null
+  section: LOGSERVICE
+  need_restart: false
+  description_en: the threshold of the size of the log disk when writing_limit will be triggered. Rang:[40,100]. setting 100
+    means turn off writing limit
+- name: log_disk_throttling_maximum_duration
+  require: false
+  type: TIME
+  default: 2h
+  min_value: null
+  max_value: null
+  section: LOGSERVICE
+  need_restart: false
+  description_en: maximum duration of log disk throttling, that is the time remaining until the log disk space is exhausted
+    after log disk throttling triggered.
+- name: log_storage_warning_tolerance_time
+  require: false
+  type: TIME
+  default: 5s
+  min_value: null
+  max_value: null
+  section: LOGSERVICE
+  need_restart: false
+  description_en: 'time to tolerate log disk io delay, after that, the disk status will be set warning. Range: [1s,300s]'
+- name: _enable_log_cache
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: LOGSERVICE
+  need_restart: false
+  description_en: 'specifies whether allow to fill log kv cache. Value:  True:turned on  False: turned off'
+- name: _lcl_op_interval
+  require: false
+  type: TIME
+  default: 5s
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: Scan interval for every detector node, smaller interval support larger deadlock scale, but cost more system
+    resource. 0ms means disable deadlock, default value is 5s. Range:[0ms, 5s]
+- name: major_freeze_duty_time
+  type: MOMENT
+  default: 02:00
+  min_value: null
+  max_value: null
+  section: DAILY_MERGE
+  need_restart: false
+  description_en: the start time of system daily merge procedure.
+  description_local: 每日定时冻结和合并的触发时刻
+- name: merger_check_interval
+  require: false
+  type: TIME
+  default: 10m
+  min_value: null
+  max_value: null
+  section: DAILY_MERGE
+  need_restart: false
+  description_en: the time interval between the schedules of the task that checks on the progress of MERGE for each zone.
+  description_local: 合并状态检查线程的调度间隔
+- name: trx_commit_retry_interval
+  require: false
+  type: TIME
+  default: 100ms
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: 'the time interval between the retries in case of failure during a transaction commit. Range: [1ms,5000ms]'
+- name: clog_sync_time_warn_threshold
+  require: false
+  type: TIME
+  default: 100ms
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: the time given to the commit log synchronization between a leader and its followers before a warning message
+    is printed in the log file.
+  description_local: 事务日志同步耗时告警阈值，同步耗时超过该值产生WARN日志
+- name: row_compaction_update_limit
+  require: false
+  type: INT
+  default: 6
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: maximum update count before trigger row compaction
+  description_local: 触发内存中行内数据合并的修改次数
+- name: enable_early_lock_release
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable early lock release
+- name: _tx_result_retention
+  require: false
+  type: INT
+  default: 300
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: 'The tx data can be recycled after at least _tx_result_retention seconds. Range: [0, 36000]'
+- name: _enable_parallel_redo_logging
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable parallel write redo log.
+- name: _parallel_redo_logging_trigger
+  require: false
+  type: CAPACITY_MB
+  default: 16M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'size of single transaction''s pending redo log to trigger parallel writes redo log. Range: [0B,+∞)'
+- name: _tx_debug_level
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: 'the debug level of transaction module. Range: [0, 10] in integer.'
+- name: rpc_timeout
+  require: false
+  type: TIME
+  default: 2s
+  min_value: null
+  max_value: null
+  section: RPC
+  need_restart: false
+  description_en: the time during which a RPC request is permitted to execute before it is terminated
+  description_local: 集群内部请求的超时时间
+- name: location_cache_refresh_sql_timeout
+  require: false
+  type: TIME
+  default: 1s
+  min_value: null
+  max_value: null
+  section: LOCATION_CACHE
+  need_restart: false
+  description_en: 'The timeout used for refreshing location cache by SQL. Range: [1ms, +∞)'
+- name: bf_cache_miss_count_threshold
+  require: false
+  type: INT
+  default: 100
+  min_value: null
+  max_value: null
+  section: CACHE
+  need_restart: false
+  description_en: bf cache miss count threshold, 0 means disable bf cache
+  description_local: 用于控制bloomfilter cache的触发次数，当宏块未命中次数达到这个值时，给创建bloomfilter缓存。0表示关闭。
+- name: _data_storage_io_timeout
+  require: false
+  type: TIME
+  default: 10s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: io timeout for data storage, Range [1s,600s]. The default value is 10s
+- name: data_storage_warning_tolerance_time
+  require: false
+  type: TIME
+  default: 5s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: time to tolerate disk read failure, after that, the disk status will be set warning. Range [10s,300s]. The
+    default value is 30s
+  description_local: 数据盘状态设为 WARNING 状态的容忍时间。
+- name: data_disk_usage_limit_percentage
+  require: false
+  type: INT
+  default: 90
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the safe use percentage of data disk
+  description_local: 数据文件最大可以写入的百分比，超过这个阈值后，禁止数据迁入
+- name: sys_bkgd_net_percentage
+  require: false
+  type: INT
+  default: 60
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the net percentage of sys background net.
+  description_local: 后台系统任务可占用网络带宽百分比
+- name: disk_io_thread_count
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: The number of io threads on each disk.
+  description_local: 磁盘IO线程数。必须为偶数。
+- name: sync_io_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'The number of io threads for synchronizing request on each device. The default value is 0. Range: [0,1024]
+    in integer'
+- name: _io_callback_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'The number of io callback threads. The default value is 0. Range: [0,128] in integer. If not specified,
+    The number of threads is dynamically configured according to the memory size'
+- name: _enable_parallel_minor_merge
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'specifies whether enable parallel minor merge. Value: True:turned on;  False: turned off'
+- name: _enable_adaptive_compaction
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies whether allow adaptive compaction schedule and information collection
+- name: compaction_dag_cnt_limit
+  require: false
+  type: INT
+  default: 50000
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the compaction dag count limit. Range: [10000,500000] in integer. default value is 50000'
+- name: compaction_schedule_tablet_batch_cnt
+  require: false
+  type: INT
+  default: 50000
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the batch size when scheduling tablet to execute compaction task. Range: [10000,500000] in integer. default
+    value is 50000'
+- name: compaction_low_thread_score
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the current work thread score of low priority compaction. Range: [0,100] in integer. Especially, 0 means
+    default value'
+- name: compaction_mid_thread_score
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the current work thread score of middle priority compaction. Range: [0,100] in integer. Especially, 0 means
+    default value'
+- name: compaction_high_thread_score
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the current work thread score of high priority compaction. Range: [0,100] in integer. Especially, 0 means
+    default value'
+- name: storage_high_thread_score
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the current work thread score of high priority storage tasks. Range: [0,100] in integer. Especially, 0
+    means default value'
+- name: ddl_thread_score
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the current work thread score of ddl thread. Range: [0,100] in integer. Especially, 0 means default value'
+- name: minor_compact_trigger
+  require: false
+  type: INT
+  default: 2
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: minor_compact_trigger
+  description_local: 触发小合并的迷你合并次数
+- name: _enable_compaction_diagnose
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'enable compaction diagnose functionValue:  True:turned on;  False: turned off'
+- name: _force_skip_encoding_partition_id
+  require: false
+  type: STRING
+  default: ''
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: force the specified partition to major without encoding row store, only for emergency!
+- name: _private_buffer_size
+  require: false
+  type: CAPACITY_MB
+  default: 16K
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: '[0B,)the trigger remaining data size within transaction for immediate logging, 0B represents not trigger
+    immediate loggingRange: [0B, total size of memory]'
+- name: _fast_commit_callback_count
+  require: false
+  type: INT
+  default: 10000
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: '[0,)trigger max callback count allowed within transaction for durable callback checkpoint, 0 represents
+    not allow durable callbackRange: [0, not limited callback count'
+- name: _trx_max_log_cb_limit
+  require: false
+  type: INT
+  default: 16
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Control the upper limit of TxLogCbs involved in the participant to manage the maximum concurrency of  submiting
+    logs in a transaction
+- name: _minor_compaction_amplification_factor
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'thre L1 compaction write amplification factor, 0 means default 25, Range: [0,100] in integer'
+- name: major_compact_trigger
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: major_compact_trigger alias to minor_freeze_times
+  description_local: 多少次小合并触发一次全局合并。值为0时，表示关闭小合并
+- name: _minor_merge_write_amplification_threshold
+  require: false
+  type: INT
+  default: 2000000
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: The write amplification threshold about minor compaction. The larger the value, the smaller the write amplicification
+- name: ob_compaction_schedule_interval
+  require: false
+  type: TIME
+  default: 120s
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'the time interval to schedule compaction, Range: [3s,5m]Range: [3s, 5m]'
+- name: _ob_elr_fast_freeze_threshold
+  require: false
+  type: INT
+  default: 500000
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: per row update counts threshold to trigger minor freeze for tables with ELR optimization
+- name: _ob_enable_fast_freeze
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'specifies whether fast freeze is enabled for the server runtime. Value: True:turned on;  False: turned
+    off'
+- name: _compaction_prewarm_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'specifies the fixed percentage data to prewarm in compactionRange: [0, 100] in integer0 means not use this
+    method, value > 0 means the corresponding percentage of data will be prewarmed'
+- name: tablet_size
+  require: false
+  type: CAPACITY_MB
+  default: 128M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: default tablet size, has to be a multiple of 2M
+  description_local: 分区内部并行处理（合并、查询等）时每个分片的大小
+- name: builtin_db_data_verify_cycle
+  require: false
+  type: INT
+  default: 20
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: check cycle of db data.
+  description_local: 数据坏块自检周期，单位为天。值0表示不检查。
+- name: micro_block_merge_verify_level
+  require: false
+  type: INT
+  default: 2
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specify what kind of verification should be done when merging micro block. 0, no verification will be done;
+    1, verify encoding algorithm, encoded micro block will be read to ensure data is correct; 2, verify encoding and compression
+    algorithm, besides encoding verification, compressed block will be decompressed to ensure data is correct; 3, verify encoding,
+    compression algorithm and lost write protect
+  description_local: 控制合并时宏块的校验级别
+- name: _cache_wash_interval
+  require: false
+  type: TIME
+  default: 200ms
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specify interval of cache background wash
+- name: _io_read_batch_size
+  require: false
+  type: CAPACITY_MB
+  default: 0K
+  min_value: null
+  max_value: null
+  section: SSTABLE
+  need_restart: false
+  description_en: Maximum batch size in one read io request. Range:[0K,16M]
+- name: _io_read_redundant_limit_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: SSTABLE
+  need_restart: false
+  description_en: Maximum percentage of redundant size in one read io request, redundant data means blocks in the middle of
+    the batch that hit in cache or filtered by skipping index but must be read. Range:[0,99]
+- name: dtl_buffer_size
+  require: false
+  type: CAPACITY_MB
+  default: 64K
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: buffer size for DTL
+  description_local: SQL数据传输模块使用的缓存大小
+- name: px_task_size
+  require: false
+  type: CAPACITY_MB
+  default: 2M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: min task access size of px task
+  description_local: SQL并行查询引擎每个任务处理的数据量大小
+- name: _max_elr_dependent_trx_count
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: max elr dependent transaction count
+- name: stack_size
+  require: false
+  type: CAPACITY_MB
+  default: 256K
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: the size of routine execution stack
+  description_local: 程序函数调用栈大小
+- name: _px_max_pipeline_depth
+  require: false
+  type: INT
+  default: 2
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'max parallel execution pipeline depth, range: [2,3]'
+- name: ssl_client_authentication
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable server supports SSL connection, takes effect only after server restart with all ca/cert/key file.
+  description_local: 是否开启SSL连接功能
+- name: use_ipv6
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: Whether this server uses ipv6 address
+- name: _ob_ddl_timeout
+  require: false
+  type: TIME
+  default: 1000s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the config parameter of ddl timeoutRange: [1s, +∞)'
+- name: ob_enable_batched_multi_statement
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable use of batched multi statement
+- name: _bloom_filter_ratio
+  require: false
+  type: INT
+  default: 35
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'The px bloom filter false-positive rate. Range: [0,100]'
+- name: schema_history_recycle_interval
+  require: false
+  type: TIME
+  default: 10m
+  min_value: null
+  max_value: null
+  section: LOAD_BALANCE
+  need_restart: false
+  need_redeploy: false
+  description_en: 'the time interval between the schedules of schema history recyle task. Range: [0s, +∞)'
+  description_local: 系统内部执行 schema 多版本记录回收任务的时间间隔。
+- name: _bloom_filter_enabled
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable join bloom filter
+- name: ob_ssl_invited_common_names
+  require: false
+  type: STRING
+  default: NONE
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: when server use ssl, use it to control client identity with ssl subject common name. default NONE
+- name: _ob_ssl_invited_nodes
+  require: false
+  type: STRING
+  default: NONE
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: when rpc need use ssl, we will use it to store invited server ipv4 during grayscale change.when it is finish,
+    it can use ALL instead of all server ipv4
+- name: _max_schema_slot_num
+  require: false
+  type: INT
+  default: 128
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the max schema slot number for multi-version schema memory management, Range: [2, 256] in integer'
+- name: _enable_add_fulltext_index_to_existing_table
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable create fulltext index after table is created
+- name: open_cursors
+  require: false
+  type: INT
+  default: 50
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'specifies the maximum number of open cursors a session can have at once.can use this parameter to prevent
+    a session from opening an excessive number of cursors.Range: [0, 65535] in integer'
+- name: _enable_px_batch_rescan
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable px batch rescan for nlj or subplan filter
+- name: _enable_spf_batch_rescan
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable das batch rescan for subplan filter
+- name: _enable_das_keep_order
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable das keep order optimization
+- name: _enable_index_merge
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable index merge optimization
+- name: _enable_distributed_das_scan
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable distributed DAS scan
+- name: _enable_das_batch_rescan_flag
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable das batch rescan for multiple scenarios.
+- name: _parallel_max_active_sessions
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'maximum active parallel sessions allowed on the server runtime. Range: [0,+∞)'
+- name: enable_tcp_keepalive
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: enable TCP keepalive for the TCP connection of sql protocol. Take effect for new established connections.
+  description_local: 开启或关闭客户端连接的探活机制。
+- name: tcp_keepidle
+  require: false
+  type: TIME
+  default: 7200s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probe. Take
+    effect for new established connections. Range: [1s, +∞]'
+  description_local: 客户端连接上服务器后，如果没有数据发送，多久后会发送 Keepalive 探测分组，单位为秒。
+- name: tcp_keepintvl
+  require: false
+  type: TIME
+  default: 6s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The time (in seconds) between individual keepalive probes. Take effect for new established connections.
+    Range: [1s, +∞]'
+  description_local: 开启客户端连接的探活机制后，前后两次探测之间的时间间隔，单位为秒。
+- name: tcp_keepcnt
+  require: false
+  type: INT
+  default: 10
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: 'The maximum number of keepalive probes TCP should send before dropping the connection. Take effect for
+    new established connections. Range: [1,+∞)'
+  description_local: 关闭一个非活跃连接之前的最大重试次数。
+- name: _send_bloom_filter_size
+  require: false
+  type: INT
+  default: 1024
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'Set send bloom filter slice sizeRange: [1, +∞)'
+- name: _enable_px_ordered_coord
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable px task ordered coord
+- name: job_queue_processes
+  require: false
+  type: INT
+  default: 1000
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies the maximum number of job slaves per instance that can be created for the execution of DBMS_JOB
+    and DBMS_SCHEDULER jobs.
+- name: _px_bloom_filter_group_size
+  require: false
+  type: STRING
+  default: auto
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'specifies the px bloom filter each group size in sending to the other sqcRange: [1, +∞) or auto, the default
+    value is auto'
+- name: _enable_block_file_punch_hole
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether to punch whole when free blocks in block_file
+- name: _ob_enable_fast_parser
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: control if enable fast parser
+- name: _ob_obj_dep_maint_task_interval
+  require: false
+  type: TIME
+  default: 1ms
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'The execution interval of the task of maintaining the dependency of the object. Range: [0, 10s]'
+- name: _enable_newsort
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: control if enable encode sort
+- name: _px_object_sampling
+  require: false
+  type: INT
+  default: 200
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: '[1, 100000]parallel query sampling for base objects (100000 = 100%)'
+- name: _follower_snapshot_read_retry_duration
+  require: false
+  type: TIME
+  default: 0ms
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the waiting time after the first judgment failure of strong reading on followerRange: [0ms, +∞)'
+- name: _print_sample_ppm
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: In the full link diagnosis, control the frequency of printing traces to the log (unit is ppm, parts per
+    million).
+- name: _enable_parallel_das_dml
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: By default, the das service is allowed to use multiple threads to submit das tasks
+- name: _ob_immediate_row_conflict_check
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: By default, OB's MySQL mode will check unique conflicts row by row after the update.When the switch is turned
+    off, it will only check whether the final state of a batch of data after the update satisfies the unique constraint.
+- name: _enable_var_assign_use_das
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enable use das if the sql statement has variable assignment
+- name: sql_net_thread_count
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the number of global mysql I/O threads. Range: [0, 64] in integer, default value is 0, 0 stands for GCONF.net_thread_count'
+- name: _display_non_session_cursor
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: whether the content of non session cursors is displayed.
+- name: _ob_plan_cache_auto_flush_interval
+  require: false
+  type: TIME
+  default: 0s
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'time interval for auto periodic flush plan cache. Range: [0s, +∞)'
+- name: _px_join_skew_handling
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: enables skew handling for parallel joins. The  default value is True.
+- name: _px_join_skew_minfreq
+  require: false
+  type: INT
+  default: 30
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'sets minimum frequency(%) for skewed value for parallel joins. Range: [1, 100] in integer'
+- name: _enable_transaction_internal_routing
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: enable SQLs of transaction routed to any servers in the cluster on demand
+- name: _enable_hgby_skew_detection
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies whether hgby skew detection is enabled
+- name: _pdml_thread_cache_size
+  require: false
+  type: CAPACITY_MB
+  default: 2M
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: The cache size of per pdml thread.Range:[1B, )
+- name: _enable_hgby_llc_ndv_adaptive
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: specifies whether llc ndv adptive is activated
+- name: rpc_client_authentication_method
+  require: false
+  type: STRING
+  default: NONE
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'specifies rpc client authentication method. NONE: without authentication. SSL_NO_ENCRYPT: authentication
+    by SSL handshake but not encrypt the communication channel. SSL_IO: authentication by SSL handshake and encrypt the communication
+    channel'
+- name: rpc_server_authentication_method
+  require: false
+  type: STRING
+  default: ALL
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'specifies rpc server authentication method. ALL: support all authentication methods. NONE: without authentication.
+    SSL_NO_ENCRYPT: authentication by SSL handshake but not encrypt the communication channel. SSL_IO: authentication by SSL
+    handshake and encrypt the communication channel'
+- name: _enable_backtrace_function
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Decide whether to let the backtrace function take effect
+- name: _with_subquery
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'WITH subquery transformation,0: optimizer,1: materialize,2: inline'
+- name: _optimizer_group_by_placement
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable group by placement transform rule
+- name: _complex_cbqt_table_num
+  require: false
+  type: INT
+  default: 10
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: cost-based transform will be disabled when table count in a single stmt exceeds threshold
+- name: _enable_in_range_optimization
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Enable extract query range optimization for in predicate
+- name: _force_subquery_unnest
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: aggressively unnest all subqueries that can be unnested, with correctness guaranteed.
+- name: range_optimizer_max_mem_size
+  require: false
+  type: CAPACITY_MB
+  default: 128M
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'to limit the memory consumption for the query range optimizer. Range: [0M,+∞), 0 stands for unlimited'
+- name: _schema_memory_recycle_interval
+  require: false
+  type: TIME
+  default: 15m
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: the time interval between the schedules of schema memory recycle task. 0 means only turn off gc current
+    allocator, and other schema memory recycle task's interval will be 15mins. Range [0s,)
+- name: _optimizer_better_inlist_costing
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable improved costing of index access using in-list(s)
+- name: _enable_skip_index
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable the skip index in storage engine
+- name: _ob_ddl_temp_file_compress_func
+  require: false
+  type: STRING
+  default: AUTO
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'specific compression in ObTempBlockStore.AUTO: use compression algorithm from table schema;ZSTD: use ZSTD
+    compression algorithm;NONE: do not use compression.'
+- name: _enable_prefetch_limiting
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable limiting memory in prefetch for single query
+- name: _ob_sqlstat_enable
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable/disable sql stat
+- name: _enable_inner_session_mgr
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable/disable inner session mgr
+- name: _enable_trace_tablet_leak
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: true
+  description_en: enable t3m tablet leak checker. The default value is False
+- name: _inlist_rewrite_threshold
+  require: false
+  type: INT
+  default: 1000
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: '[1, 2147483647]specifies transform how much const params in IN list to values table'
+- name: vector_index_optimize_duty_time
+  require: false
+  type: STRING
+  default: '[24:00:00, 24:00:00]'
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: A runtime range bounded by start time and end time for vector index background task, e.g., [23:00:00, 24:00:00]
+- name: model_request_timeout
+  require: false
+  type: TIME
+  default: 60s
+  min_value: null
+  max_value: null
+  section: AI
+  need_restart: false
+  description_en: Used to control the HTTP timeout for accessing the  model. Especially, the default value is 60s.
+- name: model_max_retries
+  require: false
+  type: INT
+  default: 2
+  min_value: null
+  max_value: null
+  section: AI
+  need_restart: false
+  description_en: Used to control the retry times after a failed model interaction. Especially, the default value is 2
+- name: sql_protocol_min_tls_version
+  require: false
+  type: STRING
+  default: none
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'SQL SSL control options, used to specify the minimum SSL/TLS version number. values: none, TLSv1, TLSv1.1,
+    TLSv1.2, TLSv1.3'
+- name: shared_log_retention
+  require: false
+  type: TIME
+  default: 1d
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: Retention time of log files on shared storage
+- name: _enable_optimizer_qualify_filter
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Enable extracting qualify filters for window function
+- name: _enable_range_extraction_for_not_in
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Enable extract query range for not in predicate
+- name: optimizer_index_cost_adj
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: adjust costing of index scan
+- name: enable_rpc_authentication_bypass
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether allow OMS service to connect cluster and provide service when rpc authentication is turned
+    on.
+- name: _preserve_order_for_pagination
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable preserver order for limit
+- name: _preserve_order_for_groupby
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Control whether the query results are sorted according to the GROUP BY expression
+- name: max_partition_num
+  require: false
+  type: INT
+  default: 8192
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: set max partition num in mysql mode
+- name: json_document_max_depth
+  require: false
+  type: INT
+  default: 100
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: maximum nesting depth allowed in a JSON document
+- name: _multimodel_memory_trace_level
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Multi-mode memory tracking mechanism
+- name: _query_record_size_limit
+  require: false
+  type: INT
+  default: 65536
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'set sql_audit and plan stat query sql size. Range: [0,67108864] in integer in integer.'
+- name: _allow_skip_replay_redo_after_detete_tablet
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'allow skip replay invalid redo log after tablet delete transaction is committed.The default value is FALSE.
+    Value: TRUE means we allow skip replaying this invalid redo log, False means we do not alow such behavior.'
+- name: strict_check_os_params
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: 'Deprecated. The strict OS parameter check logic has been removed and this parameter has no effect. Default:
+    False. Value: True/False are accepted for compatibility only.'
+- name: _enable_tree_based_io_scheduler
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'A switch that allows enabling the tree-based IO scheduler.Value: True: allowed; False: disabled'
+- name: clog_io_isolation_mode
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'Specifies the I/O isolation mode for Commit Log (clog). Values: 1 - Non-isolation mode (disable I/O isolation),
+    2 - Full isolation mode (enable I/O isolation). Example: 1=Off, 2=On'
+- name: _enable_memleak_light_backtrace
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: specifies whether allow memleak to get the backtrace of malloc by light_backtrace
+- name: _enable_dbms_job_package
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Control whether can use DBMS_JOB package.
+- name: lob_enable_block_cache_threshold
+  require: false
+  type: CAPACITY_MB
+  default: 256K
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: For outrow-stored LOBs, if the length is less than or equal to that threshold, they can be admitted into
+    the block cache to speed up the next query.
+- name: _ob_pl_compile_max_concurrency
+  require: false
+  type: INT
+  default: 4
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: The maximum number of threads that an observer node can compile PL concurrently.
+- name: enable_lock_priority
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: TRANS
+  need_restart: false
+  description_en: specifies whether to enable lock priority, which, when activated, gives certain DDL operations the highest
+    table lock precedence.
+- name: _preset_runtime_bloom_filter_size
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'Whether build runtime bloom filter with row count estimated by optimizor.Value:  True:turned on  False:
+    turned off'
+- name: _enable_ddl_worker_isolation
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: a switch controling ddl thread isolation
+- name: ob_vector_memory_limit_percentage
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Deprecated compatibility parameter. The configured value is accepted and persisted, but is ignored by vector
+    memory sizing and memory control.
+- name: vector_index_memory_saving_mode
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Specifies whether to enable the vector index memory saving mode. This can reduce the memory used by the
+    partition table vector index rebuild.
+- name: _enable_drop_and_add_index
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: it specifies that whether we can drop and add index in single statement
+- name: ob_encoding_granularity
+  require: false
+  type: INT
+  default: 65536
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Maximum rows for encoding in one micro block. Range:[8192,1048576]
+- name: _partition_wise_plan_enabled
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: enable/disable optimizer partition wise plan
+- name: _enable_adaptive_auto_dop
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Enable or disable adaptive auto dop feature.
+- name: query_memory_limit_percentage
+  require: false
+  type: INT
+  default: 32
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'the percentage of server runtime memory that can be used by a single SQL. The default value is 32. Range:
+    [0,100]'
+- name: _ndv_runtime_bloom_filter_size
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'whether to use NDV to build a bloom filter in runtime filter.Value:  True:turned on  False: turned off'
+- name: _max_px_workers_per_cpu
+  require: false
+  type: INT
+  default: 1
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'The upper limit of PX workers that each CPU can carry. Range: [1,30]'
+- name: default_table_organization
+  require: false
+  type: STRING
+  default: INDEX
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: The default_organization configuration option allows you to set the default table organization mode to either
+    HEAP (unordered data storage) or INDEX (the data rows are held in an index defined on the primary key for the table) when
+    creating new tables.
+- name: _enable_topn_runtime_filter
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Enable topn runtime filter.
+- name: _enable_async_load_sys_package
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Controls the ability to enable/disable async load sys package
+- name: _enable_px_task_rebalance
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Enable or disable px task rebalance.
+- name: _px_task_rebalance_trigger_time
+  require: false
+  type: TIME
+  default: 10ms
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'Control the trigger time of px task rebalance. Range: [1us, 1h]'
+- name: _ob_enable_truncate_partition_preserve_global_index
+  require: false
+  type: BOOL
+  default: false
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Specifies Whether to allow global indexes to be preserved when truncating/dropping the main table partition.
+- name: _px_worker_share_plan_enabled
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Enable parallel execution optimization by sharing plan and only serializing necessary expressions.
+- name: _enable_drop_column_instant
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: ROOT_SERVICE
+  need_restart: false
+  description_en: 'Whether to enable the capability for fast column deletion.Value:  True: drop column instant;  False: drop
+    column inplace'
+- name: _enable_routine_call_param_defend
+  require: false
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: Enable or disable routine call parameter defend.
+- name: _hnsw_max_scan_vectors
+  require: false
+  type: INT
+  default: 20000
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'The upper limit of hnsw iter-filter search nums. Range: [0,)'
+- name: _advance_checkpoint_interval
+  require: false
+  type: TIME
+  default: 10m
+  min_value: null
+  max_value: null
+  section: RUNTIME
+  need_restart: false
+  description_en: 'The execution interval for the advance checkpoint task, 0m means disable this feature. Range: [0m, 12h]'
+- name: server_create_time
+  require: false
+  type: INT
+  default: 0
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: true
+  description_en: 'the first time this server created, default: 0 (invalid timestamp), Range: [1,)'
+  read_only: true
+- name: log_restore_source
+  name_local: 备库日志同步上游
+  require: false
+  essential: true
+  type: STRING
+  default: ''
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: Upstream for standby log synchronization, format ip:rpc_port. Can be the primary or another standby.
+  description_local: 备库同步的上游，格式 ip:rpc_port，可为主库或另一备库。动态生效；备库场景必须设置。
+- name: server_role_info
+  require: false
+  type: STRING
+  default: ''
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  description_en: 'server role state, format: active_role:pending_role:transition_status:cutover_scn'
+- name: install_utils
+  require: false
+  essential: false
+  type: BOOL
+  default: false
+  need_reload: true
+  description_en: Install and maintain the SeekDB utility package.
+  description_local: 是否安装并维护 SeekDB 工具包。
+- name: home_path
+  name_local: 工作目录
+  require: true
+  essential: true
+  type: PATH
+  min_value: null
+  max_value: null
+  need_redeploy: true
+  description_en: the directory for the work data file
+  description_local: OceanBase工作目录
+- name: obshell_port
+  name_local: obshell 服务端口
+  require: true
+  type: INT
+  default: 2886
+  min_value: 1025
+  max_value: 65535
+  modify_limit: modify
+  need_redeploy: true
+  description_en: The port for obshell agent
+  description_local: obshell agent 的端口号
+- name: devname
+  name_local: 网卡名
+  essential: true
+  type: SAFE_STRING
+  min_value: null
+  max_value: null
+  need_restart: true
+  description_en: name of network adapter
+  description_local: 非必填, 服务进程绑定的网卡设备名, 默认通过配置的ip设置local_ip, 如果预检查失败可通过配置此项来指定网卡
+- name: local_ip
+  name_local: 本机ip
+  type: SAFE_STRING
+  min_value: null
+  max_value: null
+  need_restart: true
+  description_en: local ip address
+  description_local: 本机ip地址
+- name: root_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: null
+  max_value: null
+  need_restart: false
+  description_en: password of observer root user
+  description_local: sys租户root用户的密码
+- name: seekdb_monitor_user
+  require: false
+  type: SAFE_STRING
+  default: seekdb_monitor
+  min_value: null
+  max_value: null
+  need_restart: false
+  description_en: read-only sys-tenant user for obagent monitoring when obagent is in the same deploy; auto-set with seekdb_monitor_password
+  description_local: 与 obagent 同部署时用于监控采集的只读 sys 租户用户名；与 seekdb_monitor_password 配套自动生成
+- name: seekdb_monitor_password
+  require: false
+  type: STRING
+  default: ''
+  min_value: null
+  max_value: null
+  need_restart: false
+  description_en: password for seekdb_monitor_user; auto-generated when obagent depends on seekdb and not set in yaml
+  description_local: seekdb_monitor 用户密码；同部署含 obagent 且未在 yaml 中配置时自动生成
+- name: production_mode
+  name_local: 生产模式开关
+  essential: true
+  require: true
+  type: BOOL
+  default: true
+  min_value: null
+  max_value: null
+  section: OBSERVER
+  need_restart: false
+  need_redeploy: false
+  description_en: Production mode switch. When enabled, OBD requires memory_budget to be at least 16G.
+  description_local: 生产模式开关。开启后，OBD 要求 memory_budget 至少为 16G。
+- name: enable_auto_start
+  require: false
+  essential: true
+  type: BOOL
+  default: false
+  need_reload: true
+  description_en: Support seekdb auto-start on boot
+  description_local: seekdb开机自启,需确保部署用户具有sudo权限且非容器环境

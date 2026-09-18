@@ -132,7 +132,7 @@ def _validate_field(key, new_val, config_after_edit, client, stdio):
             return False, "Available memory on target < 1G."
         return True, None
 
-    if key in ("memory_limit", "memory_hard_limit"):
+    if key in ("memory_budget", "memory_limit", "memory_hard_limit"):
         new_val = InteractiveUI.normalize_size_input(new_val) or new_val
         try:
             cap = Capacity(new_val)
@@ -227,13 +227,12 @@ def _validate_field(key, new_val, config_after_edit, client, stdio):
 
 
 def _fmt_cap_bytes(b):
-    """Format byte size as human string for config (e.g. 3G)."""
-    if b >= 1024 ** 4:
-        return "%dT" % (b // (1024 ** 4))
-    if b >= 1024 ** 3:
-        return "%dG" % (b // (1024 ** 3))
+    """Format capacity without ever rounding a required size down."""
+    for unit, suffix in ((1024 ** 4, "T"), (1024 ** 3, "G")):
+        if b >= unit and b % unit == 0:
+            return "%d%s" % (b // unit, suffix)
     if b >= 1024 ** 2:
-        return "%dM" % (b // (1024 ** 2))
+        return "%dM" % ((b + 1024 ** 2 - 1) // (1024 ** 2))
     return "%d" % b
 
 
@@ -253,11 +252,14 @@ def seekdb_confirm_config(plugin_context, *args, **kwargs):
             stdio.print("  %d. %s = %s" % (i + 1, k, v))
         install_mode = plugin_context.get_variable("install_mode", spacename="interactive") or "standalone"
         if install_mode in ["primary", "standby"]:
-            mem_str = dict(config_list).get("memory_limit") or ""
+            config_dict = dict(config_list)
+            memory_key = "memory_budget" if config_dict.get("memory_budget") else "memory_limit"
+            mem_str = config_dict.get(memory_key) or ""
             mem_bytes = Capacity(InteractiveUI.normalize_size_input(mem_str) or mem_str).bytes
             if mem_bytes < 6 * (1024 ** 3):
                 stdio.warn(
-                    "memory_limit is below 6G. For a primary cluster this is small; standby sync may be slow. Consider 6G or more if you plan heavy replication."
+                    "%s is below 6G. For a primary cluster this is small; standby sync may be slow. Consider 6G or more if you plan heavy replication."
+                    % memory_key
                 )
 
         confirm_ans = InteractiveUI.prompt("Confirm config? (y/yes or n/no to modify)", "yes")
@@ -273,7 +275,7 @@ def seekdb_confirm_config(plugin_context, *args, **kwargs):
         new_val = InteractiveUI.prompt("New value (current: %s)" % cur_val, (str(cur_val)[:-1] + ', unit: G') if str(cur_val)[-1] == "G" else cur_val)
         if new_val == "":
             continue
-        if key_edit in ("memory_limit", "memory_hard_limit", "datafile_maxsize", "log_disk_size"):
+        if key_edit in ("memory_budget", "memory_limit", "memory_hard_limit", "datafile_maxsize", "log_disk_size"):
             new_val = InteractiveUI.normalize_size_input(new_val) or new_val
         config_dict = dict(config_list)
         config_dict[key_edit] = new_val
@@ -292,19 +294,17 @@ def seekdb_confirm_config(plugin_context, *args, **kwargs):
         stdio.print("  Updated %s = %s" % (key_edit, new_val))
         install_mode = plugin_context.get_variable("install_mode", spacename="interactive") or "standalone"
         run_mode = plugin_context.get_variable("install_run_mode", spacename="interactive") or "dev"
-        if key_edit == "memory_limit" and install_mode in ("primary", "standby"):
+        if key_edit in ("memory_budget", "memory_limit") and install_mode in ("primary", "standby"):
             mem_bytes = Capacity(new_val).bytes
             log_disk_str = _fmt_cap_bytes(mem_bytes * 3)
             for i, (k, _) in enumerate(config_list):
                 if k == "log_disk_size":
                     config_list[i] = ("log_disk_size", log_disk_str)
                     break
-        elif (key_edit == ("memory_limit") and install_mode == "standalone"):
-            d = dict(config_list)
-            soft_raw = (d.get("memory_limit") or "").strip()
-            soft_norm = InteractiveUI.normalize_size_input(soft_raw) or soft_raw
-            soft_b = Capacity(soft_norm).bytes
-            log_b = max(CLOG_MIN_BYTES, soft_b // 2)
+        elif key_edit in ("memory_budget", "memory_limit") and install_mode == "standalone":
+            memory_value = (new_val or "").strip()
+            memory_value = InteractiveUI.normalize_size_input(memory_value) or memory_value
+            log_b = max(CLOG_MIN_BYTES, Capacity(memory_value).bytes // 2)
             log_disk_str = _fmt_cap_bytes(log_b)
             for i, (k, _) in enumerate(config_list):
                 if k == "log_disk_size":

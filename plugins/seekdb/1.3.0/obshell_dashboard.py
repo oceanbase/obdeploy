@@ -41,6 +41,12 @@ def passwd_format(passwd):
     return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 
+def mask_display_password(password, display_encrypt_password=None):
+    if not password:
+        return ''
+    return display_encrypt_password or password
+
+
 def obshell_dashboard(plugin_context, config_encrypted, display_encrypt_password='******', obshell_clients=None, skip_when_status_check_failed=False, *args, **kwargs):
     if skip_when_status_check_failed and plugin_context.get_variable('status_check_pass') is False:
         return plugin_context.return_true()
@@ -74,8 +80,10 @@ def obshell_dashboard(plugin_context, config_encrypted, display_encrypt_password
         dashboard_info_list = [{
             "url": dashboard_info,
             "user": "root",
-            "password": passwd_format(cluster_config.get_global_conf().get('root_password', '')
-                                      if not display_encrypt_password else display_encrypt_password)
+            "password": passwd_format(mask_display_password(
+                cluster_config.get_global_conf().get('root_password', ''),
+                display_encrypt_password,
+            ))
         }]
         stdio.print_list(
             dashboard_info_list,

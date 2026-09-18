@@ -29,6 +29,7 @@ import {
 import { formatParameters } from '../Obdeploy/ClusterConfig';
 import EnStyles from './indexEn.less';
 import ZhStyles from './indexZh.less';
+import { buildComponentParameterFormValues } from './utils';
 import { Password } from '@oceanbase/ui';
 const locale = getLocale();
 const styles = locale === 'zh-CN' ? ZhStyles : EnStyles;
@@ -72,6 +73,8 @@ export default function ComponentConfig() {
     setComponentsMore,
     componentsMoreConfig,
     setComponentsMoreConfig,
+    componentsMoreConfigSignature,
+    setComponentsMoreConfigSignature,
     lowVersion,
     componentConfig,
     setComponentConfig,
@@ -87,10 +90,41 @@ export default function ComponentConfig() {
     alertmanager = {},
   } = componentConfig;
   const components = { prometheus, obproxy, obagent, obconfigserver, grafana, alertmanager };
+  const componentsMoreFilters = onlyComponentsKeys.reduce<
+    API.ParameterFilter[]
+  >((filters, key) => {
+    if (components[key]?.component && components[key]?.version) {
+      filters.push({
+        component: components[key].component,
+        version: components[key].version,
+        is_essential_only: true,
+      });
+    }
+    return filters;
+  }, []);
+  const componentsMoreRequestSignature = JSON.stringify(componentsMoreFilters);
   const { setErrorVisible, setErrorsList, errorsList, handleQuitProgress } =
     useModel('global');
   const homePathSuffix = `/${appname}`;
   const [componentsMoreLoading, setComponentsMoreLoading] = useState(false);
+  const [componentsMoreInitialized, setComponentsMoreInitialized] =
+    useState<boolean>(
+      !componentsMore ||
+        componentsMoreConfigSignature === componentsMoreRequestSignature,
+    );
+  const loadedComponentsMoreSignature = useRef<string>();
+  const activeComponentsMoreSignature = useRef<string>();
+  const currentComponentsMoreSignature = useRef(
+    componentsMoreRequestSignature,
+  );
+  currentComponentsMoreSignature.current = componentsMoreRequestSignature;
+  const componentsMoreConfigIsCurrent =
+    loadedComponentsMoreSignature.current === componentsMoreRequestSignature ||
+    componentsMoreConfigSignature === componentsMoreRequestSignature;
+  const currentComponentsMoreConfig =
+    componentsMoreConfigSignature === componentsMoreRequestSignature
+      ? componentsMoreConfig
+      : [];
   const [grafanaPassed, setGrafanaPassed] = useState<boolean>(true);
   const [prometheusPassed, setPrometheusPassed] = useState<boolean>(true);
   const [alertmanagerPassed, setAlertmanagerPassed] = useState<boolean>(true);
@@ -121,7 +155,7 @@ export default function ComponentConfig() {
       parameters: getInitialParameters(
         obproxy?.component,
         obproxy?.parameters,
-        componentsMoreConfig,
+        currentComponentsMoreConfig,
       ),
     },
     obagent: {
@@ -131,7 +165,7 @@ export default function ComponentConfig() {
       parameters: getInitialParameters(
         obagent?.component,
         obagent?.parameters,
-        componentsMoreConfig,
+        currentComponentsMoreConfig,
       ),
     },
     obconfigserver: {
@@ -140,7 +174,7 @@ export default function ComponentConfig() {
       parameters: getInitialParameters(
         obconfigserver?.component,
         obconfigserver?.parameters,
-        componentsMoreConfig,
+        currentComponentsMoreConfig,
       ),
     },
     grafana: {
@@ -149,7 +183,7 @@ export default function ComponentConfig() {
       parameters: getInitialParameters(
         grafana?.component,
         grafana?.parameters,
-        componentsMoreConfig,
+        currentComponentsMoreConfig,
       ),
     },
     prometheus: {
@@ -158,7 +192,7 @@ export default function ComponentConfig() {
       parameters: getInitialParameters(
         prometheus?.component,
         prometheus?.parameters,
-        componentsMoreConfig,
+        currentComponentsMoreConfig,
       ),
     },
     alertmanager: {
@@ -167,7 +201,7 @@ export default function ComponentConfig() {
       parameters: getInitialParameters(
         alertmanager?.component,
         alertmanager?.parameters,
-        componentsMoreConfig,
+        currentComponentsMoreConfig,
       ),
     },
     home_path: initHomePath,
@@ -196,68 +230,55 @@ export default function ComponentConfig() {
   };
 
   const getComponentsMoreParamsters = async () => {
-    const filters: API.ParameterFilter[] = [];
-    let currentOnlyComponentsKeys: string[] = onlyComponentsKeys;
-    if (lowVersion) {
-      currentOnlyComponentsKeys = onlyComponentsKeys.filter(
-      );
-    }
-    currentOnlyComponentsKeys.forEach((item) => {
-      if (components[item]?.component && components[item]?.version) {
-        filters.push({
-          component: components[item]?.component,
-          version: components[item]?.version,
-          is_essential_only: true,
-        });
-      }
-    });
+    const currentOnlyComponentsKeys: string[] = onlyComponentsKeys;
+    const requestSignature = componentsMoreRequestSignature;
+    activeComponentsMoreSignature.current = requestSignature;
+    setComponentsMoreInitialized(false);
     setComponentsMoreLoading(true);
     try {
-      const { success, data } = await getMoreParamsters({ filters });
+      const { success, data } = await getMoreParamsters({
+        filters: componentsMoreFilters,
+      });
+      if (currentComponentsMoreSignature.current !== requestSignature) return;
       if (success) {
         const newComponentsMoreConfig = formatMoreConfig(data?.items);
         setComponentsMoreConfig(newComponentsMoreConfig);
-        const setValues = {
-          obproxy: {
-            parameters: getInitialParameters(
-              obproxy?.component,
-              obproxy?.parameters,
-              newComponentsMoreConfig,
-            ),
-          },
-          obagent: {
-            parameters: getInitialParameters(
-              obagent?.component,
-              obagent?.parameters,
-              newComponentsMoreConfig,
-            ),
-          },
-          obconfigserver: {
-            parameters: getInitialParameters(
-              obconfigserver?.component,
-              obconfigserver.parameters,
-              newComponentsMoreConfig,
-            ),
-          },
-        };
-        if (!lowVersion) {
-        }
-        form.setFieldsValue(setValues);
+        setComponentsMoreConfigSignature(requestSignature);
+        const setValues = buildComponentParameterFormValues(
+          components,
+          currentOnlyComponentsKeys,
+          newComponentsMoreConfig,
+          getInitialParameters,
+        );
+        Object.entries(setValues).forEach(([key, value]) => {
+          form.setFieldValue([key, 'parameters'], value.parameters);
+        });
+        loadedComponentsMoreSignature.current = requestSignature;
+        setComponentsMoreInitialized(true);
+      } else {
+        setComponentsMore(false);
       }
     } catch (e) {
+      if (currentComponentsMoreSignature.current !== requestSignature) return;
       setComponentsMore(false);
       const errorInfo = getErrorInfo(e);
       setErrorVisible(true);
       setErrorsList([...errorsList, errorInfo]);
     }
 
-    setComponentsMoreLoading(false);
+    if (
+      activeComponentsMoreSignature.current === requestSignature &&
+      currentComponentsMoreSignature.current === requestSignature
+    ) {
+      setComponentsMoreLoading(false);
+    }
   };
   const handleComponentsMoreChange = (checked: boolean) => {
     setComponentsMore(checked);
-    if (!componentsMoreConfig?.length) {
-      getComponentsMoreParamsters();
-    }
+    setComponentsMoreInitialized(
+      !checked ||
+        componentsMoreConfigIsCurrent,
+    );
   };
 
   const setData = (dataSource: FormValues) => {
@@ -342,6 +363,11 @@ export default function ComponentConfig() {
   }, [alertmanager?.servers]);
 
   const nextStep = () => {
+    if (
+      componentsMore &&
+      (!componentsMoreInitialized || !componentsMoreConfigIsCurrent)
+    )
+      return;
     // 在验证前，确保 alertmanager 的值只包含当前显示的那个值
     if (alertmanagerValues.length > 0) {
       form.setFieldValue(['alertmanager', 'servers'], alertmanagerValues);
@@ -349,13 +375,24 @@ export default function ComponentConfig() {
         tableFormRef.current.setFieldValue(['alertmanager', 'servers'], alertmanagerValues);
       }
     }
-    form.validateFields().then((values) => {
-      setData(values);
-      setCurrent(current + 1);
-      setErrorVisible(false);
-      setErrorsList([]);
-      window.scrollTo(0, 0);
-    });
+    form
+      .validateFields()
+      .then((values) => {
+        setData(values);
+        setCurrent(current + 1);
+        setErrorVisible(false);
+        setErrorsList([]);
+        window.scrollTo(0, 0);
+      })
+      .catch(({ errorFields }) => {
+        if (
+          errorFields?.some(({ name }: { name: string[] }) =>
+            name.includes('parameters'),
+          )
+        ) {
+          setComponentsMore(true);
+        }
+      });
   };
   const preStep = () => {
     const formValues = form.getFieldsValue(true);
@@ -367,10 +404,18 @@ export default function ComponentConfig() {
   };
 
   useEffect(() => {
-    if (componentsMore) {
+    if (
+      componentsMore &&
+      loadedComponentsMoreSignature.current !== componentsMoreRequestSignature &&
+      componentsMoreConfigSignature !== componentsMoreRequestSignature
+    ) {
       getComponentsMoreParamsters();
     }
-  }, [componentsMore]);
+  }, [
+    componentsMore,
+    componentsMoreConfigSignature,
+    componentsMoreRequestSignature,
+  ]);
 
   // 手动设置端口初始值
   useEffect(() => {
@@ -711,7 +756,8 @@ export default function ComponentConfig() {
 
               <MoreConfigTable
                 loading={componentsMoreLoading}
-                datasource={componentsMoreConfig}
+                datasource={currentComponentsMoreConfig}
+                keepMountedWhenHidden
                 switchChecked={componentsMore}
                 switchOnChange={handleComponentsMoreChange}
                 form={form}
@@ -735,7 +781,15 @@ export default function ComponentConfig() {
             defaultMessage: '上一步',
           })}
         </Button>
-        <Button onClick={nextStep} type="primary">
+        <Button
+          disabled={
+            componentsMore &&
+            (!componentsMoreInitialized || !componentsMoreConfigIsCurrent)
+          }
+          loading={componentsMoreLoading}
+          onClick={nextStep}
+          type="primary"
+        >
           {intl.formatMessage({
             id: 'OBD.pages.ComponentDeploy.ComponentConfig.NextStep',
             defaultMessage: '下一步',

@@ -79,7 +79,7 @@ def import_time_zone(plugin_context, create_tenant_options=[], cursor=None, scal
             for repository in repositories:
                 if repository.name in const.COMPS_OB:
                     time_zone_info_param = os.path.join(repository.repository_dir, 'etc', 'timezone_V1.log')
-                    if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ''), time_zone_info_param)):
+                    if not exector.exec_script('import_time_zone_info.py', repository, param="-h {} -P {} -t {} -p '{}' -f {}".format(tenant_cursor.ip, tenant_cursor.port, name, global_config.get("root_password", ""), time_zone_info_param)):
                         stdio.warn('execute import_time_zone_info.py failed')
                     break
             cmd = 'obclient -h%s -P%s -u%s -Doceanbase -A\n' % (tenant_cursor.ip, tenant_cursor.port, tenant_cursor.user)

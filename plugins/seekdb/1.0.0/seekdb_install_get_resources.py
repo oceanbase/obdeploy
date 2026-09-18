@@ -22,6 +22,7 @@ import re
 import platform
 
 import const
+from _types import effective_memory_available, effective_memory_total
 from tool import NetUtil
 from ssh import SshClient, SshConfig, LocalClient
 
@@ -113,6 +114,24 @@ def seekdb_install_get_resources(plugin_context, *args, **kwargs):
                     if line.startswith("MemFree:"):
                         avail_mem = int(line.split()[1]) * 1024
                         break
+
+        limit_ret = run_cmd(
+            "if [ -r /sys/fs/cgroup/memory.max ]; then "
+            "cat /sys/fs/cgroup/memory.max; cat /sys/fs/cgroup/memory.current; "
+            "elif [ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then "
+            "cat /sys/fs/cgroup/memory/memory.limit_in_bytes; "
+            "cat /sys/fs/cgroup/memory/memory.usage_in_bytes; fi")
+        cgroup_values = (
+            str(limit_ret.stdout).splitlines()
+            if limit_ret and limit_ret.stdout else []
+        )
+        cgroup_limit = cgroup_values[0].strip() if cgroup_values else None
+        cgroup_usage = (
+            cgroup_values[1].strip() if len(cgroup_values) > 1 else None)
+        physical_total = total_mem
+        total_mem = effective_memory_total(total_mem, cgroup_limit)
+        avail_mem = effective_memory_available(
+            physical_total, avail_mem, cgroup_limit, cgroup_usage)
 
     free_disk_kb = _df_avail_kb(run_cmd, path_for_disk)
     free_disk_bytes = free_disk_kb * 1024

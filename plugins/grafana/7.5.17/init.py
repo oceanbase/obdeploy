@@ -13,14 +13,131 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import absolute_import, division, print_function
+import json
 import os
+import tempfile
+
+from _rpm import Version
 from tool import OrderedDict
 from _errno import EC_CONFIG_CONFLICT_DIR, EC_FAIL_TO_INIT_PATH, InitDirFailedErrorMessage, EC_COMPONENT_DIR_NOT_EMPTY
 from const import COMP_OB_SEEKDB
 
+
+SEEKDB_DASHBOARD_FILTER_MIN_VERSION = Version('1.4.0')
+SEEKDB_REMOVED_METRICS = (
+    'seekdb_sysstat',
+    'seekdb_waitevent_wait_seconds_total',
+    'seekdb_waitevent_wait_total',
+)
+GRAFANA_DASHBOARD_WIDTH = 24
+
 stdio = None
 force = False
 global_ret = True
+
+
+def should_filter_seekdb_dashboard(repositories):
+    for repository in repositories or []:
+        if repository.name == COMP_OB_SEEKDB:
+            return repository.version >= SEEKDB_DASHBOARD_FILTER_MIN_VERSION
+    return False
+
+
+def _safe_unlink(path):
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+def _target_uses_removed_seekdb_metric(target):
+    expression = target.get('expr', '')
+    return any(metric in expression for metric in SEEKDB_REMOVED_METRICS)
+
+
+def _layout_dashboard_section(row, panels, start_y):
+    if row:
+        row_grid = row.setdefault('gridPos', {})
+        row_grid.update({'x': 0, 'y': start_y, 'w': GRAFANA_DASHBOARD_WIDTH})
+        start_y += row_grid.get('h', 1)
+
+    if len(panels) == 1:
+        panel_grid = panels[0].setdefault('gridPos', {})
+        panel_grid.update({'x': 0, 'y': start_y, 'w': GRAFANA_DASHBOARD_WIDTH})
+        return start_y + panel_grid.get('h', 1)
+
+    current_x = 0
+    current_row_height = 0
+    for panel in panels:
+        panel_grid = panel.setdefault('gridPos', {})
+        panel_width = min(panel_grid.get('w', 12), GRAFANA_DASHBOARD_WIDTH)
+        panel_height = panel_grid.get('h', 1)
+        if current_x and current_x + panel_width > GRAFANA_DASHBOARD_WIDTH:
+            start_y += current_row_height
+            current_x = 0
+            current_row_height = 0
+        panel_grid.update({'x': current_x, 'y': start_y, 'w': panel_width})
+        current_x += panel_width
+        current_row_height = max(current_row_height, panel_height)
+    return start_y + current_row_height
+
+
+def filter_seekdb_dashboard(dashboard):
+    sections = []
+    current_row = None
+    current_panels = []
+
+    def flush_section():
+        if current_panels:
+            sections.append((current_row, current_panels[:]))
+
+    for panel in dashboard.get('panels', []):
+        if panel.get('type') == 'row':
+            flush_section()
+            current_row = panel
+            current_panels = []
+            continue
+
+        targets = panel.get('targets', [])
+        if targets:
+            supported_targets = [
+                target for target in targets
+                if not _target_uses_removed_seekdb_metric(target)
+            ]
+            if not supported_targets:
+                continue
+            panel['targets'] = supported_targets
+        current_panels.append(panel)
+    flush_section()
+
+    filtered_panels = []
+    next_y = 0
+    for row, panels in sections:
+        if row:
+            filtered_panels.append(row)
+        filtered_panels.extend(panels)
+        next_y = _layout_dashboard_section(row, panels, next_y)
+
+    dashboard['panels'] = filtered_panels
+    dashboard['version'] = dashboard.get('version', 0) + 1
+    return dashboard
+
+
+def create_filtered_seekdb_dashboard(dashboard_path):
+    fd, filtered_path = tempfile.mkstemp(prefix='obd-seekdb-dashboard-', suffix='.json')
+    os.close(fd)
+    try:
+        with open(dashboard_path, 'r') as dashboard_file:
+            dashboard = json.load(dashboard_file, object_pairs_hook=OrderedDict)
+        filter_seekdb_dashboard(dashboard)
+        with open(filtered_path, 'w') as dashboard_file:
+            json.dump(dashboard, dashboard_file, ensure_ascii=False, indent=2)
+            dashboard_file.write('\n')
+        return filtered_path
+    except Exception:
+        _safe_unlink(filtered_path)
+        raise
+
 
 def critical(*arg, **kwargs):
     global global_ret
@@ -117,7 +234,15 @@ def init(plugin_context, source_option=None, *args, **kwargs):
             is_seekdb_deploy = COMP_OB_SEEKDB in deploy_components
             file_name = 'seekdb-metrics_rev1.json' if is_seekdb_deploy else 'oceanbase-metrics_rev1.json'
             dashboard = os.path.join(os.path.split(__file__)[0], file_name)
-            client.put_file(dashboard, os.path.join(dashboard_template_path, file_name))
+            filtered_dashboard = None
+            try:
+                if is_seekdb_deploy and should_filter_seekdb_dashboard(plugin_context.repositories):
+                    filtered_dashboard = create_filtered_seekdb_dashboard(dashboard)
+                    dashboard = filtered_dashboard
+                client.put_file(dashboard, os.path.join(dashboard_template_path, file_name))
+            finally:
+                if filtered_dashboard:
+                    _safe_unlink(filtered_dashboard)
         else:
             critical(EC_FAIL_TO_INIT_PATH.format(server=server, key='conf/provisioning/dashboards/templates', msg=InitDirFailedErrorMessage.CREATE_FAILED.format(path=dashboard_template_path)))
             continue

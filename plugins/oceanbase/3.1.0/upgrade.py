@@ -21,6 +21,7 @@ import tool
 import datetime
 from ssh import LocalClient
 from tool import Exector as BaseExector
+from _deploy import ObserverIdentity
 
 
 class Exector(BaseExector):
@@ -156,7 +157,8 @@ class Upgrader(object):
         self.apply_param_plugin(self.repositories[self.route_index - 1])
         while self.route_index < total:
             start_workflows = self.get_workflows('upgrade_start', [self.repositories[self.route_index - 1]])
-            self.run_workflow(start_workflows, self.repositories[self.route_index - 1], self.cluster_config, **{self.repositories[self.route_index].name: {"local_home_path": None, "repository_dir": None}})
+            if not self.run_workflow(start_workflows, self.repositories[self.route_index - 1], self.cluster_config, **{self.repositories[self.route_index].name: {"local_home_path": None, "repository_dir": None}}):
+                return False
             self.close()
             if not self.connect():
                 return False
@@ -395,7 +397,7 @@ class Upgrader(object):
                         where svr_ip = %s and svr_port = %s and refreshed_schema_version > 1
                         ) as b on a.tenant_id = b.tenant_id 
                     where b.tenant_id is null'''
-                    if self.execute_sql(sql, args=(server.ip, config['rpc_port'])).get('cnt'):
+                    if self.execute_sql(sql, args=(ObserverIdentity.identity_ip(self.cluster_config, server), config['rpc_port'])).get('cnt'):
                         break
                 else:
                     break
@@ -484,4 +486,3 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
         if upgrader.route_index >= len(upgrader.route):
             upgrader.call_plugin(upgrader.display_plugin, upgrader.cursor, *args, **kwargs)
         plugin_context.return_true()
-

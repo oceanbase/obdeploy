@@ -154,9 +154,23 @@ def reload(plugin_context, new_cluster_config, *args, **kwargs):
     raise_cursor = cursor.raise_cursor
     cursor.execute('use oceanbase;')
     role = cursor.fetchone('select role from __all_virtual_server_stat;')['role']
+    monitor_keys = {'seekdb_monitor_user', 'seekdb_monitor_password'}
+    if role != 'STANDBY' and monitor_keys.intersection(global_change_conf):
+        monitor_config = new_cluster_config.get_global_conf()
+        monitor_user = str(monitor_config.get('seekdb_monitor_user') or 'seekdb_monitor').replace('`', '')
+        monitor_password = monitor_config.get('seekdb_monitor_password')
+        if monitor_password is not None:
+            sql = 'CREATE USER IF NOT EXISTS `%s` IDENTIFIED BY %%s' % monitor_user
+            raise_cursor.execute(sql, [monitor_password])
+            sql = 'ALTER USER `%s` IDENTIFIED BY %%s' % monitor_user
+            raise_cursor.execute(sql, [monitor_password])
+            sql = 'GRANT SELECT ON oceanbase.* TO `%s`' % monitor_user
+            raise_cursor.execute(sql, raise_exception=False, exc_level='verbose')
     for key in global_change_conf:
         try:
             if key in set(need_restart_key):
+                continue
+            if key in monitor_keys:
                 continue
             if key in ['proxyro_password', 'root_password'] and role != 'STANDBY':
                 if global_change_conf[key]['count'] != servers_num:

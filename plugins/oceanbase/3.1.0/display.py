@@ -20,6 +20,7 @@ import time
 import uuid
 
 from const import ENCRYPT_PASSWORD
+from _deploy import ObserverIdentity, ObserverIdentityError
 
 
 class Codec(object):
@@ -62,8 +63,18 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
     try:
         while True:
             try:
-                servers = cursor.fetchall('select * from oceanbase.__all_server', raise_exception=True, exc_level='verbose')
-                if servers:
+                raw_servers = cursor.fetchall('select * from oceanbase.__all_server', raise_exception=True, exc_level='verbose')
+                if raw_servers:
+                    ObserverIdentity.verify(cluster_config, raw_servers)
+                    servers = []
+                    for raw_server in raw_servers:
+                        server_info = dict(raw_server)
+                        identity_ip = raw_server['svr_ip']
+                        management_ip = ObserverIdentity.externalize_ip(cluster_config, identity_ip)
+                        server_info['identity_ip'] = identity_ip
+                        server_info['management_ip'] = management_ip
+                        server_info['svr_ip'] = management_ip
+                        servers.append(server_info)
                     stdio.print_list(servers, ['ip', 'version', 'port', 'zone', 'status'],
                         lambda x: [x['svr_ip'], x['build_version'].split('_')[0], x['inner_port'], x['zone'], x['status']], title=cluster_config.name)
                     display_server = servers[0]
@@ -94,11 +105,17 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
                         stdio.print('cluster unique id: %s\n' % unique_id)
                     plugin_context.set_variable('server_infos', servers)
                     return plugin_context.return_true(info=info_dict, unique_id=unique_id)
+            except ObserverIdentityError:
+                raise
             except Exception as e:
                 code = e.args[0]
                 if code != 1146 and code != 4012:
                     raise e
                 time.sleep(3)
+    except ObserverIdentityError as e:
+        stdio.stop_loading('fail')
+        stdio.error(str(e))
+        return plugin_context.return_false()
     except:
         stdio.stop_loading('fail', 'observer need bootstarp')
     stdio.exception('')

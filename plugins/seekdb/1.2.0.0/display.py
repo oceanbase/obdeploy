@@ -50,6 +50,12 @@ def passwd_format(passwd):
     return "'{}'".format(passwd.replace("'", "'\"'\"'"))
 
 
+def mask_display_password(password, display_encrypt_password=None):
+    if not password:
+        return ''
+    return display_encrypt_password or password
+
+
 def display(plugin_context, cursor, config_encrypted, display_encrypt_password='******', *args, **kwargs):
     stdio = plugin_context.stdio
     if kwargs.get("source_type") != "display":
@@ -88,7 +94,10 @@ def display(plugin_context, cursor, config_encrypted, display_encrypt_password='
                      title=cluster_config.name)
 
     user = 'root'
-    password = cluster_config.get_global_conf().get('root_password', '') if not display_encrypt_password else display_encrypt_password
+    password = mask_display_password(
+        cluster_config.get_global_conf().get('root_password', ''),
+        display_encrypt_password,
+    )
     cmd = 'obclient -h%s -P%s -uroot %s-Doceanbase -A' % (ip, port, '-p%s ' % passwd_format(password) if password else '')
     stdio.print(cmd)
     

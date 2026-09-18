@@ -23,6 +23,7 @@ const InputWidthStyle = { width: 328 };
 
 type FormValues = {
   metadb: {
+    cluster_name?: string;
     host: string;
     port: number;
     user: string;
@@ -91,8 +92,13 @@ export default function ConnectConfig({ setCurrent, current }: API.StepProp) {
             password: encrypt(password, publicKey) || password,
             cluster_name,
           },
-        ).then(() => {
-          setData(values);
+        ).then(({ data }) => {
+          setData({
+            metadb: {
+              ...values.metadb,
+              cluster_name: data?.cluster_name || cluster_name,
+            },
+          });
           setCurrent(current + 1);
           setErrorVisible(false);
           setErrorsList([]);

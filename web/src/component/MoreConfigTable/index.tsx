@@ -19,6 +19,7 @@ interface MoreConfigTableProps {
   switchOnChange: (checked: boolean) => void;
   datasource: any;
   loading: boolean;
+  keepMountedWhenHidden?: boolean;
 }
 
 export default function MoreConfigTable({
@@ -27,8 +28,8 @@ export default function MoreConfigTable({
   switchOnChange,
   loading,
   datasource,
+  keepMountedWhenHidden = false,
 }: MoreConfigTableProps) {
-  const [show, setShow] = useState<boolean>(switchChecked);
   const proxyPasswordFormValue = ProForm.useWatch(
     ['obproxy', 'parameters', 'obproxy_sys_password', 'params'],
     form,
@@ -168,8 +169,7 @@ export default function MoreConfigTable({
     <>
       <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
         onClick={() => {
-          setShow(!show);
-          switchOnChange(!show);
+          switchOnChange(!switchChecked);
         }}
       >
         <Space
@@ -182,7 +182,7 @@ export default function MoreConfigTable({
             whiteSpace: 'nowrap',
           }}
         >
-          {show ? <CaretDownOutlined /> : <CaretRightOutlined />}
+          {switchChecked ? <CaretDownOutlined /> : <CaretRightOutlined />}
           <span>
             {intl.formatMessage({
               id: 'OBD.pages.components.ClusterConfig.MoreConfigurations',
@@ -202,6 +202,7 @@ export default function MoreConfigTable({
           configserverAddressRules,
           configserverPortRules,
         ]}
+        keepMountedWhenHidden={keepMountedWhenHidden}
       />
     </>
   );

@@ -13,10 +13,11 @@ import {
 } from '@ant-design/icons';
 import { ProCard, ProForm, ProFormDigit } from '@ant-design/pro-components';
 import { getLocale, useModel } from '@umijs/max';
-import { Button, Input, Tooltip } from 'antd';
+import { Button, Form, Input, Tooltip } from 'antd';
 import { FormInstance } from 'antd/lib/form';
 import { useEffect, useState } from 'react';
 import CustomPasswordInput from '../CustomPasswordInput';
+import { getEffectiveOcpUser, getOcpUserPaths } from './helper';
 import { MsgInfoType } from './index';
 
 interface ServiceConfigProps {
@@ -45,6 +46,14 @@ export default function ServiceConfig({
   const { ocpConfigData, setOcpConfigData } = useModel('global');
   const { isSingleOcpNode, ocpVersionInfo, deployUser, useRunningUser } =
     useModel('ocpInstallData');
+  const sshUser = Form.useWatch(['auth', 'user'], form);
+  const launchUser = Form.useWatch('launch_user', form);
+  const effectiveUser = getEffectiveOcpUser(
+    useRunningUser,
+    launchUser,
+    sshUser,
+    deployUser,
+  );
 
   // ocp版本小于4.2.2密码使用旧规则，反之使用最新的密码规则
   const isLowVersion =
@@ -61,8 +70,8 @@ export default function ServiceConfig({
   const defaultSiteUrl = ocpserver.ocp_site_url
     ? ocpserver.ocp_site_url
     : isSingleOcpNode === true && ip.length
-      ? `http://${ip[0]}:8080`
-      : '';
+    ? `http://${ip[0]}:8080`
+    : '';
   const [siteUrl, setSiteUrl] = useState<string>(defaultSiteUrl);
   const setPassword = (password: string) => {
     form.setFieldValue(['ocpserver', 'admin_password'], password);
@@ -119,23 +128,11 @@ export default function ServiceConfig({
   }, [defaultSiteUrl, siteUrl]);
 
   useEffect(() => {
-    // 只有在 deployUser 有值时才设置路径
-    if (deployUser) {
-      const homePath = !useRunningUser && deployUser === 'root'
-        ? `/${deployUser}`
-        : `/home/${deployUser}`;
-      const logDir = deployUser === 'root'
-        ? `/${deployUser}/logs`
-        : `/home/${deployUser}/logs`;
-      const softDir = deployUser === 'root'
-        ? `/${deployUser}/software`
-        : `/home/${deployUser}/software`;
-
+    const paths = getOcpUserPaths(effectiveUser);
+    if (paths) {
       form.setFieldsValue({
         ocpserver: {
-          home_path: homePath,
-          log_dir: logDir,
-          soft_dir: softDir,
+          ...paths,
         },
       });
 
@@ -146,14 +143,12 @@ export default function ServiceConfig({
           ...ocpConfigData.components,
           ocpserver: {
             ...ocpConfigData.components.ocpserver,
-            home_path: homePath,
-            log_dir: logDir,
-            soft_dir: softDir,
+            ...paths,
           },
         },
       });
     }
-  }, [deployUser, useRunningUser]);
+  }, [effectiveUser]);
 
   return (
     <ProCard
@@ -186,19 +181,19 @@ export default function ServiceConfig({
               title={
                 isLowVersion
                   ? intl.formatMessage(
-                    {
-                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                    },
-                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
-                  )
+                      {
+                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                      },
+                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON_OLD },
+                    )
                   : intl.formatMessage(
-                    {
-                      id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
-                      defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
-                    },
-                    { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
-                  )
+                      {
+                        id: 'OBD.component.OCPConfigNew.ServiceConfig.ThePasswordMustBeMet',
+                        defaultMessage: '密码需满足：{{OCPPASSWORDERROR}}',
+                      },
+                      { OCPPASSWORDERROR: OCP_PASSWORD_ERROR_REASON },
+                    )
               }
             >
               <QuestionCircleOutlined className="ml-10" />

@@ -19,6 +19,8 @@ export default () => {
   const [componentsMoreConfig, setComponentsMoreConfig] = useState<
     API.NewParameterMeta[]
   >([]);
+  const [componentsMoreConfigSignature, setComponentsMoreConfigSignature] =
+    useState('');
   const [selectedCluster, setSelectedCluster] = useState<SelectedCluster>();
   const [installStatus, setInstallStatus] = useState('RUNNING');
   const [deployedComps, setDeployedComps] = useState<string[]>([]);
@@ -41,6 +43,8 @@ export default () => {
     setComponentsMore,
     componentsMoreConfig,
     setComponentsMoreConfig,
+    componentsMoreConfigSignature,
+    setComponentsMoreConfigSignature,
     selectedCluster,
     setSelectedCluster,
     installStatus,

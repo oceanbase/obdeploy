@@ -25,7 +25,7 @@ def scale_out(plugin_context, workflow, *args, **kwargs):
 
     workflow.add_with_kwargs(const.STAGE_FIRST, {'target_servers': added_servers}, 'start_check_pre', 'status_check', 'parameter_check', 'system_limits_check', 'resource_check', 'environment_check')
 
-    workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap')
+    workflow.add_with_kwargs(const.STAGE_SECOND, {'target_servers': added_servers}, 'configserver_pre', 'start_pre', 'start', 'health_check', 'connect', 'bootstrap', 'verify_observer_identity')
 
     workflow.add_with_kwargs(const.STAGE_THIRD, {'target_servers': pre_exist_server}, 'connect', 'scale_out')
     plugin_context.return_true()

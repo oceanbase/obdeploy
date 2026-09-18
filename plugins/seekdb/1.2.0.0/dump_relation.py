@@ -40,7 +40,7 @@ def dump_relation(plugin_context, *args, **kwargs):
     if not primary_deploy:
         stdio.warn('Primary cluster {} not found while dumping relation.'.format(primary_name))
         return plugin_context.return_true()
-    
+
     if not standby_deploy:
         stdio.warn('Standby cluster {} not found while dumping relation.'.format(standby_name))
         return plugin_context.return_true()
@@ -50,19 +50,19 @@ def dump_relation(plugin_context, *args, **kwargs):
     repository = kwargs.get('repository')
     primary_cluster_config = primary_deploy.deploy_config.components.get(repository.name)
     primary_relation_list = primary_cluster_config.get_component_attr('_cluster_standby_relation') or []
-    
+
     # Add standby if not present (Primary config stores Standby names)
     if standby_name not in primary_relation_list:
         primary_relation_list.append(standby_name)
     else:
         return plugin_context.return_true()
-    
+
     # Update primary config
     primary_cluster_config.update_component_attr('_cluster_standby_relation', primary_relation_list, save=True)
 
     # 2. Update Standby Cluster Config
     # Standby config stores Primary names (usually just one, but list for consistency/future)
-    
+
     standby_cluster_config.update_component_attr('_cluster_primary', primary_name, save=False)
 
     stdio.verbose('Successfully dumped standby relation.')

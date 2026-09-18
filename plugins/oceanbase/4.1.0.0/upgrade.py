@@ -162,7 +162,8 @@ class Upgrader(object):
         self.apply_param_plugin(self.repositories[self.route_index - 1])
         while self.route_index < total:
             start_workflows = self.get_workflows('upgrade_start', [self.repositories[self.route_index - 1]])
-            self.run_workflow(start_workflows, self.repositories[self.route_index], self.cluster_config, **{self.repositories[self.route_index].name: {"local_home_path": None, "repository_dir": None}})
+            if not self.run_workflow(start_workflows, self.repositories[self.route_index], self.cluster_config, **{self.repositories[self.route_index].name: {"local_home_path": None, "repository_dir": None}}):
+                return False
             self.close()
             if not self.connect():
                 return False
@@ -527,4 +528,3 @@ def upgrade(plugin_context, search_py_script_plugin, apply_param_plugin, install
         if upgrader.route_index >= len(upgrader.route):
             upgrader.call_plugin(upgrader.display_plugin, upgrader.cursor, *args, **kwargs)
         plugin_context.return_true()
-

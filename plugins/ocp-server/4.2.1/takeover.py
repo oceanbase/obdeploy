@@ -33,6 +33,11 @@ from _errno import EC_OBSERVER_CAN_NOT_MIGRATE_IN
 def takeover(plugin_context, cursors=None, *args, **kwargs):
     try:
         # init variables, include get obcluster info from deploy config
+        precheck_result = plugin_context.get_return('takeover_precheck')
+        if precheck_result and precheck_result.get_return('already_taken_over'):
+            plugin_context.stdio.print(
+                "The OceanBase cluster is already managed by OCP; duplicate takeover is skipped.")
+            return plugin_context.return_true(already_taken_over=True)
         cluster_config = plugin_context.cluster_config
         clients = plugin_context.clients
         options = plugin_context.options
@@ -89,13 +94,14 @@ def takeover(plugin_context, cursors=None, *args, **kwargs):
                                                                 "passphrase": pass_phrase}}
             credential_id = cursor.create_credential(create_credential_data, stdio=stdio)['data']['id']
         server = cluster_config.servers[0]
-        mysql_port = cluster_config.get_global_conf().get("mysql_port")
-        root_password = cluster_config.get_global_conf().get("root_password")
+        server_config = cluster_config.get_server_conf_with_default(server) or {}
+        mysql_port = server_config.get("mysql_port")
+        root_password = server_config.get("root_password")
         takeover_data = {"switchConfigUrl": True, "connectionMode": "direct", "rootSysPassword": root_password,
                          "address": server.ip, "port": mysql_port,
                          "hostInfo": {"kind": "DEDICATED_PHYSICAL_MACHINE", "hostTypeId": host_type_id, "sshPort": ssh_config.port,
                                       "credentialId": credential_id}}
-        proxyro_password = cluster_config.get_global_conf().get("proxyro_password")
+        proxyro_password = server_config.get("proxyro_password")
         if proxyro_password is not None and proxyro_password != "":
             takeover_data.update({"proxyroPassword": proxyro_password})
         takeover_result = cursor.take_over(takeover_data, stdio=stdio)

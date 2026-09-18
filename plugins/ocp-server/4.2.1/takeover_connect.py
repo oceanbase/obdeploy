@@ -24,6 +24,31 @@ import time
 import _errno as err
 
 
+def _mask_sensitive_data(value):
+    if isinstance(value, dict):
+        masked = {}
+        for key, item in value.items():
+            normalized_key = str(key).lower()
+            if normalized_key == 'passphrase' or normalized_key.endswith('password'):
+                masked[key] = '******'
+            else:
+                masked[key] = _mask_sensitive_data(item)
+        return masked
+    if isinstance(value, list):
+        return [_mask_sensitive_data(item) for item in value]
+    return value
+
+
+def _is_cluster_already_taken_over(content):
+    if not isinstance(content, dict):
+        return False
+    error = content.get('error')
+    if not isinstance(error, dict) or error.get('code') != 'OBE13034':
+        return False
+    message = error.get('message')
+    return isinstance(message, str) and 'to be taken over already exists' in message
+
+
 class OcpCursor(object):
 
     class Response(object):
@@ -85,6 +110,8 @@ class OcpCursor(object):
         resp = self._request('POST', '/api/v2/ob/clusters/takeOverPreCheck', data=data, stdio=stdio)
         if resp.code == 200:
             return resp.content
+        if _is_cluster_already_taken_over(resp.content):
+            return {'already_taken_over': True}
 
     def get_host_types(self, stdio=None):
         resp = self._request('GET', '/api/v2/compute/hostTypes', stdio=stdio)
@@ -135,16 +162,16 @@ class OcpCursor(object):
         url = self.url_prefix + api
         headers = {'Content-Type': 'application/json'} if not files else {}
         try:
-            if data is not None:
-                data = json.dumps(data)
-            stdio.verbose('send http request method: {}, url: {}, data: {}, files: {}'.format(method, url, data, files))
-            resp = requests.request(method, url, data=data, files=files, verify=False, headers=headers, auth=self.auth)
+            request_data = json.dumps(data) if data is not None else None
+            log_data = json.dumps(_mask_sensitive_data(data)) if data is not None else None
+            stdio.verbose('send http request method: {}, url: {}, data: {}, files: {}'.format(method, url, log_data, files))
+            resp = requests.request(method, url, data=request_data, files=files, verify=False, headers=headers, auth=self.auth)
             return_code = resp.status_code
             content = resp.content
         except Exception as e:
             if retry:
                 retry -= 1
-                return self._request(method=method, api=api, data=data, retry=retry, stdio=stdio)
+                return self._request(method=method, api=api, data=data, files=files, retry=retry, stdio=stdio)
             stdio.exception("")
             return_code = 500
             content = str(e)
@@ -195,5 +222,3 @@ def takeover_connect(plugin_context, target_server=None, *args, **kwargs):
 
     stdio.stop_loading('succeed')
     return return_true(connect=cursors, cursor=cursors)
-
-

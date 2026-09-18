@@ -41,6 +41,15 @@ def delete_relation_clusters(plugin_context, cursors={}, cluster_configs={}, *ar
         stdio.verbose("Removing primary cluster relation: {}.".format(primary_deploy_name))
         primary_cluster_config = cluster_configs.get(primary_deploy_name)
         if option_type in ['failover', 'decouple']:
+            if not primary_cluster_config:
+                stdio.error(
+                    "Primary cluster %s not found; cannot verify "
+                    "log_restore_source before decoupling/failover."
+                    % primary_deploy_name
+                )
+                stdio.stop_loading('fail')
+                return plugin_context.return_false()
+
             standby_cursor = cursors.get(standby_deploy_name)
             sql = 'select log_restore_source from oceanbase.__all_virtual_server_stat'
             res = standby_cursor.fetchone(sql, stdio=stdio)
@@ -49,15 +58,20 @@ def delete_relation_clusters(plugin_context, cursors={}, cluster_configs={}, *ar
                 stdio.stop_loading('fail')
                 return plugin_context.return_false()
 
-            service_str = ""
-            if primary_cluster_config:
-                primary_server = primary_cluster_config.servers[0]
-                primary_server_conf = primary_cluster_config.get_server_conf_with_default(primary_server)
-                service_str = "%s:%s" % (primary_server.ip, primary_server_conf.get('rpc_port'))
-            if res['log_restore_source'] != service_str:
+            primary_server = primary_cluster_config.servers[0]
+            primary_server_conf = primary_cluster_config.get_server_conf_with_default(primary_server)
+            expected_restore_source = "%s:%s" % (
+                primary_server.ip, primary_server_conf.get('rpc_port'))
+
+            # SeekDB retains the former primary address after ACTIVATE
+            # STANDBY. Only detach the OBD topology when that relationship can
+            # still be verified.
+            log_restore_source = res.get('log_restore_source')
+            if log_restore_source != expected_restore_source:
                 stdio.error(
-                    "ip and rpc_port mismatch when decoupling/failover: expected %s, got %s."
-                    % (res.get('log_restore_source'))
+                    "log_restore_source mismatch when decoupling/failover: "
+                    "expected %r, got %r."
+                    % (expected_restore_source, log_restore_source)
                 )
                 stdio.stop_loading('fail')
                 return plugin_context.return_false()

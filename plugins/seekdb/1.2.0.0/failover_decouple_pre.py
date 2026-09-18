@@ -34,7 +34,8 @@ def failover_decouple_pre(plugin_context, cursors={}, cluster_configs={}, *args,
         return plugin_context.return_false()
 
     if res['role'] != 'STANDBY':
-        stdio.error("Current cluster {} is not a STANDBY cluster (Role: {}). Cannot perform failover.".format(standby_deploy_name, res['role']))
+        stdio.error("Current cluster {} is not a STANDBY cluster (Role: {}). Cannot perform {}.".format(
+            standby_deploy_name, res['role'], option_type))
         stdio.stop_loading('fail')
         return plugin_context.return_false()
     

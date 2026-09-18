@@ -54,14 +54,24 @@ def seekdb_install_check_rpc(plugin_context, deploy_manager=None, *args, **kwarg
     stdio.stop_loading('succeed')
     try:
         row = cursor.fetchone("SHOW parameters LIKE 'enable_rpc_service'")
-        rpc_enabled = str(row['value']).lower() == 'true'
+        if not row:
+            version = (deploy.deploy_info.components.get('seekdb') or {}).get('version', 'unknown')
+            stdio.error(
+                'Primary SeekDB %s does not expose enable_rpc_service; standby installation is not supported.'
+                % version)
+            cursor.close()
+            return plugin_context.return_false()
+        value = row.get('value', row.get('VALUE')) if isinstance(row, dict) else row[1]
+        rpc_enabled = str(value).lower() == 'true'
         cursor.execute('use oceanbase;')
-        rpc_port = cursor.fetchone("select rpc_port from __all_virtual_server_stat;")['rpc_port']
+        rpc_port_row = cursor.fetchone("select rpc_port from __all_virtual_server_stat;")
+        rpc_port = rpc_port_row.get('rpc_port', rpc_port_row.get('RPC_PORT')) if isinstance(rpc_port_row, dict) else rpc_port_row[0]
         if rpc_port:
             primary_rpc_info["rpc_port"] = int(rpc_port)
     except Exception as e:
-        stdio.error('Failed to fetch rpc port: %s' % e)
-        rpc_enabled = False
+        stdio.error('Failed to query standby prerequisites from the primary: %s' % e)
+        cursor.close()
+        return plugin_context.return_false()
     plugin_context.set_variable('primary_rpc_enabled', rpc_enabled)
     plugin_context.set_variable('primary_deploy_name', deploy_name)
     if not rpc_enabled:
